@@ -98,7 +98,10 @@
   - `GrafanaModal.jsx` 내부에 실제 가동 중인 Grafana 대시보드 URL을 iFrame(`&kiosk`)으로 직접 임베딩.
 - **현재 구현 상태**:
   - React 순수 디자인 시스템으로 제작된 3종 전문 관제 패널(L7 트래픽, vLLM/GPU DCGM, FinOps) 시뮬레이션 뷰와 외부 새창 연결 버튼으로 구현됨.
-- **영향도**: 낮음 (에어갭 환경에서 Grafana 컨테이너 미구동 상태에서도 운영자가 관제 화면 형태를 완벽히 모니터링 가능).
+- **영향도**: 낮음 (에어갭 폐쇄망에서 Grafana 별도 컨테이너 미구동 상태에서도 운영자가 관제 화면 형태를 완벽히 모니터링 가능).
+- **현행화 완료**: 마스터 설계서(`dashboard_engineering_plan.md`) [ADR-04]로 공식 현행화 반영 완료.
+
+> **💡 설계서 현행화 완료 안내**: 위 4대 아키텍처 대체 구현(REST RDS v3, Multi-Compute Pool, 직접 사용량 보고, 내장 Grafana 패널)은 마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)의 시스템 다이어그램과 Phase 2 및 Phase 3 상세 명세에 ADR(아키텍처 결정 기록: ADR-01 ~ ADR-04)로 전면 현행화 반영되었습니다.
 
 ### 3.7 [미구현 - Phase 3] 예산 임계치 도달 시 외부 웹훅(Webhook) 실시간 알림기
 - **설계서 명세**:

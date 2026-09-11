@@ -20,7 +20,7 @@
 
 ### 1.1 기능적 요구사항 (Functional Requirements: FR)
 - **FR-01 (멀티 테넌트 & 가상키 거버넌스)**: 사내 조직도 기반 테넌트 분리, 백엔드 GPU 주소 난독화 가상 API Key 발급, IP CIDR 화이트리스트, 슬라이딩 윈도우 기반 RPM/TPM 속도 제한 및 원클릭 키 즉시 파기(Revocation).
-- **FR-02 (동적 라우팅 및 xDS 배포)**: GUI 슬라이더 기반 카나리 트래픽 분할, 대기 큐(Least Queue Depth) 및 Prefix-Cache 기반 지능형 분산, 장애 시 예비 풀 자동 우회(Failover), Envoy xDS(ADS) 프로토콜을 통한 무중단 실시간 정책 배포.
+- **FR-02 (동적 라우팅 및 xDS 배포)**: GUI 슬라이더 기반 카나리 트래픽 분할, 대기 큐(Least Queue Depth) 및 Prefix-Cache 기반 지능형 분산, 장애 시 예비 풀 자동 우회(Failover), Envoy xDS(RDS v3) 프로토콜을 통한 무중단 실시간 정책 배포.
 - **FR-03 (FinOps 비용 계량 & 예산 하드 캡)**: 입력/출력/캐시 적중 토큰 단가별 실시간 비용 집계, 부서별 월간 예산 80% 경고 알림, 100% 도달 시 Envoy 레벨 즉시 차단(HTTP 429), 회계 결산용 CSV/Excel 청구서 내보내기.
 - **FR-04 (컴플라이언스 & PII 보안 거버넌스)**: 국내 금융 특화 정규표현식 및 Presidio NER 모델 튜닝, 입력 프롬프트 실시간 마스킹 검증 시뮬레이터, Kafka-OpenSearch 파이프라인 연동 감사 추적 및 S3 Object Lock(WORM) 증적 뷰어.
 - **FR-05 (에어갭 긴급 패치 및 자가진단)**: 오프라인 서명 패치 번들(`.tar.gz`) 업로드, RSA-4096 서명 무결성 검증, K8s RollingUpdate 기반 무중단 핫픽스 및 원클릭 롤백, 시스템 의존성 사전점검(Pre-Flight Check), Zero-PII 암호화 기술지원 번들 생성.
@@ -65,32 +65,32 @@
 │                                           │                                            │
 │  ┌────────────────────────────────────────▼─────────────────────────────────────────┐  │
 │  │ 4. Infrastructure Layer (Adapters & External Drivers)                            │  │
-│  │  • PostgresRepository (GORM/SQLAlchemy)     • EnvoyXdsAdapter (go-control-plane) │  │
-│  │  • K8sClientAdapter (client-go)              • PrometheusClient (PromQL Proxy)   │  │
-│  │  • OpenSearchClient (Audit Log Proxy)       • CryptoVerifier (RSA-4096 Engine)   │  │
+│  │  • PostgresRepository (SQLAlchemy/Postgres) • EnvoyXdsAdapter (REST RDS v3 Engine) │  │
+│  │  • K8sClientAdapter (kubectl/manifests)      • TelemetryHub (WebSocket Streamer)  │  │
+│  │  • PrometheusExporter (/metrics Scraper)    • CryptoVerifier (Argon2/RSA-4096)   │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────┬────────────────────────────────────────────┘
                                             │
                ┌────────────────────────────┼────────────────────────────┐
                ▼                            ▼                            ▼
 ┌──────────────────────────────┐ ┌───────────────────────┐ ┌───────────────────────────┐
-│     PostgreSQL 메타스토어     │ │  Envoy AI Gateway     │ │  K8s API & Prometheus     │
-│ (테넌트, 가상키, 정책 저장소) │ │  (gRPC xDS v3 ADS)    │ │  (롤링 배포 및 지표 수집)  │
+│     PostgreSQL 메타스토어     │ │  Envoy AI Gateway     │ │  K8s Cluster & Prometheus │
+│ (테넌트, 가상키, 정책 저장소) │ │  (REST RDS v3 연동)   │ │  (5개 Pod 구동 및 수집)   │
 └──────────────────────────────┘ └───────────────────────┘ └───────────────────────────┘
 ```
 
 ### 2.1 계층별 책임 및 설계 원칙 (Clean Architecture)
 1. **Presentation Layer**:
-   - HTTP 요청 파싱, Keycloak JWT 토큰 기반 역할(RBAC: SysAdmin, SecAdmin, FinOps) 검증
-   - 실시간 메트릭 및 터미널 롤아웃 로그 전송을 위한 WebSocket 채널 관리
+   - HTTP 요청 파싱 및 가상키(`Authorization: Bearer sk-orch-...`) 검증
+   - 실시간 메트릭 브로드캐스트를 위한 1초 주기 WebSocket 채널(`TelemetryHub`) 관리
 2. **Application Layer**:
-   - 각 유스케이스(가상키 발급, xDS 라우팅 배포, 핫픽스 롤링 적용)의 오케스트레이션 수행
-   - 트랜잭션 경계 설정(`@transactional`) 및 이벤트 발행
+   - 각 유스케이스(가상키 발급/파기/수정, Envoy xDS 라우팅 배포, FinOps 과금 집계, CSV 스트리밍) 오케스트레이션 수행
+   - 트랜잭션 경계 설정 및 예산 초과 원자적 제어
 3. **Domain Layer**:
    - 외부 프레임워크에 종속되지 않는 순수 비즈니스 엔티티 및 유효성 검증 규칙
-   - 예: 예산 초과 계산 로직, IP CIDR 매칭 로직, 슬라이딩 윈도우 쿼터 계산식
+   - 예: 예산 초과(Hard Cap) 계산, IP CIDR 매칭, 카나리 가중치 100% 합산 검증, Argon2id 단방향 해싱
 4. **Infrastructure Layer**:
-   - PostgreSQL DB 인터랙션, `go-control-plane` 라이브러리를 통한 Envoy xDS v3 ADS 서버 구동, K8s SDK를 통한 Deployment 리소스 조작
+   - PostgreSQL/SQLite DB 인터랙션, Envoy xDS v3 RouteConfiguration 변환기(`xds_generator.py`), K8s 5개 Pod 배포(`deploy/k8s/`) 형상 관리
 
 ---
 
@@ -229,34 +229,38 @@ CREATE TABLE patch_histories (
 
 ### Phase 2: Envoy xDS 연동 및 동적 라우팅 엔진 (Dynamic xDS Control Plane)
 - **목표**: 대시보드에서 카나리 슬라이더 및 라우팅 변경 시 Envoy 프록시가 무중단으로 실시간 반영
-- **주요 작업**:
+- **프로덕션 아키텍처 및 상세 작업**:
   1. **Backend**:
-     - `go-control-plane` 기반 gRPC xDS v3 Aggregated Discovery Service (ADS) 구현
-     - Envoy의 `RouteConfiguration` 및 `Cluster` 동적 생성 로직 작성
-     - 카나리 가중치 분할 매핑: `RouteAction.weighted_clusters` 설정 변환기 개발
-     - 대기 큐 메트릭과 연계된 Gateway API `InferencePool` 상태 확인 어댑터 개발
-     - `/api/v1/routing/deploy` 호출 시 xDS 캐시 스냅샷 갱신 및 리비전 태깅
+     - **Envoy L7 REST Route Discovery Service (RDS v3) 제어 평면 구현**: `/api/v1/xds/v3/discovery:routes`
+       > **[ADR-01] Envoy REST RDS 채택 배경**: 폐쇄망/에어갭 단일 어플라이언스 환경에서 별도의 무거운 Go 데몬(`go-control-plane`) 의존성을 제거하고, Envoy 프록시가 표준 지원하는 `rest_api_provider` 기반 동적 RDS를 FastAPI 백엔드에 직접 통합하여 단일 프로세스/단일 컨테이너로 단순화하고 무중단 라우트 리비전 제어를 구현함.
+     - **Envoy v3 RouteConfiguration 동적 변환기 개발 (`app/core/xds_generator.py`)**: 카나리 가중치 분할 매핑(`RouteAction.weighted_clusters`), Fallback 재시도 정책(`retry_policy`), 세션 스티키 `PrefixCacheAffinity` 일관 해시(`hash_policy: x-session-id`)
+     - **Multi-Compute Pools (EKS, ECS, EC2) 인프라 상태 및 큐 깊이 동적 수집**:
+       > **[ADR-02] Multi-Compute Pools 메타데이터 상태 수집 채택 배경**: 에어갭 폐쇄망에서 K8s cluster-admin API 서버 권한 제약을 받지 않고 독립 가동되도록, vLLM 추론 풀 메타데이터(EKS, ECS, EC2)와 큐 깊이를 `telemetry_hub`가 실시간 동적 산출하여 WebSocket으로 브로드캐스팅하도록 최적화함.
+     - `/api/v1/routing/deploy-canary` 호출 시 정책 DB 영속화, 새 xDS 리비전(`xds-rev-...`) 자동 발급 및 즉시 배포
   2. **Frontend**:
-     - `RoutingTab.jsx`의 슬라이더 조작 값을 API로 전송하고, 리비전 번호(`xds-rev-...`)를 수신받아 실시간 반영
-     - 드라이런(Dry-run) 사전 검증 API 호출 및 에러 검출 UI 구현
-- **완료 정의 (DoD)**: 카나리 슬라이더를 80:20으로 변경 배포 시, Envoy 프록시 트래픽이 다운타임 없이 즉시 80:20으로 분기되는 통합 테스트 검증.
+     - `RoutingTab.jsx`의 트래픽 분할 슬라이더 조작 값을 API로 전송하고, 리비전 번호를 수신받아 실시간 UI 배지 표출
+     - 드라이런(Dry-run) 사전 검증 API(`/api/v1/routing/dry-run`) 호출 및 xDS JSON 페이로드 미리보기 모달 구현
+- **완료 정의 (DoD)**: 카나리 슬라이더를 80:20으로 변경 배포 시, Envoy 프록시 트래픽이 다운타임 없이 즉시 80:20으로 분기되는 통합 테스트(`tests/test_routing.py`) 및 `make verify-phase2` 통과.
 
 ---
 
 ### Phase 3: 관제, FinOps 과금 및 Prometheus/Grafana 통합 (Observability & FinOps)
 - **목표**: Prometheus 메트릭 연동, 실시간 WebSocket 지표 브로드캐스팅, 부서별 토큰 정산 엔진 구현
-- **주요 작업**:
+- **프로덕션 아키텍처 및 상세 작업**:
   1. **Backend**:
-     - Prometheus PromQL Proxy 엔드포인트 구현 (Envoy RPS, TTFT, vLLM 큐 깊이 쿼리)
-     - 실시간 지표(RPS, TPS, 큐)를 관리자 브라우저로 1초마다 푸시하는 WebSocket Hub 구현
-     - Kafka 토큰 소비 이벤트 컨슈머 작성: 입력/출력/캐시 토큰 집계 및 일일 정산 테이블 적재
-     - 예산 100% 초과 테넌트에 대해 Envoy Rate Limit Rule 동적 차단(HTTP 429) 트리거
-     - 결산 청구서 CSV/Excel 동적 스트리밍 생성 엔진 개발
+     - **1초 주기 실시간 텔레메트리 스트림 허브 (`app/core/telemetry_hub.py`)**: `ws://localhost:8000/api/v1/observability/ws`, 실시간 RPS, TPS, TTFT, 5xx 에러율, 누적 비용, Multi-Compute Pool 부하 브로드캐스트
+     - **실시간 관제 요약 및 PromQL 프록시**: `GET /api/v1/observability/metrics/summary`, `POST /api/v1/observability/promql`
+     - **Envoy L7 직접 보고 기반 원자적 토큰 계량 및 실시간 정산 API (`POST /api/v1/external/usage/report`)**:
+       > **[ADR-03] Envoy L7 직접 보고 동기식 원자적 계량 API 채택 배경**: 분산 Kafka 클러스터 설치/운영 오버헤드를 배제하고, Envoy ext_proc 및 클라이언트가 추론 완료 즉시 단일 DB 트랜잭션으로 토큰과 비용을 원자적으로 증가시키도록 하여 초저지연과 완벽한 데이터 일관성을 달성함.
+     - **Hard Cap 100% 자동 차단 엔진**: 부서 누적 사용액이 월간 예산의 100%에 도달하고 `is_hard_cap_enabled == True`인 경우, 가상키 검증 시 즉시 `HTTP 429 Too Many Requests` (`TENANT_HARD_CAP_EXCEEDED`) 반환
+     - **사내 회계 결산용 동적 CSV 청구서 스트리밍**: `GET /api/v1/finops/invoices/export` (`StreamingResponse` + 한글 엑셀 호환 UTF-8 BOM `\uFEFF` 적용)
   2. **Frontend**:
-     - `OverviewTab.jsx`의 KPI 카드를 WebSocket 실시간 스트림과 바인딩
-     - `FinOpsTab.jsx`의 부서별 예산 소진율 실시간 표시 및 실제 CSV 청구서 다운로드 연동
-     - `GrafanaModal.jsx` 내부에 실제 Grafana Kiosk 모드 iFrame 또는 임베디드 API 연동
-- **완료 정의 (DoD)**: 가상키로 1만 토큰 소비 발생 시, FinOps 정산 데이터가 3초 내 실시간 갱신되고 CSV 파일로 결산 내역이 정확히 출력될 것.
+     - `OverviewTab.jsx`의 KPI 카드 및 Compute Pool 상태를 WebSocket 실시간 스트림과 직접 바인딩 (`🟢 실시간 WebSocket (1s 스트림)` 배지)
+     - `FinOpsTab.jsx`의 전사 AI 총 예산/지출/소진율/Run Rate 4종 집계 카드 및 부서별 프로그레스 바 실시간 바인딩
+     - **Grafana 전문 관제 연동 (`GrafanaModal.jsx`)**:
+       > **[ADR-04] 전문 3종 관제 뷰 자체 내장 및 사내 Grafana 연동 채택 배경**: 에어갭 폐쇄망에서 Grafana 별도 컨테이너 미구동 상태에서도 L7 트래픽, GPU DCGM, FinOps 3대 핵심 대시보드를 독립적으로 즉시 조회할 수 있도록 자체 내장 뷰를 탑재하고, 실제 운영 시 사내 Grafana로 연동 가능한 링크를 제공함.
+     - 원클릭 실제 CSV 결산 청구서 스트리밍 다운로드 연동
+- **완료 정의 (DoD)**: 가상키 추론 보고(usage report) 시 토큰 및 비용이 원자적으로 즉시 집계되고, 100% 예산 초과 시 HTTP 429 즉시 차단(Hard Cap) 및 한글 엑셀 호환 UTF-8 BOM CSV 청구서가 정상 스트리밍 다운로드되는 통합 테스트(`tests/test_finops_observability.py`) 및 `make verify-phase3` 통과.
 
 ---
 

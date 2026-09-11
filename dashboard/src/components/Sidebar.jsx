@@ -13,7 +13,7 @@ import {
 export default function Sidebar({ activeTab, setActiveTab, unreadPatchCount = 1 }) {
   const navItems = [
     { id: 'overview', label: '글로벌 관제 홈', icon: LayoutDashboard },
-    { id: 'routing', label: '모델 & 라우팅 스튜디오', icon: GitFork, badge: 'xDS' },
+    { id: 'routing', label: '모델 & 라우팅 스튜디오', icon: GitFork, badge: 'Envoy L7' },
     { id: 'virtual-keys', label: '가상 API Key 거버넌스', icon: KeyRound },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
     { id: 'compliance', label: 'PII 보안 & 감사 포렌식', icon: ShieldAlert },

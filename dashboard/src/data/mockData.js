@@ -267,7 +267,7 @@ export const componentVersions = [
   { name: 'Envoy AI Gateway', version: 'v1.31.2', status: '최신 버전', type: 'Ingress L7 Proxy' },
   { name: 'Compliance Engine (ext_proc)', version: 'v1.2.0', status: '핫픽스 권고 대기', type: 'PII & Security' },
   { name: 'Microsoft Presidio Engine', version: 'v2.2.354', status: '정상', type: 'Korean NER PII' },
-  { name: 'Orchestrator Control Plane', version: 'v1.2.0', status: '정상', type: 'xDS & Management API' },
+  { name: 'Orchestrator Control Plane', version: 'v1.2.0', status: '정상', type: 'Envoy RDS & Management API' },
   { name: 'Keycloak SSO Server', version: '24.0.5', status: '정상', type: 'OIDC Identity' },
   { name: 'Prometheus & Grafana', version: 'v2.53 / v10.4', status: '정상', type: 'Observability' }
 ];

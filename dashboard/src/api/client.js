@@ -208,7 +208,7 @@ export const apiClient = {
     });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || 'xDS 라우팅 배포 실패');
+      throw new Error(err.detail || 'Envoy L7 라우팅 배포 실패');
     }
     return await res.json();
   },

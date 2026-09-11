@@ -284,7 +284,7 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
             {/* Terminal Live Rollout Logs */}
             <div className="terminal-window">
               <div style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '4px' }}>
-                LIVE DEPLOYMENT STREAM (Kubernetes Client & xDS Controller)
+                LIVE DEPLOYMENT STREAM (Kubernetes Client & Envoy RDS Controller)
               </div>
               {patchLogs.map((log, idx) => (
                 <div key={idx} className="terminal-line success">

@@ -109,14 +109,14 @@ export default function RoutingTab({ onNotify }) {
       localStorage.setItem('aiorche_canary_weight', String(canaryWeight));
       localStorage.setItem('aiorche_routing_strategy', strategy);
       localStorage.setItem('aiorche_fallback_model', fallbackModel);
-      onNotify('SUCCESS', res.message || `Envoy AI Gateway에 xDS 라우팅 정책이 무중단 실시간 배포되었습니다. (리비전: ${newRev})`);
+      onNotify('SUCCESS', res.message || `Envoy L7 게이트웨이에 라우팅 정책(RDS v3)이 무중단 실시간 배포되었습니다. (리비전: ${newRev})`);
     } catch (err) {
       // Fallback offline mock deployment
       const fallbackRev = `xds-rev-${Date.now().toString().slice(-8)}`;
       setXdsRevision(fallbackRev);
       localStorage.setItem('aiorche_xds_revision', fallbackRev);
       localStorage.setItem('aiorche_canary_weight', String(canaryWeight));
-      onNotify('SUCCESS', `Envoy AI Gateway에 xDS 라우팅 정책이 무중단 실시간 배포되었습니다. (리비전: ${fallbackRev})`);
+      onNotify('SUCCESS', `Envoy L7 게이트웨이에 라우팅 정책(RDS v3)이 무중단 실시간 배포되었습니다. (리비전: ${fallbackRev})`);
     } finally {
       setIsDeploying(false);
     }
@@ -134,12 +134,12 @@ export default function RoutingTab({ onNotify }) {
       };
       const res = await apiClient.dryRunRouting(payload);
       if (res.is_valid) {
-        onNotify('SUCCESS', `드라이런 검증 통과: Envoy xDS 구문 및 InferencePool 엔드포인트 100% 정상 (예상 지연시간: ${res.estimated_latency_ms}ms, 활성 엔드포인트: ${res.active_endpoints_count}개).`);
+        onNotify('SUCCESS', `드라이런 검증 통과: Envoy RDS v3 RouteConfig 및 모델 서빙 엔드포인트 100% 정상 (예상 지연시간: ${res.estimated_latency_ms}ms, 활성 엔드포인트: ${res.active_endpoints_count}개).`);
       } else {
         onNotify('ERROR', `드라이런 검증 실패: ${res.validation_errors.join(', ')}`);
       }
     } catch (err) {
-      onNotify('INFO', '드라이런 검증 완료: Envoy xDS 구문 및 InferencePool 엔드포인트 연결성 100% 정상 (오프라인 모의).');
+      onNotify('INFO', '드라이런 검증 완료: Envoy RDS v3 RouteConfig 및 모델 서빙 엔드포인트 연결성 100% 정상 (오프라인 모의).');
     }
   };
 
@@ -172,7 +172,7 @@ export default function RoutingTab({ onNotify }) {
       setModels(updated);
       localStorage.setItem('aiorche_models', JSON.stringify(updated));
       setShowNewModelModal(false);
-      onNotify('SUCCESS', `신규 모델 '${res.alias}'이(가) 등록되어 Envoy xDS 라우팅 풀에 추가되었습니다.`);
+      onNotify('SUCCESS', `신규 서빙 모델 '${res.alias}'이(가) 등록되어 Envoy L7 라우팅 대상 풀에 추가되었습니다.`);
     } catch (err) {
       // Offline fallback
       const fallbackEntry = {
@@ -198,13 +198,36 @@ export default function RoutingTab({ onNotify }) {
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-wrap">
-          <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
-          <p>Envoy AI Gateway의 xDS 프로토콜을 통해 재시작 없는 무중단 카나리 트래픽 분할 및 장애 우회 정책 제어</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy L7 REST RDS v3</span>
+          </div>
+          <p>L7 게이트웨이(Envoy)에서 가중치 분할을 실시간 제어하며, 백엔드 AI 모델(vLLM)은 재시작 없이 순수 추론에만 전념합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
             + 신규 서빙 모델 등록
           </button>
+        </div>
+      </div>
+
+      {/* Architecture Notice Banner (ADR-01 & ADR-02) */}
+      <div style={{ 
+        background: 'rgba(56, 189, 248, 0.08)', 
+        border: '1px solid rgba(56, 189, 248, 0.25)', 
+        borderRadius: 'var(--radius-md)', 
+        padding: '12px 16px', 
+        marginBottom: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '0.82rem',
+        color: '#bae6fd'
+      }}>
+        <span style={{ fontSize: '1.1rem' }}>💡</span>
+        <div>
+          <strong>아키텍처 가이드 (ADR-01 / ADR-02)</strong>: 백엔드 서빙 모델(vLLM) 자체는 xDS를 사용하지 않는 순수 HTTP 추론 엔진이며, 
+          카나리 트래픽 분할(80:20) 및 장애 우회는 <strong>Envoy L7 게이트웨이가 제어 평면의 REST RDS v3 API</strong>를 실시간 구독하여 수행합니다.
         </div>
       </div>
 
@@ -216,7 +239,7 @@ export default function RoutingTab({ onNotify }) {
             <span>가상 모델 라우팅 정책 빌더 (Route: "financial-advisor-v1")</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>현재 xDS 배포 리비전:</span>
+            <span style={{ color: 'var(--text-muted)' }}>현재 Envoy 라우팅 리비전 (RDS v3):</span>
             <span style={{ fontFamily: 'var(--font-mono)', color: '#34d399', fontWeight: 600 }}>{xdsRevision}</span>
           </div>
         </div>
@@ -348,12 +371,12 @@ export default function RoutingTab({ onNotify }) {
             {isDeploying ? (
               <>
                 <RefreshCw size={16} className="status-dot" style={{ animation: 'spin 1s linear infinite' }} />
-                <span>Envoy xDS 정책 배포 중...</span>
+                <span>Envoy L7 라우팅 정책 배포 중...</span>
               </>
             ) : (
               <>
                 <GitFork size={16} />
-                <span>🚀 Envoy xDS 실시간 무중단 배포</span>
+                <span>🚀 Envoy L7 라우팅 정책 무중단 배포 (RDS v3)</span>
               </>
             )}
           </button>
@@ -367,7 +390,7 @@ export default function RoutingTab({ onNotify }) {
             <Cpu size={18} color="#06b6d4" />
             <span>등록된 백엔드 vLLM 서빙 모델 풀 ({models.length}개)</span>
           </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>K8s InferencePool CRD 자동 바인딩</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Multi-Compute 서빙 풀 (EKS/ECS/EC2) 엔드포인트 연동 [ADR-02]</span>
         </div>
 
         <div className="table-container">

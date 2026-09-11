@@ -1,0 +1,265 @@
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.tenant import Tenant
+from app.models.virtual_key import VirtualKey
+from app.schemas.virtual_key import (
+    VirtualKeyCreate,
+    VirtualKeyCreateResponse,
+    VirtualKeyResponse,
+    VirtualKeyRevokeRequest,
+    VirtualKeyUpdate,
+    VirtualKeyValidateRequest,
+    VirtualKeyValidateResponse,
+)
+from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key
+
+router = APIRouter(prefix="/virtual-keys", tags=["Virtual Key Lifecycle"])
+
+@router.get("", response_model=List[VirtualKeyResponse])
+def list_virtual_keys(
+    tenant_id: Optional[str] = Query(None, description="테넌트(부서) ID 필터"),
+    search: Optional[str] = Query(None, description="키 명칭 또는 Key ID 검색어"),
+    is_active: Optional[bool] = Query(None, description="활성화 여부 필터"),
+    db: Session = Depends(get_db)
+):
+    """
+    가상 API Key 목록 조회 (원문 키 제외, 보안상 마스킹된 접두사만 반환)
+    """
+    query = db.query(VirtualKey).join(Tenant, VirtualKey.tenant_id == Tenant.tenant_id, isouter=True)
+
+    if tenant_id and tenant_id != "ALL":
+        query = query.filter(VirtualKey.tenant_id == tenant_id)
+
+    if is_active is not None:
+        query = query.filter(VirtualKey.is_active == is_active)
+
+    if search:
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            (VirtualKey.name.ilike(search_fmt)) |
+            (VirtualKey.key_id.ilike(search_fmt)) |
+            (VirtualKey.key_prefix.ilike(search_fmt))
+        )
+
+    keys = query.order_by(VirtualKey.created_at.desc()).all()
+    results = []
+    for k in keys:
+        results.append(
+            VirtualKeyResponse(
+                key_id=k.key_id,
+                name=k.name,
+                tenant_id=k.tenant_id,
+                tenant_name=k.tenant.name if k.tenant else None,
+                key_prefix=k.key_prefix,
+                allowed_models=k.allowed_models or [],
+                allowed_ip_cidrs=k.allowed_ip_cidrs or [],
+                rpm_limit=k.rpm_limit,
+                tpm_limit=k.tpm_limit,
+                is_active=k.is_active,
+                revoked_reason=k.revoked_reason,
+                expires_at=k.expires_at,
+                created_at=k.created_at,
+                updated_at=k.updated_at
+            )
+        )
+    return results
+
+@router.post("", response_model=VirtualKeyCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_virtual_key(payload: VirtualKeyCreate, db: Session = Depends(get_db)):
+    """
+    신규 가상 API Key 발급
+    - 32자리 sk-orch-<hex> 보안 토큰 생성
+    - Argon2id 단방향 솔트 해시 계산 및 DB 저장
+    - **원문 토큰(raw_key)은 본 응답에서 단 1회만 제공**
+    """
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == payload.tenant_id).first()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"지정된 테넌트(부서)를 찾을 수 없습니다: {payload.tenant_id}"
+        )
+
+    raw_key = generate_virtual_key()
+    key_prefix = raw_key[:16]  # e.g., 'sk-orch-9a1b2c3d'
+    key_hash = hash_virtual_key(raw_key)
+    key_id = f"vk-{uuid.uuid4().hex[:8]}"
+
+    virtual_key = VirtualKey(
+        key_id=key_id,
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+        tenant_id=tenant.tenant_id,
+        name=payload.name,
+        allowed_models=payload.allowed_models,
+        allowed_ip_cidrs=payload.allowed_ip_cidrs,
+        rpm_limit=payload.rpm_limit,
+        tpm_limit=payload.tpm_limit,
+        is_active=True,
+        expires_at=payload.expires_at
+    )
+    db.add(virtual_key)
+    db.commit()
+    db.refresh(virtual_key)
+
+    return VirtualKeyCreateResponse(
+        key_id=virtual_key.key_id,
+        name=virtual_key.name,
+        tenant_id=virtual_key.tenant_id,
+        tenant_name=tenant.name,
+        key_prefix=virtual_key.key_prefix,
+        allowed_models=virtual_key.allowed_models or [],
+        allowed_ip_cidrs=virtual_key.allowed_ip_cidrs or [],
+        rpm_limit=virtual_key.rpm_limit,
+        tpm_limit=virtual_key.tpm_limit,
+        is_active=virtual_key.is_active,
+        revoked_reason=None,
+        expires_at=virtual_key.expires_at,
+        created_at=virtual_key.created_at,
+        updated_at=virtual_key.updated_at,
+        raw_key=raw_key
+    )
+
+@router.patch("/{key_id}/revoke", response_model=VirtualKeyResponse)
+def revoke_virtual_key(
+    key_id: str,
+    payload: VirtualKeyRevokeRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    가상 API Key 즉시 파기 / 비활성화
+    """
+    key = db.query(VirtualKey).filter(VirtualKey.key_id == key_id).first()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="가상키를 찾을 수 없습니다.")
+
+    key.is_active = False
+    key.revoked_reason = payload.revoked_reason
+    db.commit()
+    db.refresh(key)
+
+    return VirtualKeyResponse(
+        key_id=key.key_id,
+        name=key.name,
+        tenant_id=key.tenant_id,
+        tenant_name=key.tenant.name if key.tenant else None,
+        key_prefix=key.key_prefix,
+        allowed_models=key.allowed_models or [],
+        allowed_ip_cidrs=key.allowed_ip_cidrs or [],
+        rpm_limit=key.rpm_limit,
+        tpm_limit=key.tpm_limit,
+        is_active=key.is_active,
+        revoked_reason=key.revoked_reason,
+        expires_at=key.expires_at,
+        created_at=key.created_at,
+        updated_at=key.updated_at
+    )
+
+@router.patch("/{key_id}", response_model=VirtualKeyResponse)
+def update_virtual_key(
+    key_id: str,
+    payload: VirtualKeyUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    가상 API Key 설정 및 정보 변경 (명칭, 속도제한 RPM/TPM, 허용 모델, 활성 상태 등)
+    """
+    key = db.query(VirtualKey).filter(VirtualKey.key_id == key_id).first()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="가상키를 찾을 수 없습니다.")
+
+    if payload.name is not None:
+        key.name = payload.name
+    if payload.allowed_models is not None:
+        key.allowed_models = payload.allowed_models
+    if payload.allowed_ip_cidrs is not None:
+        key.allowed_ip_cidrs = payload.allowed_ip_cidrs
+    if payload.rpm_limit is not None:
+        key.rpm_limit = payload.rpm_limit
+    if payload.tpm_limit is not None:
+        key.tpm_limit = payload.tpm_limit
+    if payload.is_active is not None:
+        key.is_active = payload.is_active
+        if payload.is_active:
+            key.revoked_reason = None
+        elif payload.revoked_reason:
+            key.revoked_reason = payload.revoked_reason
+
+    db.commit()
+    db.refresh(key)
+
+    return VirtualKeyResponse(
+        key_id=key.key_id,
+        name=key.name,
+        tenant_id=key.tenant_id,
+        tenant_name=key.tenant.name if key.tenant else None,
+        key_prefix=key.key_prefix,
+        allowed_models=key.allowed_models or [],
+        allowed_ip_cidrs=key.allowed_ip_cidrs or [],
+        rpm_limit=key.rpm_limit,
+        tpm_limit=key.tpm_limit,
+        is_active=key.is_active,
+        revoked_reason=key.revoked_reason,
+        expires_at=key.expires_at,
+        created_at=key.created_at,
+        updated_at=key.updated_at
+    )
+
+@router.post("/validate", response_model=VirtualKeyValidateResponse)
+def validate_virtual_key_endpoint(
+    payload: VirtualKeyValidateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    L7 AI Gateway (Envoy ext_proc) 또는 내부 클라이언트용 가상키 유효성 검증 API
+    """
+    raw_key = payload.raw_key.strip()
+    if not raw_key.startswith("sk-orch-"):
+        return VirtualKeyValidateResponse(valid=False, reason="잘못된 가상 API Key 형식입니다.")
+
+    prefix = raw_key[:16]
+    candidates = db.query(VirtualKey).filter(VirtualKey.key_prefix == prefix).all()
+
+    matched_key = None
+    for candidate in candidates:
+        if verify_virtual_key(raw_key, candidate.key_hash):
+            matched_key = candidate
+            break
+
+    if not matched_key:
+        return VirtualKeyValidateResponse(valid=False, reason="등록되지 않았거나 일치하지 않는 가상키입니다.")
+
+    if not matched_key.is_active:
+        return VirtualKeyValidateResponse(
+            valid=False,
+            key_id=matched_key.key_id,
+            reason=f"차단/파기된 가상키입니다: {matched_key.revoked_reason or '관리자 파기'}"
+        )
+
+    if matched_key.expires_at and matched_key.expires_at < datetime.now(timezone.utc):
+        return VirtualKeyValidateResponse(
+            valid=False,
+            key_id=matched_key.key_id,
+            reason="유효기간이 만료된 가상키입니다."
+        )
+
+    if payload.model_id and matched_key.allowed_models:
+        if payload.model_id not in matched_key.allowed_models:
+            return VirtualKeyValidateResponse(
+                valid=False,
+                key_id=matched_key.key_id,
+                reason=f"요청한 모델({payload.model_id})에 대한 호출 권한이 없습니다."
+            )
+
+    return VirtualKeyValidateResponse(
+        valid=True,
+        key_id=matched_key.key_id,
+        tenant_id=matched_key.tenant_id,
+        tenant_name=matched_key.tenant.name if matched_key.tenant else None,
+        rpm_limit=matched_key.rpm_limit,
+        tpm_limit=matched_key.tpm_limit
+    )

@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 1. 메타스토어: PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiorche-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aiorche_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aiorche_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. 분산 쿼터 및 Rate Limit 캐시: Redis
+  redis:
+    image: redis:7-alpine
+    container_name: aiorche-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. L7 Ingress: Envoy AI Gateway
+  envoy:
+    image: envoyproxy/envoy:v1.31.2
+    container_name: aiorche-envoy
+    volumes:
+      - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml
+    ports:
+      - "8080:8080" # L7 Traffic Ingress
+      - "9901:9901" # Envoy Admin & Prometheus Stats
+    command: ["/usr/local/bin/envoy", "-c", "/etc/envoy/envoy.yaml"]
+
+  # 4. 컨트롤 플레인 백엔드 API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aiorche-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/aiorche_db
+      REDIS_HOST: redis
+      ENVOY_ADMIN_URL: http://envoy:9901
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 5. 어드민 포털 프론트엔드 (React 18 + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aiorche-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

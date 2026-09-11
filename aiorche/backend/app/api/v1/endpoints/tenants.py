@@ -1,5 +1,6 @@
 import uuid
 from typing import List
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -29,7 +30,7 @@ def list_tenants(db: Session = Depends(get_db)):
                 department_code=t.department_code,
                 monthly_budget_krw=t.monthly_budget_krw,
                 is_hard_cap_enabled=t.is_hard_cap_enabled,
-                spent_budget_krw=0.00,
+                spent_budget_krw=t.spent_budget_krw or Decimal("0.00"),
                 active_keys_count=active_count,
                 created_at=t.created_at,
                 updated_at=t.updated_at
@@ -97,8 +98,49 @@ def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
         department_code=tenant.department_code,
         monthly_budget_krw=tenant.monthly_budget_krw,
         is_hard_cap_enabled=tenant.is_hard_cap_enabled,
-        spent_budget_krw=0.00,
+        spent_budget_krw=tenant.spent_budget_krw or Decimal("0.00"),
         active_keys_count=active_count,
         created_at=tenant.created_at,
         updated_at=tenant.updated_at
     )
+
+@router.patch("/{tenant_id}", response_model=TenantResponse)
+def update_tenant(
+    tenant_id: str,
+    payload: TenantUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    테넌트(부서) 정보 수정 (예산, 부서명, 하드캡 여부)
+    """
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
+
+    if payload.name is not None:
+        tenant.name = payload.name
+    if payload.monthly_budget_krw is not None:
+        tenant.monthly_budget_krw = payload.monthly_budget_krw
+    if payload.is_hard_cap_enabled is not None:
+        tenant.is_hard_cap_enabled = payload.is_hard_cap_enabled
+
+    db.commit()
+    db.refresh(tenant)
+
+    active_count = db.query(VirtualKey).filter(
+        VirtualKey.tenant_id == tenant.tenant_id,
+        VirtualKey.is_active == True
+    ).count()
+
+    return TenantResponse(
+        tenant_id=tenant.tenant_id,
+        name=tenant.name,
+        department_code=tenant.department_code,
+        monthly_budget_krw=tenant.monthly_budget_krw,
+        is_hard_cap_enabled=tenant.is_hard_cap_enabled,
+        spent_budget_krw=tenant.spent_budget_krw or Decimal("0.00"),
+        active_keys_count=active_count,
+        created_at=tenant.created_at,
+        updated_at=tenant.updated_at
+    )
+

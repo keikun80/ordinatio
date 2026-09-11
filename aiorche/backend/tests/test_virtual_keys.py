@@ -39,6 +39,22 @@ def test_tenant_lifecycle():
     )
     assert dup_res.status_code == 409
 
+    # 4. Get tenant details
+    get_res = client.get("/api/v1/tenants/dept-loan-02")
+    assert get_res.status_code == 200
+    assert get_res.json()["name"] == "여신심사부"
+
+    # 5. Update tenant (PATCH)
+    patch_res = client.patch(
+        "/api/v1/tenants/dept-loan-02",
+        json={"name": "여신심사혁신부", "monthly_budget_krw": 30000000.00, "is_hard_cap_enabled": False}
+    )
+    assert patch_res.status_code == 200
+    patched = patch_res.json()
+    assert patched["name"] == "여신심사혁신부"
+    assert float(patched["monthly_budget_krw"]) == 30000000.00
+    assert patched["is_hard_cap_enabled"] is False
+
 def test_virtual_key_creation_one_time_exposure_and_argon2_hashing():
     # 1. Create a virtual key
     payload = {

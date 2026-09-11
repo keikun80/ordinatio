@@ -13,22 +13,87 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { initialKPIs, initialClusterPools } from '../data/mockData';
+import { apiClient } from '../api/client';
 
 export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
   const [kpis, setKpis] = useState(initialKPIs);
   const [clusterPools, setClusterPools] = useState(initialClusterPools);
+  const [isLiveWs, setIsLiveWs] = useState(false);
 
-  // Simulate real-time heartbeat fluctuations
   useEffect(() => {
-    const timer = setInterval(() => {
-      setKpis((prev) => ({
-        ...prev,
-        rps: Math.floor(1380 + Math.random() * 80),
-        tps: Math.floor(41800 + Math.random() * 1400),
-        ttft: Math.floor(180 + Math.random() * 12),
-      }));
-    }, 2500);
-    return () => clearInterval(timer);
+    let ws = null;
+    let fallbackTimer = null;
+
+    try {
+      const wsUrl = apiClient.getObservabilityWsUrl();
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        setIsLiveWs(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const packet = JSON.parse(event.data);
+          if (packet.rps !== undefined) {
+            setKpis((prev) => ({
+              ...prev,
+              rps: Math.round(packet.rps),
+              tps: Math.round(packet.tps),
+              ttft: Math.round(packet.ttft_ms),
+              errorRate: packet.error_rate_5xx,
+              dailyCost: Math.round(packet.cumulative_cost_krw || prev.dailyCost),
+            }));
+
+            if (packet.compute_pools && packet.compute_pools.length > 0) {
+              setClusterPools(packet.compute_pools.map((p, idx) => ({
+                id: `pool-${p.infra.toLowerCase()}-${idx}`,
+                name: p.pool_name,
+                model: p.infra === 'EKS' ? 'meta-llama/Llama-3.1-8B-Instruct' : p.infra === 'ECS' ? 'upstage/SOLAR-10.7B-Instruct' : 'Qwen/Qwen2.5-72B-Instruct',
+                workload: p.infra === 'EKS' ? '사내 AI 비서 / 챗봇' : p.infra === 'ECS' ? '배치 문서 요약' : '심층 리스크 분석',
+                pods: p.pod_count,
+                queueDepth: p.waiting_queue,
+                gpuMemoryPercent: Math.round(p.gpu_memory_pct),
+                scalingTech: p.infra === 'EKS' ? 'KEDA + HPA v2' : p.infra === 'ECS' ? 'ECS Target Tracking' : 'Static Multi-Instance'
+              })));
+            }
+          }
+        } catch (e) {
+          // ignore non-JSON or ping/pong
+        }
+      };
+
+      ws.onerror = () => {
+        setIsLiveWs(false);
+      };
+
+      ws.onclose = () => {
+        setIsLiveWs(false);
+      };
+    } catch (e) {
+      setIsLiveWs(false);
+    }
+
+    // Fallback polling if WS is disconnected
+    fallbackTimer = setInterval(async () => {
+      if (!isLiveWs) {
+        const summary = await apiClient.getMetricsSummary();
+        if (summary) {
+          setKpis((prev) => ({
+            ...prev,
+            rps: Math.round(summary.current_rps),
+            tps: Math.round(summary.current_tps),
+            ttft: Math.round(summary.p95_ttft_ms),
+            errorRate: summary.error_rate,
+          }));
+        }
+      }
+    }, 2000);
+
+    return () => {
+      if (ws) ws.close();
+      if (fallbackTimer) clearInterval(fallbackTimer);
+    };
   }, []);
 
   return (
@@ -36,7 +101,12 @@ export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-wrap">
-          <h1>글로벌 관제 대시보드</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1>글로벌 관제 대시보드</h1>
+            <span className={`badge ${isLiveWs ? 'active' : 'info'}`} style={{ fontSize: '0.75rem' }}>
+              {isLiveWs ? '🟢 실시간 WebSocket (1s 스트림)' : '🟡 지표 요약 모드'}
+            </span>
+          </div>
           <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, vLLM 추론 지연 및 비용 현황</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>

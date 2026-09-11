@@ -247,6 +247,17 @@ def validate_virtual_key_endpoint(
             reason="유효기간이 만료된 가상키입니다."
         )
 
+    # Check Tenant Hard Cap 100% budget limit
+    tenant = matched_key.tenant
+    if tenant and tenant.is_hard_cap_enabled:
+        monthly_budget = float(tenant.monthly_budget_krw)
+        spent_budget = float(tenant.spent_budget_krw)
+        if monthly_budget > 0 and spent_budget >= monthly_budget:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"TENANT_HARD_CAP_EXCEEDED: 부서({tenant.name})의 월간 AI 예산(₩{int(monthly_budget):,})이 100% 소진되어 Hard Cap 정책에 의해 신규 추론 호출이 자동 차단되었습니다."
+            )
+
     if payload.model_id and matched_key.allowed_models:
         if payload.model_id not in matched_key.allowed_models:
             return VirtualKeyValidateResponse(

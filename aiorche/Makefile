@@ -45,6 +45,9 @@ verify-phase1:
 verify-phase2:
 	@bash scripts/verify-phase2.sh
 
+verify-phase3:
+	@bash scripts/verify-phase3.sh
+
 # Kubernetes (Pod 배포 및 관리)
 k8s-deploy:
 	@echo "==> Deploying Phase 0 & Phase 1 Pods to Kubernetes (aiorche namespace)..."

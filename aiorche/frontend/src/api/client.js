@@ -71,6 +71,19 @@ export const apiClient = {
     return await res.json();
   },
 
+  async updateTenantBudget(tenantId, data) {
+    const res = await fetch(`${API_BASE_URL}/external/tenants/${tenantId}/budget`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '부서 예산 변경 실패');
+    }
+    return await res.json();
+  },
+
   // --- Virtual Key Lifecycle (Phase 1) ---
   async getVirtualKeys(params = {}) {
     try {
@@ -208,6 +221,53 @@ export const apiClient = {
     } catch (err) {
       return [];
     }
+  },
+
+  // --- Observability & Telemetry (Phase 3) ---
+  getObservabilityWsUrl() {
+    const isHttps = window.location.protocol === 'https:';
+    const host = window.location.hostname || 'localhost';
+    return `${isHttps ? 'wss' : 'ws'}://${host}:8000/api/v1/observability/ws`;
+  },
+
+  async getMetricsSummary() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/observability/metrics/summary`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getMetricsSummary offline, fallback to mock');
+      return null;
+    }
+  },
+
+  // --- FinOps & Billing (Phase 3) ---
+  async getFinOpsOverview() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/finops/overview`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getFinOpsOverview offline, fallback to mock');
+      return null;
+    }
+  },
+
+  async exportFinOpsInvoiceCsv(month = null) {
+    const url = new URL(`${API_BASE_URL}/finops/invoices/export`);
+    if (month) url.searchParams.append('month', month);
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `aiorche_invoice_${month || new Date().toISOString().slice(0, 7)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+    return true;
   }
 };
 

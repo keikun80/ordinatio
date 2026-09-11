@@ -26,8 +26,9 @@
 4. **프론트엔드 라우팅 제어 콘솔 (`RoutingTab.jsx`)**:
    - 실시간 트래픽 분할 슬라이더 (예: Qwen2.5 80% : Llama-3 20%)
    - Prefix-Cache Affinity 및 Fallback Model 드롭다운 선택기
-   - "Dry-Run 검증" 모달 (xDS RouteConfig JSON 사전 검증)
-   - "Envoy L7 즉시 배포" 원클릭 트리거 및 현재 xDS 리비전 배지 표시
+   - "Dry-Run 검증" 모달 (Envoy RDS v3 RouteConfig JSON 사전 검증)
+   - "Envoy L7 라우팅 정책 무중단 배포 (RDS v3)" 원클릭 트리거 및 현재 Envoy 라우팅 리비전 배지 표시
+   - 아키텍처 가이드 안내 배너 (서빙 모델은 xDS 미사용 / Envoy L7이 REST RDS v3 구독) 탑재
 5. **폐쇄망 Kubernetes 5개 Pod 배포 아키텍처 (`aiorche/deploy/k8s/`)**:
    - 네임스페이스: `aiorche`
    - `01-postgres.yaml`: PostgreSQL 16 메타데이터 스토어 Pod & ClusterIP
@@ -116,3 +117,16 @@
 - **증적 아티팩트**:
   - 스크린샷: `phase2_xds_deployment_1789135472844.png`
   - 세션 녹화: `phase2_routing_demo_1789135426348.webp`
+
+### 2.5 화면 UI 아키텍처 정합성 개편 및 실환경 검증 (ADR-01 / ADR-02 연계)
+- **개편 배경**: "모델은 xDS를 사용하지 않는 순수 HTTP 추론 엔진이며, xDS는 Envoy L7 프록시가 구독하는 동적 라우팅 규격"이라는 점을 운영자가 직관적으로 인지할 수 있도록 UI 용어 및 배너 전면 개편.
+- **주요 개편 사항**:
+  1. **사이드바 메뉴**: `xDS` 배지를 **`Envoy L7`** 배지로 직관화.
+  2. **페이지 상단 헤더**: `Envoy L7 REST RDS v3` 배지 및 "L7 게이트웨이에서 가중치 분할 실시간 제어, 백엔드 모델은 재시작 없이 순수 추론 전념" 안내문 추가.
+  3. **아키텍처 가이드 안내 배너 신설**: "서빙 모델(vLLM) 자체는 xDS를 사용하지 않는 순수 HTTP 추론 엔진이며, 트래픽 분기(80:20) 및 장애 우회는 Envoy L7 게이트웨이가 제어 평면의 REST RDS v3 API를 실시간 구독하여 수행함" 명시.
+  4. **배포 버튼 및 상태 배지**: "🚀 Envoy L7 라우팅 정책 무중단 배포 (RDS v3)" 및 "현재 Envoy 라우팅 리비전 (RDS v3)" 표기.
+  5. **모델 테이블 서브헤더**: "Multi-Compute 서빙 풀 (EKS/ECS/EC2) 엔드포인트 연동 [ADR-02]" 명시.
+- **실환경 검증 증적**:
+  - 스크린샷: `envoy_l7_rds_verified_1789137173884.png`
+  - 브라우저 세션 녹화: `verify_routing_ui_update`
+

@@ -112,6 +112,8 @@ kubectl get pods,svc -n aiorche -o wide
    - 증적: `overview_tab_websocket_1789136069150.png`
 5. **FinOps 실시간 예산 집계 및 CSV 청구서 다운로드 (Phase 3)**:
    - 증적: `finops_tab_invoice_toast_1789136131434.png` / `phase3_finops_demo_1789136054484.webp`
+6. **Envoy L7 REST RDS v3 및 Multi-Compute 서빙 풀 UI 개편 검증 (Phase 2 & ADR-01/02)**:
+   - 증적: `envoy_l7_rds_verified_1789137173884.png` / `verify_routing_ui_update`
 
 ---
 

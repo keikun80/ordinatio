@@ -92,6 +92,17 @@
 4. **Infrastructure Layer**:
    - PostgreSQL/SQLite DB 인터랙션, Envoy xDS v3 RouteConfiguration 변환기(`xds_generator.py`), K8s 5개 Pod 배포(`deploy/k8s/`) 형상 관리
 
+### 2.2 주요 아키텍처 결정 기록 (Architectural Decision Records: ADR-01 ~ ADR-04)
+
+본 시스템은 100% 에어갭 폐쇄망 어플라이언스의 운영 자립성과 단순성을 보장하기 위해 아래 4대 아키텍처 결정을 채택하여 구현되었습니다.
+
+| 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
+| :---: | :---: | :--- | :--- | :--- |
+| **ADR-01** | xDS 제어 평면 | `go-control-plane` gRPC ADS 서버 | **FastAPI Envoy REST RDS v3** (`/api/v1/xds/v3/discovery:routes`) | 별도 무거운 Go 데몬 의존성을 배제하고 Envoy 공식 `rest_api_provider`를 단일 백엔드에 통합하여 무중단 카나리 라우팅 구현 |
+| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 동적 상태 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `telemetry_hub`를 통한 1초 주기 실시간 관제 스트림 구축 |
+| **ADR-03** | FinOps 과금 계량 | Apache Kafka 비동기 이벤트 컨슈머 | **Envoy L7 직접 보고 동기식 원자적 계량 API** (`POST /api/v1/external/usage/report`) | 분산 Kafka 클러스터 설치/운영 오버헤드 없이 단일 DB 트랜잭션으로 토큰/비용의 100% 원자적 일관성 및 초저지연 보장 |
+| **ADR-04** | 전문 관제 대시보드 | Grafana Kiosk 모드 iFrame 직접 임베딩 | **전문 3종 내장 관제 패널 및 외부 Grafana 연동 링크** | Grafana 컨테이너 미구동 상태에서도 L7, GPU, FinOps 3대 화면을 자체 독립적으로 완벽 관제 가능 |
+
 ---
 
 ## 3. 도메인 모델 및 데이터 영속성 설계 (Domain-Driven Design & Persistence)

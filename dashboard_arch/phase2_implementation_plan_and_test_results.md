@@ -36,6 +36,14 @@
    - `04-envoy.yaml`: Envoy L7 AI 게이트웨이 Pod & NodePort (10000, 9901)
    - `05-frontend.yaml`: React Admin Web 콘솔 Pod & NodePort (30080)
 
+### 1.3 아키텍처 대체 결정 기록 (ADR-01, ADR-02 현행화)
+본 단계 구현 시 100% 에어갭 폐쇄망 환경의 운영 자립성과 단순성을 극대화하기 위해 다음 두 가지 대체 아키텍처 결정을 채택하고 정식 반영하였습니다.
+
+| 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
+| :---: | :---: | :--- | :--- | :--- |
+| **ADR-01** | xDS 제어 평면 | `go-control-plane` gRPC ADS 서버 | **FastAPI Envoy REST RDS v3** (`/api/v1/xds/v3/discovery:routes`) | 별도 무거운 Go 데몬 의존성을 배제하고 Envoy 공식 `rest_api_provider`를 단일 백엔드에 통합하여 무중단 카나리 라우팅 구현 |
+| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 동적 상태 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `telemetry_hub`를 통한 1초 주기 실시간 관제 스트림 구축 |
+
 ---
 
 ## 2. 테스트 결과 보고서 (Test Results & Verification)

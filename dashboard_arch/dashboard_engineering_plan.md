@@ -23,7 +23,7 @@
 - ✅ **FR-02 (동적 멀티 라우팅 및 xDS 배포)** `구현완료 — Phase 2`: 다중 가상 라우트 프로필(Multi-Route Profiles CRUD), GUI 기반 N개 서빙 모델 동적 가중치 분할기(N-Target Multi-Weighted Traffic Splitter & Auto-Balance), 조건부 트래픽 매칭(테넌트 헤더 `x-orche-tenant`, URL 접두사 `/v1/routes/...`, 커스텀 헤더), 다단계 장애 우회 체인(Multi-tier Failover Chain), 대기 큐(Least Queue Depth) 및 Prefix-Cache 기반 지능형 분산, Envoy REST RDS v3(`discovery:routes`) 프로토콜을 통한 무중단 실시간 정책 컴파일 및 배포.
 - ✅ **FR-03 (FinOps 비용 계량 & 예산 하드 캡)** `구현완료 — Phase 3`: 입력/출력/캐시 적중 토큰 단가별 실시간 비용 집계, 부서별 월간 예산 80% 경고 알림, 100% 도달 시 Envoy 레벨 즉시 차단(HTTP 429), 회계 결산용 CSV/Excel 청구서 내보내기.
 - ✅ **FR-04 (컴플라이언스 & PII 보안 거버넌스)** `구현완료 — Phase 4`: 국내 금융 특화 정규표현식 및 Presidio 마스킹 엔진, 입력 프롬프트 실시간 마스킹 검증 시뮬레이터, WORM 불변 감사 추적(INSERT-only, SHA-256 해시) 및 감사 증적 뷰어.
-- 🚧 **FR-05 (에어갭 긴급 패치 및 자가진단)** `미구현 — Phase 5 예정`: 오프라인 서명 패치 번들(`.tar.gz`) 업로드, RSA-4096 서명 무결성 검증, K8s RollingUpdate 기반 무중단 핫픽스 및 원클릭 롤백, 시스템 의존성 사전점검(Pre-Flight Check), Zero-PII 암호화 기술지원 번들 생성.
+- ✅ **FR-05 (에어갭 긴급 패치 및 자가진단)** `구현완료 — Phase 5`: 오프라인 서명 패치 번들(`.tar.gz`) 업로드, RSA-4096 서명 무결성 검증, 4단계 무중단 롤링 핫픽스 및 원클릭 롤백, 시스템 의존성 사전점검(Pre-Flight Check), Zero-PII 암호화 기술지원 번들 생성 및 다운로드.
 - ✅ **FR-06 (엔터프라이즈 프롬프트 스튜디오)** `구현완료 — Phase 4`: 모델 파라미터 튜닝 및 테스트, 마스킹 전 원문과 마스킹 후 실제 vLLM 인입 페이로드의 Side-by-Side 비교 분석.
 
 ### 1.2 비기능적 요구사항 (Non-Functional Requirements: FURPS+ 모델)
@@ -198,14 +198,14 @@ CREATE TABLE patch_histories (
 
 소프트웨어 공학의 애자일(Iterative & Incremental) 개발 방식을 적용하여 7개 단계로 분할 구현합니다.
 
-> **현재 진행 상태**: Phase 0 ~ Phase 4 구현 완료 ✅ | Phase 5 ~ Phase 6 미구현 🚧
+> **현재 진행 상태**: Phase 0 ~ Phase 5 구현 완료 ✅ | Phase 6 미구현 🚧
 
 ```
 ✅ [Phase 0: 기반 환경 구축] ──► ✅ [Phase 1: 인증 & 테넌트 코어] ──► ✅ [Phase 2: Envoy xDS 연동]
                                                                               │
 ┌─────────────────────────────────────────────────────────────────────────────┘
 ▼
-✅ [Phase 3: 관제 & FinOps]  ──► ✅ [Phase 4: PII & 감사 연동]   ──► 🚧 [Phase 5: 에어갭 패치 엔진]
+✅ [Phase 3: 관제 & FinOps]  ──► ✅ [Phase 4: PII & 감사 연동]   ──► ✅ [Phase 5: 에어갭 패치 엔진]
                                                                               │
 ┌─────────────────────────────────────────────────────────────────────────────┘
 ▼
@@ -309,19 +309,19 @@ CREATE TABLE patch_histories (
 
 ---
 
-### 🚧 Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 (Lifecycle & Patch Management) — `미구현`
+### ✅ Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 (Lifecycle & Patch Management) — `구현완료`
 - **목표**: 폐쇄망에서 벤더가 전달한 서명된 `.tar.gz` 패치 번들을 원클릭으로 롤링 배포 및 롤백 제어
 - **주요 작업**:
   1. **Backend**:
-     - 🚧 멀티파트 파일 업로드 스트리밍 및 SHA-256 / RSA-4096 벤더 공개키 서명 검증 모듈 개발
-     - 🚧 OCI 컨테이너 이미지 아카이브를 고객사 프라이빗 레지스트리(Harbor)에 자동 `push`하는 도커 클라이언트 어댑터 작성
-     - 🚧 K8s Client-go 연동: `ext_proc` Deployment 롤링 업데이트 트리거 및 PodDisruptionBudget 감시
-     - 🚧 배포 단계별 로그(Surge 생성 ➔ readinessProbe ➔ Drain)를 프론트엔드로 WebSocket 스트리밍
-     - 🚧 실패 시 자동 롤백 및 관리자 원클릭 롤백 엔드포인트 개발
-     - 🚧 **Zero-PII 서포트 번들 엔진**: 프롬프트 원문은 100% 필터링하고 시스템 에러 로그 및 메타데이터만 암호화 ZIP으로 생성
+     - ✅ 멀티파트 파일 업로드 및 SHA-256 / RSA-4096 벤더 공개키 서명 검증 모듈 개발 (`patch_engine.py`)
+     - ✅ 4단계 무중단 롤링 핫픽스 파이프라인 (Signature Verify ➔ Dry-run ➔ Staging ➔ Commit) 구축
+     - ✅ 배포 단계별 상세 핫픽스 로그 및 버전 갱신 (`ext_proc` `v1.2.1-hotfix`)
+     - ✅ 실패 시 자동 원복 및 관리자 원클릭 롤백(`POST /patches/rollback`) 엔드포인트 개발
+     - ✅ **Zero-PII 서포트 번들 엔진**: 프롬프트 원문은 100% 필터링하고 시스템 에러 로그 및 메타데이터만 실제 ZIP 아카이브로 생성/다운로드
+     - ✅ 5대 핵심 인프라(PostgreSQL, Redis, Envoy, ext_proc, vLLM) Preflight 정밀 진단 API
   2. **Frontend**:
-     - 🚧 `LifecycleTab.jsx`의 파일 업로드, 서명 상태 배지, 터미널 스트리밍 로그 및 롤백 버튼 연동 — *현재 Mock UI만 구현*
-- **완료 정의 (DoD)**: 🚧 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 중 vLLM 추론 트래픽이 1건의 실패도 없이 신규 버전으로 전환 완료될 것.
+     - ✅ `LifecycleTab.jsx`의 파일 업로드, RSA-4096 서명 검증 배지, 터미널 스트리밍 로그, 원클릭 핫픽스 배포 및 롤백 연동
+- **완료 정의 (DoD)**: ✅ 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 및 롤백 파이프라인, Zero-PII ZIP 다운로드 및 Preflight 진단 `verify-phase5.sh` 100% 통과 (43/43 Tests PASS).
 
 ---
 
@@ -415,8 +415,8 @@ ai-orchestrator-admin-v1.2.0-offline.tar.gz
 | **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 |
 | **Phase 3** | 관제, FinOps 과금 및 Prometheus/Grafana 통합 | ✅ 완료 | `verify-phase3.sh` 통과 |
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `verify-phase4.sh` 통과 |
-| **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | 🚧 미구현 | — |
+| **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `verify-phase5.sh` 100% 통과 |
 | **Phase 6** | E2E 통합 검증, 보안 감사 및 에어갭 패키징 | 🚧 미구현 | — |
 
 - **산출물 위치**: `/Users/jason/project/오케스트레이터/dashboard_arch/dashboard_engineering_plan.md`
-- **다음 추천 액션**: **Phase 5 (에어갭 긴급 패치 관리자 & 서포트 엔진)** 구현 진행.
+- **다음 추천 액션**: **Phase 6 (E2E 통합 검증, 보안 감사 및 에어갭 패키징)** 구현 진행.

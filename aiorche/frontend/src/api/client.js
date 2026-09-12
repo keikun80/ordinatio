@@ -420,6 +420,104 @@ export const apiClient = {
       console.warn('API getComplianceStats offline, fallback to mock:', err);
       return null;
     }
+  },
+
+  // --- Lifecycle & Patch Management (Phase 5) ---
+  async getLifecycleComponents() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/lifecycle/components`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getLifecycleComponents offline, fallback to mock:', err);
+      return null;
+    }
+  },
+
+  async verifyPatchBundle(patchData) {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patchData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '서명 검증 실패' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async runPatchDryRun(patchData) {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/dry-run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patchData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '드라이런 검증 실패' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async applyPatch(patchData) {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patchData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '패치 배포 실패' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async rollbackPatch(rollbackData) {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/rollback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rollbackData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '롤백 실패' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async getPatchHistory(limit = 20) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/lifecycle/patches/history?limit=${limit}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getPatchHistory offline:', err);
+      return [];
+    }
+  },
+
+  async runLifecyclePreflight() {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/preflight`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  async generateSupportBundle(bundleReq = {}) {
+    const res = await fetch(`${API_BASE_URL}/lifecycle/support-bundle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bundleReq)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '서포트 번들 생성 실패' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  getSupportBundleDownloadUrl(bundleId) {
+    return `${API_BASE_URL}/lifecycle/support-bundle/download/${bundleId}`;
   }
 };
 

@@ -63,6 +63,10 @@ verify-phase3:
 verify-phase4:
 	@bash scripts/verify-phase4.sh
 
+verify-phase5:
+	@bash scripts/verify-phase5.sh
+
+
 # Kubernetes (Pod 배포, 라이프사이클 및 관리)
 k8s-up: k8s-deploy
 k8s-down: k8s-delete

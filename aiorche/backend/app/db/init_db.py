@@ -7,6 +7,7 @@ from app.models.model_catalog import ModelCatalog
 from app.models.routing_policy import RoutingPolicy
 from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
+from app.models.patch_history import PatchHistory
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +234,23 @@ def init_db():
             db.add_all([a1, a2])
             db.commit()
             logger.info("Initialized database with sample audit logs")
+
+        # 6. Baseline Patch History
+        if db.query(PatchHistory).count() == 0:
+            p1 = PatchHistory(
+                patch_id="patch-v1.2.0-baseline",
+                package_name="aiorche-core-v1.2.0-initial.tar.gz",
+                target_component="all",
+                previous_version="v1.1.9",
+                applied_version="v1.2.0",
+                signature_verified=True,
+                status="APPLIED",
+                applied_by="system-installer",
+                details_json='{"release_notes": "초기 고객사 폐쇄망 표준 릴리즈 배포", "signer": "Antigravity Vendor Official Release Key (RSA-4096)"}'
+            )
+            db.add(p1)
+            db.commit()
+            logger.info("Initialized database with baseline patch history")
 
         db.close()
     except Exception as e:

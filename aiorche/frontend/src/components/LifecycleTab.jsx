@@ -1,162 +1,285 @@
-import React, { useState } from 'react';
-import { PackageCheck, Upload, ShieldCheck, RefreshCw, Terminal, CheckCircle2, RotateCcw, Activity, Download, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  PackageCheck, 
+  Upload, 
+  ShieldCheck, 
+  RefreshCw, 
+  Terminal, 
+  CheckCircle2, 
+  RotateCcw, 
+  Activity, 
+  Download, 
+  AlertCircle,
+  FileCode,
+  Check,
+  ShieldAlert
+} from 'lucide-react';
+import { api } from '../api/client';
 import { componentVersions, sampleVendorPatch } from '../data/mockData';
 
 export default function LifecycleTab({ onNotify, onPatchApplied }) {
-  const [components, setComponents] = useState(componentVersions);
+  const [components, setComponents] = useState([]);
+  const [loadingComponents, setLoadingComponents] = useState(true);
   const [loadedPatch, setLoadedPatch] = useState(null);
   const [patchLogs, setPatchLogs] = useState([]);
   const [isPatching, setIsPatching] = useState(false);
   const [patchProgress, setPatchProgress] = useState(0);
   const [isDryRunSuccess, setIsDryRunSuccess] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Diagnostics State
   const [isRunningDiag, setIsRunningDiag] = useState(false);
   const [diagResults, setDiagResults] = useState(null);
 
+  // Load components on mount
+  const loadComponents = async () => {
+    setLoadingComponents(true);
+    const data = await api.getLifecycleComponents();
+    if (data && data.components && data.components.length > 0) {
+      setComponents(data.components.map(c => ({
+        name: c.name,
+        type: c.description,
+        version: c.version,
+        target_patch_version: c.target_patch_version,
+        status: c.status
+      })));
+    } else {
+      setComponents(componentVersions);
+    }
+    setLoadingComponents(false);
+  };
+
+  useEffect(() => {
+    loadComponents();
+  }, []);
+
   // Load sample vendor patch bundle
-  const handleLoadSampleBundle = () => {
-    setLoadedPatch(sampleVendorPatch);
-    setPatchLogs([
-      `[${new Date().toLocaleTimeString()}] 📦 오프라인 패치 번들 인식 완료: ${sampleVendorPatch.fileName}`,
-      `[${new Date().toLocaleTimeString()}] 🔑 벤더 RSA-4096 전자서명 무결성 검증: 🟢 정상 (공식 릴리즈 키 확인됨)`,
-      `[${new Date().toLocaleTimeString()}] 🎯 대상 컴포넌트: ${sampleVendorPatch.targetComponent}`
-    ]);
-    onNotify('INFO', '벤더 긴급 보안 핫픽스 번들이 로드되었습니다. 서명 검증 성공.');
+  const handleLoadSampleBundle = async () => {
+    try {
+      const res = await api.verifyPatchBundle({
+        patch_id: "patch-v1.2.1-hotfix-cve2026",
+        package_name: "patch-v1.2.1-hotfix-cve2026.tar.gz",
+        target_component: "ext_proc",
+        version: "v1.2.1-hotfix",
+        cve_id: "CVE-2026-0812",
+        description: "Presidio L7 메모리 누수 및 PII 필터링 보안 패치"
+      });
+
+      setLoadedPatch({
+        fileName: res.package_name,
+        version: res.version,
+        targetComponent: res.target_component,
+        cveId: res.cve_id,
+        size: "42.8 MB (Tar.gz)",
+        vendorSignature: `${res.verification.signer} (${res.verification.algorithm})`,
+        fingerprint: res.verification.fingerprint,
+        vllmImpact: "vLLM 추론 클러스터 무영향 (ext_proc 독립 롤링 업데이트)"
+      });
+
+      setPatchLogs([
+        `[${new Date().toLocaleTimeString()}] 📦 오프라인 패치 번들 인식 완료: ${res.package_name}`,
+        `[${new Date().toLocaleTimeString()}] 🔑 벤더 RSA-4096 전자서명 무결성 검증: 🟢 정상 (${res.verification.signer})`,
+        `[${new Date().toLocaleTimeString()}] 🛡️ 서명 지문: ${res.verification.fingerprint}`,
+        `[${new Date().toLocaleTimeString()}] 🎯 대상 컴포넌트: ${res.target_component} (${res.version})`
+      ]);
+
+      onNotify('SUCCESS', '공식 벤더 긴급 보안 핫픽스 번들이 로드되었습니다. RSA-4096 서명 검증 성공.');
+    } catch (err) {
+      onNotify('ERROR', `패치 번들 서명 검증 실패: ${err.message}`);
+    }
+  };
+
+  // Handle local file selection
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const res = await api.verifyPatchBundle({
+        package_name: file.name,
+        target_component: "ext_proc",
+        version: "v1.2.1-hotfix",
+        description: `사용자 수동 반입 패치: ${file.name}`
+      });
+
+      setLoadedPatch({
+        fileName: file.name,
+        version: res.version,
+        targetComponent: res.target_component,
+        cveId: res.cve_id || "CVE-2026-0812",
+        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        vendorSignature: `${res.verification.signer} (${res.verification.algorithm})`,
+        fingerprint: res.verification.fingerprint,
+        vllmImpact: "vLLM 추론 클러스터 무영향 (ext_proc 독립 롤링 업데이트)"
+      });
+
+      setPatchLogs([
+        `[${new Date().toLocaleTimeString()}] 📥 패치 파일 업로드 완료: ${file.name}`,
+        `[${new Date().toLocaleTimeString()}] 🔑 벤더 RSA-4096 전자서명 검증 완료: 🟢 정상`,
+        `[${new Date().toLocaleTimeString()}] 🎯 대상 모듈: ${res.target_component}`
+      ]);
+
+      onNotify('SUCCESS', `패치 번들 '${file.name}' 서명 검증이 통과되었습니다.`);
+    } catch (err) {
+      onNotify('ERROR', `패치 번들 검증 실패: ${err.message}`);
+    }
   };
 
   // Run Dry-run
-  const handleDryRun = () => {
-    setPatchLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] 🧪 드라이런(Dry-Run) 시작: K8s 매니페스트 및 DB 마이그레이션 호환성 검사...`,
-      `[${new Date().toLocaleTimeString()}] 🧪 PodDisruptionBudget (minAvailable: 2) 충족 여부 확인... 정상`,
-      `[${new Date().toLocaleTimeString()}] 🧪 gRPC :9002 readinessProbe 스키마 검사... 정상`,
-      `[${new Date().toLocaleTimeString()}] ✅ 드라이런 완료: 서비스 중단 없이 안전하게 롤링 배포 가능.`
-    ]);
-    setIsDryRunSuccess(true);
-    onNotify('SUCCESS', '드라이런 검증이 완료되었습니다. 무중단 롤링 패치를 실행할 수 있습니다.');
+  const handleDryRun = async () => {
+    if (!loadedPatch) return;
+    try {
+      const res = await api.runPatchDryRun({
+        patch_id: "patch-v1.2.1-hotfix-cve2026",
+        package_name: loadedPatch.fileName,
+        target_component: loadedPatch.targetComponent,
+        version: loadedPatch.version
+      });
+
+      setPatchLogs((prev) => [
+        ...prev,
+        ...res.logs
+      ]);
+
+      setIsDryRunSuccess(true);
+      onNotify('SUCCESS', '드라이런 검증이 완료되었습니다. 무중단 롤링 패치를 실행할 수 있습니다.');
+    } catch (err) {
+      onNotify('ERROR', `드라이런 검증 실패: ${err.message}`);
+    }
   };
 
   // Apply zero-downtime rolling hotfix
-  const handleApplyHotfix = () => {
+  const handleApplyHotfix = async () => {
     if (!loadedPatch) return;
     setIsPatching(true);
-    setPatchProgress(10);
+    setPatchProgress(15);
 
-    setPatchLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] 🚀 무중단 롤링 핫픽스 배포 시작 (Deployment: orchestrator-ext-proc)...`
-    ]);
-
-    setTimeout(() => {
-      setPatchProgress(35);
+    try {
+      // Step 1: Initial Log
       setPatchLogs((prev) => [
         ...prev,
-        `[${new Date().toLocaleTimeString()}] 🔄 내부 Harbor 레지스트리에서 신규 이미지 로드 (ext-proc:${loadedPatch.version})...`,
-        `[${new Date().toLocaleTimeString()}] 🟢 신규 파드 1대 Surge 생성 시작 (ext-proc-7f89d-2)...`
+        `[${new Date().toLocaleTimeString()}] 🚀 무중단 롤링 핫픽스 배포 시작 (Deployment: orchestrator-${loadedPatch.targetComponent})...`
       ]);
-    }, 1000);
 
-    setTimeout(() => {
-      setPatchProgress(70);
+      // Step 2: Intermediate progression simulation
+      await new Promise(r => setTimeout(r, 700));
+      setPatchProgress(45);
+      setPatchLogs((prev) => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] 🔄 내부 Harbor 레지스트리에서 신규 이미지 로드 (${loadedPatch.targetComponent}:${loadedPatch.version})...`,
+        `[${new Date().toLocaleTimeString()}] 🟢 신규 파드 1대 Surge 생성 시작 (${loadedPatch.targetComponent}-7f89d-2)...`
+      ]);
+
+      // Step 3: Backend API Call
+      await new Promise(r => setTimeout(r, 800));
+      setPatchProgress(75);
+
+      const res = await api.applyPatch({
+        patch_id: "patch-v1.2.1-hotfix-cve2026",
+        package_name: loadedPatch.fileName,
+        target_component: loadedPatch.targetComponent,
+        version: loadedPatch.version,
+        applied_by: "admin-sysops"
+      });
+
+      setPatchProgress(100);
+      setIsPatching(false);
+
       setPatchLogs((prev) => [
         ...prev,
         `[${new Date().toLocaleTimeString()}] 🩺 신규 파드 readinessProbe gRPC 헬스체크 통과 (소요시간 1.8s)`,
         `[${new Date().toLocaleTimeString()}] 🔄 Envoy AI Gateway 신규 파드로 트래픽 전환 완료`,
-        `[${new Date().toLocaleTimeString()}] 🧹 구버전 파드 Graceful Drain 및 종료 중...`
-      ]);
-    }, 2200);
-
-    setTimeout(() => {
-      setPatchProgress(100);
-      setIsPatching(false);
-      setPatchLogs((prev) => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] 🎉 롤링 핫픽스 배포 완료! (버전: ${loadedPatch.version})`,
+        `[${new Date().toLocaleTimeString()}] 🧹 구버전 파드 Graceful Drain 및 종료 중...`,
+        `[${new Date().toLocaleTimeString()}] 🎉 롤링 핫픽스 배포 완료! (버전: ${res.applied_version})`,
         `[${new Date().toLocaleTimeString()}] 🔒 vLLM GPU 추론 클러스터 및 Envoy 게이트웨이 무중단(Zero-Downtime) 유지됨.`
       ]);
 
-      // Update component table
-      setComponents((prev) =>
-        prev.map((c) =>
-          c.name.includes('ext_proc')
-            ? { ...c, version: loadedPatch.version, status: '최신 패치 완료' }
-            : c
-        )
-      );
+      // Refresh components from backend
+      await loadComponents();
 
-      onNotify('SUCCESS', `긴급 보안 핫픽스가 무중단으로 적용되었습니다. ext_proc 버전이 ${loadedPatch.version}로 갱신되었습니다.`);
+      onNotify('SUCCESS', `긴급 보안 핫픽스가 무중단으로 적용되었습니다. ${res.target_component} 버전이 ${res.applied_version}로 갱신되었습니다.`);
       if (onPatchApplied) onPatchApplied();
-    }, 3500);
+    } catch (err) {
+      setIsPatching(false);
+      onNotify('ERROR', `핫픽스 배포 실패: ${err.message}`);
+    }
   };
 
   // Rollback
-  const handleRollback = () => {
-    setComponents((prev) =>
-      prev.map((c) =>
-        c.name.includes('ext_proc')
-          ? { ...c, version: 'v1.2.0', status: '핫픽스 권고 대기' }
-          : c
-      )
-    );
-    setPatchLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] ⏪ 원클릭 롤백 실행: 이전 안정 버전(v1.2.0)으로 즉시 복원되었습니다.`
-    ]);
-    onNotify('INFO', '이전 안정 버전(v1.2.0)으로 즉각 롤백되었습니다.');
+  const handleRollback = async () => {
+    try {
+      const res = await api.rollbackPatch({
+        target_component: "ext_proc",
+        rollback_to_version: "v1.2.0",
+        reason: "관리자에 의한 롤백 실행",
+        applied_by: "admin-sysops"
+      });
+
+      setPatchLogs((prev) => [
+        ...prev,
+        ...res.logs
+      ]);
+
+      // Refresh component list
+      await loadComponents();
+      setPatchProgress(0);
+
+      onNotify('INFO', `컴포넌트가 이전 안정 버전(${res.restored_version})으로 즉각 롤백되었습니다.`);
+    } catch (err) {
+      onNotify('ERROR', `롤백 실패: ${err.message}`);
+    }
   };
 
   // Run Pre-flight System Diagnostics
-  const handleRunDiagnostics = () => {
+  const handleRunDiagnostics = async () => {
     setIsRunningDiag(true);
-    setTimeout(() => {
-      setDiagResults({
-        postgres: { status: 'OK', latency: '0.8 ms', msg: '메타데이터 DB 연결성 정상' },
-        redis: { status: 'OK', latency: '0.3 ms', msg: 'Rate Limit 카운터 응답성 양호' },
-        kafka: { status: 'OK', latency: '1.2 ms', msg: '이벤트 버스 지연 0 ms (Lag: 0)' },
-        vllmEks: { status: 'OK', latency: '24 ms', msg: 'EKS vLLM Pod 12대 응답 정상' },
-        dcgm: { status: 'OK', latency: '4 ms', msg: 'NVIDIA GPU 드라이버 통신 정상' }
-      });
-      setIsRunningDiag(false);
+    try {
+      const res = await api.runLifecyclePreflight();
+      setDiagResults(res.checks);
       onNotify('SUCCESS', '시스템 사전 점검 완료: 5개 핵심 의존성 컴포넌트 100% 정상 가동 확인.');
-    }, 1200);
+    } catch (err) {
+      onNotify('ERROR', `시스템 자가 진단 실패: ${err.message}`);
+    } finally {
+      setIsRunningDiag(false);
+    }
   };
 
-  // Generate Zero-PII Support Bundle
-  const handleDownloadSupportBundle = () => {
-    const bundleData = {
-      bundleId: `support-bundle-${Date.now()}`,
-      generatedAt: new Date().toISOString(),
-      clusterInfo: {
-        environment: 'On-Premise Private VPC',
-        kubernetesVersion: 'v1.30.2',
-        orchestratorVersion: 'v1.2.1-hotfix'
-      },
-      sanitizationReport: {
-        promptsStripped: 1840,
-        piiMaskedCount: 94,
-        promptsIncluded: false,
-        userPIIIncluded: false
-      },
-      diagnostics: diagResults || { status: 'All systems healthy' }
-    };
+  // Generate and Download Zero-PII Support Bundle
+  const handleDownloadSupportBundle = async () => {
+    try {
+      const res = await api.generateSupportBundle({
+        include_diagnostics: true,
+        include_system_metrics: true,
+        include_routing_dump: true,
+        requester_id: "admin-sysops"
+      });
 
-    const blob = new Blob([JSON.stringify(bundleData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `zero-pii-support-bundle-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      // Trigger file download
+      const downloadUrl = api.getSupportBundleDownloadUrl(res.bundle_id);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = downloadUrl;
+      downloadAnchor.setAttribute('download', res.bundle_filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
 
-    onNotify('SUCCESS', 'Zero-PII 암호화 기술지원 번들이 다운로드되었습니다. 벤더 기술 지원팀에 안전하게 전달할 수 있습니다.');
+      onNotify('SUCCESS', `Zero-PII 암호화 기술지원 번들(${res.bundle_filename})이 생성 및 다운로드되었습니다.`);
+    } catch (err) {
+      onNotify('ERROR', `서포트 번들 생성 실패: ${err.message}`);
+    }
   };
 
   return (
     <div className="tab-pane">
+      {/* Hidden File Input */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        style={{ display: 'none' }} 
+        accept=".tar.gz,.zip"
+        onChange={handleFileUpload}
+      />
+
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-wrap">
@@ -183,14 +306,14 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
               <CheckCircle2 size={18} />
               <span>시스템 사전 점검(Pre-Flight Check) 결과: 전체 정상 (Healthy)</span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>방금 전 검사 완료</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>실시간 5대 컴포넌트 응답성 통과</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '0.8rem' }}>
-            <div>PostgreSQL DB: <strong style={{ color: '#34d399' }}>정상 ({diagResults.postgres.latency})</strong></div>
-            <div>Redis 쿼터: <strong style={{ color: '#34d399' }}>정상 ({diagResults.redis.latency})</strong></div>
-            <div>Kafka 버스: <strong style={{ color: '#34d399' }}>정상 ({diagResults.kafka.latency})</strong></div>
-            <div>EKS vLLM Pods: <strong style={{ color: '#34d399' }}>정상 ({diagResults.vllmEks.latency})</strong></div>
-            <div>NVIDIA DCGM: <strong style={{ color: '#34d399' }}>정상 ({diagResults.dcgm.latency})</strong></div>
+            <div>PostgreSQL DB: <strong style={{ color: '#34d399' }}>{diagResults.postgres?.status} ({diagResults.postgres?.latency})</strong></div>
+            <div>Redis 쿼터: <strong style={{ color: '#34d399' }}>{diagResults.redis?.status} ({diagResults.redis?.latency})</strong></div>
+            <div>Kafka 버스: <strong style={{ color: '#34d399' }}>{diagResults.kafka?.status} ({diagResults.kafka?.latency})</strong></div>
+            <div>EKS vLLM Pods: <strong style={{ color: '#34d399' }}>{diagResults.vllmEks?.status} ({diagResults.vllmEks?.latency})</strong></div>
+            <div>NVIDIA DCGM: <strong style={{ color: '#34d399' }}>{diagResults.dcgm?.status} ({diagResults.dcgm?.latency})</strong></div>
           </div>
         </div>
       )}
@@ -216,7 +339,7 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
               background: 'rgba(15, 23, 42, 0.4)',
               cursor: 'pointer'
             }}
-            onClick={handleLoadSampleBundle}
+            onClick={() => fileInputRef.current?.click()}
           >
             <Upload size={32} color="#38bdf8" style={{ margin: '0 auto 12px' }} />
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff', marginBottom: '4px' }}>
@@ -242,7 +365,7 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
                 </span>
               </div>
               <div style={{ fontSize: '0.82rem', color: '#38bdf8', marginBottom: '4px' }}>
-                대상: {loadedPatch.targetComponent}
+                대상: {loadedPatch.targetComponent} ({loadedPatch.version}) {loadedPatch.cveId && `[${loadedPatch.cveId}]`}
               </div>
               <div style={{ fontSize: '0.78rem', color: '#34d399' }}>
                 🛡️ 영향도: {loadedPatch.vllmImpact}

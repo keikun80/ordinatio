@@ -134,3 +134,20 @@ VALUES
     ('pii-card', '신용카드 번호', 'CREDIT_CARD', '\d{4}-\d{4}-\d{4}-\d{4}', 0.90, 'MASK'),
     ('pii-employee', '사내 행번/사번', 'EMPLOYEE_ID', 'EMP-[A-Z]{2}\d{5}', 0.80, 'BLOCK')
 ON CONFLICT (rule_id) DO NOTHING;
+
+-- 6. 긴급 패치 및 배포 이력 (Patch History)
+CREATE TABLE IF NOT EXISTS patch_history (
+    patch_id VARCHAR(64) PRIMARY KEY,
+    package_name VARCHAR(255) NOT NULL,          -- 'patch-v1.2.1-hotfix.tar.gz'
+    target_component VARCHAR(64) NOT NULL,       -- 'ext_proc', 'envoy', 'control_plane'
+    previous_version VARCHAR(32) NOT NULL,
+    applied_version VARCHAR(32) NOT NULL,
+    signature_verified BOOLEAN DEFAULT FALSE,
+    status VARCHAR(32) NOT NULL DEFAULT 'APPLIED', -- 'APPLIED', 'ROLLED_BACK', 'FAILED'
+    applied_by VARCHAR(64) NOT NULL DEFAULT 'sysadmin-ops',
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    details_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_patch_history_applied_at ON patch_history (applied_at DESC);
+

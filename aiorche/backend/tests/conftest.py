@@ -32,9 +32,15 @@ from app.models.model_catalog import ModelCatalog
 from app.models.routing_policy import RoutingPolicy
 from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
+from app.models.patch_history import PatchHistory
 
 # Create all tables and seed data immediately at module load
 Base.metadata.create_all(bind=test_engine)
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
 
 def seed_data():
     db = TestSessionLocal()

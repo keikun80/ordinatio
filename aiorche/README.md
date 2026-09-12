@@ -55,7 +55,7 @@ make run-frontend
 
 ### 3. 단계별 검증 (DoD Automated Verification)
 ```bash
-# 전체 단위/통합 테스트 실행 (pytest 27개 테스트)
+# 전체 단위/통합 테스트 실행 (pytest 43개 테스트)
 make test
 
 # 단계별 완료 정의(DoD) 자동화 검증
@@ -63,6 +63,8 @@ make verify-phase0    # Phase 0: 기반 환경 및 에어갭 패키징 무결성
 bash scripts/verify-phase1.sh   # Phase 1: 테넌트 거버넌스 및 가상 API Key
 bash scripts/verify-phase2.sh   # Phase 2: Envoy xDS 동적 멀티 라우팅 및 N-Way 분할
 bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 관제 스트림
+bash scripts/verify-phase4.sh   # Phase 4: PII 보안 거버넌스 및 WORM 감사 포렌식
+bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진
 ```
 
 ---
@@ -77,7 +79,7 @@ bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 �
 | **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 |
 | **Phase 3** | 관제, FinOps 과금 및 실시간 관제 허브 | ✅ 완료 | `verify-phase3.sh` 통과 |
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
-| **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | 🚧 미구현 | — |
+| **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
 | **Phase 6** | E2E 통합 검증, 보안 감사 및 에어갭 패키징 | 🚧 미구현 | — |
 
 ---
@@ -103,9 +105,12 @@ bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 �
    - 실시간 프롬프트 마스킹 시뮬레이션 및 WORM 불변 감사 로그 테이블 적재
    - `ComplianceTab.jsx`: 실시간 Presidio 마스킹 검증, PII 룰셋 동적 CRUD(등록 모달 & 인앱 안전 삭제 확인 모달), WORM 감사 포렌식 뷰어 & JSON 리포트 다운로드
    - `PromptStudioTab.jsx`: Side-by-Side PII 마스킹 비교 및 SHA-256 원문/마스킹 페이로드 무결성 해시 표기
-5. 🚧 **Phase 5: 에어갭 긴급 패치 관리자** — `미구현`
-   - RSA-4096 서명 검증, K8s 롤링 배포, Zero-PII 서포트 번들 엔진
-   - 프론트엔드 `LifecycleTab.jsx`에 Mock UI만 구현 완료
+5. ✅ **Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진** — `구현완료`
+   - RSA-4096 / SHA-256 서명 검증 및 4단계 무중단 롤링 핫픽스 엔진
+   - 장애 발생 시 이전 버전으로 즉시 원복하는 원클릭 롤백 파이프라인 (`POST /patches/rollback`)
+   - 개인정보 완전 필터링 Zero-PII 서포트 번들 암호화 ZIP 생성 및 즉시 다운로드
+   - 5대 핵심 인프라(Postgres, Redis, Envoy, ext_proc, vLLM) Preflight 정밀 자가진단
+   - 프론트엔드 `LifecycleTab.jsx`: 실시간 터미널 스트리밍 로그, 버전 배지 갱신 및 원클릭 배포 연동
 6. 🚧 **Phase 6: E2E 통합 검증 및 에어갭 패키징** — `미구현`
    - Playwright E2E, Helm Chart, 오프라인 이미지 번들, SAST/컨테이너 스캔
 

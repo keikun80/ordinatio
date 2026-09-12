@@ -1,30 +1,30 @@
-# AI Orchestrator Phase 0 ~ 4 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
+# AI Orchestrator Phase 0 ~ 5 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
 **문서 번호**: AIORCHE-ENG-REP-20260912  
 **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-09-12 (Phase 4 완료 및 PII 삭제 UI 고도화 반영 현행화)  
-**검증 상태**: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4 전체 100% PASS (DoD 충족)**  
+**작성 일자**: 2026-09-12 (Phase 5 긴급 패치 관리자 & 서포트 엔진 완료 현행화)  
+**검증 상태**: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5 전체 100% PASS (DoD 충족)**  
 
 ---
 
 ## 1. 종합 요약 및 엔지니어링 개요
 
-본 문서는 `dashboard_arch/dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 4까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
+본 문서는 `dashboard_arch/dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 5까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                                       │
-├───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┬─────────────────────────────┤
-│     Phase 0 (기반)     │    Phase 1 (거버넌스)  │     Phase 2 (라우팅)   │    Phase 3 (FinOps)   │   Phase 4 (Compliance)     │
-├───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┼─────────────────────────────┤
-│ • 100% 에어갭 아키텍처│ • 테넌트 부서별 분리  │ • 동적 모델 카탈로그  │ • 1초 WebSocket 관제  │ • 자체 고속 PII 엔진 (<2ms) │
-│ • FastAPI Clean Core  │ • sk-orch- Argon2id   │ • Envoy L7 xDS v3 RDS │ • 토큰 단위 표준 과금 │ • MASK/HASH/BLOCK 3대 액션  │
-│ • React 18 + Vite Web │ • 가상키 수명주기/수정│ • N-Way 동적 가중치   │ • Hard Cap 100% 차단  │ • PII 룰셋 CRUD & 안전 삭제 │
-│ • 5대 인프라 Preflight│ • 외부 연동 REST 4종  │ • Prefix Cache Affinity│ • UTF-8 BOM CSV 청구서│ • WORM 불변 감사 로그 적재  │
-│ • Docker & K8s 배포   │ • Prometheus /metrics │ • K8s 5개 Pod 배포    │ • 4종 FinOps 통계 카드│ • 감사 증적 포렌식 JSON 출력│
-├───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┼─────────────────────────────┤
-│  5/5 Tests (100% PASS)│ 15/15 Tests (100% PASS│ 20/20 Tests (100%)    │ 26/26 Tests (100% PASS│   35/35 Tests (100% PASS)   │
-└───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┴─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                              AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                                               │
+├─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬───────────────────────────────┤
+│    Phase 0 (기반)   │   Phase 1 (거버넌스)│    Phase 2 (라우팅) │    Phase 3 (FinOps) │  Phase 4 (Compliance│     Phase 5 (Lifecycle)       │
+├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
+│ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 동적 모델 카탈로그│ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명 검증     │
+│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 xDS v3   │ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 핫픽스 배포 │
+│ • React 18 + Vite   │ • 가상키 수명주기   │ • N-Way 가중치 분할 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 이전 버전 롤백 엔진  │
+│ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Prefix Cache 해시 │ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 인프라 Preflight 자가진단│
+│ • Docker & K8s 배포 │ • Prometheus /metric│ • K8s 5개 Pod 배포  │ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII 암호화 ZIP 번들    │
+├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
+│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│20/20 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    43/43 Tests (100% PASS)    │
+└─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────────────┘
 ```
 
 ---
@@ -40,10 +40,11 @@
 | **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md) | 동적 모델 카탈로그, Envoy L7 xDS(RDS) 제어기, N-Way 가중치 분할, K8s 5개 Pod 배포 | `make verify-phase2` | 20 / 20 PASS |
 | **Phase 3** | [phase3_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
 | **Phase 4** | [phase4_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
+| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 43 / 43 PASS |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (35 / 35 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (43 / 43 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
@@ -86,6 +87,14 @@ cd aiorche/backend && uv run pytest -v
 | | `test_compliance_simulate_and_audit_log` | 실시간 프롬프트 마스킹 시뮬레이션 및 WORM 감사 로그 테이블 자동 적재 검증 | **PASSED** |
 | | `test_compliance_simulate_block` | 차단 규칙 발동 시 감사 로그에 `BLOCK` 조치 기록 및 차단 응답 확인 | **PASSED** |
 | | `test_compliance_stats` | 규제 준수 통계 API(총 규칙, 활성 규칙, 누적 감사 로그, 타입별 집계) 검증 | **PASSED** |
+| `test_lifecycle.py` | `test_component_version_listing` | 컴포넌트별 버전 및 패치 권고 상태 조회 (ext_proc, Envoy, Control Plane, Presidio) | **PASSED** |
+| | `test_rsa_signature_verification_success` | 벤더 RSA-4096 / SHA-256 서명 무결성 검증 성공 및 공식 서명자 정보 확인 | **PASSED** |
+| | `test_rsa_signature_verification_failure` | 비공식 확장자 및 위조/변조(Tampered) 서명 인입 시 400 Bad Request 차단 | **PASSED** |
+| | `test_patch_dry_run_validation` | K8s PDB 및 gRPC readinessProbe 호환성 무중단 드라이런 검증 통과 | **PASSED** |
+| | `test_rolling_hotfix_apply_and_history_persistence` | 무중단 롤링 핫픽스 배포, 4단계 로그 스트림, 버전 갱신 및 DB 이력 영속화 | **PASSED** |
+| | `test_rollback_lifecycle_and_version_restoration` | 원클릭 롤백 실행, 이전 버전(v1.2.0) 복원 및 롤백 이력 DB 기록 | **PASSED** |
+| | `test_preflight_diagnostics` | 5대 핵심 인프라 컴포넌트 실시간 자가진단(Pre-flight) API 응답성 검증 | **PASSED** |
+| | `test_zero_pii_support_bundle_zip_generation_and_download` | Zero-PII 기술지원 번들 생성, 프롬프트 배제 인증서 및 실제 ZIP 다운로드 무결성 | **PASSED** |
 
 ---
 
@@ -99,9 +108,9 @@ kubectl get pods,svc -n aiorche -o wide
 
 | Pod 명칭 | Ready | Status | IP | Node | 주요 역할 |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| `postgres-5b86d57c7b-97m28` | 1/1 | **Running** | 10.244.1.2 | desktop-worker | RDBMS 메타데이터 스토어 (테넌트, 가상키, 모델, 정책, PII룰, WORM로그) |
+| `postgres-5b86d57c7b-97m28` | 1/1 | **Running** | 10.244.1.2 | desktop-worker | RDBMS 메타데이터 스토어 (테넌트, 가상키, 모델, 정책, PII룰, WORM로그, 패치이력) |
 | `redis-b7f66f4b6-hfjvk` | 1/1 | **Running** | 10.244.1.3 | desktop-worker | 실시간 RPM/TPM 속도 제한 및 세션 캐시 |
-| `backend-c64cbc9b9-twcqt` | 1/1 | **Running** | 10.244.1.5 | desktop-worker | FastAPI 코어 컨트롤 플레인 (인증, xDS, 관제, FinOps, Compliance) |
+| `backend-c64cbc9b9-twcqt` | 1/1 | **Running** | 10.244.1.5 | desktop-worker | FastAPI 코어 컨트롤 플레인 (인증, xDS, 관제, FinOps, Compliance, Lifecycle) |
 | `envoy-5cfc8cf5c5-gsxqh` | 1/1 | **Running** | 10.244.1.4 | desktop-worker | L7 AI Ingress 게이트웨이 및 동적 트래픽 라우팅 |
 | `frontend-654f797f9-n2dtf` | 1/1 | **Running** | 10.244.1.6 | desktop-worker | React 18 + Vite 관리자 웹 콘솔 포털 |
 
@@ -127,6 +136,8 @@ kubectl get pods,svc -n aiorche -o wide
    - 증적: `pii_rule_add_button_1789170430313.png` / `pii_modal_dialog_1789170521689.png` / `compliance_modal_check_1789170383840.webp`
 8. **PII 규칙 인앱 안전 삭제 확인 모달 및 낙관적 UI 갱신 (Phase 4)**:
    - 증적: `rule_delete_success_1789171034799.png` / `verify_rule_deletion_1789170960973.webp`
+9. **에어갭 긴급 패치 관리, RSA-4096 서명, 롤링 배포 및 Zero-PII 번들 다운로드 (Phase 5)**:
+   - 증적: `phase5_verification_success_1789171915217.png` / `verify_phase5_lifecycle_1789171840274.webp`
 
 ---
 
@@ -147,6 +158,6 @@ kubectl get pods,svc -n aiorche -o wide
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(35/35 테스트)**하였습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(43/43 테스트)**하였습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
-- **향후 단계**: `dashboard_engineering_plan.md`의 **Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 (Lifecycle & Patch Management)**으로 즉시 연계가 가능합니다.
+- **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)**으로 즉시 연계가 가능합니다.

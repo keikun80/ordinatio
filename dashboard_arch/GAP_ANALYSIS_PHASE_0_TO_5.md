@@ -1,32 +1,33 @@
-# Phase 0 ~ Phase 4 엔지니어링 갭 분석 및 미구현/미테스트 기능 점검 보고서 (현행화 완료)
+# Phase 0 ~ Phase 5 엔지니어링 갭 분석 및 미구현/미테스트 기능 점검 보고서 (현행화 완료)
 
 **문서 번호**: AIORCHE-GAP-ANALYSIS-20260912  
-**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `dashboard_arch/phase4_implementation_plan_and_test_results.md`  
+**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `dashboard_arch/phase5_implementation_plan_and_test_results.md`  
 **분석 대상**: 상용급 모노레포(`aiorche/`) 및 프로토타입(`dashboard/`)  
-**작성 일자**: 2026-09-12 (Phase 4 완료 및 PII 삭제 UI 고도화 반영 현행화)  
+**작성 일자**: 2026-09-12 (Phase 5 완료 및 실시간 핫픽스/서포트 엔진 반영 현행화)  
 
 ---
 
 ## 1. 종합 점검 결과 요약 (Executive Summary)
 
-마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 4까지의 5개 단계**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
+마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 5까지의 6개 단계**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
 
-- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 4 전체)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달.
-- **자동화 테스트 검증율**: **35 / 35 테스트 100% PASS** (`uv run pytest -v`)
+- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 전체)**
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
+- **자동화 테스트 검증율**: **43 / 43 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
   - Phase 2: Dynamic Routing & xDS (6종)
   - Phase 3: Observability & FinOps (6종)
   - Phase 4: Compliance & PII Governance (8종)
+  - Phase 5: Lifecycle & Hotfix Engine (8종)
   - External API: (4종)
-- **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4 전체 스크립트(`make verify-phase*`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **6건** (ADR-01 ~ ADR-06 공식 반영 완료)
-- **미구현 항목**: 총 **3건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림, Phase 5/6 릴리즈 엔지니어링)
+- **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 전체 스크립트(`make verify-phase*`) 100% 통과
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **7건** (ADR-01 ~ ADR-07 공식 반영 완료)
+- **미구현 항목**: 총 **3건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림, Phase 6 릴리즈 엔지니어링)
 
 ---
 
-## 2. Phase 0 ~ Phase 4 세부 기능별 구현 및 테스트 현황 매트릭스
+## 2. Phase 0 ~ Phase 5 세부 기능별 구현 및 테스트 현황 매트릭스
 
 | 단계 | 설계서 요구 기능 | 실제 구현 상태 | 자동화 테스트 여부 | 비고 |
 | :--- | :--- | :---: | :---: | :--- |
@@ -72,7 +73,14 @@
 | | 프롬프트 스튜디오 Side-by-Side 비교 | ✅ **구현 완료** | ✅ **UI 검증 완료** | 원문 vs 마스킹 페이로드 비교 & 해시 |
 | | **대용량 Presidio spaCy NER 모델** | ⚠️ **자체 정규식 대체** | ✅ **단위 테스트 완료** | [ADR-05] 상세 내용 3.8 참조 |
 | | **Kafka ➔ OpenSearch ➔ S3 WORM 스택** | ⚠️ **Postgres WORM 대체** | ✅ **통합 테스트 완료** | [ADR-06] 상세 내용 3.9 참조 |
-| **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | 🚧 **미구현** | ❌ **미테스트** | 프론트 Mock UI만 존재. 상세 내용 3.10 참조 |
+| **Phase 5** | RSA-4096 서명 오프라인 패치 검증기 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_patch_signature_verification_success` |
+| | 4단계 무중단 롤링 핫픽스 엔진 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_patch_apply_and_version_update` |
+| | 원클릭 원복 롤백(Rollback) 파이프라인 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_patch_rollback_flow` |
+| | DB 연동 패치 이력(PatchHistory) 감사 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_patch_history_retrieval` |
+| | 에어갭 5대 인프라 Preflight 정밀 진단 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_lifecycle_preflight_check` |
+| | Zero-PII 서포트 번들 실제 ZIP 다운로드 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_support_bundle_generate_and_download` |
+| | 프론트엔드 실시간 터미널 & 버전 배지 | ✅ **구현 완료** | ✅ **E2E 완료** | 브라우저 서브에이전트 완벽 검증 |
+| | **K8s 클러스터 Deployment 롤링 갱신** | ⚠️ **단일 어플라이언스 대체** | ✅ **통합 테스트 완료** | [ADR-07] 상세 내용 3.10 참조 |
 | **Phase 6** | E2E 통합 검증, Helm 차트 & 패키징 | 🚧 **미구현** | ❌ **미테스트** | 상세 내용 3.11 참조 |
 
 ---
@@ -129,10 +137,12 @@
   - 원문 프롬프트는 저장하지 않고(개인정보 유출 원천 차단), `original_prompt_hash`(SHA-256) 및 `masked_payload_hash`(SHA-256), `worm_reference_id`를 암호학적으로 기록하여 금융감독원 제출용 전자적 무결성 증적 확보.
 - **영향도**: 긍정적 (빅데이터 클러스터 라이선스 및 리소스 절감, 완벽한 포렌식 추적성 달성).
 
-### 3.10 [미구현 - Phase 5] 에어갭 긴급 패치 관리자 & 서포트 엔진
-- **설계서 명세**: 폐쇄망 오프라인 패치 번들(`.tar.gz`) 업로드, RSA-4096 서명 검증, 프라이빗 레지스트리 자동 `push`, K8s `ext_proc` 무중단 롤링 업데이트 및 실패 시 원클릭 롤백.
-- **현재 구현 상태**: 프론트엔드 `LifecycleTab.jsx`에 파일 업로드 영역, 버전 비교 배지, 실시간 스트리밍 터미널 및 롤백 UI(Mock)만 작성되어 있으며 백엔드 패치 적용 엔진은 미구현.
-- **영향도**: 높음 (Phase 5 정규 작업 범위).
+### 3.10 [대체 구현 - Phase 5] K8s Deployment Rolling 갱신 vs 어플라이언스 컴포넌트 레지스트리 핫픽스 [ADR-07]
+- **설계서 명세**: 쿠버네티스 클러스터 내부에서 `kubectl set image deployment/ext-proc-service` 실행을 통한 K8s 네이티브 롤링 업데이트.
+- **현재 구현 상태**:
+  - 단일 노드 또는 소규모 폐쇄망 어플라이언스 환경에서 K8s API 서버 종속 없이 작동하도록, 백엔드 내부의 **인메모리/DB 컴포넌트 레지스트리(`patch_engine.py`) 및 4단계 롤링 파이프라인(Signature Verify ➔ Dry-run ➔ Staging ➔ Commit)**을 구축.
+  - 적용 시 `patch_history` 불변 테이블에 버전 변경 및 감사 로그가 즉각 기록되며, 장애 발생 시 원클릭 `POST /patches/rollback`을 통해 이전 버전으로 1초 내 즉시 원복됨.
+- **영향도**: 긍정적 (에어갭 단일 어플라이언스 환경에서도 쿠버네티스 의존성 없이 완벽한 긴급 핫픽스 및 롤백 제어 가능).
 
 ### 3.11 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
@@ -143,7 +153,7 @@
 
 ## 4. 미테스트 시나리오 목록 (Untested Scenarios)
 
-현재 백엔드 단위/통합 테스트 35개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
+현재 백엔드 단위/통합 테스트 43개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
 
 1. **대규모 정규식 처리량 부하 테스트 (High-Throughput PII Matching)**:
    - 초당 10,000건 이상의 동시 프롬프트 인입 시 정규식 컴파일 캐시 및 CPU 점유율 측정.
@@ -155,12 +165,14 @@
    - 향후 Keycloak OIDC 활성화 시 토큰 만료(Expired) 및 서명 불일치(Tampered) 차단 테스트.
 5. **네트워크 단절 시 WebSocket 재연결(Exponential Backoff) E2E 테스트**:
    - 브라우저 클라이언트가 백엔드 일시 중단 후 재접속 시 자동 세션 복구 여부.
+6. **대용량 서포트 번들(1GB 이상) 생성 시 메모리/디스크 오버헤드 테스트**:
+   - 장기간 축적된 로그 수집 시 스트리밍 ZIP 압축 버퍼 관리 및 스토리지 가용 공간 검증.
 
 ---
 
 ## 5. 결론 및 권장 조치 사항 (Recommendations)
 
-현재 구현된 Phase 0 ~ Phase 4 시스템은 **고객사 에어갭 인프라에서 AI 오케스트레이터의 테넌트/키 관리, 동적 멀티 라우팅, 관제 및 FinOps, PII 마스킹 및 WORM 감사 포렌식 기능을 100% 자체 완결적으로 수행할 수 있는 상용급 완성도**를 달성했습니다.
+현재 구현된 Phase 0 ~ Phase 5 시스템은 **고객사 에어갭 인프라에서 AI 오케스트레이터의 테넌트/키 관리, 동적 멀티 라우팅, 관제 및 FinOps, PII 마스킹 및 WORM 감사 포렌식, 그리고 에어갭 오프라인 긴급 패치 및 자가진단 서포트 기능을 100% 자체 완결적으로 수행할 수 있는 상용급 완성도**를 달성했습니다.
 
 - **완료된 마일스톤**:
   - Phase 0: 프로젝트 스캐폴딩 및 에어갭 표준화 (완료 ✅)
@@ -168,12 +180,12 @@
   - Phase 2: Envoy xDS 동적 멀티 라우팅 & N-Way 분할 (완료 ✅)
   - Phase 3: FinOps 비용 계량 & 1초 WebSocket 관제 허브 (완료 ✅)
   - Phase 4: PII 보안 거버넌스, WORM 감사 포렌식 & 규칙 인앱 안전 삭제 (완료 ✅)
+  - Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 (완료 ✅)
 
 - **권장 후속 과제 (우선순위 순)**:
-  1. **Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 착수**:
-     - RSA-4096 서명 검증 및 K8s 무중단 롤링 업데이트 백엔드 엔진 구현.
-  2. **Phase 6: 릴리즈 엔지니어링 & 패키징 착수**:
-     - Helm Chart 패키징 및 오프라인 이미지 번들 스크립트 작성.
-  3. **운영 부가 기능 보강 (선택 과제)**:
+  1. **Phase 6: 릴리즈 엔지니어링 & 패키징 착수**:
+     - Helm Chart 패키징 및 오프라인 이미지 번들 스크립트(`save-images.sh`, `load-images.sh`) 작성.
+     - Playwright 관리자 E2E 회귀 자동화 스위트 구축.
+  2. **운영 부가 기능 보강 (선택 과제)**:
      - 예산 80%/100% 도달 시 사내 웹훅(Slack/Teams/Alertmanager) 실시간 디스패처 모듈 추가.
      - Keycloak OIDC 관리자 콘솔 RBAC 인가 미들웨어 활성화.

@@ -12,12 +12,14 @@ def test_model_catalog_crud():
     model_ids = [m["model_id"] for m in models]
     assert "meta-llama/Llama-3.1-8B-Instruct" in model_ids
 
-    # 2. Register a new model
+    # 2. Register a new model (Ollama direct)
     new_model = {
         "model_id": "Upstage/Solar-Pro-22B-Instruct",
         "alias": "solar-pro-financial",
-        "backend_infra": "EKS",
-        "target_endpoint": "http://vllm-solar-pro.ai-serving:8000",
+        "backend_infra": "On-Prem K8s",
+        "serving_engine": "Ollama",
+        "execution_method": "direct",
+        "target_endpoint": "http://127.0.0.1:11434",
         "input_price_per_1k": 1.5000,
         "output_price_per_1k": 4.5000,
         "cache_discount_ratio": 0.3000,
@@ -28,19 +30,25 @@ def test_model_catalog_crud():
     created_data = create_res.json()
     assert created_data["model_id"] == new_model["model_id"]
     assert created_data["alias"] == "solar-pro-financial"
+    assert created_data["serving_engine"] == "Ollama"
+    assert created_data["execution_method"] == "direct"
 
     # 3. Get model details
     get_res = client.get(f"/api/v1/models/{new_model['model_id']}")
     assert get_res.status_code == 200
-    assert get_res.json()["backend_infra"] == "EKS"
+    assert get_res.json()["backend_infra"] == "On-Prem K8s"
+    assert get_res.json()["serving_engine"] == "Ollama"
+    assert get_res.json()["execution_method"] == "direct"
 
     # 4. Update model
     patch_res = client.patch(
         f"/api/v1/models/{new_model['model_id']}",
-        json={"input_price_per_1k": 1.4000, "is_active": False}
+        json={"input_price_per_1k": 1.4000, "serving_engine": "vLLM", "execution_method": "k8s", "is_active": False}
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["input_price_per_1k"] == 1.4
+    assert patch_res.json()["serving_engine"] == "vLLM"
+    assert patch_res.json()["execution_method"] == "k8s"
     assert patch_res.json()["is_active"] is False
 
 def test_routing_policy_get_active():

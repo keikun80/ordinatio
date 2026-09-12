@@ -13,7 +13,22 @@ logger = logging.getLogger(__name__)
 
 def init_db():
     try:
+        from sqlalchemy import text
         Base.metadata.create_all(bind=engine)
+
+        # 0. Safe DDL Column Migrations (Execute before opening ORM session)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS serving_engine VARCHAR(32) DEFAULT 'vLLM';"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS execution_method VARCHAR(32) DEFAULT 'k8s';"))
+                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS priority INT DEFAULT 10;"))
+                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS match_conditions JSONB DEFAULT '{}'::jsonb;"))
+                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS failover_chain JSONB DEFAULT '[]'::jsonb;"))
+                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS description TEXT;"))
+        except Exception as mig_err:
+            logger.debug(f"Column migration check: {mig_err}")
+
         db = SessionLocal()
         
         # 1. Tenants
@@ -44,6 +59,8 @@ def init_db():
                 model_id="meta-llama/Llama-3.1-8B-Instruct",
                 alias="financial-advisor-v1",
                 backend_infra="On-Prem K8s",
+                serving_engine="vLLM",
+                execution_method="k8s",
                 target_endpoint="http://vllm-llama8b.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -54,6 +71,8 @@ def init_db():
                 model_id="meta-llama/Llama-3.1-8B-FineTuned-v2",
                 alias="financial-advisor-canary",
                 backend_infra="On-Prem K8s",
+                serving_engine="vLLM",
+                execution_method="k8s",
                 target_endpoint="http://vllm-llama8b-canary.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -64,6 +83,8 @@ def init_db():
                 model_id="meta-llama/Llama-3.1-70B-Instruct",
                 alias="deep-risk-evaluator",
                 backend_infra="Bare-Metal GPU",
+                serving_engine="vLLM",
+                execution_method="direct",
                 target_endpoint="http://10.20.4.12:8000",
                 input_price_per_1k=3.5000,
                 output_price_per_1k=10.5000,
@@ -74,28 +95,29 @@ def init_db():
                 model_id="Solar-10.7B-Financial",
                 alias="compliance-auditor",
                 backend_infra="Private VM",
+                serving_engine="vLLM",
+                execution_method="docker-compose",
                 target_endpoint="http://vllm-solar.ai-serving:8000",
                 input_price_per_1k=1.2000,
                 output_price_per_1k=3.6000,
                 cache_discount_ratio=0.2500,
                 is_active=True
             )
-            db.add_all([m1, m2, m3, m4])
+            m5 = ModelCatalog(
+                model_id="qwen2.5:14b",
+                alias="ollama-local-advisor",
+                backend_infra="Local Server",
+                serving_engine="Ollama",
+                execution_method="direct",
+                target_endpoint="http://127.0.0.1:11434",
+                input_price_per_1k=0.5000,
+                output_price_per_1k=1.5000,
+                cache_discount_ratio=0.2500,
+                is_active=True
+            )
+            db.add_all([m1, m2, m3, m4, m5])
             db.commit()
             logger.info("Initialized database with default model catalog")
-
-        # Migration: Ensure columns exist on existing table
-        try:
-            from sqlalchemy import text
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS priority INT DEFAULT 10;"))
-                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS match_conditions JSONB DEFAULT '{}'::jsonb;"))
-                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS failover_chain JSONB DEFAULT '[]'::jsonb;"))
-                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
-                conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS description TEXT;"))
-                conn.commit()
-        except Exception as mig_err:
-            logger.debug(f"Column migration check: {mig_err}")
 
         # 3. Dynamic Routing Policy (Multi-Routing Seeds)
         if db.query(RoutingPolicy).count() == 0:

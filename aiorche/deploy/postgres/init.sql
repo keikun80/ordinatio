@@ -39,7 +39,9 @@ CREATE INDEX IF NOT EXISTS idx_virtual_keys_prefix ON virtual_keys(key_prefix);
 CREATE TABLE IF NOT EXISTS model_catalogs (
     model_id VARCHAR(128) PRIMARY KEY,
     alias VARCHAR(64) NOT NULL UNIQUE,
-    backend_infra VARCHAR(32) NOT NULL,
+    backend_infra VARCHAR(32) NOT NULL DEFAULT 'On-Prem K8s',
+    serving_engine VARCHAR(32) NOT NULL DEFAULT 'vLLM',
+    execution_method VARCHAR(32) NOT NULL DEFAULT 'k8s',
     target_endpoint VARCHAR(255) NOT NULL,
     input_price_per_1k NUMERIC(10, 4) NOT NULL DEFAULT 0.8,
     output_price_per_1k NUMERIC(10, 4) NOT NULL DEFAULT 2.4,
@@ -119,12 +121,13 @@ VALUES
     ('dept-05', '준법감시팀', 'COMP-500', 3000000.00, FALSE)
 ON CONFLICT (tenant_id) DO NOTHING;
 
-INSERT INTO model_catalogs (model_id, alias, backend_infra, target_endpoint, input_price_per_1k, output_price_per_1k)
+INSERT INTO model_catalogs (model_id, alias, backend_infra, serving_engine, execution_method, target_endpoint, input_price_per_1k, output_price_per_1k)
 VALUES
-    ('meta-llama/Llama-3.1-8B-Instruct', 'financial-advisor-v1', 'EKS', 'http://vllm-llama8b.ai-serving:8000', 0.8000, 2.4000),
-    ('meta-llama/Llama-3.1-8B-FineTuned-v2', 'financial-advisor-canary', 'EKS', 'http://vllm-llama8b-canary.ai-serving:8000', 0.8000, 2.4000),
-    ('meta-llama/Llama-3.1-70B-Instruct', 'deep-risk-evaluator', 'EC2', 'http://10.20.4.12:8000', 3.5000, 10.5000),
-    ('Solar-10.7B-Financial', 'compliance-auditor', 'ECS', 'http://vllm-solar.ai-serving:8000', 1.2000, 3.6000)
+    ('meta-llama/Llama-3.1-8B-Instruct', 'financial-advisor-v1', 'On-Prem K8s', 'vLLM', 'k8s', 'http://vllm-llama8b.ai-serving:8000', 0.8000, 2.4000),
+    ('meta-llama/Llama-3.1-8B-FineTuned-v2', 'financial-advisor-canary', 'On-Prem K8s', 'vLLM', 'k8s', 'http://vllm-llama8b-canary.ai-serving:8000', 0.8000, 2.4000),
+    ('meta-llama/Llama-3.1-70B-Instruct', 'deep-risk-evaluator', 'Bare-Metal GPU', 'vLLM', 'direct', 'http://10.20.4.12:8000', 3.5000, 10.5000),
+    ('Solar-10.7B-Financial', 'compliance-auditor', 'Private VM', 'vLLM', 'docker-compose', 'http://vllm-solar.ai-serving:8000', 1.2000, 3.6000),
+    ('qwen2.5:14b', 'ollama-local-advisor', 'Local Server', 'Ollama', 'direct', 'http://127.0.0.1:11434', 0.5000, 1.5000)
 ON CONFLICT (model_id) DO NOTHING;
 
 INSERT INTO pii_rules (rule_id, name, entity_type, regex_pattern, confidence_threshold, action)

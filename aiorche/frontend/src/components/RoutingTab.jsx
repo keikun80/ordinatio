@@ -96,11 +96,56 @@ export default function RoutingTab({ onNotify }) {
   const [newModelForm, setNewModelForm] = useState({
     model_id: 'Qwen/Qwen2.5-14B-Instruct',
     alias: 'qwen-14b-enterprise',
+    serving_engine: 'vLLM',
+    execution_method: 'k8s',
     backend_infra: 'On-Prem K8s',
     target_endpoint: 'http://vllm-qwen14b.ai-serving:8000',
     input_price_per_1k: 1.2,
     output_price_per_1k: 3.6
   });
+
+  const handleEngineChange = (engine) => {
+    let defaultEndpoint = newModelForm.target_endpoint;
+    let infra = newModelForm.backend_infra;
+    if (engine === 'Ollama') {
+      defaultEndpoint = newModelForm.execution_method === 'direct' 
+        ? 'http://127.0.0.1:11434' 
+        : (newModelForm.execution_method === 'docker-compose' ? 'http://ollama:11434' : 'http://ollama-service.ai-serving:11434');
+      infra = newModelForm.execution_method === 'direct' ? 'Local Server' : (newModelForm.execution_method === 'docker-compose' ? 'Private VM' : 'On-Prem K8s');
+    } else {
+      defaultEndpoint = newModelForm.execution_method === 'direct'
+        ? 'http://127.0.0.1:8000'
+        : (newModelForm.execution_method === 'docker-compose' ? 'http://vllm:8000' : 'http://vllm-qwen14b.ai-serving:8000');
+      infra = newModelForm.execution_method === 'direct' ? 'Bare-Metal GPU' : (newModelForm.execution_method === 'docker-compose' ? 'Private VM' : 'On-Prem K8s');
+    }
+    setNewModelForm({
+      ...newModelForm,
+      serving_engine: engine,
+      target_endpoint: defaultEndpoint,
+      backend_infra: infra
+    });
+  };
+
+  const handleExecutionMethodChange = (method) => {
+    let defaultEndpoint = newModelForm.target_endpoint;
+    let infra = newModelForm.backend_infra;
+    if (method === 'direct') {
+      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://127.0.0.1:11434' : 'http://127.0.0.1:8000';
+      infra = newModelForm.serving_engine === 'Ollama' ? 'Local Server' : 'Bare-Metal GPU';
+    } else if (method === 'docker-compose') {
+      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://ollama:11434' : 'http://vllm:8000';
+      infra = 'Private VM';
+    } else {
+      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://ollama-service.ai-serving:11434' : 'http://vllm-qwen14b.ai-serving:8000';
+      infra = 'On-Prem K8s';
+    }
+    setNewModelForm({
+      ...newModelForm,
+      execution_method: method,
+      target_endpoint: defaultEndpoint,
+      backend_infra: infra
+    });
+  };
 
   // Load Models and Multi-Routes on Mount
   useEffect(() => {
@@ -117,6 +162,8 @@ export default function RoutingTab({ onNotify }) {
             id: m.model_id,
             alias: m.alias,
             backend: m.backend_infra,
+            engine: m.serving_engine || (m.backend_infra?.toLowerCase().includes('ollama') ? 'Ollama' : 'vLLM'),
+            executionMethod: m.execution_method || 'k8s',
             endpoint: m.target_endpoint,
             inputPricePer1k: m.input_price_per_1k,
             outputPricePer1k: m.output_price_per_1k,
@@ -369,6 +416,8 @@ export default function RoutingTab({ onNotify }) {
       const res = await apiClient.createModel({
         model_id: newModelForm.model_id,
         alias: newModelForm.alias,
+        serving_engine: newModelForm.serving_engine,
+        execution_method: newModelForm.execution_method,
         backend_infra: newModelForm.backend_infra,
         target_endpoint: newModelForm.target_endpoint,
         input_price_per_1k: Number(newModelForm.input_price_per_1k),
@@ -381,6 +430,8 @@ export default function RoutingTab({ onNotify }) {
         id: res.model_id,
         alias: res.alias,
         backend: res.backend_infra,
+        engine: res.serving_engine || newModelForm.serving_engine,
+        executionMethod: res.execution_method || newModelForm.execution_method,
         endpoint: res.target_endpoint,
         inputPricePer1k: res.input_price_per_1k,
         outputPricePer1k: res.output_price_per_1k,
@@ -392,12 +443,14 @@ export default function RoutingTab({ onNotify }) {
       setModels(updated);
       localStorage.setItem('aiorche_models', JSON.stringify(updated));
       setShowNewModelModal(false);
-      onNotify('SUCCESS', `신규 모델 '${res.alias}'이(가) 서빙 풀에 추가되었습니다.`);
+      onNotify('SUCCESS', `신규 모델 '${res.alias}' (${newEntry.engine})이(가) 서빙 풀에 추가되었습니다.`);
     } catch (err) {
       const fallbackEntry = {
         id: newModelForm.model_id,
         alias: newModelForm.alias,
         backend: newModelForm.backend_infra,
+        engine: newModelForm.serving_engine,
+        executionMethod: newModelForm.execution_method,
         endpoint: newModelForm.target_endpoint,
         inputPricePer1k: Number(newModelForm.input_price_per_1k),
         outputPricePer1k: Number(newModelForm.output_price_per_1k),
@@ -408,7 +461,7 @@ export default function RoutingTab({ onNotify }) {
       setModels(updated);
       localStorage.setItem('aiorche_models', JSON.stringify(updated));
       setShowNewModelModal(false);
-      onNotify('SUCCESS', `신규 모델 '${newModelForm.alias}'이(가) 등록되었습니다.`);
+      onNotify('SUCCESS', `신규 모델 '${newModelForm.alias}' (${newModelForm.serving_engine})이(가) 등록되었습니다.`);
     }
   };
 
@@ -830,10 +883,10 @@ export default function RoutingTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <Cpu size={20} color="#34d399" />
-            <span>등록된 vLLM 서빙 모델 풀 (Model Catalog: {models.length}개)</span>
+            <span>등록된 LLM 서빙 모델 풀 (vLLM / Ollama: {models.length}개)</span>
           </div>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            주전산센터(K8s/Bare-Metal/VM) 내 배포된 실제 추론 엔드포인트 목록
+            주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 목록
           </span>
         </div>
 
@@ -842,7 +895,8 @@ export default function RoutingTab({ onNotify }) {
             <thead>
               <tr>
                 <th>모델 식별자 / 별칭</th>
-                <th>구동 인프라</th>
+                <th>런타임 엔진</th>
+                <th>구동 인프라 & 방식</th>
                 <th>엔드포인트 URL</th>
                 <th>토큰 단가 (입력/출력)</th>
                 <th>대기 큐</th>
@@ -853,6 +907,7 @@ export default function RoutingTab({ onNotify }) {
             <tbody>
               {models.map((m) => {
                 const isInCurrentRoute = currentWeights.some(w => w.model_id === m.id);
+                const isOllama = m.engine === 'Ollama' || m.backend?.toLowerCase().includes('ollama');
                 return (
                   <tr key={m.id}>
                     <td>
@@ -861,24 +916,43 @@ export default function RoutingTab({ onNotify }) {
                     </td>
                     <td>
                       <span 
-                        className="badge" 
+                        className="badge"
                         style={{
                           fontSize: '0.72rem',
-                          background: m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.15)' : 
-                                      (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.15)' : 
-                                      (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.1)')),
-                          color: m.backend?.includes('K8s') ? '#38bdf8' : 
-                                 (m.backend?.includes('Bare-Metal') ? '#c084fc' : 
-                                 (m.backend?.includes('VM') ? '#34d399' : '#e2e8f0')),
-                          border: `1px solid ${
-                            m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.3)' : 
-                            (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.3)' : 
-                            (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.2)'))
-                          }`
+                          fontWeight: 700,
+                          background: isOllama ? 'rgba(249, 115, 22, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                          color: isOllama ? '#fb923c' : '#38bdf8',
+                          border: `1px solid ${isOllama ? 'rgba(249, 115, 22, 0.35)' : 'rgba(56, 189, 248, 0.35)'}`
                         }}
                       >
-                        {m.backend}
+                        {m.engine || (isOllama ? 'Ollama' : 'vLLM')}
                       </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span 
+                          className="badge" 
+                          style={{
+                            fontSize: '0.72rem',
+                            background: m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.15)' : 
+                                        (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.15)' : 
+                                        (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.1)')),
+                            color: m.backend?.includes('K8s') ? '#38bdf8' : 
+                                   (m.backend?.includes('Bare-Metal') ? '#c084fc' : 
+                                   (m.backend?.includes('VM') ? '#34d399' : '#e2e8f0')),
+                            border: `1px solid ${
+                              m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.3)' : 
+                              (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.3)' : 
+                              (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.2)'))
+                            }`
+                          }}
+                        >
+                          {m.backend}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          [{m.executionMethod || 'k8s'}]
+                        </span>
+                      </div>
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
                       {m.endpoint}
@@ -999,19 +1073,117 @@ export default function RoutingTab({ onNotify }) {
       {/* New Model Modal */}
       {showNewModelModal && (
         <div className="modal-overlay" onClick={() => setShowNewModelModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff' }}>
-                신규 vLLM 모델 서빙 풀 등록
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cpu size={20} color="#38bdf8" />
+                <span>신규 LLM 서빙 모델 등록 (vLLM / Ollama 카탈로그)</span>
               </div>
             </div>
             <form onSubmit={handleCreateModel}>
               <div className="modal-body">
+                {/* 1. 런타임 서빙 엔진 선택 */}
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>서빙 런타임 엔진 (Serving Runtime)</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>* 고처리량 분산 vs 경량 GGUF</span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    {[
+                      { id: 'vLLM', label: 'vLLM (고성능/연속배치)', color: '#38bdf8' },
+                      { id: 'Ollama', label: 'Ollama (경량/GGUF)', color: '#fb923c' },
+                      { id: 'SGLang', label: 'SGLang (고속/구조화)', color: '#c084fc' }
+                    ].map(eng => {
+                      const isSelected = newModelForm.serving_engine === eng.id;
+                      return (
+                        <button
+                          key={eng.id}
+                          type="button"
+                          onClick={() => handleEngineChange(eng.id)}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? `2px solid ${eng.color}` : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.5)',
+                            color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                            fontWeight: isSelected ? 700 : 500,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span style={{ color: isSelected ? eng.color : 'inherit', fontSize: '0.88rem' }}>{eng.id}</span>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{eng.label.split(' ')[1]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. 실행 / 배포 환경 선택 */}
+                <div className="form-group">
+                  <label className="form-label">실행 및 배포 환경 (Execution Method)</label>
+                  <select 
+                    className="form-select"
+                    value={newModelForm.execution_method}
+                    onChange={(e) => handleExecutionMethodChange(e.target.value)}
+                  >
+                    <option value="k8s">Kubernetes (사내 온프레미스 K8s 클러스터 파드 배포)</option>
+                    <option value="docker-compose">Docker Compose (도커 컨테이너 / 격리 VM)</option>
+                    <option value="direct">Direct Host CLI (서버 호스트 OS 직접 백그라운드 명령어 실행)</option>
+                  </select>
+                </div>
+
+                {/* 3. 호스트 직접 실행/도커 가이드 스니펫 (Launch Snippet Box) */}
+                {(newModelForm.execution_method === 'direct' || newModelForm.execution_method === 'docker-compose') && (
+                  <div style={{
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px dashed var(--border-accent)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#38bdf8', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>💡 운영자 서버 구동 참고 템플릿 ({newModelForm.serving_engine} / {newModelForm.execution_method}):</span>
+                    </div>
+                    <pre style={{
+                      margin: 0,
+                      padding: '8px 10px',
+                      background: '#090d16',
+                      borderRadius: '4px',
+                      fontSize: '0.72rem',
+                      fontFamily: 'var(--font-mono)',
+                      color: '#a7f3d0',
+                      overflowX: 'auto',
+                      border: '1px solid #1e293b'
+                    }}>
+                      <code>
+                        {newModelForm.serving_engine === 'Ollama' ? (
+                          newModelForm.execution_method === 'direct' 
+                            ? `OLLAMA_HOST=0.0.0.0:11434 ollama serve\nollama run ${newModelForm.model_id || 'qwen2.5:14b'}`
+                            : `docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama\ndocker exec -it ollama ollama run ${newModelForm.model_id || 'qwen2.5:14b'}`
+                        ) : (
+                          newModelForm.execution_method === 'direct'
+                            ? `python3 -m vllm.entrypoints.openai.api_server \\\n  --model ${newModelForm.model_id || 'meta-llama/Llama-3.1-8B-Instruct'} \\\n  --port 8000 --max-model-len 8192`
+                            : `docker run --gpus all -v ~/.cache/huggingface:/root/.cache/huggingface \\\n  -p 8000:8000 --ipc=host vllm/vllm-openai:latest \\\n  --model ${newModelForm.model_id || 'meta-llama/Llama-3.1-8B-Instruct'}`
+                        )}
+                      </code>
+                    </pre>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+                      ※ AI Orchestrator는 기동 완료된 엔드포인트 URL을 등록받아 L7 라우팅을 제어하며 서버에 직접 배포하지 않습니다.
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">모델 식별자 (Model ID)</label>
                   <input 
                     className="form-input" 
-                    placeholder="예: Qwen/Qwen2.5-14B-Instruct" 
+                    placeholder="예: Qwen/Qwen2.5-14B-Instruct 또는 qwen2.5:14b" 
                     value={newModelForm.model_id}
                     onChange={(e) => setNewModelForm({...newModelForm, model_id: e.target.value})}
                     required
@@ -1035,18 +1207,19 @@ export default function RoutingTab({ onNotify }) {
                     onChange={(e) => setNewModelForm({...newModelForm, backend_infra: e.target.value})}
                   >
                     <optgroup label="온프레미스 / 폐쇄망 표준 인프라 (On-Premises Air-Gap)">
-                      <option value="On-Prem K8s">vLLM on Kubernetes (사내 온프레미스 K8s 클러스터)</option>
-                      <option value="Bare-Metal GPU">vLLM on Bare-Metal (사내 DGX/HGX 전용 고성능 GPU 서버)</option>
-                      <option value="Private VM">vLLM on Private VM (사내 VMware/Nutanix 가상화 GPU VM)</option>
+                      <option value="On-Prem K8s">Kubernetes (사내 온프레미스 K8s 클러스터)</option>
+                      <option value="Bare-Metal GPU">Bare-Metal GPU (사내 DGX/HGX 전용 고성능 GPU 서버)</option>
+                      <option value="Private VM">Private VM (사내 VMware/Nutanix 가상화 GPU VM)</option>
+                      <option value="Local Server">Local Server / Host (사내 호스트 서버/워크스테이션)</option>
                     </optgroup>
                     <optgroup label="하이브리드 클라우드 연동 (Hybrid Cloud Extensions)">
-                      <option value="Cloud GPU (EKS)">vLLM on Cloud K8s (AWS EKS / NCP InferencePool)</option>
-                      <option value="Cloud GPU (VM)">vLLM on Cloud Instance (AWS EC2 / NCP GPU)</option>
+                      <option value="Cloud GPU (EKS)">Cloud GPU K8s (AWS EKS / NCP InferencePool)</option>
+                      <option value="Cloud GPU (VM)">Cloud GPU Instance (AWS EC2 / NCP GPU)</option>
                     </optgroup>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">엔드포인트 URL</label>
+                  <label className="form-label">엔드포인트 URL (Target Endpoint)</label>
                   <input 
                     className="form-input" 
                     value={newModelForm.target_endpoint}

@@ -69,7 +69,9 @@ def seed_data():
             ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-Instruct",
                 alias="financial-advisor-v1",
-                backend_infra="EKS",
+                backend_infra="On-Prem K8s",
+                serving_engine="vLLM",
+                execution_method="k8s",
                 target_endpoint="http://vllm-llama8b.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -79,7 +81,9 @@ def seed_data():
             ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-FineTuned-v2",
                 alias="financial-advisor-canary",
-                backend_infra="EKS",
+                backend_infra="On-Prem K8s",
+                serving_engine="vLLM",
+                execution_method="k8s",
                 target_endpoint="http://vllm-llama8b-canary.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -89,10 +93,24 @@ def seed_data():
             ModelCatalog(
                 model_id="meta-llama/Llama-3.1-70B-Instruct",
                 alias="deep-risk-evaluator",
-                backend_infra="EC2",
+                backend_infra="Bare-Metal GPU",
+                serving_engine="vLLM",
+                execution_method="direct",
                 target_endpoint="http://10.20.4.12:8000",
                 input_price_per_1k=3.5000,
                 output_price_per_1k=10.5000,
+                cache_discount_ratio=0.2500,
+                is_active=True
+            ),
+            ModelCatalog(
+                model_id="qwen2.5:14b",
+                alias="ollama-local-advisor",
+                backend_infra="Local Server",
+                serving_engine="Ollama",
+                execution_method="direct",
+                target_endpoint="http://127.0.0.1:11434",
+                input_price_per_1k=0.5000,
+                output_price_per_1k=1.5000,
                 cache_discount_ratio=0.2500,
                 is_active=True
             )

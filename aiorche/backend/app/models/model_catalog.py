@@ -6,7 +6,9 @@ class ModelCatalog(Base):
 
     model_id = Column(String(128), primary_key=True, index=True)
     alias = Column(String(64), unique=True, nullable=False)
-    backend_infra = Column(String(32), nullable=False)  # 'EKS', 'ECS', 'EC2'
+    backend_infra = Column(String(32), nullable=False)  # Legacy/Composite (e.g. 'On-Prem K8s')
+    serving_engine = Column(String(32), nullable=False, default="vLLM")  # 'vLLM', 'Ollama', 'SGLang', 'Triton'
+    execution_method = Column(String(32), nullable=False, default="k8s")  # 'k8s', 'docker-compose', 'direct'
     target_endpoint = Column(String(255), nullable=False)
     input_price_per_1k = Column(Numeric(10, 4), default=0.8, nullable=False)
     output_price_per_1k = Column(Numeric(10, 4), default=2.4, nullable=False)

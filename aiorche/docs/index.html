@@ -960,10 +960,22 @@ bash scripts/verify-phase5.sh</code></pre>
               </thead>
               <tbody>
                 <tr>
-                  <td><strong>모델 식별자 (Model ID)</strong></td>
-                  <td><code>meta-llama/Llama-3.1-8B-Instruct</code></td>
+                  <td><strong>서빙 런타임 엔진 (Serving Runtime)</strong></td>
+                  <td><code>vLLM</code> / <code>Ollama</code> / <code>SGLang</code></td>
                   <td><span class="badge badge-danger">필수</span></td>
-                  <td>Hugging Face 또는 사내 모델 저장소 표준 고유 식별자</td>
+                  <td>추론 서빙 프레임워크 선택. 대규모 분산 배치(vLLM: Port 8000) 또는 경량 GGUF 양자화(Ollama: Port 11434)</td>
+                </tr>
+                <tr>
+                  <td><strong>실행 및 배포 환경 (Execution Method)</strong></td>
+                  <td><code>k8s</code> / <code>docker-compose</code> / <code>direct</code></td>
+                  <td><span class="badge badge-danger">필수</span></td>
+                  <td>쿠버네티스 파드, 도커 컴포즈 컨테이너, 또는 서버 호스트 OS 직접 명령어(CLI) 구동 방식</td>
+                </tr>
+                <tr>
+                  <td><strong>모델 식별자 (Model ID)</strong></td>
+                  <td><code>meta-llama/Llama-3.1-8B-Instruct</code> 또는 <code>qwen2.5:14b</code></td>
+                  <td><span class="badge badge-danger">필수</span></td>
+                  <td>Hugging Face 또는 Ollama 로컬 라이브러리 표준 모델 식별자</td>
                 </tr>
                 <tr>
                   <td><strong>서비스 Alias</strong></td>
@@ -973,33 +985,15 @@ bash scripts/verify-phase5.sh</code></pre>
                 </tr>
                 <tr>
                   <td><strong>대상 엔드포인트 URL</strong></td>
-                  <td><code>http://10.20.4.15:8000</code></td>
+                  <td><code>http://vllm-service:8000</code> 또는 <code>http://127.0.0.1:11434</code></td>
                   <td><span class="badge badge-danger">필수</span></td>
-                  <td>실제 모델 추론 서버가 구동 중인 내부 IP/도메인 및 포트</td>
-                </tr>
-                <tr>
-                  <td><strong>초기 트래픽 가중치 (Weight)</strong></td>
-                  <td><code>50</code> (0 ~ 100)</td>
-                  <td>선택</td>
-                  <td>로드밸런싱 트래픽 분배 기본 가중치 (백분율)</td>
-                </tr>
-                <tr>
-                  <td><strong>레이턴시 SLA (ms)</strong></td>
-                  <td><code>800</code></td>
-                  <td>선택</td>
-                  <td>목표 지연시간 한도. 초과 시 서킷 브레이커 감시 대상 등록</td>
-                </tr>
-                <tr>
-                  <td><strong>컨텍스트 윈도우 (Tokens)</strong></td>
-                  <td><code>128000</code></td>
-                  <td><span class="badge badge-danger">필수</span></td>
-                  <td>해당 모델이 수용 가능한 최대 토큰 길이</td>
+                  <td>실제 모델 추론 서버가 구동 중인 내부 IP/도메인 및 포트 (엔진 선택 시 자동 추천)</td>
                 </tr>
                 <tr>
                   <td><strong>토큰당 단가 (입력 / 출력)</strong></td>
-                  <td><code>0.8 / 1.5</code> ($/1k tokens)</td>
+                  <td><code>0.8 / 2.4</code> (₩/1k tokens)</td>
                   <td>선택</td>
-                  <td>FinOps 비용 정산에 적용될 1,000 토큰당 단가(USD)</td>
+                  <td>FinOps 비용 정산에 적용될 1,000 토큰당 단가(KRW)</td>
                 </tr>
               </tbody>
             </table>
@@ -1061,8 +1055,21 @@ bash scripts/verify-phase5.sh</code></pre>
                   <td><code>Cloud GPU (VM)</code></td>
                   <td><strong>vLLM on Cloud Instance:</strong> 퍼블릭 클라우드 전용 GPU 가상머신 연동 풀</td>
                 </tr>
+                <tr>
+                  <td><span class="badge badge-warning">온프레미스 경량/호스트</span></td>
+                  <td><code>Local Server</code></td>
+                  <td><strong>Ollama on Host/Workstation:</strong> 사내 단일 호스트 서버 또는 연구용 워크스테이션에서 직접 CLI 구동 (Port 11434)</td>
+                </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="alert alert-info" style="margin-top: 1.25rem;">
+            <div class="alert-title">⚡ 런타임 엔진별 기본 포트 및 헬스체크 표준</div>
+            <ul style="margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.85rem;">
+              <li><strong>vLLM:</strong> 기본 포트 <code>8000</code>, 헬스체크 경로 <code>/health</code>, 대규모 엔터프라이즈 연속 배치(Continuous Batching) 최적화</li>
+              <li><strong>Ollama:</strong> 기본 포트 <code>11434</code>, 헬스체크 경로 <code>/api/tags</code>, 단일 노드 GGUF 양자화 경량 추론 최적화</li>
+            </ul>
           </div>
         </div>
 

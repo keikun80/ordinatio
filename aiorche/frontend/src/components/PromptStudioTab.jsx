@@ -125,11 +125,12 @@ export default function PromptStudioTab({ onNotify }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">호출 대상 vLLM 서빙 모델</label>
+            <label className="form-label" style={{ color: '#F54927' }}>호출 대상 vLLM 서빙 모델</label>
             <select 
               className="form-select"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
+              style={{ color: '#F54927' }}
             >
               {initialModels.map((m) => (
                 <option key={m.id} value={m.id}>{m.id.split('/')[1] || m.id} ({m.backend})</option>
@@ -139,8 +140,8 @@ export default function PromptStudioTab({ onNotify }) {
 
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label className="form-label" style={{ margin: 0 }}>Temperature</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{temperature}</span>
+              <label className="form-label" style={{ margin: 0, color: '#F54927' }}>Temperature</label>
+              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: '#F54927' }}>{temperature}</span>
             </div>
             <input 
               type="range" 
@@ -155,8 +156,8 @@ export default function PromptStudioTab({ onNotify }) {
 
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label className="form-label" style={{ margin: 0 }}>Max Output Tokens</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>{maxTokens}</span>
+              <label className="form-label" style={{ margin: 0, color: '#F54927' }}>Max Output Tokens</label>
+              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: '#F54927' }}>{maxTokens}</span>
             </div>
             <input 
               type="range" 
@@ -205,6 +206,7 @@ export default function PromptStudioTab({ onNotify }) {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="테스트할 프롬프트를 입력하세요..."
+              style={{ color: '#F54927' }}
             />
           </div>
 
@@ -276,13 +278,13 @@ export default function PromptStudioTab({ onNotify }) {
                 </div>
               </div>
 
-              {/* Completion Output */}
+              {/* Completion Output - 백엔드 통신 Mock 응답 #5EF527 */}
               {output.response && (
                 <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffffff', marginBottom: '6px' }}>
-                    생성된 vLLM 스트리밍 완료 텍스트 (Completion Output):
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#5EF527', marginBottom: '6px' }}>
+                    생성된 vLLM 스트리밍 완료 텍스트 (Completion Output - 시뮬레이션):
                   </div>
-                  <div style={{ background: '#090d16', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: '#f8fafc', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ background: '#090d16', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: '#5EF527', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid rgba(94, 245, 39, 0.3)' }}>
                     {output.response}
                   </div>
                 </div>

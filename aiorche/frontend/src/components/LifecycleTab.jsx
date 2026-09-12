@@ -341,12 +341,12 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
             }}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload size={32} color="#38bdf8" style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff', marginBottom: '4px' }}>
+            <Upload size={32} color="#F54927" style={{ margin: '0 auto 12px' }} />
+            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#F54927', marginBottom: '4px' }}>
               벤더 긴급 패치 아카이브 파일 (.tar.gz)을 선택하거나 드래그하세요
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              폐쇄망 망연계 솔루션을 통해 반입된 서명된 OCI 패키지 파일
+            <div style={{ fontSize: '0.78rem', color: '#F54927', marginBottom: '14px' }}>
+              폐쇄망 망연계 솔루션을 통해 반입된 서명된 OCI 패키지 파일 (로컬 선택)
             </div>
             <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleLoadSampleBundle(); }}>
               [데모용] 벤더 공식 핫픽스 번들 로드 (patch-v1.2.1-hotfix-cve2026.tar.gz)

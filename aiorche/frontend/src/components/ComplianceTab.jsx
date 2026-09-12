@@ -307,6 +307,7 @@ export default function ComplianceTab({ onNotify }) {
                 type="button"
                 className={`btn btn-sm ${selectedSample === idx ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => handleSelectSample(idx)}
+                style={{ color: '#F54927' }}
               >
                 {p.label}
               </button>
@@ -515,18 +516,18 @@ export default function ComplianceTab({ onNotify }) {
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px' }}>
-              <Search size={14} color="var(--text-muted)" />
+              <Search size={14} color="#F54927" />
               <input 
                 type="text" 
                 placeholder="사번, 키, 로그ID 검색..." 
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '0.8rem', outline: 'none', width: '130px' }}
+                style={{ background: 'transparent', border: 'none', color: '#F54927', fontSize: '0.8rem', outline: 'none', width: '130px' }}
               />
             </div>
             <select 
               className="form-select" 
-              style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem' }}
+              style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem', color: '#F54927' }}
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
             >
@@ -538,9 +539,10 @@ export default function ComplianceTab({ onNotify }) {
             <button 
               className="btn btn-secondary btn-sm"
               onClick={handleExportAuditLogs}
+              style={{ color: '#F54927' }}
             >
-              <Download size={14} />
-              <span>감사 증적 리포트 출력</span>
+              <Download size={14} color="#F54927" />
+              <span style={{ color: '#F54927' }}>감사 증적 리포트 출력</span>
             </button>
           </div>
         </div>

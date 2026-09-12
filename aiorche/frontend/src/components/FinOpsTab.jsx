@@ -154,17 +154,17 @@ export default function FinOpsTab({ onNotify }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>입력 토큰 (Prompt Tokens)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>₩ 0.80 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>/ 1k tok</span></div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.80 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>사내 GPU 전력 및 감가상각 반영</div>
           </div>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>출력 토큰 (Completion Tokens)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#a855f7', fontFamily: 'var(--font-mono)' }}>₩ 2.40 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>/ 1k tok</span></div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 2.40 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Continuous Batching 가중 연산</div>
           </div>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>KV-Cache 적중 토큰 (Prefix Hit)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', fontFamily: 'var(--font-mono)' }}>₩ 0.20 <span style={{ fontSize: '0.8rem', color: '#10b981' }}>(75% 절감)</span></div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.20 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>(75% 절감)</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>PagedAttention 캐싱 재사용 유도</div>
           </div>
         </div>

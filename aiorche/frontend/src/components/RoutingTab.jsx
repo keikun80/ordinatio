@@ -468,8 +468,8 @@ export default function RoutingTab({ onNotify }) {
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    <GitFork size={14} />
-                    <span>{r.route_name}</span>
+                    <GitFork size={14} color="#F54927" />
+                    <span style={{ color: '#F54927' }}>{r.route_name}</span>
                     <span style={{
                       fontSize: '0.7rem',
                       padding: '2px 6px',
@@ -540,8 +540,8 @@ export default function RoutingTab({ onNotify }) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance}>
-                <Scale size={14} /> 가중치 균등 분할
+              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance} style={{ color: '#F54927' }}>
+                <Scale size={14} color="#F54927" /> <span style={{ color: '#F54927' }}>가중치 균등 분할</span>
               </button>
               <div style={{
                 fontSize: '0.85rem',
@@ -644,9 +644,9 @@ export default function RoutingTab({ onNotify }) {
                         value={item.weight}
                         onChange={(e) => handleWeightChange(idx, e.target.value)}
                         className="form-input"
-                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right' }}
+                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: '#F54927' }}
                       />
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>
+                      <span style={{ fontSize: '0.8rem', color: '#F54927' }}>%</span>
                     </div>
                   </div>
 
@@ -654,10 +654,10 @@ export default function RoutingTab({ onNotify }) {
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => handleRemoveModelFromRoute(idx)}
-                      style={{ padding: '6px', color: '#f87171' }}
+                      style={{ padding: '6px', color: '#F54927' }}
                       title="모델 제외"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} color="#F54927" />
                     </button>
                   )}
                 </div>
@@ -671,7 +671,7 @@ export default function RoutingTab({ onNotify }) {
               <select
                 id="addModelSelect"
                 className="form-select"
-                style={{ maxWidth: '360px', fontSize: '0.82rem' }}
+                style={{ maxWidth: '360px', fontSize: '0.82rem', color: '#F54927' }}
                 defaultValue=""
                 onChange={(e) => {
                   if (e.target.value) {
@@ -759,8 +759,8 @@ export default function RoutingTab({ onNotify }) {
             
             <div style={{ marginBottom: '14px' }}>
               <label className="form-label" style={{ marginBottom: '6px' }}>지능형 부하 분산 알고리즘</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: '#F54927' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#F54927' }}>
                   <input
                     type="radio"
                     name="strategy"
@@ -768,9 +768,9 @@ export default function RoutingTab({ onNotify }) {
                     checked={(currentRoute.load_balancing_strategy || 'LeastQueueDepth') === 'LeastQueueDepth'}
                     onChange={() => updateCurrentRoute({ load_balancing_strategy: 'LeastQueueDepth' })}
                   />
-                  <span><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
+                  <span style={{ color: '#F54927' }}><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#F54927' }}>
                   <input
                     type="radio"
                     name="strategy"

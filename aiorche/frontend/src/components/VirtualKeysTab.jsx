@@ -322,9 +322,9 @@ export default function VirtualKeysTab({ onNotify }) {
           <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={handleResetToDefault} title="초기 데이터로 복원">
-            <RotateCcw size={15} />
-            <span>초기화</span>
+          <button className="btn btn-secondary" onClick={handleResetToDefault} title="초기 데이터로 복원" style={{ color: '#F54927' }}>
+            <RotateCcw size={15} color="#F54927" />
+            <span style={{ color: '#F54927' }}>초기화</span>
           </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             <Plus size={16} />
@@ -338,10 +338,10 @@ export default function VirtualKeysTab({ onNotify }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1, minWidth: '260px' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#F54927' }} />
               <input
                 className="form-input"
-                style={{ paddingLeft: '36px' }}
+                style={{ paddingLeft: '36px', color: '#F54927' }}
                 placeholder="키 명칭, Key ID, 또는 접두사 검색..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -682,17 +682,17 @@ export default function VirtualKeysTab({ onNotify }) {
                     type="button"
                     className="btn btn-primary"
                     onClick={handleCopySecret}
-                    style={{ minWidth: '110px' }}
+                    style={{ minWidth: '110px', color: '#F54927' }}
                   >
                     {copied ? (
                       <>
-                        <Check size={16} />
-                        <span>복사됨!</span>
+                        <Check size={16} color="#F54927" />
+                        <span style={{ color: '#F54927' }}>복사됨!</span>
                       </>
                     ) : (
                       <>
-                        <Copy size={16} />
-                        <span>키 복사</span>
+                        <Copy size={16} color="#F54927" />
+                        <span style={{ color: '#F54927' }}>키 복사</span>
                       </>
                     )}
                   </button>

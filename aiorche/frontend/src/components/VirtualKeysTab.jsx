@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle, RotateCcw } from 'lucide-react';
+import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { initialVirtualKeys, initialTenants, initialModels } from '../data/mockData';
 
@@ -293,16 +293,6 @@ export default function VirtualKeysTab({ onNotify }) {
     }
   };
 
-  const handleResetToDefault = () => {
-    if (window.confirm('모든 가상 API Key 데이터를 초기 기본값으로 리셋하시겠습니까?')) {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      localStorage.removeItem(LOCAL_STORAGE_TENANTS_KEY);
-      setKeys(initialVirtualKeys);
-      setTenants(initialTenants);
-      onNotify('INFO', '가상 API Key 목록이 초기 기본값으로 리셋되었습니다.');
-    }
-  };
-
   // Filter keys
   const filteredKeys = keys.filter((k) => {
     const matchesDept = selectedDept === 'ALL' || k.tenantId === selectedDept;
@@ -322,10 +312,6 @@ export default function VirtualKeysTab({ onNotify }) {
           <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={handleResetToDefault} title="초기 데이터로 복원" style={{ color: '#F54927' }}>
-            <RotateCcw size={15} color="#F54927" />
-            <span style={{ color: '#F54927' }}>초기화</span>
-          </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             <Plus size={16} />
             <span>신규 가상 API Key 발급</span>

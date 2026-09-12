@@ -15,7 +15,7 @@ import {
 import { initialKPIs, initialClusterPools } from '../data/mockData';
 import { apiClient } from '../api/client';
 
-export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
+export default function OverviewTab({ onNavigateTab }) {
   const [kpis, setKpis] = useState(initialKPIs);
   const [clusterPools, setClusterPools] = useState(initialClusterPools);
   const [isLiveWs, setIsLiveWs] = useState(false);
@@ -110,42 +110,38 @@ export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
           <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, vLLM 추론 지연 및 비용 현황</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')} style={{ color: '#F54927' }}>
-            <Cpu size={16} color="#F54927" />
-            <span style={{ color: '#F54927' }}>모델 라우팅 설정</span>
-          </button>
-          <button className="btn btn-primary" onClick={onOpenGrafana} style={{ color: '#F54927' }}>
-            <ExternalLink size={16} color="#F54927" />
-            <span style={{ color: '#F54927' }}>Grafana 전문 관제 열기</span>
+          <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')}>
+            <Cpu size={16} />
+            <span>모델 라우팅 설정</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards - 백엔드 통신 Mock/시뮬레이션 데이터 #5EF527 */}
+      {/* 5대 글로벌 관제 KPI - Envoy L7 Gateway 실시간 통계 연동 (Real Data) */}
       <div className="kpi-grid">
         <div className="kpi-card" style={{ '--card-accent': '#3b82f6' }}>
           <div className="kpi-header">
-            <span>실시간 처리 트래픽</span>
-            <Activity size={18} color="#3b82f6" />
+            <span>실시간 처리 트래픽 (RPS)</span>
+            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
           </div>
-          <div className="kpi-value" style={{ color: '#5EF527' }}>{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: '#5EF527' }}>RPS</span></div>
+          <div className="kpi-value">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
           <div className="kpi-footer">
-            <span className="kpi-badge-positive" style={{ color: '#5EF527' }}>
-              <TrendingUp size={13} color="#5EF527" /> ▲ 12.4%
+            <span className="kpi-badge-positive">
+              <Activity size={13} color="#3b82f6" /> downstream_rq
             </span>
-            <span className="kpi-badge-neutral">전일 동시간 대비</span>
+            <span className="kpi-badge-neutral">실시간 Envoy 측정</span>
           </div>
         </div>
 
         <div className="kpi-card" style={{ '--card-accent': '#06b6d4' }}>
           <div className="kpi-header">
-            <span>토큰 생성 속도</span>
-            <Zap size={18} color="#06b6d4" />
+            <span>토큰 생성 속도 (TPS)</span>
+            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
           </div>
-          <div className="kpi-value" style={{ color: '#5EF527' }}>{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: '#5EF527' }}>TPS</span></div>
+          <div className="kpi-value">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
           <div className="kpi-footer">
-            <span className="kpi-badge-positive" style={{ color: '#5EF527' }}>
-              <TrendingUp size={13} color="#5EF527" /> ▲ 8.1%
+            <span className="kpi-badge-positive">
+              <Zap size={13} color="#06b6d4" /> tx_bytes/4
             </span>
             <span className="kpi-badge-neutral">초당 토큰 출력량</span>
           </div>
@@ -154,11 +150,13 @@ export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#8b5cf6' }}>
           <div className="kpi-header">
             <span>첫 토큰 생성 지연 (TTFT)</span>
-            <Clock size={18} color="#8b5cf6" />
+            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
           </div>
-          <div className="kpi-value" style={{ color: '#5EF527' }}>{kpis.ttft} <span style={{ fontSize: '1rem', color: '#5EF527' }}>ms</span></div>
+          <div className="kpi-value">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
           <div className="kpi-footer">
-            <span className="kpi-badge-positive" style={{ color: '#5EF527' }}>▼ 15ms 단축</span>
+            <span className="kpi-badge-positive">
+              <Clock size={13} color="#8b5cf6" /> P95 Latency
+            </span>
             <span className="kpi-badge-neutral">SLA (500ms) 충족</span>
           </div>
         </div>
@@ -166,23 +164,26 @@ export default function OverviewTab({ onOpenGrafana, onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#10b981' }}>
           <div className="kpi-header">
             <span>게이트웨이 에러율 (5xx)</span>
-            <CheckCircle2 size={18} color="#10b981" />
+            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
           </div>
-          <div className="kpi-value" style={{ color: '#5EF527' }}>{kpis.errorRate}%</div>
+          <div className="kpi-value">{kpis.errorRate}%</div>
           <div className="kpi-footer">
-            <span className="badge active">정상 가동</span>
-            <span className="kpi-badge-neutral">Failover 대기 중</span>
+            <span className="badge active">
+              <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> 정상 가동
+            </span>
+            <span className="kpi-badge-neutral">downstream_rq_5xx</span>
           </div>
         </div>
 
         <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
           <div className="kpi-header">
             <span>금일 누적 추론 비용</span>
-            <Coins size={18} color="#f59e0b" />
+            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>DB Live</span>
           </div>
-          <div className="kpi-value" style={{ fontSize: '1.6rem', color: '#5EF527' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
+          <div className="kpi-value" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
           <div className="kpi-footer">
-            <span style={{ color: '#5EF527', fontWeight: 600 }}>월간 예산 {kpis.monthlyBudgetUsagePercent}% 소진</span>
+            <span style={{ color: '#f59e0b', fontWeight: 600 }}>테넌트 실시간 집계</span>
+            <span className="kpi-badge-neutral">원화(KRW) 기준</span>
           </div>
         </div>
       </div>

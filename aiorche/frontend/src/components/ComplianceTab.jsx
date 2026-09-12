@@ -19,11 +19,40 @@ import {
 import { api } from '../api/client';
 import { initialPiiRules, samplePrompts, initialAuditLogs } from '../data/mockData';
 
+const PRESETS_STORAGE_KEY = 'aiorche_compliance_presets';
+
 export default function ComplianceTab({ onNotify }) {
   const [rules, setRules] = useState([]);
   const [loadingRules, setLoadingRules] = useState(true);
+
+  // Dynamic Presets State
+  const [presets, setPresets] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PRESETS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse presets from localStorage', e);
+    }
+    return samplePrompts;
+  });
   const [selectedSample, setSelectedSample] = useState(0);
-  const [inputText, setInputText] = useState(samplePrompts[0]?.text || '');
+  const [inputText, setInputText] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PRESETS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0]?.text || '';
+      }
+    } catch (e) {}
+    return samplePrompts[0]?.text || '';
+  });
+  const [isAddPresetModalOpen, setIsAddPresetModalOpen] = useState(false);
+  const [newPreset, setNewPreset] = useState({ label: '', text: '' });
+  const [deletingPresetIndex, setDeletingPresetIndex] = useState(null);
+
   const [simulationResult, setSimulationResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -150,10 +179,50 @@ export default function ComplianceTab({ onNotify }) {
     }
   };
 
+  const savePresets = (newPresets) => {
+    setPresets(newPresets);
+    try {
+      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
+    } catch (e) {
+      console.error('Failed to save presets to localStorage', e);
+    }
+  };
+
   const handleSelectSample = (idx) => {
     setSelectedSample(idx);
-    setInputText(samplePrompts[idx].text);
+    if (presets[idx]) {
+      setInputText(presets[idx].text);
+    }
     setSimulationResult(null);
+  };
+
+  const handleAddPreset = (e) => {
+    e.preventDefault();
+    if (!newPreset.label.trim() || !newPreset.text.trim()) {
+      onNotify('WARNING', '프리셋 명칭과 프롬프트 내용을 모두 입력해주세요.');
+      return;
+    }
+    const updated = [...presets, { label: newPreset.label.trim(), text: newPreset.text.trim() }];
+    savePresets(updated);
+    setSelectedSample(updated.length - 1);
+    setInputText(newPreset.text.trim());
+    setIsAddPresetModalOpen(false);
+    setNewPreset({ label: '', text: '' });
+    onNotify('SUCCESS', `시나리오 프리셋 '${newPreset.label.trim()}'이(가) 추가되었습니다.`);
+  };
+
+  const handleDeletePreset = (idx) => {
+    const target = presets[idx];
+    const updated = presets.filter((_, i) => i !== idx);
+    savePresets(updated);
+    setDeletingPresetIndex(null);
+    if (selectedSample === idx) {
+      setSelectedSample(0);
+      setInputText(updated[0]?.text || '');
+    } else if (selectedSample > idx) {
+      setSelectedSample(prev => prev - 1);
+    }
+    onNotify('INFO', `시나리오 프리셋 '${target?.label || ''}'이(가) 삭제되었습니다.`);
   };
 
   // Rule Update
@@ -225,16 +294,32 @@ export default function ComplianceTab({ onNotify }) {
     onNotify('SUCCESS', '금융감독원 감사 대응용 WORM 무결성 포렌식 리포트가 다운로드되었습니다.');
   };
 
-  // Filtered Audit Logs
+  // Filtered Audit Logs with Full-Field Search
   const filteredLogs = auditLogs.filter(log => {
-    const matchSearch = !logSearch || 
-      (log.requester_id && log.requester_id.toLowerCase().includes(logSearch.toLowerCase())) ||
-      (log.key_id && log.key_id.toLowerCase().includes(logSearch.toLowerCase())) ||
-      (log.log_id && log.log_id.toLowerCase().includes(logSearch.toLowerCase()));
+    const query = logSearch.trim().toLowerCase();
+    
+    let matchSearch = true;
+    if (query) {
+      const actionText = (log.action_taken || '').toLowerCase();
+      const isBlocked = log.is_blocked || log.action_taken === 'BLOCK';
+      const koreanAction = isBlocked ? '차단' : (log.pii_count > 0 ? '마스킹' : '통과');
+
+      matchSearch = 
+        (log.requester_id && log.requester_id.toLowerCase().includes(query)) ||
+        (log.key_id && log.key_id.toLowerCase().includes(query)) ||
+        (log.log_id && log.log_id.toLowerCase().includes(query)) ||
+        (log.worm_reference_id && log.worm_reference_id.toLowerCase().includes(query)) ||
+        (log.model_id && log.model_id.toLowerCase().includes(query)) ||
+        (log.original_prompt_hash && log.original_prompt_hash.toLowerCase().includes(query)) ||
+        (log.masked_payload_hash && log.masked_payload_hash.toLowerCase().includes(query)) ||
+        (log.timestamp && String(log.timestamp).toLowerCase().includes(query)) ||
+        actionText.includes(query) ||
+        koreanAction.includes(query);
+    }
 
     const matchAction = actionFilter === 'ALL' || 
       (actionFilter === 'BLOCK' && (log.action_taken === 'BLOCK' || log.is_blocked)) ||
-      (actionFilter === 'MASK' && log.action_taken === 'MASK') ||
+      (actionFilter === 'MASK' && (log.action_taken === 'MASK' || (!log.is_blocked && log.pii_count > 0))) ||
       (actionFilter === 'PASS' && log.action_taken === 'PASS');
 
     return matchSearch && matchAction;
@@ -299,18 +384,73 @@ export default function ComplianceTab({ onNotify }) {
         </div>
 
         <div style={{ marginBottom: '14px' }}>
-          <label className="form-label">테스트용 시나리오 프리셋 선택:</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <label className="form-label" style={{ margin: 0 }}>테스트용 시나리오 프리셋 선택:</label>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setNewPreset({ label: '', text: inputText || '' });
+                setIsAddPresetModalOpen(true);
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '4px 10px' }}
+            >
+              <Plus size={14} />
+              <span>프리셋 추가</span>
+            </button>
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {samplePrompts.map((p, idx) => (
-              <button
+            {presets.map((p, idx) => (
+              <div 
                 key={idx}
-                type="button"
-                className={`btn btn-sm ${selectedSample === idx ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleSelectSample(idx)}
-                style={{ color: '#F54927' }}
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center',
+                  borderRadius: 'var(--radius-sm)',
+                  border: selectedSample === idx ? '1px solid #38bdf8' : '1px solid var(--border-subtle)',
+                  background: selectedSample === idx ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s'
+                }}
               >
-                {p.label}
-              </button>
+                <button
+                  type="button"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: selectedSample === idx ? '#38bdf8' : 'var(--text-secondary)',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    fontWeight: selectedSample === idx ? 600 : 400
+                  }}
+                  onClick={() => handleSelectSample(idx)}
+                >
+                  {p.label}
+                </button>
+                <button
+                  type="button"
+                  title="프리셋 삭제"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeletingPresetIndex(idx);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    padding: '6px 8px 6px 2px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = '#f43f5e'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                >
+                  <X size={13} />
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -512,22 +652,47 @@ export default function ComplianceTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <FileText size={18} color="#a855f7" />
-            <span>금융감독원 제출용 WORM 감사 포렌식 로그 (Kafka ➔ OpenSearch & S3)</span>
+            <span>금융감독원 제출용 WORM 감사 포렌식 로그 (불변 무결성 증적)</span>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px' }}>
-              <Search size={14} color="#F54927" />
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              background: 'rgba(255,255,255,0.05)', 
+              border: '1px solid var(--border-subtle)',
+              padding: '4px 10px', 
+              borderRadius: 'var(--radius-sm)' 
+            }}>
+              <Search size={14} style={{ color: 'var(--text-muted)' }} />
               <input 
                 type="text" 
-                placeholder="사번, 키, 로그ID 검색..." 
+                placeholder="요청자, 키, 모델, WORM ID, 해시, 조치 검색..." 
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
-                style={{ background: 'transparent', border: 'none', color: '#F54927', fontSize: '0.8rem', outline: 'none', width: '130px' }}
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: 'var(--text-primary)', 
+                  fontSize: '0.82rem', 
+                  outline: 'none', 
+                  width: '230px' 
+                }}
               />
+              {logSearch && (
+                <button
+                  type="button"
+                  onClick={() => setLogSearch('')}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                  title="검색어 지우기"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
             <select 
               className="form-select" 
-              style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem', color: '#F54927' }}
+              style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem' }}
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
             >
@@ -539,10 +704,9 @@ export default function ComplianceTab({ onNotify }) {
             <button 
               className="btn btn-secondary btn-sm"
               onClick={handleExportAuditLogs}
-              style={{ color: '#F54927' }}
             >
-              <Download size={14} color="#F54927" />
-              <span style={{ color: '#F54927' }}>감사 증적 리포트 출력</span>
+              <Download size={14} />
+              <span>감사 증적 리포트 출력</span>
             </button>
           </div>
         </div>
@@ -562,7 +726,27 @@ export default function ComplianceTab({ onNotify }) {
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map((log) => (
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.92rem', marginBottom: '8px' }}>
+                      검색 조건에 일치하는 WORM 감사 포렌식 로그가 없습니다.
+                    </div>
+                    {(logSearch || actionFilter !== 'ALL') && (
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setLogSearch(''); setActionFilter('ALL'); }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
+                      >
+                        <RefreshCw size={12} />
+                        <span>검색 및 필터 초기화</span>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                filteredLogs.map((log) => (
                 <tr key={log.log_id}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: '#94a3b8' }}>
                     {typeof log.timestamp === 'string' ? log.timestamp.replace('T', ' ').slice(0, 19) : log.timestamp}
@@ -594,8 +778,9 @@ export default function ComplianceTab({ onNotify }) {
                     </span>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              ))
+            )}
+          </tbody>
           </table>
         </div>
       </div>
@@ -789,6 +974,144 @@ export default function ComplianceTab({ onNotify }) {
                 onClick={() => confirmDeleteRule(deletingRule.rule_id)}
               >
                 규칙 삭제 실행
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Preset Modal */}
+      {isAddPresetModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '520px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Plus size={20} color="#38bdf8" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem' }}>신규 시나리오 프리셋 추가</h3>
+              </div>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setIsAddPresetModalOpen(false)}
+                style={{ padding: '4px 6px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPreset}>
+              <div className="form-group">
+                <label className="form-label">프리셋 명칭 (Label)</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required
+                  value={newPreset.label}
+                  onChange={(e) => setNewPreset({ ...newPreset, label: e.target.value })}
+                  placeholder="예: 여신 승인 상담 예시 (주민번호/계좌번호)"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">시뮬레이션 프롬프트 본문 (Prompt Text)</label>
+                <textarea 
+                  className="form-textarea" 
+                  rows={4}
+                  required
+                  style={{ fontFamily: 'var(--font-sans)', fontSize: '0.9rem' }}
+                  value={newPreset.text}
+                  onChange={(e) => setNewPreset({ ...newPreset, text: e.target.value })}
+                  placeholder="테스트할 사용자 인입 원문 프롬프트를 입력하세요..."
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsAddPresetModalOpen(false)}>
+                  취소
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  프리셋 저장
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Preset Confirmation Modal */}
+      {deletingPresetIndex !== null && presets[deletingPresetIndex] && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '440px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={20} color="#f43f5e" />
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f43f5e' }}>시나리오 프리셋 삭제 확인</h3>
+              </div>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setDeletingPresetIndex(null)}
+                style={{ padding: '4px 6px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.6', marginBottom: '20px' }}>
+              다음 시나리오 프리셋을 삭제하시겠습니까?
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '12px', 
+                background: 'rgba(0,0,0,0.35)', 
+                borderRadius: '6px', 
+                border: '1px solid rgba(255,255,255,0.08)' 
+              }}>
+                <div style={{ fontWeight: 600, color: '#fff', marginBottom: '4px' }}>
+                  {presets[deletingPresetIndex].label}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {presets[deletingPresetIndex].text}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setDeletingPresetIndex(null)}
+              >
+                취소
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                style={{ background: '#e11d48', borderColor: '#e11d48', color: '#fff' }}
+                onClick={() => handleDeletePreset(deletingPresetIndex)}
+              >
+                프리셋 삭제 실행
               </button>
             </div>
           </div>

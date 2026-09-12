@@ -259,7 +259,7 @@ export default function ComplianceTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <FileText size={18} color="#a855f7" />
-            <span>금융감독원 제출용 WORM 감사 포렌식 로그 (Kafka ➔ OpenSearch & S3)</span>
+            <span>금융감독원 제출용 WORM 감사 포렌식 로그 (불변 무결성 증적)</span>
           </div>
           <button 
             className="btn btn-secondary btn-sm"

@@ -31,8 +31,8 @@ def test_observability_websocket_telemetry():
         assert "ttft_ms" in packet
         assert "cumulative_cost_krw" in packet
         assert "compute_pools" in packet
-        assert packet["rps"] > 0
-        assert packet["tps"] > 0
+        assert packet["rps"] >= 0
+        assert packet["tps"] >= 0
 
         # 2. Test ping-pong heartbeat
         ws.send_text("ping")

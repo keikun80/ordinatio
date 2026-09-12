@@ -9,14 +9,15 @@ def get_system_info():
     return {
         "solution": "Enterprise AI Orchestrator Appliance",
         "version": settings.VERSION,
+        "datacenter_name": settings.DATACENTER_NAME,
+        "cluster_region": settings.CLUSTER_REGION,
+        "deploy_mode": settings.DEPLOY_MODE,
         "mode": "Air-Gapped Customer-Managed",
         "components": {
             "envoy": "v1.31.2",
             "ext_proc": "v1.2.0",
             "presidio": "v2.2.354",
-            "control_plane": settings.VERSION,
-            "prometheus": "v2.53",
-            "grafana": "v10.4"
+            "control_plane": settings.VERSION
         }
     }
 

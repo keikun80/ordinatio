@@ -8,13 +8,11 @@ import FinOpsTab from './components/FinOpsTab';
 import ComplianceTab from './components/ComplianceTab';
 import LifecycleTab from './components/LifecycleTab';
 import PromptStudioTab from './components/PromptStudioTab';
-import GrafanaModal from './components/GrafanaModal';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [unreadPatchCount, setUnreadPatchCount] = useState(1);
-  const [isGrafanaOpen, setIsGrafanaOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   // Trigger Toast Notification
@@ -42,7 +40,6 @@ export default function App() {
       {/* Main Wrapper */}
       <div className="main-wrapper">
         <Header 
-          onOpenGrafana={() => setIsGrafanaOpen(true)}
           onOpenPatchTab={() => setActiveTab('lifecycle')}
           unreadPatchCount={unreadPatchCount}
         />
@@ -50,7 +47,6 @@ export default function App() {
         <main className="page-content">
           {activeTab === 'overview' && (
             <OverviewTab 
-              onOpenGrafana={() => setIsGrafanaOpen(true)}
               onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
@@ -83,12 +79,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      {/* Grafana Dashboard Modal */}
-      <GrafanaModal 
-        isOpen={isGrafanaOpen} 
-        onClose={() => setIsGrafanaOpen(false)} 
-      />
 
       {/* Global Toast Notification Container */}
       <div className="toast-container">

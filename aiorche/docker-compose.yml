@@ -1,21 +1,21 @@
-version: '3.8'
-
 services:
   # 1. 메타스토어: PostgreSQL
   postgres:
     image: postgres:15-alpine
     container_name: aiorche-postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aiorche_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-aiorche_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d aiorche_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aiorche_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,7 +25,7 @@ services:
     image: redis:7-alpine
     container_name: aiorche-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -39,8 +39,8 @@ services:
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml
     ports:
-      - "8080:8080" # L7 Traffic Ingress
-      - "9901:9901" # Envoy Admin & Prometheus Stats
+      - "${ENVOY_TRAFFIC_PORT:-8080}:8080" # L7 Traffic Ingress
+      - "${ENVOY_ADMIN_PORT:-9901}:9901" # Envoy Admin & Prometheus Stats
     command: ["/usr/local/bin/envoy", "-c", "/etc/envoy/envoy.yaml"]
 
   # 4. 컨트롤 플레인 백엔드 API (FastAPI)
@@ -49,12 +49,17 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: aiorche-backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/aiorche_db
-      REDIS_HOST: redis
-      ENVOY_ADMIN_URL: http://envoy:9901
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-aiorche_db}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      ENVOY_ADMIN_URL: ${ENVOY_ADMIN_URL:-http://envoy:9901}
+      DATACENTER_NAME: ${DATACENTER_NAME:-온프레미스 주전산센터}
+      CLUSTER_REGION: ${CLUSTER_REGION:-DC-1 서울}
+      DEPLOY_MODE: ${DEPLOY_MODE:-air-gap}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,8 +72,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: aiorche-frontend
+    env_file:
+      - .env
     ports:
-      - "5173:80"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - backend
 

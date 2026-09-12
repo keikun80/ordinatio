@@ -62,19 +62,15 @@
 
 ---
 
-### 3.1 공통 레이아웃 (Header, Sidebar, GrafanaModal)
+### 3.1 공통 레이아웃 (Header, Sidebar)
 
 | 위치 | UI 요소 명칭 | 요소 유형 | 지원 기능 | 백엔드 통신 상태 | 컬러 표기 및 상세 동작 |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Header** | 데이터 플레인 가동 상태 표시 | 배지 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 정적 인프라 안내 문구 |
+| **Header** | 전산센터 및 인프라 리전 배지 | 배지 | 뷰 | 정상 백엔드/.env 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (.env Live)</span> `.env` 환경변수(`DATACENTER_NAME`, `CLUSTER_REGION`) 및 백엔드 `GET /api/v1/system/info` 실시간 동적 바인딩 |
 | **Header** | 벤더 긴급 핫픽스 대기 알림 | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 클릭 시 `lifecycle` 탭으로 내부 화면 전환 |
-| **Header** | Grafana 관제 | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 클릭 시 `GrafanaModal` 팝업 오픈 (내부 상태 변경) |
 | **Header** | 사용자 프로필 (홍길동 수석/Admin) | 아바타/텍스트 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 정적 관리자 프로필 UI (상호작용 없음) |
 | **Sidebar** | 7대 메인 메뉴 탭 (홈, 라우팅, 가상키 등) | 메뉴 아이템 | 클릭 | 백엔드 미통신 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">기본 컬러 유지</span> 탭 가독성 및 UI 표준을 위해 기본 컬러 유지 (클릭 시 `setActiveTab` 로컬 전환) |
-| **GrafanaModal**| 3개 대시보드 탭 (L7, vLLM, FinOps) | 탭 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 클릭 시 `activeDashboard` 로컬 탭 뷰 전환 |
-| **GrafanaModal**| 메트릭 지표 카드 (1,424 req/s, 1.24ms 등) | 차트/패널 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 사전 내장 정적 시각화 패널 |
-| **GrafanaModal**| Grafana 새 탭에서 열기 | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> `alert()` 가상 브라우저 연결 안내 팝업 |
-| **GrafanaModal**| 모달 닫기 버튼 (X, 닫기) | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 모달 닫기 이벤트 |
+| *제거됨* | *Grafana 관제 헤더 버튼 및 모달* | 버튼/모달 | 미지원 | **미존재 (제거 완료)** | <span style="background-color: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">미존재 (제거)</span> 에어갭 Envoy L7 직결 텔레메트리로 일원화됨에 따라 외부 Grafana 호출 버튼 및 모달 완전 제거 |
 
 ---
 
@@ -83,9 +79,9 @@
 | UI 요소 명칭 | 요소 유형 | 지원 기능 | 백엔드 통신 상태 | 컬러 표기 및 상세 동작 |
 | :--- | :---: | :---: | :---: | :--- |
 | **실시간 WebSocket 연결 배지** | 배지 | 뷰 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `/api/v1/observability/ws` 소켓 연결 상태 실시간 감지 |
-| **모델 라우팅 설정 버튼** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> `routing` 탭으로 화면 이동 |
-| **Grafana 전문 관제 열기 버튼** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> `GrafanaModal` 팝업 오픈 |
-| **5대 핵심 KPI 카드 (RPS, TPS, TTFT, 5xx, 누적비용)** | KPI 카드 | 뷰 | 백엔드 통신 (Mock) | <span style="background-color: #5EF527; color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#5EF527</span> WebSocket을 통해 1초마다 백엔드 `telemetry_hub`의 시뮬레이션 지표를 수신하여 갱신 |
+| **모델 라우팅 설정 바로가기 버튼** | 버튼 | 클릭/이동 | 정상 내부 내비게이션 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">기본 컬러 유지</span> 클릭 시 모델 & 라우팅 스튜디오(`routing`) 탭으로 즉시 화면 전환 (사이드바 메뉴와 동일한 내비게이션 표준 적용) |
+| *제거됨* | *Grafana 전문 관제 열기 버튼* | 버튼 | 미지원 | **미존재 (제거 완료)** | <span style="background-color: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">미존재 (제거)</span> 5대 KPI가 포털 내 실시간 Envoy 직결 수집 체계로 전환되어 불필요 버튼 완전 제거 |
+| **5대 핵심 KPI 카드 (RPS, TPS, TTFT, 5xx, 누적비용)** | KPI 카드 | 뷰 | 정상 백엔드/Envoy 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (Envoy Live)</span> Envoy Admin API(:9901) 실시간 스크래핑(`downstream_rq_total`, `tx_bytes`, `rq_time`, `rq_5xx`) 및 PostgreSQL DB 테넌트 누적 지출액 실시간 집계 |
 | **vLLM 서빙 인프라 풀 카드 (EKS/ECS/EC2)** | 리스트 카드 | 뷰 | 백엔드 통신 (Mock) | <span style="background-color: #5EF527; color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#5EF527</span> 백엔드 WebSocket 패킷의 `compute_pools` 데이터를 받아 렌더링 |
 | **모델별 실시간 트래픽 점유율 막대** | 프로그레스바 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> Llama 68%, 70B 24%, Solar 8% 정적 하드코딩 비율 |
 | **최근 시스템 이상 징후 알림 리스트** | 알림 카드 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 보안/인프라/FinOps 3대 정적 알림 문구 |
@@ -103,7 +99,7 @@
 | **1회성 시크릿 복사 버튼** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 브라우저 `navigator.clipboard.writeText` 클립보드 복사 |
 | **가상키 수정 버튼 (슬라이더 아이콘)** | 버튼 | 클릭/수정 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 수정 모달 오픈 후 저장 시 `PATCH /api/v1/virtual-keys/{id}` DB 갱신 |
 | **가상키 즉시 파기/활성화 토글 버튼** | 버튼 | 클릭/수정 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 클릭 시 `PATCH /virtual-keys/{id}/revoke` 및 상태 전환 DB 즉시 반영 |
-| **초기화 버튼** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 브라우저 localStorage 초기화 및 Mock 리셋 |
+| ~~**초기화 버튼**~~ | 버튼 | 클릭 | 제거 완료 | **제거됨** (운영 거버넌스 원칙에 따라 임의 데이터 초기화 버튼 UI 제거) |
 
 ---
 
@@ -142,11 +138,11 @@
 | UI 요소 명칭 | 요소 유형 | 지원 기능 | 백엔드 통신 상태 | 컬러 표기 및 상세 동작 |
 | :--- | :---: | :---: | :---: | :--- |
 | **상단 통계 카드 (활성 규칙, WORM 로그 등)** | KPI 카드 | 뷰 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `GET /api/v1/compliance/stats` 실제 DB 집계 통계 렌더링 |
-| **샘플 프롬프트 버튼들 (개인정보, 사번 등)** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 클릭 시 `setInputText` 입력창에 로컬 예시 텍스트 주입 |
+| **시나리오 프리셋 버튼군 & 프리셋 추가/삭제** | 버튼/칩/모달 | 클릭/추가/삭제 | 브라우저/로컬 영속 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 프리셋 선택 시 입력창 프롬프트 교체, `+ 프리셋 추가` 모달로 신규 등록 및 `X` 삭제 모달로 프리셋 삭제 (localStorage 자동 동기화) |
 | **실시간 Presidio 마스킹 검증 실행 버튼** | 버튼 | 클릭 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `POST /api/v1/compliance/simulate` 호출, 인라인 마스킹 및 WORM 감사 로그 DB 자동 INSERT |
 | **신규 PII 규칙 추가 버튼 & 등록 모달** | 버튼/모달 | 클릭/추가 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 정규식 작성 후 저장 시 `POST /api/v1/compliance/rules` DB INSERT |
 | **PII 규칙 삭제 버튼 (휴지통) & 안전 삭제 모달** | 버튼/모달 | 클릭/삭제 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 모달 확인 클릭 시 `DELETE /api/v1/compliance/rules/{id}` DB 영구 삭제 |
-| **감사 로그 검색창 & 액션 필터 드롭다운** | Input/Select | 입력/선택 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 로드된 감사 로그 목록에 대한 브라우저 클라이언트 사이드 필터링 |
+| **감사 로그 검색창 & 액션 필터 드롭다운** | Input/Select | 입력/선택 | 클라이언트 고도화 필터링 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 요청자, 키, 모델, WORM ID, 해시, 조치(차단/마스킹/통과) 전 필드 다중 검색 및 실시간 필터링 완벽 지원 |
 | **금융감독원 제출용 감사 증적 JSON 다운로드** | 버튼 | 클릭/다운로드 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 화면 상의 WORM 감사 로그 객체를 브라우저 Blob JSON 파일로 직접 직렬화 다운로드 |
 
 ---
@@ -184,10 +180,10 @@
 | 탭 화면 | 클릭(Click) 기능 | 추가(Create) 기능 | 수정(Update) 기능 | 삭제(Delete) 기능 | 종합 판정 |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **글로벌 관제 홈** | 탭 전환, Grafana 모달 열기 | — (관제 전용) | — (관제 전용) | — (관제 전용) | ✅ **정상 동작** |
-| **가상 API Key 거버넌스** | 필터, 시크릿 복사, 초기화 | 신규 가상키 발급 모달 (`POST`) | 키 속성 수정 모달 (`PATCH`)<br>키 즉시 파기/활성화 (`PATCH`) | — (보안상 Revoke로 처리) | ✅ **정상 동작** |
+| **가상 API Key 거버넌스** | 필터, 시크릿 복사 | 신규 가상키 발급 모달 (`POST`) | 키 속성 수정 모달 (`PATCH`)<br>키 즉시 파기/활성화 (`PATCH`) | — (보안상 Revoke로 처리) | ✅ **정상 동작** |
 | **모델 & 라우팅 스튜디오** | 프로필 선택, Auto-Balance, 드라이런 | 신규 라우트 생성 (`POST`)<br>신규 모델 등록 (`POST`)<br>타깃 모델 추가 | 가중치 슬라이더 수정<br>전략 드롭다운 변경<br>실시간 xDS 배포 (`POST`) | 라우트 프로필 삭제 (`DELETE`)<br>타깃 모델 풀 제외 | ✅ **정상 동작** |
 | **FinOps 비용 & 예산** | 새로고침, 청구서 CSV 다운로드 | — (키/테넌트 연동) | 부서 예산 긴급 증액 (`PATCH`) | — (회계 감사 보존) | ✅ **정상 동작** |
-| **PII 보안 & 감사 포렌식** | 샘플 주입, 마스킹 시뮬레이션, JSON 다운로드 | 신규 PII 규칙 등록 모달 (`POST`) | — (규칙 삭제 후 재등록 원칙) | PII 규칙 안전 삭제 모달 (`DELETE`) | ✅ **정상 동작** |
+| **PII 보안 & 감사 포렌식** | 샘플 주입, 마스킹 시뮬레이션, JSON 다운로드 | 신규 PII 규칙 등록 모달 (`POST`)<br>시나리오 프리셋 등록 모달 | — (규칙 삭제 후 재등록 원칙) | PII 규칙 안전 삭제 모달 (`DELETE`)<br>시나리오 프리셋 삭제 모달 | ✅ **정상 동작** |
 | **프롬프트 스튜디오** | 모델 선택, 슬라이더 조절, 추론 실행 | — (플레이그라운드) | 프롬프트 수정 및 파라미터 조절 | — (플레이그라운드) | ✅ **정상 동작** |
 | **긴급 패치 & 자가진단** | 사전점검, 서포트번들, 패치 로드, 드라이런, 롤백 | 신규 패치 번들 로드 (`POST`) | 무중단 롤링 핫픽스 배포 (`POST`) | — (WORM 패치 이력 영구 보존) | ✅ **정상 동작** |
 

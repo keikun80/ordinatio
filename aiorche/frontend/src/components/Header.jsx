@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Server, Bell, Download, RefreshCw, ExternalLink } from 'lucide-react';
+import { apiClient } from '../api/client';
 
-export default function Header({ onOpenGrafana, onOpenPatchTab, unreadPatchCount = 1 }) {
+export default function Header({ onOpenPatchTab, unreadPatchCount = 1 }) {
+  const [datacenterName, setDatacenterName] = useState(
+    import.meta.env.VITE_DATACENTER_NAME || '온프레미스 주전산센터'
+  );
+  const [clusterRegion, setClusterRegion] = useState(
+    import.meta.env.VITE_CLUSTER_REGION || 'DC-1 서울'
+  );
+
+  useEffect(() => {
+    async function loadSystemInfo() {
+      const info = await apiClient.getSystemInfo();
+      if (info && info.datacenter_name) {
+        setDatacenterName(info.datacenter_name);
+      }
+      if (info && info.cluster_region) {
+        setClusterRegion(info.cluster_region);
+      }
+    }
+    loadSystemInfo();
+  }, []);
+
   return (
     <header className="top-header">
       <div className="header-left">
-        <div className="env-tag" style={{ color: '#F54927' }}>
-          <Server size={14} color="#F54927" />
-          <span style={{ color: '#F54927' }}>온프레미스 주전산센터 (DC-1 서울)</span>
+        <div className="env-tag">
+          <Server size={14} color="#38bdf8" />
+          <span>{datacenterName} ({clusterRegion})</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <span className="status-dot"></span>
@@ -42,11 +63,6 @@ export default function Header({ onOpenGrafana, onOpenPatchTab, unreadPatchCount
             </span>
           </button>
         )}
-
-        <button className="header-action-btn" onClick={onOpenGrafana} title="Grafana 전문 대시보드 열기" style={{ color: '#F54927' }}>
-          <ExternalLink size={14} color="#F54927" />
-          <span style={{ color: '#F54927' }}>Grafana 관제</span>
-        </button>
 
         <div className="user-profile">
           <div className="user-avatar" style={{ color: '#F54927' }}>

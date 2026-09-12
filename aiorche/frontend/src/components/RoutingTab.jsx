@@ -82,6 +82,10 @@ export default function RoutingTab({ onNotify }) {
     return localStorage.getItem('aiorche_xds_revision') || 'xds-rev-20260911-1422';
   });
 
+  // Health Check States
+  const [healthStatus, setHealthStatus] = useState({});
+  const [isHealthCheckingAll, setIsHealthCheckingAll] = useState(false);
+
   // Modal States
   const [showNewRouteModal, setShowNewRouteModal] = useState(false);
   const [newRouteForm, setNewRouteForm] = useState({
@@ -186,6 +190,24 @@ export default function RoutingTab({ onNotify }) {
           setXdsRevision(activePolicyRes.xds_revision);
           localStorage.setItem('aiorche_xds_revision', activePolicyRes.xds_revision);
         }
+
+        // Automatic initial health check on load
+        apiClient.checkAllModelsHealth().then(results => {
+          if (results && Array.isArray(results)) {
+            const statusMap = {};
+            results.forEach(r => {
+              statusMap[r.model_id] = {
+                is_healthy: r.is_healthy,
+                latency_ms: r.latency_ms,
+                status_code: r.status_code,
+                error_message: r.error_message,
+                checked_at: r.checked_at,
+                checking: false
+              };
+            });
+            setHealthStatus(statusMap);
+          }
+        }).catch(err => console.warn('Initial health check failed:', err));
       } catch (err) {
         console.warn('Using local fallback state for multi-routing:', err);
       }
@@ -219,6 +241,76 @@ export default function RoutingTab({ onNotify }) {
     });
     setRoutes(updatedRoutes);
     localStorage.setItem('aiorche_multi_routes', JSON.stringify(updatedRoutes));
+  };
+
+  // Health Check Handlers
+  const handleCheckAllHealth = async () => {
+    setIsHealthCheckingAll(true);
+    try {
+      const results = await apiClient.checkAllModelsHealth();
+      if (results && Array.isArray(results)) {
+        const statusMap = {};
+        results.forEach(r => {
+          statusMap[r.model_id] = {
+            is_healthy: r.is_healthy,
+            latency_ms: r.latency_ms,
+            status_code: r.status_code,
+            error_message: r.error_message,
+            checked_at: r.checked_at,
+            checking: false
+          };
+        });
+        setHealthStatus(prev => ({ ...prev, ...statusMap }));
+        const healthyCount = results.filter(r => r.is_healthy).length;
+        if (onNotify) {
+          onNotify('SUCCESS', `전체 ${results.length}개 모델 헬스체크 완료 (정상: ${healthyCount}개, 오프라인: ${results.length - healthyCount}개)`);
+        }
+      } else {
+        if (onNotify) onNotify('WARNING', '헬스체크 응답을 가져오지 못했습니다.');
+      }
+    } catch (err) {
+      if (onNotify) onNotify('ERROR', `헬스체크 실패: ${err.message}`);
+    } finally {
+      setIsHealthCheckingAll(false);
+    }
+  };
+
+  const handleCheckSingleHealth = async (modelId) => {
+    setHealthStatus(prev => ({
+      ...prev,
+      [modelId]: { ...(prev[modelId] || {}), checking: true }
+    }));
+    try {
+      const res = await apiClient.checkModelHealth(modelId);
+      setHealthStatus(prev => ({
+        ...prev,
+        [modelId]: {
+          is_healthy: res.is_healthy,
+          latency_ms: res.latency_ms,
+          status_code: res.status_code,
+          error_message: res.error_message,
+          checked_at: res.checked_at,
+          checking: false
+        }
+      }));
+      if (onNotify) {
+        if (res.is_healthy) {
+          onNotify('SUCCESS', `[${res.alias || modelId}] 헬스체크 정상: ${res.latency_ms}ms (HTTP ${res.status_code})`);
+        } else {
+          onNotify('WARNING', `[${res.alias || modelId}] 헬스체크 실패: ${res.error_message || '응답 없음'}`);
+        }
+      }
+    } catch (err) {
+      setHealthStatus(prev => ({
+        ...prev,
+        [modelId]: {
+          is_healthy: false,
+          error_message: err.message,
+          checking: false
+        }
+      }));
+      if (onNotify) onNotify('ERROR', `[${modelId}] 헬스체크 오류: ${err.message}`);
+    }
   };
 
   // Change individual weight
@@ -880,14 +972,35 @@ export default function RoutingTab({ onNotify }) {
 
       {/* Model Catalog Table */}
       <div className="card">
-        <div className="card-header">
-          <div className="card-title">
-            <Cpu size={20} color="#34d399" />
-            <span>등록된 LLM 서빙 모델 풀 (vLLM / Ollama: {models.length}개)</span>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="card-title">
+              <Cpu size={20} color="#34d399" />
+              <span>등록된 LLM 서빙 모델 풀 (vLLM / Ollama: {models.length}개)</span>
+            </div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 실시간 헬스 상태
+            </span>
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 목록
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleCheckAllHealth}
+              disabled={isHealthCheckingAll}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+            >
+              <RefreshCw size={14} className={isHealthCheckingAll ? 'spin' : ''} />
+              <span>{isHealthCheckingAll ? '전체 점검 중...' : '전체 헬스체크 (Ping All)'}</span>
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowNewModelModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+            >
+              <Plus size={14} />
+              <span>신규 모델 등록</span>
+            </button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -900,7 +1013,7 @@ export default function RoutingTab({ onNotify }) {
                 <th>엔드포인트 URL</th>
                 <th>토큰 단가 (입력/출력)</th>
                 <th>대기 큐</th>
-                <th>상태</th>
+                <th>상태 & 헬스</th>
                 <th>현재 라우트 포함</th>
               </tr>
             </thead>
@@ -964,9 +1077,105 @@ export default function RoutingTab({ onNotify }) {
                       {m.waitingQueue} reqs
                     </td>
                     <td>
-                      <span className={`badge ${m.active !== false ? 'active' : 'revoked'}`}>
-                        {m.active !== false ? '정상 서빙' : '비활성'}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>
+                          <span className={`badge ${m.active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem' }}>
+                            {m.active !== false ? '정상 서빙' : '비활성'}
+                          </span>
+                        </div>
+                        {(() => {
+                          const hs = healthStatus[m.id];
+                          if (!hs) {
+                            return (
+                              <button
+                                onClick={() => handleCheckSingleHealth(m.id)}
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '2px 8px', fontSize: '0.68rem', height: '22px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}
+                                title="실시간 엔드포인트 핑 테스트"
+                              >
+                                <Zap size={11} color="#38bdf8" />
+                                <span>핑 테스트</span>
+                              </button>
+                            );
+                          }
+                          if (hs.checking) {
+                            return (
+                              <span
+                                className="badge"
+                                style={{
+                                  fontSize: '0.68rem',
+                                  background: 'rgba(56, 189, 248, 0.15)',
+                                  color: '#38bdf8',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  width: 'fit-content'
+                                }}
+                              >
+                                <RefreshCw size={11} className="spin" />
+                                <span>점검 중...</span>
+                              </span>
+                            );
+                          }
+                          if (hs.is_healthy) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    background: 'rgba(52, 211, 153, 0.15)',
+                                    color: '#34d399',
+                                    border: '1px solid rgba(52, 211, 153, 0.3)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  title={`HTTP ${hs.status_code || 200} OK | 지연시간: ${hs.latency_ms}ms`}
+                                >
+                                  <CheckCircle2 size={11} />
+                                  <span>정상 ({hs.latency_ms}ms)</span>
+                                </span>
+                                <button
+                                  onClick={() => handleCheckSingleHealth(m.id)}
+                                  title="다시 점검"
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span
+                                className="badge"
+                                style={{
+                                  fontSize: '0.68rem',
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#f87171',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                                title={hs.error_message || '연결 불가'}
+                              >
+                                <AlertCircle size={11} />
+                                <span>오프라인</span>
+                              </span>
+                              <button
+                                onClick={() => handleCheckSingleHealth(m.id)}
+                                title={`재시도: ${hs.error_message || '연결 실패'}`}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#f87171', padding: '2px', display: 'flex', alignItems: 'center' }}
+                              >
+                                <RefreshCw size={12} />
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td>
                       {isInCurrentRoute ? (

@@ -221,3 +221,34 @@ def test_multi_route_crud_and_xds_compilation():
     assert patch_res.status_code == 200
     assert patch_res.json()["is_active"] is False
 
+def test_model_serving_health_check():
+    # 1. Health check all models
+    res = client.get("/api/v1/models/health-check")
+    assert res.status_code == 200
+    results = res.json()
+    assert isinstance(results, list)
+    assert len(results) >= 2
+
+    first = results[0]
+    assert "model_id" in first
+    assert "alias" in first
+    assert "serving_engine" in first
+    assert "execution_method" in first
+    assert "target_endpoint" in first
+    assert "is_healthy" in first
+    assert isinstance(first["is_healthy"], bool)
+    assert "latency_ms" in first
+    assert "checked_at" in first
+
+    # 2. Check single model health (existing)
+    model_id = first["model_id"]
+    single_res = client.post(f"/api/v1/models/{model_id}/health")
+    assert single_res.status_code == 200
+    single_data = single_res.json()
+    assert single_data["model_id"] == model_id
+    assert isinstance(single_data["is_healthy"], bool)
+
+    # 3. Check single model health (non-existent)
+    not_found_res = client.post("/api/v1/models/non-existent-model-xyz/health")
+    assert not_found_res.status_code == 404
+

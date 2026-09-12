@@ -1,11 +1,125 @@
-from typing import List
+import asyncio
+import time
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.model_catalog import ModelCatalog
-from app.schemas.model_catalog import ModelCatalogCreate, ModelCatalogUpdate, ModelCatalogResponse
+from app.schemas.model_catalog import (
+    ModelCatalogCreate,
+    ModelCatalogUpdate,
+    ModelCatalogResponse,
+    ModelHealthCheckResult
+)
 
 router = APIRouter()
+
+async def probe_endpoint(endpoint: str, engine: str) -> Tuple[bool, Optional[int], Optional[float], Optional[str]]:
+    """
+    Probe a serving model endpoint (vLLM / Ollama / SGLang / Triton)
+    Returns: (is_healthy, status_code, latency_ms, error_message)
+    """
+    base_url = endpoint.rstrip('/')
+    urls_to_try = [base_url]
+    if "127.0.0.1" in base_url:
+        urls_to_try.append(base_url.replace("127.0.0.1", "host.docker.internal"))
+    elif "localhost" in base_url:
+        urls_to_try.append(base_url.replace("localhost", "host.docker.internal"))
+
+    engine_upper = (engine or "").upper()
+    if "OLLAMA" in engine_upper:
+        probe_paths = ["/api/tags", "/"]
+    elif "VLLM" in engine_upper or "SGLANG" in engine_upper:
+        probe_paths = ["/health", "/v1/models"]
+    elif "TRITON" in engine_upper:
+        probe_paths = ["/v1/health/ready", "/v1/models", "/"]
+    else:
+        probe_paths = ["/health", "/v1/models", "/"]
+
+    last_err = None
+    last_status = None
+    start_time = time.perf_counter()
+
+    async with httpx.AsyncClient(timeout=2.5, follow_redirects=True) as client:
+        for target in urls_to_try:
+            for path in probe_paths:
+                full_url = f"{target}{path}"
+                t0 = time.perf_counter()
+                try:
+                    res = await client.get(full_url)
+                    latency = round((time.perf_counter() - t0) * 1000, 2)
+                    if res.status_code < 400:
+                        return True, res.status_code, latency, None
+                    last_status = res.status_code
+                    last_err = f"HTTP {res.status_code}"
+                except httpx.ConnectError:
+                    last_err = "연결 거부 (Connection Refused)"
+                except httpx.ConnectTimeout:
+                    last_err = "연결 타임아웃 (Connect Timeout)"
+                except httpx.ReadTimeout:
+                    last_err = "응답 대기시간 초과 (Read Timeout)"
+                except Exception as e:
+                    last_err = str(e)
+
+    total_latency = round((time.perf_counter() - start_time) * 1000, 2)
+    return False, last_status, total_latency, last_err
+
+@router.get("/health-check", response_model=List[ModelHealthCheckResult])
+async def check_all_models_health(db: Session = Depends(get_db)):
+    """Check live health status of all registered serving models concurrently"""
+    models = db.query(ModelCatalog).all()
+    if not models:
+        return []
+
+    async def _check(m: ModelCatalog) -> ModelHealthCheckResult:
+        is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
+            m.target_endpoint,
+            m.serving_engine or "vLLM"
+        )
+        return ModelHealthCheckResult(
+            model_id=m.model_id,
+            alias=m.alias,
+            serving_engine=m.serving_engine or "vLLM",
+            execution_method=m.execution_method or "k8s",
+            target_endpoint=m.target_endpoint,
+            is_healthy=is_healthy,
+            status_code=status_code,
+            latency_ms=latency_ms,
+            error_message=error_msg,
+            checked_at=datetime.now(timezone.utc)
+        )
+
+    results = await asyncio.gather(*[_check(m) for m in models])
+    return results
+
+@router.post("/{model_id:path}/health", response_model=ModelHealthCheckResult)
+async def check_single_model_health(model_id: str, db: Session = Depends(get_db)):
+    """Check live health status of a specific serving model"""
+    model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model '{model_id}' not found."
+        )
+
+    is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
+        model.target_endpoint,
+        model.serving_engine or "vLLM"
+    )
+    return ModelHealthCheckResult(
+        model_id=model.model_id,
+        alias=model.alias,
+        serving_engine=model.serving_engine or "vLLM",
+        execution_method=model.execution_method or "k8s",
+        target_endpoint=model.target_endpoint,
+        is_healthy=is_healthy,
+        status_code=status_code,
+        latency_ms=latency_ms,
+        error_message=error_msg,
+        checked_at=datetime.now(timezone.utc)
+    )
 
 @router.get("", response_model=List[ModelCatalogResponse])
 def list_models(db: Session = Depends(get_db)):

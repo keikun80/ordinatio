@@ -176,6 +176,28 @@ export const apiClient = {
     return await res.json();
   },
 
+  async checkAllModelsHealth() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/models/health-check`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API checkAllModelsHealth offline:', err);
+      return null;
+    }
+  },
+
+  async checkModelHealth(modelId) {
+    const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health`, {
+      method: 'POST'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '모델 헬스체크 실패');
+    }
+    return await res.json();
+  },
+
   async getActiveRoutingPolicy(routeName = null) {
     try {
       const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;

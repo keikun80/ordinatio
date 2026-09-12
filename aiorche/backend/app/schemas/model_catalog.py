@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -43,3 +43,15 @@ class ModelCatalogUpdate(BaseModel):
 class ModelCatalogResponse(ModelCatalogBase):
     model_config = ConfigDict(from_attributes=True)
     updated_at: Optional[datetime] = None
+
+class ModelHealthCheckResult(BaseModel):
+    model_id: str
+    alias: str
+    serving_engine: str
+    execution_method: str
+    target_endpoint: str
+    is_healthy: bool
+    status_code: Optional[int] = None
+    latency_ms: Optional[float] = None
+    error_message: Optional[str] = None
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

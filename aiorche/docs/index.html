@@ -544,11 +544,11 @@
     <ul class="nav-list">
       <li><a href="#architecture" class="nav-link">아키텍처 및 운영 원칙</a></li>
       <li>
-        <a href="#installation" class="nav-link">## 설치 (Installation)</a>
+        <a href="#installation" class="nav-link">설치 (Installation)</a>
         <ul class="nav-sub-list">
-          <li><a href="#prerequisites" class="nav-sub-link">### 사전 준비 내용</a></li>
-          <li><a href="#post-clone-config" class="nav-sub-link">### GitHub Clone 후 설정</a></li>
-          <li><a href="#quick-startup" class="nav-sub-link">### 로컬 및 컨테이너 기동</a></li>
+          <li><a href="#prerequisites" class="nav-sub-link">1. 사전 준비 내용</a></li>
+          <li><a href="#post-clone-config" class="nav-sub-link">2. GitHub Clone 후 설정</a></li>
+          <li><a href="#quick-startup" class="nav-sub-link">3. 로컬 및 컨테이너 기동</a></li>
         </ul>
       </li>
     </ul>
@@ -632,12 +632,12 @@
 
     <!-- Installation Section -->
     <section id="installation">
-      <h2>## 설치 (Installation)</h2>
+      <h2>설치 (Installation)</h2>
       <p>온프레미스 주전산센터 또는 폐쇄망 인프라 서버에 AI Orchestrator 어플라이언스를 설치하는 상세 절차입니다.</p>
 
       <!-- Prerequisites -->
       <div id="prerequisites">
-        <h3>### 사전 준비 내용 (Prerequisites)</h3>
+        <h3>1. 사전 준비 내용 (Prerequisites)</h3>
         <p>설치 작업을 시작하기 전, 호스트 서버 환경이 다음 하드웨어 및 소프트웨어 최소 규격을 만족하는지 확인합니다.</p>
 
         <div class="card">
@@ -692,7 +692,7 @@
           </div>
           <ul>
             <li><strong>Docker & Docker Compose:</strong> Docker Engine 24.0+ 및 Docker Compose v2.20+ 이상</li>
-            <li><strong>GNU Make:</strong> `make` 빌드 자동화 도구 (`build-essential` 패키지)</li>
+            <li><strong>GNU Make:</strong> <code>make</code> 빌드 자동화 도구 (<code>build-essential</code> 패키지)</li>
             <li><strong>Python (백엔드 로컬 개발 시):</strong> Python 3.12+ 및 초고속 패키지 관리자 <code>uv</code></li>
             <li><strong>Node.js (프론트엔드 빌드 시):</strong> Node.js v18.0+ 및 npm v9.0+</li>
           </ul>
@@ -764,7 +764,7 @@
 
       <!-- Post-Clone Setup -->
       <div id="post-clone-config">
-        <h3>### GitHub에서 Clone 후 설정 해야하는 내용</h3>
+        <h3>2. GitHub에서 Clone 후 설정 해야하는 내용</h3>
         <p>저장소를 클론한 후, 에어갭 인프라 표준 환경 변수 파일(<code>.env</code>)을 초기화하고 보안 키를 설정합니다.</p>
 
         <div class="alert alert-info">
@@ -837,7 +837,7 @@ vim .env</code></pre>
 
       <!-- Quick Startup -->
       <div id="quick-startup">
-        <h3>### 로컬 및 컨테이너 기동 (Execution)</h3>
+        <h3>3. 로컬 및 컨테이너 기동 (Execution)</h3>
         <p>AI Orchestrator는 단일 명령어 <code>make</code> 타깃을 통해 도커 스택과 애플리케이션을 자동으로 빌드 및 기동합니다.</p>
 
         <h4>1. 개발 및 빌드 환경 자동 초기화</h4>
@@ -865,7 +865,7 @@ bash scripts/verify-phase5.sh</code></pre>
 
     <!-- Menu Documentation Section -->
     <section id="menu-docs">
-      <h2>## 각 메뉴별 설명 및 사용자 입력 가이드</h2>
+      <h2>각 메뉴별 설명 및 사용자 입력 가이드</h2>
       <p class="lead-text">
         AI Orchestrator Admin Console의 7대 핵심 관리 메뉴에 존재하는 모든 기능과 항목을 설명합니다.
         <strong>사용자가 직접 입력해야 하는 모든 모달 폼과 제어 영역은 실제 운영 화면 스크린샷과 함께 상세 입력 가이드</strong>를 제공합니다.
@@ -1031,7 +1031,7 @@ bash scripts/verify-phase5.sh</code></pre>
               <thead>
                 <tr>
                   <th>인프라 분류</th>
-                  <th>옵션 코드 (`backend_infra`)</th>
+                  <th>옵션 코드 (<code>backend_infra</code>)</th>
                   <th>상세 규격 및 대상 인프라 설명</th>
                 </tr>
               </thead>

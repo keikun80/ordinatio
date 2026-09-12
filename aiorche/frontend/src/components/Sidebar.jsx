@@ -49,10 +49,10 @@ export default function Sidebar({ activeTab, setActiveTab, unreadPatchCount = 1 
               className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setActiveTab(item.id)}
             >
-              <Icon size={18} color="#F54927" />
-              <span style={{ color: '#F54927' }}>{item.label}</span>
+              <Icon size={18} />
+              <span>{item.label}</span>
               {item.badge && (
-                <span className={`nav-badge ${item.isAlertBadge ? '' : 'info'}`} style={{ color: '#F54927', borderColor: '#F54927' }}>
+                <span className={`nav-badge ${item.isAlertBadge ? '' : 'info'}`}>
                   {item.badge}
                 </span>
               )}

@@ -11,40 +11,40 @@ export const initialKPIs = {
 
 export const initialClusterPools = [
   {
-    id: 'eks-general',
-    name: 'vLLM on EKS (사내 금융 비서)',
+    id: 'k8s-general',
+    name: 'vLLM on On-Prem K8s (사내 금융 비서 클러스터)',
     workload: '표준 금융 챗봇 / 유동적 버스트 트래픽',
     model: 'meta-llama/Llama-3.1-8B-Instruct',
     status: 'ACTIVE',
     pods: '12 / 20 Pods',
     queueDepth: 3.2,
     gpuMemoryPercent: 76,
-    karpenterNodes: '4 GPU 노드',
-    scalingTech: 'KEDA (num_requests_waiting > 10) + Karpenter'
+    karpenterNodes: '4 GPU 노드 (사내 K8s)',
+    scalingTech: 'KEDA (num_requests_waiting > 10) HPA'
   },
   {
-    id: 'ecs-risk',
-    name: 'vLLM on ECS (리스크 분석 전용)',
+    id: 'vm-risk',
+    name: 'vLLM on Private VM (리스크 분석 전용 가상머신)',
     workload: '부서/테넌트 격리형 리스크 심사',
     model: 'meta-llama/Llama-3.1-70B-Instruct',
     status: 'ACTIVE',
     pods: '4 / 8 Tasks',
     queueDepth: 0.8,
     gpuMemoryPercent: 62,
-    karpenterNodes: 'Fargate / GPU Dedicated',
-    scalingTech: 'Application Auto Scaling (Step Scaling)'
+    karpenterNodes: 'VMware vSphere / GPU Passthrough',
+    scalingTech: 'vSphere Dynamic Resource Scheduler (DRS)'
   },
   {
-    id: 'ec2-baremetal',
-    name: 'vLLM on EC2 (초대형 고정 모델)',
+    id: 'baremetal-gpu',
+    name: 'vLLM on Bare-Metal GPU (초대형 고정 모델 전용 노드)',
     workload: '초저지연 보장 SLA / 70B+ 대형 모델',
     model: 'meta-llama/Llama-3.1-70B-Instruct',
     status: 'ACTIVE',
     pods: '2 / 2 Instances',
     queueDepth: 5.1,
     gpuMemoryPercent: 89,
-    karpenterNodes: 'NVMe 캐싱 Warm Pool (1대 대기)',
-    scalingTech: 'EC2 ASG with Warm Pool'
+    karpenterNodes: '주전산센터 DGX/HGX 고성능 전용 서버',
+    scalingTech: 'PCIe NVMe Local Warm Pool'
   }
 ];
 
@@ -52,7 +52,7 @@ export const initialModels = [
   {
     id: 'meta-llama/Llama-3.1-8B-Instruct',
     alias: 'financial-advisor-v1',
-    backend: 'EKS Pods',
+    backend: 'On-Prem K8s',
     endpoint: 'http://vllm-llama8b.ai-serving:8000',
     contextWindow: 128000,
     inputPricePer1k: 0.8,
@@ -64,7 +64,7 @@ export const initialModels = [
   {
     id: 'meta-llama/Llama-3.1-8B-FineTuned-v2',
     alias: 'financial-advisor-canary',
-    backend: 'EKS Pods',
+    backend: 'On-Prem K8s',
     endpoint: 'http://vllm-llama8b-canary.ai-serving:8000',
     contextWindow: 128000,
     inputPricePer1k: 0.8,
@@ -76,7 +76,7 @@ export const initialModels = [
   {
     id: 'meta-llama/Llama-3.1-70B-Instruct',
     alias: 'deep-risk-evaluator',
-    backend: 'EC2 BareMetal',
+    backend: 'Bare-Metal GPU',
     endpoint: 'http://10.20.4.12:8000',
     contextWindow: 128000,
     inputPricePer1k: 3.5,
@@ -88,7 +88,7 @@ export const initialModels = [
   {
     id: 'Solar-10.7B-Financial',
     alias: 'compliance-auditor',
-    backend: 'ECS Tasks',
+    backend: 'Private VM',
     endpoint: 'http://vllm-solar.ai-serving:8000',
     contextWindow: 32000,
     inputPricePer1k: 1.2,

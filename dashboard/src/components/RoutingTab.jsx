@@ -480,9 +480,15 @@ export default function RoutingTab({ onNotify }) {
                     value={newModelForm.backend_infra}
                     onChange={(e) => setNewModelForm({...newModelForm, backend_infra: e.target.value})}
                   >
-                    <option value="EKS">vLLM on Kubernetes (EKS InferencePool)</option>
-                    <option value="ECS">vLLM on Amazon ECS (Cloud Map)</option>
-                    <option value="EC2">vLLM on Amazon EC2 (NVMe Warm Pool)</option>
+                    <optgroup label="온프레미스 / 폐쇄망 표준 인프라 (On-Premises Air-Gap)">
+                      <option value="On-Prem K8s">vLLM on Kubernetes (사내 온프레미스 K8s 클러스터)</option>
+                      <option value="Bare-Metal GPU">vLLM on Bare-Metal (사내 DGX/HGX 전용 고성능 GPU 서버)</option>
+                      <option value="Private VM">vLLM on Private VM (사내 VMware/Nutanix 가상화 GPU VM)</option>
+                    </optgroup>
+                    <optgroup label="하이브리드 클라우드 연동 (Hybrid Cloud Extensions)">
+                      <option value="Cloud GPU (EKS)">vLLM on Cloud K8s (AWS EKS / NCP InferencePool)</option>
+                      <option value="Cloud GPU (VM)">vLLM on Cloud Instance (AWS EC2 / NCP GPU)</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div className="form-group">

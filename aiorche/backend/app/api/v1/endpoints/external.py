@@ -24,21 +24,21 @@ CATALOG_MODELS = [
     {
         "model_id": "meta-llama/Llama-3.1-8B-Instruct",
         "alias": "Llama-3.1-8B (General/NLP)",
-        "backend_infra": "EKS (vLLM)",
+        "backend_infra": "On-Prem K8s (vLLM)",
         "input_price_per_1k": 0.80,
         "output_price_per_1k": 2.40
     },
     {
         "model_id": "Qwen/Qwen2.5-72B-Instruct",
         "alias": "Qwen-2.5-72B (Complex Reasoning)",
-        "backend_infra": "EC2 (vLLM)",
+        "backend_infra": "Bare-Metal GPU (vLLM)",
         "input_price_per_1k": 2.50,
         "output_price_per_1k": 7.50
     },
     {
         "model_id": "upstage/SOLAR-10.7B-Instruct",
         "alias": "SOLAR-10.7B (Finance Spec)",
-        "backend_infra": "ECS (vLLM)",
+        "backend_infra": "Private VM (vLLM)",
         "input_price_per_1k": 1.20,
         "output_price_per_1k": 3.60
     }

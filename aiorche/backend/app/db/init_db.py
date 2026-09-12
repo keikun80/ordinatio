@@ -43,7 +43,7 @@ def init_db():
             m1 = ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-Instruct",
                 alias="financial-advisor-v1",
-                backend_infra="EKS",
+                backend_infra="On-Prem K8s",
                 target_endpoint="http://vllm-llama8b.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -53,7 +53,7 @@ def init_db():
             m2 = ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-FineTuned-v2",
                 alias="financial-advisor-canary",
-                backend_infra="EKS",
+                backend_infra="On-Prem K8s",
                 target_endpoint="http://vllm-llama8b-canary.ai-serving:8000",
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
@@ -63,7 +63,7 @@ def init_db():
             m3 = ModelCatalog(
                 model_id="meta-llama/Llama-3.1-70B-Instruct",
                 alias="deep-risk-evaluator",
-                backend_infra="EC2",
+                backend_infra="Bare-Metal GPU",
                 target_endpoint="http://10.20.4.12:8000",
                 input_price_per_1k=3.5000,
                 output_price_per_1k=10.5000,
@@ -73,7 +73,7 @@ def init_db():
             m4 = ModelCatalog(
                 model_id="Solar-10.7B-Financial",
                 alias="compliance-auditor",
-                backend_infra="ECS",
+                backend_infra="Private VM",
                 target_endpoint="http://vllm-solar.ai-serving:8000",
                 input_price_per_1k=1.2000,
                 output_price_per_1k=3.6000,

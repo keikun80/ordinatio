@@ -96,7 +96,7 @@ export default function RoutingTab({ onNotify }) {
   const [newModelForm, setNewModelForm] = useState({
     model_id: 'Qwen/Qwen2.5-14B-Instruct',
     alias: 'qwen-14b-enterprise',
-    backend_infra: 'EKS',
+    backend_infra: 'On-Prem K8s',
     target_endpoint: 'http://vllm-qwen14b.ai-serving:8000',
     input_price_per_1k: 1.2,
     output_price_per_1k: 3.6
@@ -833,7 +833,7 @@ export default function RoutingTab({ onNotify }) {
             <span>등록된 vLLM 서빙 모델 풀 (Model Catalog: {models.length}개)</span>
           </div>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            클러스터(EKS/ECS/EC2) 내 배포된 실제 추론 엔드포인트 목록
+            주전산센터(K8s/Bare-Metal/VM) 내 배포된 실제 추론 엔드포인트 목록
           </span>
         </div>
 
@@ -860,7 +860,25 @@ export default function RoutingTab({ onNotify }) {
                       <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
                     </td>
                     <td>
-                      <span className="badge info">{m.backend}</span>
+                      <span 
+                        className="badge" 
+                        style={{
+                          fontSize: '0.72rem',
+                          background: m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.15)' : 
+                                      (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.15)' : 
+                                      (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.1)')),
+                          color: m.backend?.includes('K8s') ? '#38bdf8' : 
+                                 (m.backend?.includes('Bare-Metal') ? '#c084fc' : 
+                                 (m.backend?.includes('VM') ? '#34d399' : '#e2e8f0')),
+                          border: `1px solid ${
+                            m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.3)' : 
+                            (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.3)' : 
+                            (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.2)'))
+                          }`
+                        }}
+                      >
+                        {m.backend}
+                      </span>
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
                       {m.endpoint}
@@ -1016,9 +1034,15 @@ export default function RoutingTab({ onNotify }) {
                     value={newModelForm.backend_infra}
                     onChange={(e) => setNewModelForm({...newModelForm, backend_infra: e.target.value})}
                   >
-                    <option value="EKS">vLLM on Kubernetes (EKS InferencePool)</option>
-                    <option value="ECS">vLLM on Amazon ECS (Cloud Map)</option>
-                    <option value="EC2">vLLM on Amazon EC2 (NVMe Warm Pool)</option>
+                    <optgroup label="온프레미스 / 폐쇄망 표준 인프라 (On-Premises Air-Gap)">
+                      <option value="On-Prem K8s">vLLM on Kubernetes (사내 온프레미스 K8s 클러스터)</option>
+                      <option value="Bare-Metal GPU">vLLM on Bare-Metal (사내 DGX/HGX 전용 고성능 GPU 서버)</option>
+                      <option value="Private VM">vLLM on Private VM (사내 VMware/Nutanix 가상화 GPU VM)</option>
+                    </optgroup>
+                    <optgroup label="하이브리드 클라우드 연동 (Hybrid Cloud Extensions)">
+                      <option value="Cloud GPU (EKS)">vLLM on Cloud K8s (AWS EKS / NCP InferencePool)</option>
+                      <option value="Cloud GPU (VM)">vLLM on Cloud Instance (AWS EC2 / NCP GPU)</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div className="form-group">

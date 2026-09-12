@@ -32,6 +32,9 @@
   - 백엔드 설계 명세 대비 전수 구현 비교 분석 (OK / ALT / 미구현 판정표)
   - 프론트엔드 전 화면 대화형 요소 전수 점검 (클릭, 추가, 수정, 삭제)
   - 통신 상태별 컬러 매핑 (`#F54927`: 백엔드 미통신, `#5EF527`: 백엔드 통신-Mock/시뮬레이션, 기본: 정상 실시간 연동)
+- 🗺️ **[REAL_DATA_INTEGRATION_PLAN.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/REAL_DATA_INTEGRATION_PLAN.md)**:
+  - #5EF527(Mock) 및 #F54927(미통신) 요소를 실제 데이터로 전환하기 위한 역할 분담 (나의 영역 vs AI의 영역)
+  - 4대 스프린트(Sprint A~D) 마일스톤 로드맵 및 상세 실행 계획표 (RACI)
 
 ---
 

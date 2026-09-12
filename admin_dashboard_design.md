@@ -30,48 +30,48 @@
 ```
 [통합 관리 콘솔: AI Orchestrator Admin]
 │
-├── 📊 1. 글로벌 관제 홈 (Global Overview & Grafana)
-│    ├── 실시간 핵심 KPI (RPS, TPS, TTFT, 에러율, 일일 누적 비용)
-│    ├── GPU 컴퓨트 클러스터 히트맵 (EKS Pod, ECS Task, EC2 Bare-metal)
-│    ├── Prometheus 메트릭 연동 실시간 트래픽 및 모델별 점유율 차트
-│    └── 📈 Grafana 전문 대시보드 바로가기 (Inference Deep-dive / GPU DCGM)
+├── ✅ 📊 1. 글로벌 관제 홈 (Global Overview & Grafana) — 구현완료 (Phase 3)
+│    ├── ✅ 실시간 핵심 KPI (RPS, TPS, TTFT, 에러율, 일일 누적 비용)
+│    ├── ✅ GPU 컴퓨트 클러스터 히트맵 (EKS Pod, ECS Task, EC2 Bare-metal)
+│    ├── ✅ Prometheus 메트릭 연동 실시간 트래픽 및 모델별 점유율 차트
+│    └── ✅ 📈 Grafana 전문 대시보드 바로가기 (자체 내장 3종 뷰 + SSO 링크)
 │
-├── 🧭 2. 모델 카탈로그 & 라우팅 스튜디오 (Model & Routing Studio)
-│    ├── 모델 레지스트리 (vLLM 파라미터, 컨텍스트 길이, 토큰 단가 관리)
-│    ├── 비주얼 라우팅 룰 빌더 (카나리 가중치 슬라이더, Failover 설정)
-│    └── xDS 무중단 정책 배포 및 배포 이력
+├── ✅ 🧭 2. 모델 카탈로그 & 라우팅 스튜디오 (Model & Multi-Routing Studio) — 구현완료 (Phase 2)
+│    ├── ✅ 모델 레지스트리 (vLLM 파라미터, 컨텍스트 길이, 토큰 단가 관리)
+│    ├── ✅ 비주얼 N-Way 멀티 라우팅 룰 빌더 (가중치 슬라이더, 조건부 매칭, Failover Chain)
+│    └── ✅ xDS 무중단 정책 배포 및 배포 이력 (Envoy REST RDS v3)
 │
-├── 🔑 3. 가상 API 키 & 테넌트 거버넌스 (Virtual Key & Tenants)
-│    ├── 조직/부서/프로젝트 3단계 계층 관리
-│    ├── 가상 API Key 발급 마법사 (허용 모델, IP 화이트리스트, RPM/TPM 설정)
-│    └── 활성 키 모니터링 및 원클릭 즉시 파기(Revoke)
+├── ✅ 🔑 3. 가상 API 키 & 테넌트 거버넌스 (Virtual Key & Tenants) — 구현완료 (Phase 1)
+│    ├── ✅ 조직/부서/프로젝트 테넌트 계층 관리
+│    ├── ✅ 가상 API Key 발급 마법사 (허용 모델, IP 화이트리스트, RPM/TPM 설정)
+│    └── ✅ 활성 키 모니터링 및 원클릭 즉시 파기(Revoke)
 │
-├── 💰 4. FinOps & 비용 관제 센터 (Cost & Budget Analytics)
-│    ├── 부서별/프로젝트별 토큰 사용량 실시간 계량(Metering)
-│    ├── 예산 한도 설정 (Soft Cap 80% 알림 / Hard Cap 100% 자동 차단)
-│    └── 회계 결산용 쇼백(Showback)/차지백(Chargeback) 리포트 다운로더
+├── ✅ 💰 4. FinOps & 비용 관제 센터 (Cost & Budget Analytics) — 구현완료 (Phase 3)
+│    ├── ✅ 부서별/프로젝트별 토큰 사용량 실시간 계량(Metering)
+│    ├── ✅ 예산 한도 설정 (Soft Cap 80% 알림 / Hard Cap 100% 자동 차단)
+│    └── ✅ 회계 결산용 쇼백(Showback)/차지백(Chargeback) CSV 리포트 다운로더
 │
-├── 🛡️ 5. PII 보안 & 금융 감사 센터 (Compliance & Privacy Studio)
-│    ├── PII 마스킹 룰 빌더 (주민번호/계좌/카드 Regex & Presidio 임계값 튜닝)
-│    ├── 실시간 PII 탐지 시뮬레이터 (사전 검증용)
-│    └── 금융감독원 제출용 감사 포렌식 뷰어 & WORM 불변 증적 다운로드
+├── ✅ 🛡️ 5. PII 보안 & 금융 감사 센터 (Compliance & Privacy Studio) — 구현완료 (Phase 4)
+│    ├── ✅ PII 마스킹 룰 빌더 (주민번호/계좌/카드 Regex & Presidio 임계값 튜닝, CRUD 모달)
+│    ├── ✅ 실시간 PII 탐지 시뮬레이터 (사전 검증용 실시간 API 연동)
+│    └── ✅ 금융감독원 제출용 감사 포렌식 뷰어 & WORM 불변 증적 다운로드
 │
-├── 🛠️ 6. 시스템 라이프사이클 & 패치 센터 (System Lifecycle & Diagnostics)
-│    ├── 컴포넌트 버전 매트릭스 & 보안 권고 알림
-│    ├── 에어갭 오프라인 패치 번들 업로드 (.tar.gz) & 드라이런(Dry-run)
-│    ├── 원클릭 무중단 롤링 핫픽스 적용 & 즉시 롤백(Rollback)
-│    └── 제로-PII 서포트 번들 생성기 (기술지원 로그 암호화 추출)
+├── 🚧 🛠️ 6. 시스템 라이프사이클 & 패치 센터 (System Lifecycle & Diagnostics) — 미구현 (Phase 5 예정)
+│    ├── 🚧 컴포넌트 버전 매트릭스 & 보안 권고 알림
+│    ├── 🚧 에어갭 오프라인 패치 번들 업로드 (.tar.gz) & 드라이런(Dry-run) — *현재 Mock UI만 구현*
+│    ├── 🚧 원클릭 무중단 롤링 핫픽스 적용 & 즉시 롤백(Rollback)
+│    └── 🚧 제로-PII 서포트 번들 생성기 (기술지원 로그 암호화 추출)
 │
-└── 🧪 7. 엔터프라이즈 프롬프트 스튜디오 (Prompt Studio & Playground)
-     ├── 멀티 모델 응답 비교 (Side-by-Side Playground)
-     └── PII 마스킹 전/후 페이로드 비교 뷰어
+└── ✅ 🧪 7. 엔터프라이즈 프롬프트 스튜디오 (Prompt Studio & Playground) — 구현완료 (Phase 4)
+     ├── ✅ vLLM 서빙 모델 및 하이퍼파라미터 추론 실행
+     └── ✅ PII 마스킹 전/후 페이로드 및 SHA-256 해시 Side-by-Side 비교 뷰어
 ```
 
 ---
 
 ## 3. 핵심 화면별 상세 와이어프레임 및 기능 명세
 
-### 화면 1: 글로벌 관제 홈 대시보드 (Global Overview)
+### ✅ 화면 1: 글로벌 관제 홈 대시보드 (Global Overview) — `구현완료 (Phase 3)`
 
 고객사 IT 운영팀이 클러스터의 실시간 건강 상태와 트래픽 부하를 한눈에 모니터링하는 메인 화면입니다.
 
@@ -121,28 +121,37 @@
 
 ---
 
-### 화면 2: 모델 카탈로그 & 동적 라우팅 스튜디오 (Model & Routing Studio)
+### 화면 2: 모델 카탈로그 & 동적 멀티 라우팅 스튜디오 (Model & Multi-Routing Studio)
 
-엔지니어가 K8s 설정 파일을 직접 만지지 않고, GUI 슬라이더로 신규 모델을 추가하거나 트래픽을 안전하게 카나리 분할 배포합니다.
+엔지니어가 K8s 설정 파일을 직접 만지지 않고, GUI에서 복수의 가상 라우트 프로필을 관리하며 N개 모델 동적 가중치 분할, 조건부 트래픽 매칭, 다단계 장애 우회 체인을 설정하고 Envoy xDS로 무중단 배포합니다.
 
 ```
 +---------------------------------------------------------------------------------------------------------+
-| 모델 카탈로그 및 동적 라우팅 제어                                        [+ 신규 서빙 모델 등록]        |
+| 모델 카탈로그 및 동적 멀티 라우팅 제어               [+ 새 라우트 생성]        [+ 신규 서빙 모델 등록]    |
 +---------------------------------------------------------------------------------------------------------+
-| 📌 라우팅 정책 편집기 (Virtual Model Route: "financial-advisor-v1")                                     |
+| [가상 라우트 선택]: [★ financial-advisor-v1 (우선순위: 1)]  [marketing-copilot]  [code-assistant-v2]     |
++---------------------------------------------------------------------------------------------------------+
+| 📌 라우팅 정책 편집기: "financial-advisor-v1" (우선순위: 1 | 상태: 🟢 활성)                             |
 |                                                                                                         |
-| 1. 트래픽 분할 비율 설정 (Canary Deployment Slider)                                                     |
-|   [====================================================80%======|====================20%==============]   |
-|   🔵 meta-llama/Llama-3.1-8B-Instruct (운영 안정 버전): 80%                                            |
-|   🟣 meta-llama/Llama-3.1-8B-FineTuned-v2 (신규 검증 버전): 20%                                         |
+| 1. 트래픽 분할 비율 (N-Way Multi-Weighted Splitter)                     [ ⚖️ 100% 균등 자동 분배 ]       |
+|   [=================50%=================|=========30%=========|======20%======]  합계: 100% (정상)      |
+|   • [1] Llama-3.1-8B-Instruct (EKS)         가중치: [ 50 ] %   [ 슬라이더 ──●──────── ]                |
+|   • [2] Llama-3.1-8B-FineTuned-v2 (EKS)     가중치: [ 30 ] %   [ 슬라이더 ────●────── ]                |
+|   • [3] Qwen-2.5-Coder-32B (ECS)            가중치: [ 20 ] %   [ 슬라이더 ──────●──── ]  [ - 삭제 ]    |
+|   [ + 타겟 모델 추가 ]                                                                                  |
 |                                                                                                         |
-| 2. 지능형 부하 분산 전략: (o) Least Queue Depth   ( ) Prefix-Cache Affinity   ( ) Round-Robin           |
+| 2. 조건부 트래픽 매칭 규칙 (Traffic Match Conditions)                                                   |
+|   - 테넌트 격리 매칭: [ tenant_wm_01             ]  (HTTP Header: x-orche-tenant)                       |
+|   - URL 경로 접두사:  [ /v1/routes/financial     ]  (Prefix Route Matcher)                              |
+|   - 커스텀 HTTP 헤더: [ x-user-tier: vip         ]                                                      |
 |                                                                                                         |
-| 3. 장애 대응 자동 우회 (Failover Policy)                                                                |
-|   - 조건: 연속 503 에러 3회 발생 시 또는 큐 대기 시간 > 5000ms 초과 시                                 |
-|   - 우회 대상: [ Amazon EC2 70B Fallback Pool  ▼ ] 로 즉시 자동 전환                                   |
+| 3. 지능형 부하 분산 전략: (o) Least Queue Depth   ( ) Prefix-Cache Affinity   ( ) Round-Robin           |
 |                                                                                                         |
-| [ 변경 사항 드라이런(Dry-run) 검증 ]       [ 🚀 Envoy xDS 실시간 무중단 배포 (Zero-Downtime Apply) ]    |
+| 4. 다단계 장애 대응 자동 우회 (Multi-tier Failover Chain)                                               |
+|   - [Primary: 8B 풀] ──► [Secondary: 70B 예비 풀] ──► [Emergency: EC2 Bare-Metal Fallback]             |
+|   - 자동 트리거 조건: 연속 503 에러 3회 발생 시 또는 큐 대기 시간 > 5000ms 초과 시                       |
+|                                                                                                         |
+| [ 🔍 드라이런(Dry-run) 검증 ]              [ 🚀 Envoy xDS 실시간 무중단 배포 (Zero-Downtime Apply) ]    |
 +---------------------------------------------------------------------------------------------------------+
 | 📋 등록된 백엔드 서빙 모델 풀 목록                                                                     |
 | 모델명                          인프라       엔드포인트                상태    대기큐  GPU메모리   조치 |
@@ -154,7 +163,7 @@
 
 ---
 
-### 화면 3: 가상 API 키 & 멀티 테넌트 거버넌스 (Virtual Key & Tenants)
+### ✅ 화면 3: 가상 API 키 & 멀티 테넌트 거버넌스 (Virtual Key & Tenants) — `구현완료 (Phase 1)`
 
 사내 부서나 챗봇 시스템에 안전하게 접근 권한을 부여하고, 백엔드 GPU 주소를 노출하지 않도록 가상 API Key를 발급 및 회수합니다.
 
@@ -184,7 +193,7 @@
 
 ---
 
-### 화면 4: FinOps & 비용 관제 센터 (Cost & Budget Analytics)
+### ✅ 화면 4: FinOps & 비용 관제 센터 (Cost & Budget Analytics) — `구현완료 (Phase 3)`
 
 부서별 GPU 자원 독점을 방지하고, 회계 결산용 비용 정산 리포트를 자동 생성합니다.
 
@@ -210,9 +219,10 @@
 
 ---
 
-### 화면 5: PII 보안 룰 빌더 & 금융 감사 포렌식 센터 (Compliance Studio)
+### ✅ 화면 5: PII 보안 룰 빌더 & 금융 감사 포렌식 센터 (Compliance Studio) — `구현완료 (Phase 4)`
 
 금융감독규정에 따라 고객 개인정보 유출을 방어하고, 사내 규정에 맞게 PII 마스킹 룰을 커스텀 정의 및 감사 증적을 검색합니다.
+> **구현 상태**: 백엔드 PII 엔진 및 PostgreSQL/WORM 감사 로그와 완전 연동 완료 (`/api/v1/compliance/rules`, `/simulate`, `/audit-logs`, `/stats`). 실시간 시뮬레이션, 규칙 CRUD 모달, WORM 포렌식 리포트 다운로드를 지원합니다.
 
 ```
 +---------------------------------------------------------------------------------------------------------+
@@ -239,9 +249,10 @@
 
 ---
 
-### 화면 6: 시스템 라이프사이클 & 패치 관리 센터 (Lifecycle & Patch Console)
+### 🚧 화면 6: 시스템 라이프사이클 & 패치 관리 센터 (Lifecycle & Patch Console) — `미구현 (Phase 5 예정)`
 
 벤더(작성자)가 공급하는 긴급 보안 핫픽스 번들을 고객이 안전하게 폐쇄망에 반입하여 원클릭으로 롤링 배포 및 자가 진단하는 화면입니다.
+> **현재 상태**: 프론트엔드 `LifecycleTab.jsx`에 Mock UI만 구현되어 있으며, 실제 RSA-4096 서명 검증, K8s 롤링 배포 트리거, Zero-PII 서포트 번들 엔진은 미구현입니다.
 
 ```
 +---------------------------------------------------------------------------------------------------------+
@@ -343,13 +354,18 @@ CREATE TABLE model_endpoints (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- 4. 동적 라우팅 정책 (xDS 연동)
+-- 4. 동적 멀티 라우팅 정책 (xDS 연동)
 CREATE TABLE routing_policies (
     policy_id VARCHAR(64) PRIMARY KEY,
     route_name VARCHAR(128) NOT NULL,            -- 'financial-advisor-v1'
-    traffic_weights JSONB NOT NULL,              -- [{"model_id": "Llama-8b-v1", "weight": 80}, {"model_id": "Llama-8b-v2", "weight": 20}]
+    priority INT DEFAULT 0,                      -- Envoy 매칭 우선순위 (높을수록 먼저 평가)
+    match_conditions JSONB,                      -- {"tenant_id": "wm_01", "path_prefix": "/v1/routes/wm", "headers": {"x-tier": "vip"}}
+    traffic_weights JSONB NOT NULL,              -- [{"model_id": "Llama-8b-v1", "weight": 50}, {"model_id": "Llama-8b-v2", "weight": 30}, {"model_id": "Qwen-32b", "weight": 20}]
     load_balancing_strategy VARCHAR(32) DEFAULT 'LeastQueueDepth',
     fallback_model_id VARCHAR(128) REFERENCES model_endpoints(model_id),
+    failover_chain JSONB,                        -- [{"tier": 1, "model_id": "Llama-70b"}, {"tier": 2, "model_id": "EC2-Fallback"}]
+    is_active BOOLEAN DEFAULT TRUE,
+    description TEXT,
     updated_by VARCHAR(64) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -384,32 +400,113 @@ CREATE TABLE patch_history (
 
 ## 6. 핵심 제어 REST API 명세 (Control Plane API)
 
-### 6.1 xDS 무중단 라우팅 정책 실시간 배포
+### 6.1 동적 멀티 라우팅 정책 관리 & xDS RDS v3 실시간 컴파일
+
+#### [A] 신규 가상 라우트 프로필 등록 / 수정
 ```http
-POST /api/v1/routing/deploy
+POST /api/v1/routing/routes
 Content-Type: application/json
 Authorization: Bearer <Admin_JWT_Token>
 
 {
   "route_name": "financial-advisor-v1",
+  "priority": 1,
+  "match_conditions": {
+    "tenant_id": "tenant_wm_01",
+    "path_prefix": "/v1/routes/financial",
+    "headers": { "x-user-tier": "vip" }
+  },
   "traffic_weights": [
-    { "model_id": "meta-llama/Llama-3.1-8B-Instruct", "weight": 80 },
-    { "model_id": "meta-llama/Llama-3.1-8B-FineTuned-v2", "weight": 20 }
+    { "model_id": "meta-llama/Llama-3.1-8B-Instruct", "weight": 50 },
+    { "model_id": "meta-llama/Llama-3.1-8B-FineTuned-v2", "weight": 30 },
+    { "model_id": "Qwen/Qwen2.5-Coder-32B-Instruct", "weight": 20 }
   ],
-  "strategy": "LeastQueueDepth",
-  "fallback_model_id": "meta-llama/Llama-3.1-70B-Instruct"
+  "load_balancing_strategy": "LeastQueueDepth",
+  "fallback_model_id": "meta-llama/Llama-3.1-70B-Instruct",
+  "failover_chain": [
+    { "tier": 1, "model_id": "meta-llama/Llama-3.1-70B-Instruct", "endpoint": "http://10.20.4.12:8000" },
+    { "tier": 2, "model_id": "amazon/EC2-BareMetal-Fallback", "endpoint": "http://10.30.1.5:8000" }
+  ],
+  "is_active": true,
+  "description": "자산관리부 VIP 챗봇 전용 N-Way 카나리 및 장애 우회 라우트"
 }
 ```
 **응답 (200 OK):**
 ```json
 {
-  "status": "SUCCESS",
-  "message": "xDS 동적 라우팅 정책이 Envoy AI Gateway에 무중단 실시간 배포되었습니다.",
-  "version_info": "xds-rev-20260911-1422"
+  "policy_id": "pol-wm-fin-001",
+  "route_name": "financial-advisor-v1",
+  "priority": 1,
+  "traffic_weights": [
+    { "model_id": "meta-llama/Llama-3.1-8B-Instruct", "weight": 50 },
+    { "model_id": "meta-llama/Llama-3.1-8B-FineTuned-v2", "weight": 30 },
+    { "model_id": "Qwen/Qwen2.5-Coder-32B-Instruct", "weight": 20 }
+  ],
+  "is_active": true,
+  "xds_revision": "xds-rev-20260911-1500"
 }
 ```
 
-### 6.2 오프라인 긴급 패치 번들 업로드 및 롤링 배포 트리거
+#### [B] Envoy L7 REST Route Discovery Service (RDS v3)
+Envoy 프록시가 동적으로 라우트 테이블을 풀링(Polling)하거나 갱신받는 엔터프라이즈 xDS 엔드포인트입니다.
+```http
+GET /api/v1/xds/v3/discovery:routes
+```
+**응답 (200 OK):**
+```json
+{
+  "version_info": "xds-rev-20260911-1500",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "aiorche_model_routes",
+      "virtual_hosts": [
+        {
+          "name": "aiorche_vhost",
+          "domains": ["*"],
+          "routes": [
+            {
+              "name": "route_financial-advisor-v1",
+              "match": {
+                "prefix": "/v1/routes/financial",
+                "headers": [
+                  { "name": "x-orche-tenant", "exact_match": "tenant_wm_01" },
+                  { "name": "x-user-tier", "exact_match": "vip" }
+                ]
+              },
+              "route": {
+                "weighted_clusters": {
+                  "clusters": [
+                    { "name": "cluster_meta-llama_Llama-3.1-8B-Instruct", "weight": 50 },
+                    { "name": "cluster_meta-llama_Llama-3.1-8B-FineTuned-v2", "weight": 30 },
+                    { "name": "cluster_Qwen_Qwen2.5-Coder-32B-Instruct", "weight": 20 }
+                  ],
+                  "total_weight": 100
+                },
+                "retry_policy": {
+                  "retry_on": "5xx,connect-failure,refused-stream",
+                  "num_retries": 3
+                },
+                "timeout": "60s"
+              }
+            },
+            {
+              "name": "default_fallback_route",
+              "match": { "prefix": "/" },
+              "route": {
+                "cluster": "cluster_default",
+                "timeout": "60s"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 🚧 6.2 오프라인 긴급 패치 번들 업로드 및 롤링 배포 트리거 — `미구현 (Phase 5 예정)`
 ```http
 POST /api/v1/lifecycle/patches/apply
 Content-Type: multipart/form-data
@@ -435,7 +532,7 @@ dry_run: false
 }
 ```
 
-### 6.3 제로-PII 서포트 번들 생성 요청
+### 🚧 6.3 제로-PII 서포트 번들 생성 요청 — `미구현 (Phase 5 예정)`
 ```http
 POST /api/v1/diagnostics/support-bundle
 Authorization: Bearer <Admin_JWT_Token>

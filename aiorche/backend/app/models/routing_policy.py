@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, JSON, DateTime, ForeignKey, func
+from sqlalchemy import Column, String, JSON, DateTime, ForeignKey, Integer, Boolean, Text, func
 from app.db.base import Base
 
 class RoutingPolicy(Base):
@@ -12,3 +12,10 @@ class RoutingPolicy(Base):
     xds_revision = Column(String(64), nullable=False)
     deployed_by = Column(String(64), nullable=False, default="admin")
     deployed_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Multi-routing fields
+    priority = Column(Integer, default=10, nullable=False)
+    match_conditions = Column(JSON, nullable=True)
+    failover_chain = Column(JSON, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    description = Column(Text, nullable=True)

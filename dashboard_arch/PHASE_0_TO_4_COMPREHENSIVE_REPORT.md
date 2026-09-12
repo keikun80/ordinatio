@@ -1,30 +1,30 @@
-# AI Orchestrator Phase 0 ~ 3 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
+# AI Orchestrator Phase 0 ~ 4 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
-**문서 번호**: AIORCHE-ENG-REP-20260911  
+**문서 번호**: AIORCHE-ENG-REP-20260912  
 **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-09-11  
-**검증 상태**: **Phase 0, Phase 1, Phase 2, Phase 3 전체 100% PASS (DoD 충족)**  
+**작성 일자**: 2026-09-12 (Phase 4 완료 및 PII 삭제 UI 고도화 반영 현행화)  
+**검증 상태**: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4 전체 100% PASS (DoD 충족)**  
 
 ---
 
 ## 1. 종합 요약 및 엔지니어링 개요
 
-본 문서는 `dashboard_arch/dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 3까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
+본 문서는 `dashboard_arch/dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 4까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                         AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                         │
-├─────────────────────────┬─────────────────────────┬────────────────────┬─────────────────────────┤
-│       Phase 0 (기반)     │     Phase 1 (거버넌스)    │    Phase 2 (라우팅) │     Phase 3 (FinOps)    │
-├─────────────────────────┼─────────────────────────┼────────────────────┼─────────────────────────┤
-│ • 100% 에어갭 아키텍처  │ • 테넌트 부서별 분리   │ • 동적 모델 카탈로그│ • 1초 WebSocket 관제    │
-│ • FastAPI Clean Backend │ • sk-orch- Argon2id 해시│ • Envoy L7 xDS v3  │ • 토큰 단위 표준 과금   │
-│ • React 18 + Vite Web   │ • 가상키 영속성/수정    │ • 카나리 80:20 분할 │ • Hard Cap 100% 차단    │
-│ • 5대 인프라 Preflight   │ • 외부 연동 REST 4종   │ • Prefix Cache 해시│ • UTF-8 BOM CSV 청구서  │
-│ • Docker & K8s 패키징   │ • Prometheus /metrics   │ • K8s 5개 Pod 배포 │ • 4종 FinOps 집계 카드 │
-├─────────────────────────┼─────────────────────────┼────────────────────┼─────────────────────────┤
-│  5/5 Tests (100% PASS)  │ 15/15 Tests (100% PASS) │ 20/20 Tests (100%) │ 26/26 Tests (100% PASS) │
-└─────────────────────────┴─────────────────────────┴────────────────────┴─────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                                       │
+├───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┬─────────────────────────────┤
+│     Phase 0 (기반)     │    Phase 1 (거버넌스)  │     Phase 2 (라우팅)   │    Phase 3 (FinOps)   │   Phase 4 (Compliance)     │
+├───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┼─────────────────────────────┤
+│ • 100% 에어갭 아키텍처│ • 테넌트 부서별 분리  │ • 동적 모델 카탈로그  │ • 1초 WebSocket 관제  │ • 자체 고속 PII 엔진 (<2ms) │
+│ • FastAPI Clean Core  │ • sk-orch- Argon2id   │ • Envoy L7 xDS v3 RDS │ • 토큰 단위 표준 과금 │ • MASK/HASH/BLOCK 3대 액션  │
+│ • React 18 + Vite Web │ • 가상키 수명주기/수정│ • N-Way 동적 가중치   │ • Hard Cap 100% 차단  │ • PII 룰셋 CRUD & 안전 삭제 │
+│ • 5대 인프라 Preflight│ • 외부 연동 REST 4종  │ • Prefix Cache Affinity│ • UTF-8 BOM CSV 청구서│ • WORM 불변 감사 로그 적재  │
+│ • Docker & K8s 배포   │ • Prometheus /metrics │ • K8s 5개 Pod 배포    │ • 4종 FinOps 통계 카드│ • 감사 증적 포렌식 JSON 출력│
+├───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┼─────────────────────────────┤
+│  5/5 Tests (100% PASS)│ 15/15 Tests (100% PASS│ 20/20 Tests (100%)    │ 26/26 Tests (100% PASS│   35/35 Tests (100% PASS)   │
+└───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┴─────────────────────────────┘
 ```
 
 ---
@@ -37,12 +37,13 @@
 | :--- | :--- | :--- | :---: | :---: |
 | **Phase 0** | [phase0_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_implementation_plan_and_test_results.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
 | **Phase 1** | [phase1_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase1_implementation_plan_and_test_results.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md) | 동적 모델 카탈로그, Envoy L7 xDS(RDS) 제어기, 카나리 트래픽 분할, K8s 5개 Pod 배포 | `make verify-phase2` | 20 / 20 PASS |
+| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md) | 동적 모델 카탈로그, Envoy L7 xDS(RDS) 제어기, N-Way 가중치 분할, K8s 5개 Pod 배포 | `make verify-phase2` | 20 / 20 PASS |
 | **Phase 3** | [phase3_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
+| **Phase 4** | [phase4_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (26 / 26 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (35 / 35 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
@@ -77,6 +78,14 @@ cd aiorche/backend && uv run pytest -v
 | | `test_finops_overview_and_pricing` | 부서별 예산 소진율 집계 및 표준 토큰 단가표 계산 검증 | **PASSED** |
 | | `test_finops_csv_invoice_export` | 엑셀 호환 UTF-8 BOM(`\uFEFF`) 청구서 스트리밍 다운로드 무결성 | **PASSED** |
 | | `test_hard_cap_enforcement_blocks_traffic` | 예산 100% 소진 테넌트의 추론 요청에 대한 HTTP 429 차단 검증 | **PASSED** |
+| `test_compliance.py` | `test_pii_engine_mask_action` | 주민등록번호(`RRN`) 정규식 탐지, `[MASKED_RRN]` 치환, 해시 무결성 검증 | **PASSED** |
+| | `test_pii_engine_hash_action` | 은행 계좌번호(`BANK_ACCOUNT`) 단방향 SHA-256 가명화 해시 치환 검증 | **PASSED** |
+| | `test_pii_engine_block_action` | 임직원 사번(`EMPLOYEE_ID`) 인입 시 즉각 요청 차단(`is_blocked=True`) 검증 | **PASSED** |
+| | `test_pii_engine_clean_text` | PII가 포함되지 않은 일반 프롬프트의 원문 보존 및 무변조 통과 검증 | **PASSED** |
+| | `test_compliance_rules_crud` | PII 규칙 목록 조회, 신규 생성(정규식 검증), 중복 방지(409), 수정 및 삭제 API | **PASSED** |
+| | `test_compliance_simulate_and_audit_log` | 실시간 프롬프트 마스킹 시뮬레이션 및 WORM 감사 로그 테이블 자동 적재 검증 | **PASSED** |
+| | `test_compliance_simulate_block` | 차단 규칙 발동 시 감사 로그에 `BLOCK` 조치 기록 및 차단 응답 확인 | **PASSED** |
+| | `test_compliance_stats` | 규제 준수 통계 API(총 규칙, 활성 규칙, 누적 감사 로그, 타입별 집계) 검증 | **PASSED** |
 
 ---
 
@@ -90,9 +99,9 @@ kubectl get pods,svc -n aiorche -o wide
 
 | Pod 명칭 | Ready | Status | IP | Node | 주요 역할 |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| `postgres-5b86d57c7b-97m28` | 1/1 | **Running** | 10.244.1.2 | desktop-worker | RDBMS 메타데이터 스토어 (테넌트, 가상키, 모델, 정책) |
+| `postgres-5b86d57c7b-97m28` | 1/1 | **Running** | 10.244.1.2 | desktop-worker | RDBMS 메타데이터 스토어 (테넌트, 가상키, 모델, 정책, PII룰, WORM로그) |
 | `redis-b7f66f4b6-hfjvk` | 1/1 | **Running** | 10.244.1.3 | desktop-worker | 실시간 RPM/TPM 속도 제한 및 세션 캐시 |
-| `backend-c64cbc9b9-twcqt` | 1/1 | **Running** | 10.244.1.5 | desktop-worker | FastAPI 코어 컨트롤 플레인 (인증, xDS, 관제, FinOps) |
+| `backend-c64cbc9b9-twcqt` | 1/1 | **Running** | 10.244.1.5 | desktop-worker | FastAPI 코어 컨트롤 플레인 (인증, xDS, 관제, FinOps, Compliance) |
 | `envoy-5cfc8cf5c5-gsxqh` | 1/1 | **Running** | 10.244.1.4 | desktop-worker | L7 AI Ingress 게이트웨이 및 동적 트래픽 라우팅 |
 | `frontend-654f797f9-n2dtf` | 1/1 | **Running** | 10.244.1.6 | desktop-worker | React 18 + Vite 관리자 웹 콘솔 포털 |
 
@@ -114,12 +123,16 @@ kubectl get pods,svc -n aiorche -o wide
    - 증적: `finops_tab_invoice_toast_1789136131434.png` / `phase3_finops_demo_1789136054484.webp`
 6. **Envoy L7 REST RDS v3 및 Multi-Compute 서빙 풀 UI 개편 검증 (Phase 2 & ADR-01/02)**:
    - 증적: `envoy_l7_rds_verified_1789137173884.png` / `verify_routing_ui_update`
+7. **PII 마스킹 시뮬레이션, WORM 감사로그 & 신규 규칙 등록 모달 (Phase 4)**:
+   - 증적: `pii_rule_add_button_1789170430313.png` / `pii_modal_dialog_1789170521689.png` / `compliance_modal_check_1789170383840.webp`
+8. **PII 규칙 인앱 안전 삭제 확인 모달 및 낙관적 UI 갱신 (Phase 4)**:
+   - 증적: `rule_delete_success_1789171034799.png` / `verify_rule_deletion_1789170960973.webp`
 
 ---
 
 ## 6. 아키텍처 결정 기록 (ADR) 및 설계 문서 현행화 완료 내역
 
-에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 4대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
+에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 6대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
 
 | 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
 | :---: | :---: | :--- | :--- | :--- |
@@ -127,11 +140,13 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 동적 상태 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `telemetry_hub`를 통한 1초 주기 실시간 관제 스트림 구축 |
 | **ADR-03** | FinOps 과금 계량 | Apache Kafka 비동기 이벤트 컨슈머 | **Envoy L7 직접 보고 동기식 원자적 계량 API** (`POST /api/v1/external/usage/report`) | 무거운 Kafka 클러스터 설치/운영 오버헤드 없이 단일 DB 트랜잭션으로 토큰/비용의 100% 원자적 일관성 및 초저지연 보장 |
 | **ADR-04** | 전문 관제 대시보드 | Grafana Kiosk 모드 iFrame 직접 임베딩 | **전문 3종 내장 관제 패널 및 외부 Grafana 연동 링크** | Grafana 컨테이너 미구동 상태에서도 L7, GPU, FinOps 3대 화면을 자체 독립적으로 완벽 관제 가능 |
+| **ADR-05** | PII 마스킹 엔진 | 대용량 외부 Presidio spaCy NER 모델 (~500MB) | **자체 정규식 기반 고속 PII 엔진 (`pii_engine.py`)** | 외부 인터넷 불가 에어갭 환경에서 즉시 구동 가능하며, 2ms 미만의 초저지연 처리 보장 |
+| **ADR-06** | WORM 감사 로그 | Kafka ➔ OpenSearch ➔ S3 Object Lock 전체 파이프라인 | **PostgreSQL/SQLite INSERT-only 불변 테이블 & SHA-256 해시 증적** | 별도 빅데이터 클러스터 없이도 원문 비저장 해시 증적으로 금융감독원 규정 준수 및 포렌식 무결성 보장 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과**하였습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(35/35 테스트)**하였습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
-- **향후 단계**: `dashboard_engineering_plan.md`의 **Phase 4: Presidio PII 개인정보 필터링 & 감사 증적 WORM S3 Object Lock 불변 보관**으로 즉시 연계가 가능합니다.
+- **향후 단계**: `dashboard_engineering_plan.md`의 **Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진 (Lifecycle & Patch Management)**으로 즉시 연계가 가능합니다.

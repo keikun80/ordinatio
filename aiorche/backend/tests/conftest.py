@@ -30,6 +30,8 @@ app.dependency_overrides[get_db] = override_get_db
 
 from app.models.model_catalog import ModelCatalog
 from app.models.routing_policy import RoutingPolicy
+from app.models.pii_rule import PiiRule
+from app.models.audit_log import AuditLog
 
 # Create all tables and seed data immediately at module load
 Base.metadata.create_all(bind=test_engine)
@@ -104,6 +106,85 @@ def seed_data():
             xds_revision="xds-rev-20260911-1422",
             deployed_by="admin"
         ))
+
+    # Seed PiiRule if missing
+    if not db.query(PiiRule).filter(PiiRule.rule_id == "pii-rrn").first():
+        db.add_all([
+            PiiRule(
+                rule_id="pii-rrn",
+                name="주민등록번호 마스킹",
+                entity_type="RRN",
+                regex_pattern=r"\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-[1-4]\d{6}",
+                confidence_threshold=0.99,
+                action="MASK",
+                is_active=True,
+            ),
+            PiiRule(
+                rule_id="pii-account",
+                name="계좌번호 가명화(해싱)",
+                entity_type="BANK_ACCOUNT",
+                regex_pattern=r"\b\d{3,6}-\d{2,6}-\d{3,6}\b",
+                confidence_threshold=0.90,
+                action="HASH",
+                is_active=True,
+            ),
+            PiiRule(
+                rule_id="pii-card",
+                name="신용카드 번호 마스킹",
+                entity_type="CREDIT_CARD",
+                regex_pattern=r"\b\d{4}-\d{4}-\d{4}-\d{4}\b",
+                confidence_threshold=0.95,
+                action="MASK",
+                is_active=True,
+            ),
+            PiiRule(
+                rule_id="pii-employee",
+                name="사내 행번/사번 차단",
+                entity_type="EMPLOYEE_ID",
+                regex_pattern=r"\bEMP-[A-Z]{2}\d{5}\b",
+                confidence_threshold=0.85,
+                action="BLOCK",
+                is_active=True,
+            ),
+        ])
+
+    # Seed AuditLog if empty
+    if db.query(AuditLog).count() == 0:
+        import json
+        db.add_all([
+            AuditLog(
+                log_id="aud-test-001",
+                requester_id="WM-10042",
+                key_id="sk-orch-wm-prod-01",
+                model_id="meta-llama/Llama-3.1-8B-Instruct",
+                original_prompt_hash="sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                masked_payload_hash="sha256:88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+                detections_json=json.dumps([
+                    {"entity_type": "RRN", "rule_id": "pii-rrn", "rule_name": "주민등록번호 마스킹", "confidence": 0.99, "action": "MASK", "replacement": "[MASKED_RRN]"}
+                ]),
+                pii_count=1,
+                action_taken="MASK",
+                latency_ms=1.420,
+                is_blocked=False,
+                worm_reference_id="worm-s3-vault://audit/aud-test-001.json"
+            ),
+            AuditLog(
+                log_id="aud-test-002",
+                requester_id="EMP-HQ99120",
+                key_id="sk-orch-risk-dev-02",
+                model_id="Solar-10.7B-Financial",
+                original_prompt_hash="sha256:ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+                masked_payload_hash="sha256:ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+                detections_json=json.dumps([
+                    {"entity_type": "EMPLOYEE_ID", "rule_id": "pii-employee", "rule_name": "사내 행번/사번 차단", "confidence": 0.85, "action": "BLOCK", "replacement": "[BLOCKED]"}
+                ]),
+                pii_count=1,
+                action_taken="BLOCK",
+                latency_ms=0.890,
+                is_blocked=True,
+                worm_reference_id="worm-s3-vault://audit/aud-test-002.json"
+            )
+        ])
 
     db.commit()
     db.close()

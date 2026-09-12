@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS model_catalogs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. 동적 라우팅 정책 테이블
+-- 4. 동적 라우팅 정책 테이블 (멀티 라우팅 지원)
 CREATE TABLE IF NOT EXISTS routing_policies (
     policy_id VARCHAR(64) PRIMARY KEY,
     route_name VARCHAR(128) NOT NULL UNIQUE,
@@ -57,7 +57,12 @@ CREATE TABLE IF NOT EXISTS routing_policies (
     failover_model_id VARCHAR(128) REFERENCES model_catalogs(model_id),
     xds_revision VARCHAR(64) NOT NULL,
     deployed_by VARCHAR(64) NOT NULL,
-    deployed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    deployed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    priority INT NOT NULL DEFAULT 10,
+    match_conditions JSONB DEFAULT '{}'::jsonb,
+    failover_chain JSONB DEFAULT '[]'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    description TEXT
 );
 
 -- 5. PII 보안 룰셋 테이블
@@ -71,6 +76,25 @@ CREATE TABLE IF NOT EXISTS pii_rules (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 5-1. WORM 불변 감사 로그 테이블 (INSERT-only)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    log_id VARCHAR(64) PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    requester_id VARCHAR(64) NOT NULL,
+    key_id VARCHAR(64),
+    model_id VARCHAR(128),
+    original_prompt_hash VARCHAR(128) NOT NULL,
+    masked_payload_hash VARCHAR(128) NOT NULL,
+    detections_json TEXT NOT NULL DEFAULT '[]',
+    pii_count INT NOT NULL DEFAULT 0,
+    action_taken VARCHAR(32) NOT NULL DEFAULT 'PASS',
+    latency_ms NUMERIC(10, 3) NOT NULL DEFAULT 0,
+    is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    worm_reference_id VARCHAR(128)
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_requester ON audit_logs(requester_id);
 
 -- 6. 핫픽스 및 패치 릴리즈 히스토리
 CREATE TABLE IF NOT EXISTS patch_histories (

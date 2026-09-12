@@ -61,14 +61,14 @@ services:
       redis:
         condition: service_healthy
 
-  # 5. 어드민 포털 프론트엔드 (React 18 + Vite)
+  # 5. 어드민 포털 프론트엔드 (React 18 + Vite Nginx)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: aiorche-frontend
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
 

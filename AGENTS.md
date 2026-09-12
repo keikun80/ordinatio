@@ -19,7 +19,19 @@
 - 모든 기능 구현은 `dashboard_arch/dashboard_engineering_plan.md`의 Phase(0~4) 정의에 따라 순차적으로 진행합니다.
 - 각 단계 완료 시 반드시 Definition of Done(DoD) 자동화 검증 스크립트(`scripts/verify-phase*.sh`) 및 `make test`를 통과해야 합니다.
 
-## 3. 기술 스택별 표준 규칙
+## 3. 아키텍처 문서 및 종합 보고서 동기화 표준 (Documentation Synchronization Invariants)
+각 Phase(단계)의 구현/검증이 완료되거나 주요 결함 해결/기능 수정이 발생했을 때, 에이전트는 사용자의 별도 요청 없이 아래 문서들을 **반드시 원스톱으로 동시 현행화**해야 합니다:
+1. **단계별 개별 보고서**: `dashboard_arch/phase{N}_implementation_plan_and_test_results.md` 작성 및 검증 증적 기록.
+2. **종합 총괄 보고서 (Comprehensive Report)**:
+   - `dashboard_arch/PHASE_0_TO_{N}_COMPREHENSIVE_REPORT.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - 다이어그램, 단계별 핵심 성과, 전체 테스트 매트릭스(PASS 건수), 브라우저 E2E 증적, ADR 기록 전면 업데이트.
+3. **엔지니어링 갭 분석서 (Gap Analysis)**:
+   - `dashboard_arch/GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - Phase 0부터 {N}까지의 요구사항 대비 구현율(100%), ADR-01~0N, 미구현/미테스트 및 권장 과제 전면 현행화.
+4. **디렉토리 인덱스 및 마스터 계획서 동기화**:
+   - `dashboard_arch/README.md`, `dashboard_arch/dashboard_engineering_plan.md`, `aiorche/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.
+
+## 4. 기술 스택별 표준 규칙
 1. **Backend (Python)**:
    - 의존성 및 가상환경 관리는 반드시 `uv`를 사용합니다 (`uv sync`, `uv run pytest`).
    - 시스템 Python과의 충돌을 방지하기 위해 테스트 및 CLI 실행 시 `uv run` 또는 `.venv/bin/`을 항상 사용합니다.

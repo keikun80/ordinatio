@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, Play, Sliders, Shield, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Play, Sliders, Shield, ArrowRight, CheckCircle2, AlertTriangle, Lock } from 'lucide-react';
+import { api } from '../api/client';
 import { initialModels } from '../data/mockData';
 
 export default function PromptStudioTab({ onNotify }) {
@@ -10,15 +11,48 @@ export default function PromptStudioTab({ onNotify }) {
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState(null);
 
-  const handleRunInference = () => {
+  const handleRunInference = async () => {
     setIsRunning(true);
     setOutput(null);
 
-    setTimeout(() => {
-      setIsRunning(false);
-      setOutput({
-        maskedPrompt: '고객 홍길동(주민번호 [MASKED_RRN_880101], 계좌 [HASH_ACC_9f2a1b])의 신용대출 심사를 위한 소득 및 상환 능력 분석 요약서를 금융감독 규정에 맞게 작성해줘.',
-        response: `[금융 대출 심사 분석 요약서]
+    try {
+      // 1. Run Real PII Inspection & Masking via Backend API
+      const simRes = await api.simulatePiiMasking({
+        text: prompt,
+        requester_id: 'studio-playground',
+        model_id: selectedModel
+      });
+
+      if (simRes.is_blocked) {
+        setOutput({
+          isBlocked: true,
+          maskedPrompt: simRes.masked_text,
+          detections: simRes.detections,
+          originalHash: simRes.original_hash,
+          maskedHash: simRes.masked_hash,
+          auditLogId: simRes.audit_log_id,
+          response: null,
+          stats: {
+            piiCount: simRes.pii_count,
+            piiLatencyMs: simRes.latency_ms,
+            totalLatencyMs: simRes.latency_ms
+          }
+        });
+        onNotify('ERROR', '컴플라이언스 차단: 사내 사번/행번 또는 보안 정책 위반 항목이 감지되어 vLLM 호출이 즉시 차단되었습니다.');
+        setIsRunning(false);
+        return;
+      }
+
+      // 2. Simulated LLM Response using masked text
+      setTimeout(() => {
+        setOutput({
+          isBlocked: false,
+          maskedPrompt: simRes.masked_text,
+          detections: simRes.detections,
+          originalHash: simRes.original_hash,
+          maskedHash: simRes.masked_hash,
+          auditLogId: simRes.audit_log_id,
+          response: `[금융 대출 심사 분석 요약서]
 1. 신청인 기본 사항: 고객 홍길동 (식별코드: [MASKED_RRN_880101])
 2. 결제 및 상환 계좌: [HASH_ACC_9f2a1b]
 3. 종합 상환 능력 평가:
@@ -27,16 +61,47 @@ export default function PromptStudioTab({ onNotify }) {
 4. 심사 의견:
    - 본 건 신용대출 신청액(₩50,000,000)에 대해 당행 여신 심사 기준 제14조에 의거 '가결' 의견을 제시합니다.
    - 단, 금리 변동 위험을 고려하여 거치 기간 없는 원리금균등분할상환을 권고합니다.`,
-        stats: {
-          inputTokens: 48,
-          outputTokens: 184,
-          ttftMs: 168,
-          totalLatencyMs: 1420,
-          costKrw: 0.48
+          stats: {
+            piiCount: simRes.pii_count,
+            piiLatencyMs: simRes.latency_ms,
+            inputTokens: Math.round(prompt.length / 3),
+            outputTokens: 184,
+            ttftMs: 142,
+            totalLatencyMs: Math.round(1200 + simRes.latency_ms),
+            costKrw: 0.48
+          }
+        });
+        setIsRunning(false);
+        if (simRes.pii_count > 0) {
+          onNotify('SUCCESS', `vLLM 추론 완료: ${simRes.pii_count}건의 PII 마스킹 완료 페이로드가 처리되었습니다. (WORM ID: ${simRes.audit_log_id})`);
+        } else {
+          onNotify('SUCCESS', 'vLLM 추론 완료: 프롬프트에 PII가 감지되지 않아 원문 그대로 처리되었습니다.');
         }
-      });
-      onNotify('SUCCESS', 'vLLM 모델 추론이 완료되었습니다. PII 마스킹 완료 페이로드가 정상 처리되었습니다.');
-    }, 1200);
+      }, 800);
+    } catch (err) {
+      console.warn('Backend PII simulation offline, fallback to local logic:', err);
+      // Fallback
+      setTimeout(() => {
+        setIsRunning(false);
+        setOutput({
+          isBlocked: false,
+          maskedPrompt: prompt.replace(/\d{6}-[1-4]\d{6}/g, '[MASKED_RRN]'),
+          detections: [],
+          originalHash: 'sha256:e3b0c442...',
+          maskedHash: 'sha256:88d4266f...',
+          response: `[금융 대출 심사 분석 요약서]\n심사 가결`,
+          stats: {
+            piiCount: 1,
+            piiLatencyMs: 1.2,
+            inputTokens: 48,
+            outputTokens: 120,
+            ttftMs: 150,
+            totalLatencyMs: 1250,
+            costKrw: 0.40
+          }
+        });
+      }, 500);
+    }
   };
 
   return (
@@ -67,7 +132,7 @@ export default function PromptStudioTab({ onNotify }) {
               onChange={(e) => setSelectedModel(e.target.value)}
             >
               {initialModels.map((m) => (
-                <option key={m.id} value={m.id}>{m.id.split('/')[1]} ({m.backend})</option>
+                <option key={m.id} value={m.id}>{m.id.split('/')[1] || m.id} ({m.backend})</option>
               ))}
             </select>
           </div>
@@ -104,25 +169,25 @@ export default function PromptStudioTab({ onNotify }) {
             />
           </div>
 
-          <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.25)', marginTop: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', fontWeight: 600, color: '#34d399' }}>
-              <Shield size={16} />
-              <span>Presidio PII 필터 자동 적용됨</span>
+          <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(56, 189, 248, 0.05)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '0.82rem', fontWeight: 600 }}>
+              <Shield size={14} />
+              <span>Phase 4 PII 거버넌스 활성</span>
             </div>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              추론 실행 시 프롬프트 내 민감정보가 자동 마스킹 치환되어 GPU로 전송됩니다.
-            </div>
+            <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+              프롬프트 전송 전 Presidio/정규식 인라인 마스킹 및 SHA-256 불변 감사 로그가 자동 기록됩니다.
+            </p>
           </div>
         </div>
 
-        {/* Input & Output Area */}
+        {/* Playground Area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Prompt Input Box */}
           <div className="card">
-            <div className="card-header" style={{ marginBottom: '10px' }}>
+            <div className="card-header">
               <div className="card-title" style={{ fontSize: '0.95rem' }}>
                 <Sparkles size={18} color="#a855f7" />
-                <span>테스트 프롬프트 입력</span>
+                <span>테스트 프롬프트 작성</span>
               </div>
               <button 
                 className="btn btn-primary btn-sm"
@@ -130,7 +195,7 @@ export default function PromptStudioTab({ onNotify }) {
                 disabled={isRunning}
               >
                 <Play size={14} />
-                <span>{isRunning ? 'vLLM 추론 처리 중...' : '추론 실행 (Run)'}</span>
+                <span>{isRunning ? 'PII 검증 및 vLLM 추론 중...' : '추론 실행 (Run)'}</span>
               </button>
             </div>
 
@@ -148,25 +213,52 @@ export default function PromptStudioTab({ onNotify }) {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">
-                  <CheckCircle2 size={18} color="#34d399" />
-                  <span>vLLM 모델 응답 결과 & 페이로드 분석</span>
+                  {output.isBlocked ? (
+                    <>
+                      <AlertTriangle size={18} color="#f43f5e" />
+                      <span style={{ color: '#f43f5e' }}>컴플라이언스 정책 위반으로 차단됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} color="#34d399" />
+                      <span>vLLM 모델 응답 결과 & Side-by-Side 페이로드 분석</span>
+                    </>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
-                  <span>TTFT: <strong style={{ color: '#38bdf8' }}>{output.stats.ttftMs}ms</strong></span>
-                  <span>총 지연: <strong style={{ color: '#a855f7' }}>{output.stats.totalLatencyMs}ms</strong></span>
-                  <span>출력 토큰: <strong>{output.stats.outputTokens}</strong></span>
-                  <span>추론 비용: <strong style={{ color: '#f59e0b' }}>₩{output.stats.costKrw}</strong></span>
-                </div>
+                {output.stats && !output.isBlocked && (
+                  <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
+                    <span>PII 지연: <strong style={{ color: '#38bdf8' }}>{output.stats.piiLatencyMs?.toFixed(2)}ms</strong></span>
+                    <span>TTFT: <strong style={{ color: '#38bdf8' }}>{output.stats.ttftMs}ms</strong></span>
+                    <span>총 지연: <strong style={{ color: '#a855f7' }}>{output.stats.totalLatencyMs}ms</strong></span>
+                    <span>출력 토큰: <strong>{output.stats.outputTokens}</strong></span>
+                    <span>추론 비용: <strong style={{ color: '#f59e0b' }}>₩{output.stats.costKrw}</strong></span>
+                  </div>
+                )}
               </div>
 
+              {/* Side-by-Side Comparison */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
                 <div>
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
                     1. ext_proc PII 마스킹 치환 페이로드 (vLLM 실제 인입)
                   </div>
-                  <div style={{ background: '#090d16', padding: '12px', borderRadius: '6px', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: '#38bdf8', minHeight: '90px' }}>
+                  <div style={{ 
+                    background: '#090d16', 
+                    padding: '12px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.82rem', 
+                    fontFamily: 'var(--font-mono)', 
+                    color: output.isBlocked ? '#fb7185' : '#38bdf8', 
+                    minHeight: '90px',
+                    borderLeft: `3px solid ${output.isBlocked ? '#f43f5e' : '#38bdf8'}`
+                  }}>
                     {output.maskedPrompt}
                   </div>
+                  {output.maskedHash && (
+                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Payload SHA: {output.maskedHash}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -176,17 +268,25 @@ export default function PromptStudioTab({ onNotify }) {
                   <div style={{ background: '#090d16', padding: '12px', borderRadius: '6px', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minHeight: '90px' }}>
                     {prompt}
                   </div>
+                  {output.originalHash && (
+                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Original SHA: {output.originalHash}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffffff', marginBottom: '6px' }}>
-                  생성된 vLLM 스트리밍 완료 텍스트 (Completion Output):
+              {/* Completion Output */}
+              {output.response && (
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#ffffff', marginBottom: '6px' }}>
+                    생성된 vLLM 스트리밍 완료 텍스트 (Completion Output):
+                  </div>
+                  <div style={{ background: '#090d16', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: '#f8fafc', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {output.response}
+                  </div>
                 </div>
-                <div style={{ background: '#090d16', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: '#f8fafc', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  {output.response}
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>

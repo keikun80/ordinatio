@@ -152,3 +152,64 @@ def test_xds_discovery_routes_endpoint():
     wc = completions_route["route"]["weighted_clusters"]
     assert wc["total_weight"] == 100
     assert len(wc["clusters"]) >= 2
+
+def test_multi_route_crud_and_xds_compilation():
+    # 1. List all routes
+    res = client.get("/api/v1/routing/routes")
+    assert res.status_code == 200
+    routes = res.json()
+    assert len(routes) >= 1
+
+    # 2. Create a 3-way multi-model route
+    new_route_payload = {
+        "route_name": "customer-care-tier1",
+        "traffic_weights": [
+            {"model_id": "meta-llama/Llama-3.1-8B-Instruct", "weight": 50},
+            {"model_id": "meta-llama/Llama-3.1-8B-FineTuned-v2", "weight": 30},
+            {"model_id": "meta-llama/Llama-3.1-70B-Instruct", "weight": 20}
+        ],
+        "load_balancing_strategy": "LeastQueueDepth",
+        "failover_chain": ["meta-llama/Llama-3.1-70B-Instruct"],
+        "match_conditions": {
+            "tenant_codes": ["WM-01", "LOAN-01"],
+            "path_prefix": "/v1/routes/customer-care"
+        },
+        "priority": 5,
+        "is_active": True,
+        "description": "VIP 고객 상담 3-way 동적 가중치 분할 라우트"
+    }
+    create_res = client.post("/api/v1/routing/routes", json=new_route_payload)
+    assert create_res.status_code == 201
+    created_data = create_res.json()
+    assert created_data["route_name"] == "customer-care-tier1"
+    assert len(created_data["traffic_weights"]) == 3
+    assert created_data["priority"] == 5
+
+    # 3. Dry run with 3 models and failover chain
+    dry_payload = {
+        "route_name": "customer-care-tier1",
+        "traffic_weights": created_data["traffic_weights"],
+        "failover_chain": ["meta-llama/Llama-3.1-70B-Instruct"],
+        "match_conditions": created_data["match_conditions"]
+    }
+    dry_res = client.post("/api/v1/routing/dry-run", json=dry_payload)
+    assert dry_res.status_code == 200
+    assert dry_res.json()["is_valid"] is True
+    assert dry_res.json()["total_weight"] == 100
+
+    # 4. Check that xDS RDS includes both prefix match and header matches
+    xds_res = client.get("/api/v1/xds/v3/discovery:routes")
+    assert xds_res.status_code == 200
+    rc = xds_res.json()["resources"][0]
+    vh_routes = rc["virtual_hosts"][0]["routes"]
+    
+    # Verify custom path prefix was added
+    custom_prefix_route = next((r for r in vh_routes if r.get("match", {}).get("prefix") == "/v1/routes/customer-care"), None)
+    assert custom_prefix_route is not None
+    assert len(custom_prefix_route["route"]["weighted_clusters"]["clusters"]) == 3
+
+    # 5. Update route (disable route)
+    patch_res = client.put("/api/v1/routing/routes/customer-care-tier1", json={"is_active": False, "priority": 99})
+    assert patch_res.status_code == 200
+    assert patch_res.json()["is_active"] is False
+

@@ -176,9 +176,10 @@ export const apiClient = {
     return await res.json();
   },
 
-  async getActiveRoutingPolicy() {
+  async getActiveRoutingPolicy(routeName = null) {
     try {
-      const res = await fetch(`${API_BASE_URL}/routing`);
+      const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -186,6 +187,61 @@ export const apiClient = {
       return null;
     }
   },
+
+  async getRoutes() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/routes`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getRoutes offline, fallback to local routes');
+      return [];
+    }
+  },
+
+  async getRoute(routeName) {
+    const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  async createRoute(data) {
+    const res = await fetch(`${API_BASE_URL}/routing/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '신규 라우트 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async updateRoute(routeName, data) {
+    const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '라우트 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteRoute(routeName) {
+    const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '라우트 삭제 실패');
+    }
+    return await res.json();
+  },
+
 
   async dryRunRouting(data) {
     const res = await fetch(`${API_BASE_URL}/routing/dry-run`, {
@@ -268,6 +324,105 @@ export const apiClient = {
     window.URL.revokeObjectURL(downloadUrl);
     document.body.removeChild(a);
     return true;
+  },
+
+  // --- Compliance & PII Governance (Phase 4) ---
+  async getPiiRules(activeOnly = false) {
+    try {
+      const url = new URL(`${API_BASE_URL}/compliance/rules`);
+      if (activeOnly) url.searchParams.append('active_only', 'true');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getPiiRules offline, fallback to mock:', err);
+      return null;
+    }
+  },
+
+  async createPiiRule(ruleData) {
+    const res = await fetch(`${API_BASE_URL}/compliance/rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ruleData),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to create PII rule' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async updatePiiRule(ruleId, ruleData) {
+    const res = await fetch(`${API_BASE_URL}/compliance/rules/${ruleId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ruleData),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to update PII rule' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async deletePiiRule(ruleId) {
+    const res = await fetch(`${API_BASE_URL}/compliance/rules/${encodeURIComponent(ruleId)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to delete PII rule' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async simulatePiiMasking({ text, requester_id = 'admin-sim', key_id = null, model_id = null }) {
+    const res = await fetch(`${API_BASE_URL}/compliance/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, requester_id, key_id, model_id }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'PII simulation failed' }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async getAuditLogs(params = {}) {
+    try {
+      const url = new URL(`${API_BASE_URL}/compliance/audit-logs`);
+      if (params.requester_id) url.searchParams.append('requester_id', params.requester_id);
+      if (params.key_id) url.searchParams.append('key_id', params.key_id);
+      if (params.action_taken) url.searchParams.append('action_taken', params.action_taken);
+      if (params.is_blocked !== undefined && params.is_blocked !== null) {
+        url.searchParams.append('is_blocked', params.is_blocked);
+      }
+      if (params.limit) url.searchParams.append('limit', params.limit);
+      if (params.offset) url.searchParams.append('offset', params.offset);
+
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getAuditLogs offline, fallback to mock:', err);
+      return null;
+    }
+  },
+
+  async getComplianceStats() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/compliance/stats`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getComplianceStats offline, fallback to mock:', err);
+      return null;
+    }
   }
 };
+
+export const api = apiClient;
+export default apiClient;
 

@@ -28,6 +28,10 @@
   - 미구현(Unimplemented) 및 아키텍처 대체(Alternative: ADR-01 ~ ADR-07) 기능 상세 분석
   - 에어갭 최적화 아키텍처 결정 기록(ADR) 전 설계 문서 현행화 완료 내역
   - 미테스트 시나리오 및 후속 Phase 6 연계 권장 조치 사항
+- 🧪 **[INTEGRATED_FUNCTIONAL_TEST_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/INTEGRATED_FUNCTIONAL_TEST_SPEC.md)**:
+  - 백엔드 설계 명세 대비 전수 구현 비교 분석 (OK / ALT / 미구현 판정표)
+  - 프론트엔드 전 화면 대화형 요소 전수 점검 (클릭, 추가, 수정, 삭제)
+  - 통신 상태별 컬러 매핑 (`#F54927`: 백엔드 미통신, `#5EF527`: 백엔드 통신-Mock/시뮬레이션, 기본: 정상 실시간 연동)
 
 ---
 

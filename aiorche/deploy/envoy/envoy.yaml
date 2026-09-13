@@ -22,10 +22,20 @@ static_resources:
                 route:
                   cluster: backend_service
               - match:
+                  prefix: "/v1/routes"
+                route:
+                  cluster: backend_service
+                  timeout: 120s
+              - match:
                   prefix: "/v1/chat/completions"
                 route:
-                  cluster: vllm_inference_pool
-                  timeout: 60s
+                  cluster: backend_service
+                  timeout: 120s
+              - match:
+                  prefix: "/v1/models"
+                route:
+                  cluster: backend_service
+                  timeout: 30s
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
@@ -34,6 +44,7 @@ static_resources:
   clusters:
   - name: backend_service
     type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: backend_service

@@ -23,7 +23,7 @@
 │ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • 실시간 헬스 프로빙│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 인프라 Preflight 자가진단│
 │ • Docker & K8s 배포 │ • Prometheus /metric│ • K8s 5개 Pod 배포  │ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII 암호화 ZIP 번들    │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
-│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│22/22 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    45/45 Tests (100% PASS)    │
+│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    46/46 Tests (100% PASS)    │
 └─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────────────┘
 ```
 
@@ -37,14 +37,14 @@
 | :--- | :--- | :--- | :---: | :---: |
 | **Phase 0** | [phase0_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_implementation_plan_and_test_results.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
 | **Phase 1** | [phase1_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase1_implementation_plan_and_test_results.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙, Envoy L7 엔드포인트/RDS, N-Way 분할, K8s Pod | `make verify-phase2` | 22 / 22 PASS |
+| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙, Envoy L7 엔드포인트/RDS, N-Way 분할, K8s Pod | `make verify-phase2` | 23 / 23 PASS |
 | **Phase 3** | [phase3_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
 | **Phase 4** | [phase4_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
-| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 45 / 45 PASS |
+| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (45 / 45 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (46 / 46 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
@@ -75,6 +75,7 @@ cd aiorche/backend && uv run pytest -v
 | | `test_xds_discovery_routes_endpoint` | Envoy용 RDS 표준 규격 (`RouteConfiguration`) 응답 검증 | **PASSED** |
 | | `test_model_serving_health_check` | 개별/전체 서빙 모델 Upstream 핑 헬스체크 프로빙 검증 | **PASSED** |
 | | `test_route_test_call_endpoint` | Envoy L7 라우팅 경로 실시간 테스트 호출 및 Upstream 프록시 응답 검증 | **PASSED** |
+| | `test_gateway_openai_chat_completions_ingress` | OpenAI 호환 게이트웨이 인그레스(`/v1/routes`, `/v1/chat/completions`) E2E 검증 | **PASSED** |
 | `test_finops_observability.py` | `test_observability_metrics_summary` | 대시보드 관제용 실시간 지표 요약 REST API 검증 | **PASSED** |
 | | `test_observability_websocket_telemetry` | 1초 주기 WebSocket 스트림 연결, JSON 패킷 수신 및 ping-pong | **PASSED** |
 | | `test_observability_promql_proxy` | Grafana 및 커스텀 관제용 PromQL 프록시 질의 검증 | **PASSED** |
@@ -162,6 +163,6 @@ kubectl get pods,svc -n aiorche -o wide
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(45/45 테스트)**하였습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(46/46 테스트)**하였습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
 - **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)**으로 즉시 연계가 가능합니다.

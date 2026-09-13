@@ -13,10 +13,10 @@
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 전체)**
   - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
-- **자동화 테스트 검증율**: **45 / 45 테스트 100% PASS** (`uv run pytest -v`)
+- **자동화 테스트 검증율**: **46 / 46 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
-  - Phase 2: Dynamic Routing & xDS (8종)
+  - Phase 2: Dynamic Routing & xDS (9종)
   - Phase 3: Observability & FinOps (6종)
   - Phase 4: Compliance & PII Governance (8종)
   - Phase 5: Lifecycle & Hotfix Engine (8종)
@@ -48,6 +48,7 @@
 | **Phase 2** | 서빙 모델 카탈로그 CRUD & 다중 엔진 (vLLM/Ollama/SGLang/Triton) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_catalog_crud` |
 | | 모델 서빙 풀 실시간 헬스체크 프로빙 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_serving_health_check` |
 | | Envoy L7 전용 라우팅 엔드포인트 및 실시간 테스트콜 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_route_test_call_endpoint` |
+| | OpenAI 규격 L7 게이트웨이 인그레스 (`/v1/routes`, `/v1/chat/completions`) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_gateway_openai_chat_completions_ingress` |
 | | 동적 멀티 라우팅 프로필 CRUD | ✅ **구현 완료** | ✅ **테스트 완료** | 다중 라우트 프로필 및 `priority` 정렬 |
 | | N개 타깃 멀티 가중치 분할기 | ✅ **구현 완료** | ✅ **테스트 완료** | N-Way 동적 가중치 분할 & Auto-Balance |
 | | Envoy xDS v3 RouteConfiguration | ✅ **구현 완료** | ✅ **테스트 완료** | `test_xds_discovery_routes_endpoint` |
@@ -155,7 +156,7 @@
 
 ## 4. 미테스트 시나리오 목록 (Untested Scenarios)
 
-현재 백엔드 단위/통합 테스트 45개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
+현재 백엔드 단위/통합 테스트 46개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
 
 1. **대규모 정규식 처리량 부하 테스트 (High-Throughput PII Matching)**:
    - 초당 10,000건 이상의 동시 프롬프트 인입 시 정규식 컴파일 캐시 및 CPU 점유율 측정.

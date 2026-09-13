@@ -293,3 +293,59 @@ def test_route_test_call_endpoint():
     res_404 = client.post("/api/v1/routing/test-call", json={"route_name": "ghost-route", "method": "path"})
     assert res_404.status_code == 404
 
+
+def test_gateway_openai_chat_completions_ingress():
+    """Test OpenAI-compatible AI Gateway L7 endpoints (/v1/routes and /v1/chat/completions)"""
+    # 1. Successful path-based route invocation
+    chat_payload = {
+        "messages": [
+            {"role": "user", "content": "안녕하세요. 포트폴리오 자산 배분 조언을 요청합니다."}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 256
+    }
+    headers = {
+        "Authorization": "Bearer sk-orch-your-virtual-key",
+        "Content-Type": "application/json"
+    }
+    res = client.post("/v1/routes/financial-advisor-v1", json=chat_payload, headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["object"] == "chat.completion"
+    assert "choices" in data and len(data["choices"]) > 0
+    assert "content" in data["choices"][0]["message"]
+    assert "usage" in data
+    assert "orche_metadata" in data
+    assert data["orche_metadata"]["route_name"] == "financial-advisor-v1"
+
+    # 2. Header-based chat completions
+    header_call_headers = {
+        "Authorization": "Bearer sk-orch-your-virtual-key",
+        "Content-Type": "application/json",
+        "x-orche-route": "financial-advisor-v1"
+    }
+    res_hc = client.post("/v1/chat/completions", json=chat_payload, headers=header_call_headers)
+    assert res_hc.status_code == 200
+    assert res_hc.json()["object"] == "chat.completion"
+
+    # 3. Missing Authorization header -> 401
+    res_unauth = client.post("/v1/routes/financial-advisor-v1", json=chat_payload)
+    assert res_unauth.status_code == 401
+
+    # 4. PII Blocking Rule triggered (EMP-AB12345) -> 403
+    pii_blocked_payload = {
+        "messages": [
+            {"role": "user", "content": "담당자 사번 EMP-AB12345 계정으로 긴급 승인을 요청합니다."}
+        ]
+    }
+    res_blocked = client.post("/v1/routes/financial-advisor-v1", json=pii_blocked_payload, headers=headers)
+    assert res_blocked.status_code == 403
+
+    # 5. List available models
+    res_models = client.get("/v1/models")
+    assert res_models.status_code == 200
+    models_data = res_models.json()
+    assert models_data["object"] == "list"
+    assert len(models_data["data"]) > 0
+
+

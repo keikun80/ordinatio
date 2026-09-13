@@ -216,5 +216,7 @@ AI Orchestrator는 이미 기동된 엔드포인트를 등록받아 L7 거버넌
 | 게이트웨이 테스트 프록시 | pytest | `test_routing.py::test_route_test_call_endpoint` | 경로/헤더 방식 호출 및 결과 반환 확인 | **PASS** |
 | Ollama 실환경 핑 | curl | `GET /api/v1/models/health-check` | 호스트 Ollama 200 OK (152ms) 확인 | **PASS** |
 | Envoy 포트 8080 디스패치 | curl | `POST /api/v1/routing/test-call` | Envoy(8080) 경유 업스트림 연결 확인 | **PASS** |
+| 게이트웨이 엔드포인트 실시간 테스트 호출 | pytest | `tests/test_routing.py::test_route_test_call_endpoint` | 경로/헤더 방식 Envoy 엔드포인트 연동 검증 | **PASS** |
+| OpenAI 호환 L7 게이트웨이 인그레스 E2E | pytest | `tests/test_routing.py::test_gateway_openai_chat_completions_ingress` | `/v1/routes`, `/v1/chat/completions`, PII 차단, 가상키 인증 | **PASS** |
 | 프론트엔드 빌드 무결성 | vite build | `npm run build` | 프로덕션 번들링 0건 에러 (3.28s) | **PASS** |
-| 전체 백엔드 회귀 테스트 | pytest | `aiorche/backend/` | 45 / 45 테스트 100% 통과 | **PASS** |
+| 전체 백엔드 회귀 테스트 | pytest | `aiorche/backend/` | 46 / 46 테스트 100% 통과 | **PASS** |

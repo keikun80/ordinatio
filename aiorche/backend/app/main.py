@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
-from app.api.v1.endpoints import metrics
+from app.api.v1.endpoints import metrics, gateway
 
 from contextlib import asynccontextmanager
 from app.db.init_db import init_db
@@ -31,8 +31,12 @@ if settings.ALLOWED_ORIGINS:
         allow_headers=["*"],
     )
 
+# 1. 표준 컨트롤 플레인 관리 API (/api/v1/...)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(metrics.router)
+
+# 2. OpenAI 표준 L7 AI 게이트웨이 엔드포인트 (/v1/...)
+app.include_router(gateway.router, prefix="/v1", tags=["OpenAI L7 AI Gateway Ingress"])
 
 @app.get("/")
 def root():

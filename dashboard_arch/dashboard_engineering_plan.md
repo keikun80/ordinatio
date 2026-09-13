@@ -274,7 +274,7 @@ CREATE TABLE patch_histories (
        - 다단계 장애 우회 체인(Primary -> Secondary -> Fallback Pool) 시각적 카드
        - 드라이런(Dry-run) 사전 검증 모달 및 컴파일된 Envoy xDS JSON 페이로드 실시간 인스펙터
        - 리비전 번호(`xds-rev-...`) 실시간 배지 표출 및 Envoy 프록시 즉각 배포 연동
-- **완료 정의 (DoD)**: ✅ 다중 라우트 프로필 생성/수정, N-Way 가중치 분할, Envoy REST RDS v3 컴파일 및 무중단 트래픽 분기, 모델 풀 실시간 헬스체크 및 게이트웨이 엔드포인트 테스트 통합 테스트(`tests/test_routing.py` 8개 테스트) 및 `bash scripts/verify-phase2.sh` 100% 통과 (전체 백엔드 45개 테스트 100% PASS).
+- **완료 정의 (DoD)**: ✅ 다중 라우트 프로필 생성/수정, N-Way 가중치 분할, Envoy REST RDS v3 컴파일 및 무중단 트래픽 분기, 모델 풀 실시간 헬스체크 및 게이트웨이 엔드포인트 테스트 통합 테스트(`tests/test_routing.py` 9개 테스트) 및 `bash scripts/verify-phase2.sh` 100% 통과 (전체 백엔드 46개 테스트 100% PASS).
 - **상세 설계서**: 📄 [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)
 
 ---
@@ -327,7 +327,7 @@ CREATE TABLE patch_histories (
      - ✅ 5대 핵심 인프라(PostgreSQL, Redis, Envoy, ext_proc, vLLM) Preflight 정밀 진단 API
   2. **Frontend**:
      - ✅ `LifecycleTab.jsx`의 파일 업로드, RSA-4096 서명 검증 배지, 터미널 스트리밍 로그, 원클릭 핫픽스 배포 및 롤백 연동
-- **완료 정의 (DoD)**: ✅ 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 및 롤백 파이프라인, Zero-PII ZIP 다운로드 및 Preflight 진단 `verify-phase5.sh` 100% 통과 (45/45 Tests PASS).
+- **완료 정의 (DoD)**: ✅ 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 및 롤백 파이프라인, Zero-PII ZIP 다운로드 및 Preflight 진단 `verify-phase5.sh` 100% 통과 (46/46 Tests PASS).
 
 ---
 

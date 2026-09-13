@@ -98,3 +98,25 @@
   - 개요 탭 웹소켓 스크린샷: `overview_tab_websocket_1789136069150.png`
   - FinOps 탭 청구서 다운로드 스크린샷: `finops_tab_invoice_toast_1789136131434.png`
   - 전체 시나리오 영상 녹화: `phase3_finops_demo_1789136054484.webp`
+
+### 2.4 글로벌 관제 홈(Overview) 100% 실데이터 연동 및 깜빡임 결함 해결 (2026-09-13 현행화)
+1. **서빙 인프라 풀 리소스 실데이터화 (`ComputePoolStatus`)**:
+   - **기존 한계**: EKS/ECS/EC2 등 3개 고정 더미 배열로 렌더링.
+   - **개선 구현**:
+     - `telemetry_hub.py`에서 PostgreSQL `model_catalogs` 테이블을 실시간 조회하여 현재 활성화된 모델 목록을 서빙 인프라 풀로 동적 구성.
+     - 각 모델의 서빙 엔진(`vLLM`, `Ollama`), 배포 인프라(`On-Prem K8s`, `Local Docker`), 호스트 시스템 실제 메모리 점유율(`psutil.virtual_memory().percent`), Envoy 클러스터 실시간 업스트림 큐 깊이(`upstream_rq_active`)를 실시간 매핑하여 전송.
+2. **모델별 실시간 트래픽 점유율 실데이터화 (`ModelTrafficShare`)**:
+   - **기존 한계**: Llama 68%, 70B 24%, Solar 8% 정적 하드코딩 비율.
+   - **개선 구현**:
+     - PostgreSQL WORM 불변 감사로그(`audit_logs`) 테이블에서 `COUNT(*) GROUP BY model_id` 쿼리를 실행하여 실제 누적 호출 통계를 산출.
+     - Envoy 실시간 초당 요청수(RPS)를 가중 결합하여 현재 카탈로그에 등록된 5대 모델별 실시간 트래픽 점유율(%)을 1초 주기로 동적 계산 및 시각화.
+3. **지표 요약 모드 깜빡임(Flickering) 근본 원인 해결 (Lifecycle Decoupling)**:
+   - **원인 분석**: `OverviewTab.jsx`의 `useEffect` 의존성 배열에 `metricsSummary` 객체가 포함되어 있어, WebSocket 패킷이 수신되어 상태가 바뀔 때마다 `fetchSummary()` REST 호출이 재트리거되는 무한 상태 전파 및 리렌더링 경쟁 상태 발생.
+   - **해결 방안**:
+     - `hasFetchedRef = useRef(false)` 플래그를 도입하여 컴포넌트 마운트 시 최초 1회만 REST 요약을 가져오도록 수명주기 디커플링.
+     - 이후 지표 갱신은 1초 주기 WebSocket 스트림으로만 스무스하게 반영되도록 일원화하고, 소켓 연결 단절 시 자동 폴백 재연결 로직 적용.
+4. **증적 아티팩트**:
+   - 실데이터 화면 스크린샷: `01_overview_main_real_data_1789260326198.png`
+   - 깜빡임 제거 검증 스크린샷: `01_overview_no_flicker_1789260605135.png`
+   - 검증 세션 녹화: `verify_flicker_fixed_1789260588656.webp`
+

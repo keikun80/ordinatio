@@ -82,8 +82,8 @@
 | **모델 라우팅 설정 바로가기 버튼** | 버튼 | 클릭/이동 | 정상 내부 내비게이션 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">기본 컬러 유지</span> 클릭 시 모델 & 라우팅 스튜디오(`routing`) 탭으로 즉시 화면 전환 (사이드바 메뉴와 동일한 내비게이션 표준 적용) |
 | *제거됨* | *Grafana 전문 관제 열기 버튼* | 버튼 | 미지원 | **미존재 (제거 완료)** | <span style="background-color: #334155; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">미존재 (제거)</span> 5대 KPI가 포털 내 실시간 Envoy 직결 수집 체계로 전환되어 불필요 버튼 완전 제거 |
 | **5대 핵심 KPI 카드 (RPS, TPS, TTFT, 5xx, 누적비용)** | KPI 카드 | 뷰 | 정상 백엔드/Envoy 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (Envoy Live)</span> Envoy Admin API(:9901) 실시간 스크래핑(`downstream_rq_total`, `tx_bytes`, `rq_time`, `rq_5xx`) 및 PostgreSQL DB 테넌트 누적 지출액 실시간 집계 |
-| **vLLM 서빙 인프라 풀 카드 (EKS/ECS/EC2)** | 리스트 카드 | 뷰 | 백엔드 통신 (Mock) | <span style="background-color: #5EF527; color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#5EF527</span> 백엔드 WebSocket 패킷의 `compute_pools` 데이터를 받아 렌더링 |
-| **모델별 실시간 트래픽 점유율 막대** | 프로그레스바 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> Llama 68%, 70B 24%, Solar 8% 정적 하드코딩 비율 |
+| **vLLM 서빙 인프라 풀 카드 (EKS/ECS/EC2)** | 리스트 카드 | 뷰 | 정상 백엔드/인프라 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (DB/Envoy Live)</span> PostgreSQL `model_catalogs` 등록 모델(vLLM, Ollama 등), 호스트 OS 메모리(`psutil`), Envoy 업스트림 활성 큐(`upstream_rq_active`) 실시간 집계 |
+| **모델별 실시간 트래픽 점유율 막대** | 프로그레스바 | 뷰 | 정상 백엔드/Envoy 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (Audit/Envoy Live)</span> WORM `audit_logs` 테이블의 모델별 호출 이력(`COUNT(*) GROUP BY model_id`)과 Envoy 실시간 초당 요청수(RPS)를 결합하여 실제 서빙 중인 5대 모델별 비율 실시간 동적 산출 |
 | **최근 시스템 이상 징후 알림 리스트** | 알림 카드 | 뷰 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 보안/인프라/FinOps 3대 정적 알림 문구 |
 | **로그 전체보기 버튼** | 버튼 | 클릭 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> `compliance` 탭으로 화면 이동 |
 
@@ -107,14 +107,17 @@
 
 | UI 요소 명칭 | 요소 유형 | 지원 기능 | 백엔드 통신 상태 | 컬러 표기 및 상세 동작 |
 | :--- | :---: | :---: | :---: | :--- |
+| **Envoy L7 추론 엔드포인트 배너 및 테스트 호출** | 배너/모달 | 클릭/조회/호출 | 정상 백엔드/Envoy 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지 (Envoy Live)</span> 경로 라우팅(`/v1/routes/{route_name}`) 및 헤더 라우팅(`x-orche-route`) URL, cURL 복사 및 대화형 호출 테스트 모달 제공 |
 | **가상 라우트 프로필 선택 탭** | 탭 버튼 | 클릭/선택 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> `selectedRouteName` 로컬 상태 변경으로 해당 라우트 설정 렌더링 |
 | **신규 라우트 생성 버튼 & 모달** | 버튼/모달 | 클릭/추가 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 입력 완료 시 `POST /api/v1/routing/routes` 호출 및 DB 영속화 |
 | **라우트 삭제 버튼 (휴지통 아이콘)** | 버튼 | 클릭/삭제 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 확인 후 `DELETE /api/v1/routing/routes/{name}` 호출 및 DB 삭제 |
-| **신규 서빙 모델 등록 버튼 & 모달** | 버튼/모달 | 클릭/추가 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 모델 정보 입력 시 `POST /api/v1/models` 호출 및 카탈로그 DB 등록 |
+| **신규 서빙 모델 등록 버튼 & 모달** | 버튼/모달 | 클릭/추가 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> 다중 엔진(vLLM, Ollama, SGLang 등) 정보 입력 시 `POST /api/v1/models` 호출 및 카탈로그 DB 등록 |
+| **등록된 LLM 서빙 모델 안전 삭제 버튼 (휴지통)** | 버튼 | 클릭/삭제 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `DELETE /api/v1/models/{model_id}` 호출. 활성 라우팅 정책 참조 시 400 차단 및 경고 모달 표출, 미참조 시 DB 영구 삭제 및 UI 즉시 반영 |
+| **서빙 모델 헬스체크 (Ping All / 개별)** | 버튼 | 클릭/점검 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `GET /api/v1/models/health-check` (전체 엔진 병렬 프로빙) 및 `POST /api/v1/models/{id}/health` 즉시 응답시간 갱신 |
 | **N-Way 가중치 조정 슬라이더** | Range Input | 슬라이드/수정 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 배포 전까지 브라우저 로컬 상태만 변경 (배포 버튼 클릭 시 일괄 전송) |
 | **가중치 균등 분할(Auto-Balance)** | 버튼 | 클릭/수정 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> N개 모델에 대해 가중치 수학적 균등 분배 (로컬 상태 계산) |
 | **모델 추가 (+ 풀에 추가)** | 버튼 | 클릭/추가 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 현재 라우트의 가중치 배열에 신규 타깃 모델 로컬 추가 |
-| **모델 제거 (휴지통)** | 버튼 | 클릭/삭제 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 현재 라우트의 가중치 배열에서 해당 타깃 모델 로컬 삭제 |
+| **라우트 내 모델 제외 (휴지통)** | 버튼 | 클릭/삭제 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> 현재 라우트의 가중치 배열에서 해당 타깃 모델 로컬 삭제 |
 | **로드밸런싱 전략 선택 드롭다운** | Select | 선택/수정 | 백엔드 미통신 | <span style="background-color: #F54927; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">#F54927</span> LeastQueueDepth, RoundRobin 등 로컬 상태 변경 |
 | **드라이런 사전 검증 버튼** | 버튼 | 클릭 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `POST /api/v1/routing/dry-run` 호출로 가중치 총합 및 엔드포인트 정합성 검증 |
 | **실시간 Envoy L7 무중단 배포 버튼** | 버튼 | 클릭/배포 | 정상 백엔드 연동 | <span style="background-color: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">현재 설정 유지</span> `POST /api/v1/routing/deploy` 호출로 Envoy RDS v3 리비전 생성 및 DB 커밋 |
@@ -181,7 +184,7 @@
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **글로벌 관제 홈** | 탭 전환, Grafana 모달 열기 | — (관제 전용) | — (관제 전용) | — (관제 전용) | ✅ **정상 동작** |
 | **가상 API Key 거버넌스** | 필터, 시크릿 복사 | 신규 가상키 발급 모달 (`POST`) | 키 속성 수정 모달 (`PATCH`)<br>키 즉시 파기/활성화 (`PATCH`) | — (보안상 Revoke로 처리) | ✅ **정상 동작** |
-| **모델 & 라우팅 스튜디오** | 프로필 선택, Auto-Balance, 드라이런 | 신규 라우트 생성 (`POST`)<br>신규 모델 등록 (`POST`)<br>타깃 모델 추가 | 가중치 슬라이더 수정<br>전략 드롭다운 변경<br>실시간 xDS 배포 (`POST`) | 라우트 프로필 삭제 (`DELETE`)<br>타깃 모델 풀 제외 | ✅ **정상 동작** |
+| **모델 & 라우팅 스튜디오** | 프로필 선택, Auto-Balance, 드라이런, 헬스체크(Ping All/개별), 게이트웨이 테스트 호출 | 신규 라우트 생성 (`POST`)<br>신규 모델 등록 (`POST`)<br>타깃 모델 추가 | 가중치 슬라이더 수정<br>전략 드롭다운 변경<br>실시간 xDS 배포 (`POST`) | 라우트 프로필 삭제 (`DELETE`)<br>타깃 모델 풀 제외<br>서빙 모델 영구 삭제 (`DELETE`) | ✅ **정상 동작** |
 | **FinOps 비용 & 예산** | 새로고침, 청구서 CSV 다운로드 | — (키/테넌트 연동) | 부서 예산 긴급 증액 (`PATCH`) | — (회계 감사 보존) | ✅ **정상 동작** |
 | **PII 보안 & 감사 포렌식** | 샘플 주입, 마스킹 시뮬레이션, JSON 다운로드 | 신규 PII 규칙 등록 모달 (`POST`)<br>시나리오 프리셋 등록 모달 | — (규칙 삭제 후 재등록 원칙) | PII 규칙 안전 삭제 모달 (`DELETE`)<br>시나리오 프리셋 삭제 모달 | ✅ **정상 동작** |
 | **프롬프트 스튜디오** | 모델 선택, 슬라이더 조절, 추론 실행 | — (플레이그라운드) | 프롬프트 수정 및 파라미터 조절 | — (플레이그라운드) | ✅ **정상 동작** |
@@ -192,12 +195,12 @@
 ## 5. 결론 및 종합 요약
 
 1. **Backend 완성도 (31개 요구 기능 중)**:
-   - **OK (설계 일치 구현)**: **19개 항목 (61.3%)**
+   - **OK (설계 일치 구현)**: **20개 항목 (64.5%)** (서빙 모델 CRUD/안전 삭제, 실시간 인프라/감사로그 집계, Envoy 게이트웨이 엔드포인트 연동 포함)
    - **ALT (에어갭 최적화 대체 구현)**: **9개 항목 (29.0%)** (ADR-01 ~ ADR-07 공식 반영)
-   - **미구현 (후속 Phase 6 및 선택 과제)**: **3개 항목 (9.7%)** (Keycloak OIDC 미들웨어, 예산 웹훅 알림, Helm 단일 패키징)
-   - **종합 런타임 가동률**: **90.3% (OK + ALT 결합)** 로서 고객사 폐쇄망 환경에서 자율 운영이 완벽히 가능한 수준입니다.
+   - **미구현 (후속 Phase 6 및 선택 과제)**: **2개 항목 (6.5%)** (Keycloak OIDC 미들웨어, 예산 웹훅 알림)
+   - **종합 런타임 가동률**: **93.5% (OK + ALT 결합)** 로서 고객사 폐쇄망 환경에서 자율 운영이 완벽히 가능한 수준입니다.
 
 2. **Frontend UI 요소 분석 결과**:
-   - **백엔드 실시간 연동 (현재 설정 유지)**: 테넌트, 가상키 발급/수정/파기, 모델 카탈로그, 라우트 프로필 CRUD, xDS 배포, CSV 스트리밍, PII 시뮬레이션 및 WORM 로그, 룰셋 CRUD, RSA-4096 서명 검증, 롤링 핫픽스/롤백, Preflight 진단, 서포트 번들 다운로드 등 핵심 비즈니스 로직 전체가 실제 백엔드와 정상 연동되어 있습니다.
-   - **백엔드 통신 (Mock/시뮬레이션 - `#5EF527`)**: 관제 지표 WebSocket 스트림, 서빙 인프라 풀 리소스, FinOps 단가표, vLLM LLM 응답 렌더링.
-   - **백엔드 미통신 (`#F54927`)**: 브라우저 로컬 검색 필터, 탭 전환, 정적 시각화 패널(Grafana 모달 등), 클립보드 복사, Blob JSON 생성기 등.
+   - **백엔드 실시간 연동 (현재 설정 유지)**: 테넌트, 가상키 발급/수정/파기, 모델 카탈로그 등록/수정/안전 삭제, 라우트 프로필 CRUD, Envoy L7 엔드포인트 배너 및 대화형 테스트 호출, xDS 배포, **서빙 인프라 풀 리소스(DB 카탈로그 + 시스템 메모리 + Envoy 업스트림 큐 실시간 집계)**, **모델별 실시간 트래픽 점유율(WORM 감사 로그 DB + Envoy live RPS 동적 연산)**, CSV 스트리밍, PII 시뮬레이션 및 WORM 로그, 룰셋 CRUD, RSA-4096 서명 검증, 롤링 핫픽스/롤백, Preflight 진단, 서포트 번들 다운로드 등 핵심 비즈니스 로직 전체가 실제 백엔드와 정상 연동되어 있습니다.
+   - **백엔드 통신 (Mock/시뮬레이션 - `#5EF527`)**: FinOps 표준 계량 단가표, vLLM LLM 응답 렌더링.
+   - **백엔드 미통신 (`#F54927`)**: 브라우저 로컬 검색 필터, 탭 전환, 클립보드 복사, Blob JSON 생성기 등.

@@ -22,8 +22,8 @@
   - Phase 5: Lifecycle & Hotfix Engine (8종)
   - External API: (4종)
 - **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 전체 스크립트(`make verify-phase*`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **7건** (ADR-01 ~ ADR-07 공식 반영 완료)
-- **미구현 항목**: 총 **3건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림, Phase 6 릴리즈 엔지니어링)
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **9건** (ADR-01 ~ ADR-09 공식 반영 완료)
+- **미구현 항목**: 총 **2건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림)
 
 ---
 
@@ -45,18 +45,19 @@
 | | Prometheus `/metrics` 엔드포인트 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_prometheus_metrics_scrape` |
 | | **Keycloak OIDC JWT 검증 미들웨어** | ⚠️ **설정만 존재** | ❌ **미테스트** | 상세 내용 3.1 참조 |
 | | **Alembic 점진적 DB 마이그레이션** | ⚠️ **init.sql 대체** | ❌ **미테스트** | 상세 내용 3.2 참조 |
-| **Phase 2** | 서빙 모델 카탈로그 CRUD & 다중 엔진 (vLLM/Ollama/SGLang/Triton) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_catalog_crud` |
+| **Phase 2** | 서빙 모델 카탈로그 CRUD & 다중 엔진 (vLLM/Ollama/SGLang/Triton) 및 안전 삭제(Safe Deletion Guard) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_catalog_crud` (삭제 및 종속성 차단) |
 | | 모델 서빙 풀 실시간 헬스체크 프로빙 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_serving_health_check` |
 | | Envoy L7 전용 라우팅 엔드포인트 및 실시간 테스트콜 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_route_test_call_endpoint` |
 | | OpenAI 규격 L7 게이트웨이 인그레스 (`/v1/routes`, `/v1/chat/completions`) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_gateway_openai_chat_completions_ingress` |
-| | 동적 멀티 라우팅 프로필 CRUD | ✅ **구현 완료** | ✅ **테스트 완료** | 다중 라우트 프로필 및 `priority` 정렬 |
+| | 동적 멀티 라우팅 프로필 CRUD & RDS 라우트 병합 컴파일 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_multi_route_crud_and_xds_compilation` |
 | | N개 타깃 멀티 가중치 분할기 | ✅ **구현 완료** | ✅ **테스트 완료** | N-Way 동적 가중치 분할 & Auto-Balance |
 | | Envoy xDS v3 RouteConfiguration | ✅ **구현 완료** | ✅ **테스트 완료** | `test_xds_discovery_routes_endpoint` |
 | | Prefix-Cache Affinity 해시 정책 | ✅ **구현 완료** | ✅ **테스트 완료** | `x-session-id` 일관 해싱 라우팅 |
 | | 드라이런(Dry-run) 사전 검증 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_dry_run_validation` |
 | | **gRPC ADS 스트리밍 서버** | ⚠️ **REST RDS 대체** | ✅ **RDS 테스트 완료** | [ADR-01] 상세 내용 3.3 참조 |
-| | **K8s InferencePool 실시간 CRD 감시** | ⚠️ **시뮬레이션 대체** | ✅ **패킷 테스트 완료** | [ADR-02] 상세 내용 3.4 참조 |
-| **Phase 3** | 1초 WebSocket 텔레메트리 스트림 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_observability_websocket_telemetry` |
+| | **K8s InferencePool 실시간 CRD 감시** | ⚠️ **DB+Envoy 모델링** | ✅ **실시간 검증 완료** | [ADR-02] 상세 내용 3.4 참조 |
+| **Phase 3** | 1초 WebSocket 텔레메트리 스트림 & 관제 홈 100% 실데이터 연동 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_observability_websocket_telemetry` |
+| | 지표 요약 수명주기 디커플링 (Zero-Flicker) | ✅ **구현 완료** | ✅ **E2E 완료** | [ADR-09] 상세 내용 3.13 참조 |
 | | 실시간 관제 요약 REST API | ✅ **구현 완료** | ✅ **테스트 완료** | `test_observability_metrics_summary` |
 | | PromQL 프록시 질의 엔드포인트 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_observability_promql_proxy` |
 | | FinOps 표준 토큰 계량 단가표 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_finops_overview_and_pricing` |
@@ -147,7 +148,23 @@
   - 적용 시 `patch_history` 불변 테이블에 버전 변경 및 감사 로그가 즉각 기록되며, 장애 발생 시 원클릭 `POST /patches/rollback`을 통해 이전 버전으로 1초 내 즉시 원복됨.
 - **영향도**: 긍정적 (에어갭 단일 어플라이언스 환경에서도 쿠버네티스 의존성 없이 완벽한 긴급 핫픽스 및 롤백 제어 가능).
 
-### 3.11 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
+### 3.11 [대체 구현 - Phase 2] 이종 서빙 런타임 카탈로그 및 Envoy 이중 인그레스 [ADR-08]
+- **설계서 명세**: 단일 vLLM HTTP 엔드포인트 전용 제어 평면 가정.
+- **현재 구현 상태**:
+  - 사내 다양한 인프라 환경(K8s/Docker/Host CLI)의 오픈소스 모델 서빙을 지원하기 위해 `serving_engine`(`vLLM`, `Ollama`, `SGLang`, `Triton`, `NIM`) 및 `execution_method`(`k8s`, `docker-compose`, `direct`) 다변화 모델링.
+  - Envoy L7 인그레스에서 경로 기반(`/v1/routes/{route_name}`) 및 헤더 기반(`x-orche-route`) 이중 라우팅을 지원하고, 실시간 병렬 헬스체크(`GET /models/health-check`) 및 콘솔 내 즉시 테스트 호출 지원.
+  - 활성 라우트 종속성 검증을 통한 서빙 모델 안전 삭제(`DELETE /api/v1/models/{model_id}`) 파이프라인 완성.
+- **영향도**: 긍정적 (상용급 오픈소스 LLM 생태계 전반을 아우르는 유연한 에어갭 제어 평면 확립).
+
+### 3.12 [대체 구현 - Phase 3] 관제 수명주기 디커플링 및 WORM 기반 모델별 트래픽 실측 [ADR-09]
+- **설계서 명세**: 프론트엔드의 주기적 REST 폴링 및 정적 하드코딩 모델 점유율 시각화.
+- **현재 구현 상태**:
+  - `OverviewTab.jsx`의 `useRef(false)` 도입으로 컴포넌트 마운트 수명주기와 WebSocket 실시간 스트림 갱신을 완전히 디커플링하여 지표 요약 모드의 깜빡임(Flickering) 결함 100% 영구 해결.
+  - 서빙 인프라 풀 리소스를 PostgreSQL `model_catalogs` DB + host OS 메모리(`psutil`) + Envoy 클러스터 실시간 업스트림 활성 큐(`upstream_rq_active`)로 실데이터화.
+  - 모델별 실시간 트래픽 점유율을 PostgreSQL WORM `audit_logs` 불변 감사 테이블의 `COUNT(*) GROUP BY model_id` 집계 쿼리와 Envoy live RPS를 결합하여 실제 서빙 중인 5대 모델별 비율 동적 산출.
+- **영향도**: 긍정적 (더미/Mock 데이터 제로화 및 안정적인 실시간 관제 사용자 경험 확보).
+
+### 3.13 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
 - **현재 구현 상태**: 현재 Docker Compose 기반 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 정식 단일 Helm 패키지 및 Playwright E2E 스위트는 미구현.
 - **영향도**: 높음 (Phase 6 정규 작업 범위).

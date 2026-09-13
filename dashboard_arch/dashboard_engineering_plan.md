@@ -92,16 +92,21 @@
 4. **Infrastructure Layer**:
    - PostgreSQL/SQLite DB 인터랙션, Envoy xDS v3 RouteConfiguration 변환기(`xds_generator.py`), K8s 5개 Pod 배포(`deploy/k8s/`) 형상 관리
 
-### 2.2 주요 아키텍처 결정 기록 (Architectural Decision Records: ADR-01 ~ ADR-04)
+### 2.2 주요 아키텍처 결정 기록 (Architectural Decision Records: ADR-01 ~ ADR-09)
 
-본 시스템은 100% 에어갭 폐쇄망 어플라이언스의 운영 자립성과 단순성을 보장하기 위해 아래 4대 아키텍처 결정을 채택하여 구현되었습니다.
+본 시스템은 100% 에어갭 폐쇄망 어플라이언스의 운영 자립성과 단순성을 보장하기 위해 아래 9대 아키텍처 결정을 채택하여 구현되었습니다.
 
 | 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
 | :---: | :---: | :--- | :--- | :--- |
 | **ADR-01** | xDS 제어 평면 | `go-control-plane` gRPC ADS 서버 | **FastAPI Envoy REST RDS v3** (`/api/v1/xds/v3/discovery:routes`) | 별도 무거운 Go 데몬 의존성을 배제하고 Envoy 공식 `rest_api_provider`를 단일 백엔드에 통합하여 무중단 카나리 라우팅 구현 |
-| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 동적 상태 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `telemetry_hub`를 통한 1초 주기 실시간 관제 스트림 구축 |
+| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 실시간 DB 및 시스템 메모리 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `model_catalogs` DB + host OS 메모리 + Envoy 실시간 큐 결합 스트림 구축 |
 | **ADR-03** | FinOps 과금 계량 | Apache Kafka 비동기 이벤트 컨슈머 | **Envoy L7 직접 보고 동기식 원자적 계량 API** (`POST /api/v1/external/usage/report`) | 분산 Kafka 클러스터 설치/운영 오버헤드 없이 단일 DB 트랜잭션으로 토큰/비용의 100% 원자적 일관성 및 초저지연 보장 |
 | **ADR-04** | 전문 관제 대시보드 | Grafana Kiosk 모드 iFrame 직접 임베딩 | **전문 3종 내장 관제 패널 및 외부 Grafana 연동 링크** | Grafana 컨테이너 미구동 상태에서도 L7, GPU, FinOps 3대 화면을 자체 독립적으로 완벽 관제 가능 |
+| **ADR-05** | PII 마스킹 엔진 | 대용량 외부 Presidio spaCy NER 모델 (~500MB) | **자체 정규식 기반 고속 PII 엔진 (`pii_engine.py`)** | 외부 인터넷 불가 에어갭 환경에서 즉시 구동 가능하며, 2ms 미만의 초저지연 처리 보장 |
+| **ADR-06** | WORM 감사 로그 | Kafka ➔ OpenSearch ➔ S3 Object Lock 전체 파이프라인 | **PostgreSQL/SQLite INSERT-only 불변 테이블 & SHA-256 해시 증적** | 별도 빅데이터 클러스터 없이도 원문 비저장 해시 증적으로 금융감독원 규정 준수 및 포렌식 무결성 보장 |
+| **ADR-07** | 핫픽스 롤링 배포 | K8s Deployment API 클러스터 권한 연동 | **어플라이언스 인앱 컴포넌트 레지스트리 핫픽스 & 롤백 엔진** | 고객 폐쇄망에서 복잡한 K8s RBAC/ServiceAccount 권한 부여 없이도 무중단 롤링 업데이트 및 원클릭 롤백 달성 |
+| **ADR-08** | 서빙 런타임 & 인그레스 | 단일 vLLM 전용 엔드포인트 가정 | **이종 런타임 카탈로그(vLLM/Ollama/SGLang/Triton) 및 Envoy 이중 인그레스(Path Prefix Rewrite + Header)** | 사내 다양한 인프라(K8s/Docker/Host CLI) 환경의 오픈소스 LLM을 단일 Envoy 진입점으로 통합 연동 및 실시간 프로빙 |
+| **ADR-09** | 관제 수명주기 디커플링 & WORM 기반 트래픽 실측 | 프론트엔드 주기적 REST 폴링 및 정적 하드코딩 모델 점유율 | **`useRef` 수명주기 분리(Zero-Flicker) 및 WORM `audit_logs` 기반 모델 점유율 산출** | WebSocket 상태 갱신 루프로 인한 UI 깜빡임을 100% 제거하고, 실제 추론 호출 이력과 Envoy RPS를 결합하여 정확한 서빙 트래픽 점유율 시각화 |
 
 ---
 

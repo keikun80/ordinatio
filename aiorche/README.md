@@ -55,7 +55,7 @@ make run-frontend
 
 ### 3. 단계별 검증 (DoD Automated Verification)
 ```bash
-# 전체 단위/통합 테스트 실행 (pytest 43개 테스트)
+# 전체 단위/통합 테스트 실행 (pytest 46개 테스트 100% 통과)
 make test
 
 # 단계별 완료 정의(DoD) 자동화 검증
@@ -76,7 +76,7 @@ bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & �
 | :---: | :--- | :---: | :---: |
 | **Phase 0** | 개발 환경 표준화 및 프로젝트 스캐폴딩 | ✅ 완료 | `make verify-phase0` 통과 |
 | **Phase 1** | 인증, 멀티 테넌트 및 가상 API Key 코어 | ✅ 완료 | `verify-phase1.sh` 통과 |
-| **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 |
+| **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 (46 Tests) |
 | **Phase 3** | 관제, FinOps 과금 및 실시간 관제 허브 | ✅ 완료 | `verify-phase3.sh` 통과 |
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
@@ -94,8 +94,13 @@ bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & �
    - 조건부 트래픽 매칭(`x-orche-tenant` 테넌트 격리, URL 접두사 `/v1/routes/...`, 커스텀 HTTP 헤더)
    - 다단계 장애 대응 자동 우회 체인 (Primary ➔ Secondary ➔ Emergency Fallback Pool)
    - Envoy L7 REST Route Discovery Service (RDS v3) 제어 평면 통합 (`/api/v1/xds/v3/discovery:routes`)
+   - 이종 서빙 런타임(vLLM, Ollama, SGLang, Triton, NIM) 카탈로그 & 활성 정책 종속성 검증 기반 안전 삭제(`DELETE /api/v1/models/{id}`)
+   - 실시간 모델 풀 헬스체크 프로빙(`GET /models/health-check`, `POST /models/{id}/health`) 및 Envoy 게이트웨이 대화형 테스트 호출 모달
 3. ✅ **Phase 3: FinOps 비용 계량 & 실시간 관제 허브** — `구현완료`
    - 1초 주기 WebSocket 텔레메트리 스트림 허브 (`/api/v1/observability/ws`)
+   - 글로벌 관제 홈 100% 실데이터 연동(PostgreSQL `model_catalogs` DB + host OS 메모리 + Envoy live 큐)
+   - WORM `audit_logs` 불변 감사 테이블 집계와 Envoy live RPS를 결합한 모델별 트래픽 점유율 실측
+   - 프론트엔드 수명주기 디커플링(`useRef`)을 통한 지표 요약 모드 깜빡임(Zero-Flicker) 결함 완벽 해결
    - 토큰 및 실시간 비용 원자적 정산 API (`POST /api/v1/external/usage/report`)
    - 예산 100% 소진 시 Envoy 레벨 즉각 차단(Hard Cap HTTP 429)
    - 사내 회계 결산용 UTF-8 BOM 한글 호환 CSV 청구서 스트리밍 내보내기

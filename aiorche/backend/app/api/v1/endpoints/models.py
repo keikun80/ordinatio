@@ -190,25 +190,50 @@ def delete_model(model_id: str, force: bool = False, db: Session = Depends(get_d
         )
 
     # Check if model is currently referenced in any active routing policies
-    if not force:
-        policies = db.query(RoutingPolicy).all()
-        referencing_routes = []
-        for pol in policies:
-            # Check traffic_weights
-            weights = pol.traffic_weights or []
-            for item in weights:
-                if isinstance(item, dict) and item.get("model_id") == model_id:
-                    referencing_routes.append(pol.route_name)
-                    break
-            # Check failover_model_id
-            if pol.failover_model_id == model_id and pol.route_name not in referencing_routes:
+    policies = db.query(RoutingPolicy).all()
+    referencing_routes = []
+    for pol in policies:
+        # Check traffic_weights
+        weights = pol.traffic_weights or []
+        for item in weights:
+            if isinstance(item, dict) and item.get("model_id") == model_id:
                 referencing_routes.append(pol.route_name)
+                break
+        # Check failover_model_id
+        if pol.failover_model_id == model_id and pol.route_name not in referencing_routes:
+            referencing_routes.append(pol.route_name)
 
-        if referencing_routes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"해당 모델은 활성 라우트 정책({', '.join(referencing_routes)})에서 가중치 또는 페일오버 타깃으로 사용 중이므로 삭제할 수 없습니다. 먼저 라우트 설정을 변경해 주세요."
-            )
+    if referencing_routes and not force:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"해당 모델은 활성 라우트 정책({', '.join(referencing_routes)})에서 가중치 또는 페일오버 타깃으로 사용 중이므로 삭제할 수 없습니다. 먼저 라우트 설정을 변경해 주세요."
+        )
+
+    # If force=True, cascade remove model from any referencing routes
+    if force and referencing_routes:
+        for pol in policies:
+            changed = False
+            if pol.traffic_weights:
+                new_weights = [w for w in pol.traffic_weights if isinstance(w, dict) and w.get("model_id") != model_id]
+                if len(new_weights) != len(pol.traffic_weights):
+                    if new_weights:
+                        total = sum(w.get("weight", 0) for w in new_weights)
+                        if total > 0:
+                            for w in new_weights:
+                                w["weight"] = round((w.get("weight", 0) / total) * 100)
+                            diff = 100 - sum(w.get("weight", 0) for w in new_weights)
+                            if diff != 0:
+                                new_weights[0]["weight"] += diff
+                    pol.traffic_weights = new_weights
+                    changed = True
+            if pol.failover_model_id == model_id:
+                pol.failover_model_id = None
+                changed = True
+            if pol.failover_chain and model_id in pol.failover_chain:
+                pol.failover_chain = [m for m in pol.failover_chain if m != model_id]
+                changed = True
+            if changed:
+                db.add(pol)
 
     db.delete(model)
     db.commit()

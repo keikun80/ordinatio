@@ -176,7 +176,7 @@ export const apiClient = {
     return await res.json();
   },
 
-  async deleteModel(modelId, force = false) {
+  async deleteModel(modelId, force = true) {
     const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}?force=${force}`, {
       method: 'DELETE'
     });

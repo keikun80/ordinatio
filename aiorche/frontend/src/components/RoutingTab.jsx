@@ -607,22 +607,52 @@ export default function RoutingTab({ onNotify }) {
 
   // Delete Model from Catalog
   const handleDeleteModel = async (modelId) => {
-    // Check if model is in current route
-    if (currentWeights.some(w => w.model_id === modelId)) {
-      onNotify('ERROR', `모델 '${modelId}'은(는) 현재 활성 라우트 정책에 포함되어 있어 삭제할 수 없습니다. 먼저 라우트에서 제거해 주세요.`);
-      return;
+    const inCurrentRoute = currentWeights.some(w => w.model_id === modelId);
+    const inAnyRoute = routes.some(r => 
+      (r.traffic_weights || []).some(w => w.model_id === modelId) || 
+      r.failover_model_id === modelId
+    );
+
+    let confirmMsg = `정말 모델 '${modelId}'을(를) 서빙 모델 풀에서 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`;
+    if (inCurrentRoute || inAnyRoute) {
+      confirmMsg = `⚠️ 모델 '${modelId}'은(는) 현재 라우팅 정책에 포함되어 있습니다.\n\n[확인]을 클릭하시면 해당 라우트의 트래픽 분할에서 자동으로 제외되고 카탈로그에서 영구 삭제됩니다.\n\n정말 삭제하시겠습니까?`;
     }
 
-    if (!window.confirm(`정말 모델 '${modelId}'을(를) 서빙 모델 풀에서 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
     try {
-      await apiClient.deleteModel(modelId);
+      await apiClient.deleteModel(modelId, true);
       const filtered = models.filter(m => m.id !== modelId);
       setModels(filtered);
       localStorage.setItem('aiorche_models', JSON.stringify(filtered));
-      onNotify('SUCCESS', `모델 '${modelId}'이(가) 서빙 모델 풀에서 삭제되었습니다.`);
+
+      // Remove from currentWeights if present and rebalance
+      if (inCurrentRoute) {
+        const remaining = currentWeights.filter(w => w.model_id !== modelId);
+        if (remaining.length > 0) {
+          const base = Math.floor(100 / remaining.length);
+          const remainder = 100 - (base * remaining.length);
+          const rebalanced = remaining.map((item, idx) => ({
+            ...item,
+            weight: idx === 0 ? base + remainder : base
+          }));
+          updateCurrentRoute({ traffic_weights: rebalanced });
+        } else {
+          updateCurrentRoute({ traffic_weights: [] });
+        }
+      }
+
+      // Re-fetch routes to synchronize backend updates
+      apiClient.getRoutes().then(updatedRoutes => {
+        if (updatedRoutes && updatedRoutes.length > 0) {
+          setRoutes(updatedRoutes);
+          localStorage.setItem('aiorche_multi_routes', JSON.stringify(updatedRoutes));
+        }
+      }).catch(() => {});
+
+      onNotify('SUCCESS', `모델 '${modelId}'이(가) 서빙 모델 풀 및 라우트에서 삭제되었습니다.`);
     } catch (err) {
       onNotify('ERROR', `모델 삭제 실패: ${err.message}`);
     }

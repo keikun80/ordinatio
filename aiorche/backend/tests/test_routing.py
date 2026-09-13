@@ -51,7 +51,7 @@ def test_model_catalog_crud():
     assert patch_res.json()["execution_method"] == "k8s"
     assert patch_res.json()["is_active"] is False
 
-    # 5. Delete model (referenced in active route fails with 400)
+    # 5. Delete model (referenced in active route fails with 400 when force=false)
     del_fail_res = client.delete("/api/v1/models/meta-llama/Llama-3.1-8B-Instruct")
     assert del_fail_res.status_code == 400
     assert "활성 라우트 정책" in del_fail_res.json()["detail"]
@@ -64,6 +64,27 @@ def test_model_catalog_crud():
     # 7. Verify model is gone
     get_gone_res = client.get(f"/api/v1/models/{new_model['model_id']}")
     assert get_gone_res.status_code == 404
+
+    # 8. Test force=True cascade deletion on referenced model
+    # Register a temporary model and attach to a test route
+    temp_model_id = "test-cascade/model-v1"
+    client.post("/api/v1/models", json={
+        "model_id": temp_model_id,
+        "alias": "temp-cascade",
+        "serving_engine": "vLLM",
+        "backend_infra": "Test",
+        "target_endpoint": "http://127.0.0.1:8000"
+    })
+    client.post("/api/v1/routing/routes", json={
+        "route_name": "temp-test-route",
+        "priority": 99,
+        "traffic_weights": [{"model_id": temp_model_id, "weight": 100}]
+    })
+    # Force delete temp model
+    del_force_res = client.delete(f"/api/v1/models/{temp_model_id}?force=true")
+    assert del_force_res.status_code == 200
+    # Clean up temp route
+    client.delete("/api/v1/routing/routes/temp-test-route")
 
 def test_routing_policy_get_active():
     res = client.get("/api/v1/routing")

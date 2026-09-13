@@ -91,3 +91,18 @@ class RoutingPolicyResponse(BaseModel):
     deployed_by: str
     deployed_at: datetime
 
+class RouteTestCallRequest(BaseModel):
+    route_name: str
+    method: str = "path"  # "path" or "header"
+    message: str = "안녕하세요. 라우팅 테스트 요청입니다."
+
+class RouteTestCallResponse(BaseModel):
+    is_success: bool
+    status_code: Optional[int] = None
+    latency_ms: float
+    target_url: str
+    request_headers: Dict[str, str]
+    response_body: Optional[Any] = None
+    error_message: Optional[str] = None
+    dispatched_route: str
+

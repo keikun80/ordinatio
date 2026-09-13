@@ -57,15 +57,32 @@ def build_single_route_entry(
     entries = []
     conditions = match_conditions or {}
 
-    # 1. Custom Path Prefix (e.g. /v1/routes/financial-advisor)
-    path_prefix = conditions.get("path_prefix")
-    if path_prefix:
-        entries.append({
-            "match": {"prefix": path_prefix},
-            "route": route_payload
-        })
+    # 1. Dedicated Path Prefix (e.g. /v1/routes/financial-advisor) with rewrite to upstream /v1/chat/completions
+    path_prefix = conditions.get("path_prefix") or f"/v1/routes/{route_name}"
+    path_route_payload = {
+        **route_payload,
+        "prefix_rewrite": "/v1/chat/completions"
+    }
+    entries.append({
+        "match": {"prefix": path_prefix},
+        "route": path_route_payload
+    })
 
-    # 2. Tenant code matching headers (e.g. x-orche-tenant)
+    # 2. Route Name Header Matcher (e.g. x-orche-route: financial-advisor-v1)
+    entries.append({
+        "match": {
+            "prefix": "/v1/chat/completions",
+            "headers": [
+                {
+                    "name": "x-orche-route",
+                    "string_match": {"exact": route_name}
+                }
+            ]
+        },
+        "route": route_payload
+    })
+
+    # 3. Tenant code matching headers (e.g. x-orche-tenant: WM-01)
     tenant_codes = conditions.get("tenant_codes", [])
     if tenant_codes:
         for tcode in tenant_codes:
@@ -82,7 +99,7 @@ def build_single_route_entry(
                 "route": route_payload
             })
 
-    # 3. Custom Header Matchers
+    # 4. Custom Header Matchers
     custom_headers = conditions.get("headers", {})
     if custom_headers:
         header_matchers = [
@@ -97,7 +114,7 @@ def build_single_route_entry(
             "route": route_payload
         })
 
-    # 4. Standard /v1/chat/completions fallback entry
+    # 5. Standard /v1/chat/completions fallback entry
     entries.append({
         "match": {
             "prefix": "/v1/chat/completions"

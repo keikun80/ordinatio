@@ -278,6 +278,19 @@ export const apiClient = {
     return await res.json();
   },
 
+  async testRouteCall(data) {
+    const res = await fetch(`${API_BASE_URL}/routing/test-call`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '라우트 테스트 요청 실패');
+    }
+    return await res.json();
+  },
+
   async deployRouting(data) {
     const res = await fetch(`${API_BASE_URL}/routing/deploy`, {
       method: 'POST',

@@ -211,10 +211,21 @@ def test_multi_route_crud_and_xds_compilation():
     rc = xds_res.json()["resources"][0]
     vh_routes = rc["virtual_hosts"][0]["routes"]
     
-    # Verify custom path prefix was added
+    # Verify custom path prefix was added with prefix_rewrite
     custom_prefix_route = next((r for r in vh_routes if r.get("match", {}).get("prefix") == "/v1/routes/customer-care"), None)
     assert custom_prefix_route is not None
+    assert custom_prefix_route["route"]["prefix_rewrite"] == "/v1/chat/completions"
     assert len(custom_prefix_route["route"]["weighted_clusters"]["clusters"]) == 3
+
+    # Verify x-orche-route header matcher was added
+    header_route = next(
+        (r for r in vh_routes if any(
+            h.get("name") == "x-orche-route" and h.get("string_match", {}).get("exact") == "customer-care-tier1"
+            for h in r.get("match", {}).get("headers", [])
+        )), None
+    )
+    assert header_route is not None
+    assert len(header_route["route"]["weighted_clusters"]["clusters"]) == 3
 
     # 5. Update route (disable route)
     patch_res = client.put("/api/v1/routing/routes/customer-care-tier1", json={"is_active": False, "priority": 99})
@@ -251,4 +262,34 @@ def test_model_serving_health_check():
     # 3. Check single model health (non-existent)
     not_found_res = client.post("/api/v1/models/non-existent-model-xyz/health")
     assert not_found_res.status_code == 404
+
+def test_route_test_call_endpoint():
+    # Test path-based call
+    payload_path = {
+        "route_name": "financial-advisor-v1",
+        "method": "path",
+        "message": "테스트 메시지"
+    }
+    res_path = client.post("/api/v1/routing/test-call", json=payload_path)
+    assert res_path.status_code == 200
+    data_path = res_path.json()
+    assert "target_url" in data_path
+    assert "latency_ms" in data_path
+    assert "request_headers" in data_path
+    assert data_path["dispatched_route"] == "financial-advisor-v1"
+
+    # Test header-based call
+    payload_header = {
+        "route_name": "financial-advisor-v1",
+        "method": "header",
+        "message": "테스트 메시지"
+    }
+    res_header = client.post("/api/v1/routing/test-call", json=payload_header)
+    assert res_header.status_code == 200
+    data_header = res_header.json()
+    assert data_header["request_headers"]["x-orche-route"] == "financial-advisor-v1"
+
+    # Test non-existent route
+    res_404 = client.post("/api/v1/routing/test-call", json={"route_name": "ghost-route", "method": "path"})
+    assert res_404.status_code == 404
 

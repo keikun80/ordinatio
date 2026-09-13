@@ -1,9 +1,12 @@
 import uuid
+import time
 from typing import List, Optional
 from datetime import datetime
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.model_catalog import ModelCatalog
 from app.models.routing_policy import RoutingPolicy
 from app.schemas.routing import (
@@ -13,7 +16,9 @@ from app.schemas.routing import (
     CanaryDeployResponse,
     RoutePolicyCreate,
     RoutePolicyUpdate,
-    RoutingPolicyResponse
+    RoutingPolicyResponse,
+    RouteTestCallRequest,
+    RouteTestCallResponse
 )
 from app.core.xds_generator import generate_xds_revision
 
@@ -293,4 +298,97 @@ def deploy_canary_routing(request: CanaryDeployRequest, db: Session = Depends(ge
 def get_routing_history(db: Session = Depends(get_db)):
     """List historical dynamic routing deployments and revisions"""
     return db.query(RoutingPolicy).order_by(RoutingPolicy.deployed_at.desc()).limit(20).all()
+
+@router.post("/test-call", response_model=RouteTestCallResponse)
+async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_db)):
+    """Test calling a specific route through Envoy Gateway"""
+    policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.route_name).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Route '{req.route_name}' not found."
+        )
+
+    envoy_ingress = settings.ENVOY_INGRESS_URL.rstrip('/')
+    candidate_hosts = ["http://envoy:8080", envoy_ingress]
+
+    path_prefix = ""
+    if policy.match_conditions and policy.match_conditions.get("path_prefix"):
+        path_prefix = policy.match_conditions.get("path_prefix")
+    else:
+        path_prefix = f"/v1/routes/{req.route_name}"
+
+    if req.method == "path":
+        target_path = path_prefix
+        request_headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer sk-orch-mock-test-key"
+        }
+    else:
+        target_path = "/v1/chat/completions"
+        request_headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer sk-orch-mock-test-key",
+            "x-orche-route": req.route_name
+        }
+        if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
+            request_headers["x-orche-tenant"] = policy.match_conditions["tenant_codes"][0]
+
+    payload = {
+        "model": req.route_name,
+        "messages": [
+            {"role": "user", "content": req.message}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 128
+    }
+
+    t0 = time.perf_counter()
+    status_code = None
+    resp_body = None
+    err_msg = None
+    is_success = False
+    chosen_url = f"{envoy_ingress}{target_path}"
+
+    async with httpx.AsyncClient(timeout=4.0) as client:
+        for host in candidate_hosts:
+            test_url = f"{host}{target_path}"
+            try:
+                res = await client.post(test_url, json=payload, headers=request_headers)
+                latency = round((time.perf_counter() - t0) * 1000, 2)
+                status_code = res.status_code
+                try:
+                    resp_body = res.json()
+                except Exception:
+                    resp_body = res.text[:200]
+
+                is_success = (res.status_code < 500)
+                return RouteTestCallResponse(
+                    is_success=is_success,
+                    status_code=status_code,
+                    latency_ms=latency,
+                    target_url=chosen_url,
+                    request_headers=request_headers,
+                    response_body=resp_body,
+                    error_message=None if is_success else f"Envoy Gateway HTTP {status_code}",
+                    dispatched_route=req.route_name
+                )
+            except httpx.ConnectError:
+                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
+            except httpx.TimeoutException:
+                err_msg = "게이트웨이 응답 타임아웃 (Timeout)"
+            except Exception as e:
+                err_msg = str(e)
+
+    total_latency = round((time.perf_counter() - t0) * 1000, 2)
+    return RouteTestCallResponse(
+        is_success=False,
+        status_code=status_code,
+        latency_ms=total_latency,
+        target_url=chosen_url,
+        request_headers=request_headers,
+        response_body=None,
+        error_message=err_msg or "연결 실패",
+        dispatched_route=req.route_name
+    )
 

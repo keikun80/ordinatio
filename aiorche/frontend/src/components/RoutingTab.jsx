@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight } from 'lucide-react';
+import { 
+  GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, 
+  Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight, 
+  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code 
+} from 'lucide-react';
 import { initialModels } from '../data/mockData';
 import { apiClient } from '../api/client';
 
@@ -85,6 +89,12 @@ export default function RoutingTab({ onNotify }) {
   // Health Check States
   const [healthStatus, setHealthStatus] = useState({});
   const [isHealthCheckingAll, setIsHealthCheckingAll] = useState(false);
+
+  // Gateway Endpoint & Developer Guide States
+  const [activeEndpointTab, setActiveEndpointTab] = useState('path'); // 'path' | 'header' | 'python'
+  const [copiedField, setCopiedField] = useState(null);
+  const [isTestingRoute, setIsTestingRoute] = useState(false);
+  const [testResult, setTestResult] = useState(null);
 
   // Modal States
   const [showNewRouteModal, setShowNewRouteModal] = useState(false);
@@ -310,6 +320,44 @@ export default function RoutingTab({ onNotify }) {
         }
       }));
       if (onNotify) onNotify('ERROR', `[${modelId}] 헬스체크 오류: ${err.message}`);
+    }
+  };
+
+  // Copy to clipboard helper
+  const handleCopy = (text, fieldKey) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    setTimeout(() => setCopiedField(null), 2000);
+    if (onNotify) onNotify('SUCCESS', '클립보드에 복사되었습니다.');
+  };
+
+  // Test Route Call via Envoy Gateway
+  const handleTestCall = async (methodType) => {
+    setIsTestingRoute(true);
+    setTestResult(null);
+    try {
+      const res = await apiClient.testRouteCall({
+        route_name: currentRoute.route_name,
+        method: methodType || activeEndpointTab,
+        message: "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다."
+      });
+      setTestResult(res);
+      if (res.is_success) {
+        if (onNotify) onNotify('SUCCESS', `Envoy 게이트웨이 호출 성공: HTTP ${res.status_code || 200} (${res.latency_ms}ms)`);
+      } else {
+        if (onNotify) onNotify('WARNING', `Envoy 게이트웨이 응답: ${res.error_message || '응답 오류'}`);
+      }
+    } catch (err) {
+      setTestResult({
+        is_success: false,
+        latency_ms: 0,
+        target_url: `http://localhost:8080/v1/routes/${currentRoute.route_name}`,
+        request_headers: {},
+        error_message: err.message
+      });
+      if (onNotify) onNotify('ERROR', `테스트 요청 실패: ${err.message}`);
+    } finally {
+      setIsTestingRoute(false);
     }
   };
 
@@ -559,6 +607,55 @@ export default function RoutingTab({ onNotify }) {
 
   const availableModelsToAdd = models.filter(m => !currentWeights.some(w => w.model_id === m.id));
 
+  // Gateway Connection URLs & Snippets
+  const gatewayHost = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8080` : 'http://localhost:8080';
+  const routePathPrefix = currentRoute.match_conditions?.path_prefix || `/v1/routes/${currentRoute.route_name}`;
+  const routeFullPath = `${gatewayHost}${routePathPrefix}`;
+  const standardEndpointUrl = `${gatewayHost}/v1/chat/completions`;
+  const primaryTenantCode = currentRoute.match_conditions?.tenant_codes?.[0] || 'WM-01';
+
+  const curlSnippetPath = `curl -X POST "${routeFullPath}" \\
+  -H "Authorization: Bearer sk-orch-your-virtual-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [
+      {"role": "user", "content": "안녕하세요. 포트폴리오 자산 배분 조언을 요청합니다."}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 512
+  }'`;
+
+  const curlSnippetHeader = `curl -X POST "${standardEndpointUrl}" \\
+  -H "Authorization: Bearer sk-orch-your-virtual-key" \\
+  -H "x-orche-route: ${currentRoute.route_name}" \\
+  -H "x-orche-tenant: ${primaryTenantCode}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${currentRoute.route_name}",
+    "messages": [
+      {"role": "user", "content": "안녕하세요. 포트폴리오 자산 배분 조언을 요청합니다."}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 512
+  }'`;
+
+  const pythonSnippet = `from openai import OpenAI
+
+client = OpenAI(
+    base_url="${routeFullPath}",
+    api_key="sk-orch-your-virtual-key"
+)
+
+response = client.chat.completions.create(
+    model="${currentRoute.route_name}",
+    messages=[
+        {"role": "user", "content": "안녕하세요. 포트폴리오 자산 배분 조언을 요청합니다."}
+    ],
+    temperature=0.7
+)
+
+print(response.choices[0].message.content)`;
+
   return (
     <div className="tab-pane">
       {/* Page Header */}
@@ -614,7 +711,17 @@ export default function RoutingTab({ onNotify }) {
                     }}
                   >
                     <GitFork size={14} color="#F54927" />
-                    <span style={{ color: '#F54927' }}>{r.route_name}</span>
+                    <span style={{ color: '#F54927', fontWeight: 700 }}>{r.route_name}</span>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      color: '#38bdf8'
+                    }}>
+                      {r.match_conditions?.path_prefix || `/v1/routes/${r.route_name}`}
+                    </span>
                     <span style={{
                       fontSize: '0.7rem',
                       padding: '2px 6px',
@@ -630,7 +737,10 @@ export default function RoutingTab({ onNotify }) {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>현재 xDS 리비전:</span>
+            <span style={{ color: 'var(--text-muted)' }}>Envoy 진입점:</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontWeight: 600 }}>port 8080</span>
+            <span style={{ color: 'var(--border-subtle)' }}>|</span>
+            <span style={{ color: 'var(--text-muted)' }}>xDS 리비전:</span>
             <span style={{ fontFamily: 'var(--font-mono)', color: '#34d399', fontWeight: 600 }}>{xdsRevision}</span>
           </div>
         </div>
@@ -670,6 +780,261 @@ export default function RoutingTab({ onNotify }) {
               </button>
             )}
           </div>
+        </div>
+
+        {/* 0. Envoy Gateway API Endpoint & Connection Guide */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
+          border: '1px solid rgba(56, 189, 248, 0.4)',
+          borderRadius: 'var(--radius-md)',
+          padding: '20px',
+          marginBottom: '20px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Globe size={18} color="#38bdf8" />
+                <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>
+                  Envoy L7 게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
+                </span>
+                <span className="badge active" style={{ fontSize: '0.7rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
+                  무중단 xDS 라우팅 활성
+                </span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                외부 애플리케이션 및 개발자는 아래 엔드포인트를 호출하여 <strong style={{ color: '#ffffff' }}>"{currentRoute.route_name}"</strong> 정책에 정의된 모델 풀({currentWeights.length}개 가중치 분할)로 트래픽을 전송합니다.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => handleTestCall(activeEndpointTab)}
+                disabled={isTestingRoute}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', background: '#0284c7' }}
+              >
+                <Play size={13} fill="currentColor" />
+                <span>{isTestingRoute ? '게이트웨이 호출 중...' : '⚡ 게이트웨이 즉시 테스트 호출'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Primary Endpoint Box */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#090d16',
+            border: '1px solid #1e293b',
+            borderRadius: 'var(--radius-sm)',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
+              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16' }}>
+                POST
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.94rem',
+                fontWeight: 600,
+                color: '#38bdf8',
+                wordBreak: 'break-all'
+              }}>
+                {activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`}
+              </span>
+              {activeEndpointTab === 'header' && (
+                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                  Header: x-orche-route: {currentRoute.route_name}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => handleCopy(activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`, 'endpoint')}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                {copiedField === 'endpoint' ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
+                <span>{copiedField === 'endpoint' ? '복사됨!' : 'URL 복사'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Integration Tabs */}
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '14px' }}>
+            {[
+              { id: 'path', label: '1. 경로 기반 호출 (Path Prefix / OpenAI base_url 호환)' },
+              { id: 'header', label: '2. 공통 엔드포인트 + 라우트 헤더 지정 (Standard OpenAI)' },
+              { id: 'python', label: '3. Python (OpenAI SDK 연동 스니펫)' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveEndpointTab(tab.id)}
+                style={{
+                  padding: '8px 14px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeEndpointTab === tab.id ? '2px solid #38bdf8' : '2px solid transparent',
+                  color: activeEndpointTab === tab.id ? '#38bdf8' : 'var(--text-muted)',
+                  fontSize: '0.8rem',
+                  fontWeight: activeEndpointTab === tab.id ? 700 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab 1: Path Based */}
+          {activeEndpointTab === 'path' && (
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                💡 별도 헤더 없이 고유 URL 접두사로 즉시 라우팅됩니다. OpenAI SDK의 <code style={{ color: '#38bdf8' }}>base_url</code>에 그대로 지정할 수 있습니다.
+              </div>
+              <div style={{ position: 'relative' }}>
+                <pre style={{
+                  margin: 0,
+                  padding: '12px 14px',
+                  background: '#090d16',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.75rem',
+                  fontFamily: 'var(--font-mono)',
+                  color: '#a7f3d0',
+                  overflowX: 'auto',
+                  border: '1px solid #1e293b'
+                }}>
+                  <code>{curlSnippetPath}</code>
+                </pre>
+                <button
+                  onClick={() => handleCopy(curlSnippetPath, 'curl-path')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
+                >
+                  {copiedField === 'curl-path' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  <span>{copiedField === 'curl-path' ? '복사됨' : 'cURL 복사'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 2: Header Based */}
+          {activeEndpointTab === 'header' && (
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                💡 공통 엔드포인트(<code style={{ color: '#38bdf8' }}>/v1/chat/completions</code>)를 사용하면서 <code style={{ color: '#fbbf24' }}>x-orche-route</code> 헤더로 목적지 라우트를 지정합니다.
+              </div>
+              <div style={{ position: 'relative' }}>
+                <pre style={{
+                  margin: 0,
+                  padding: '12px 14px',
+                  background: '#090d16',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.75rem',
+                  fontFamily: 'var(--font-mono)',
+                  color: '#a7f3d0',
+                  overflowX: 'auto',
+                  border: '1px solid #1e293b'
+                }}>
+                  <code>{curlSnippetHeader}</code>
+                </pre>
+                <button
+                  onClick={() => handleCopy(curlSnippetHeader, 'curl-header')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
+                >
+                  {copiedField === 'curl-header' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  <span>{copiedField === 'curl-header' ? '복사됨' : 'cURL 복사'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Python OpenAI SDK */}
+          {activeEndpointTab === 'python' && (
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                💡 파이썬 공식 OpenAI SDK 클라이언트 초기화 코드 예시입니다.
+              </div>
+              <div style={{ position: 'relative' }}>
+                <pre style={{
+                  margin: 0,
+                  padding: '12px 14px',
+                  background: '#090d16',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.75rem',
+                  fontFamily: 'var(--font-mono)',
+                  color: '#93c5fd',
+                  overflowX: 'auto',
+                  border: '1px solid #1e293b'
+                }}>
+                  <code>{pythonSnippet}</code>
+                </pre>
+                <button
+                  onClick={() => handleCopy(pythonSnippet, 'python')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
+                >
+                  {copiedField === 'python' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  <span>{copiedField === 'python' ? '복사됨' : '코드 복사'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Test Call Response Box */}
+          {testResult && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px 14px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              borderRadius: 'var(--radius-sm)',
+              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem' }}>
+                    {testResult.is_success ? `HTTP ${testResult.status_code || 200} OK` : `HTTP ${testResult.status_code || '오류'}`}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600 }}>
+                    게이트웨이 응답 테스트 결과 ({testResult.latency_ms}ms)
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    대상 URL: {testResult.target_url}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setTestResult(null)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+                >
+                  닫기 ✕
+                </button>
+              </div>
+              <pre style={{
+                margin: 0,
+                padding: '8px 10px',
+                background: '#040711',
+                borderRadius: '4px',
+                fontSize: '0.72rem',
+                fontFamily: 'var(--font-mono)',
+                color: testResult.is_success ? '#a7f3d0' : '#fca5a5',
+                overflowX: 'auto',
+                maxHeight: '160px'
+              }}>
+                <code>
+                  {testResult.response_body
+                    ? (typeof testResult.response_body === 'string' ? testResult.response_body : JSON.stringify(testResult.response_body, null, 2))
+                    : (testResult.error_message || '결과 없음')}
+                </code>
+              </pre>
+            </div>
+          )}
         </div>
 
         {/* 1. N-Way Multi-Model Traffic Splitter */}
@@ -968,6 +1333,19 @@ export default function RoutingTab({ onNotify }) {
             {isDeploying ? 'Envoy RDS 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 (무중단)'}
           </button>
         </div>
+      </div>
+
+      {/* Upstream Clarification Notice */}
+      <div style={{
+        background: 'rgba(30, 41, 59, 0.5)',
+        borderLeft: '4px solid #38bdf8',
+        padding: '10px 14px',
+        marginBottom: '14px',
+        borderRadius: '0 6px 6px 0',
+        fontSize: '0.78rem',
+        color: 'var(--text-secondary)'
+      }}>
+        💡 <strong>안내:</strong> 아래 모델 카탈로그의 엔드포인트는 주전산센터 내부 <strong>'Upstream 원본 서빙 인프라'</strong> 주소입니다. 외부 개발자 및 클라이언트는 상단의 <strong>'Envoy L7 게이트웨이 엔드포인트(포트 8080)'</strong>로 인입되며, 게이트웨이가 가중치에 따라 아래 원본 모델 풀로 트래픽을 자동 분산합니다.
       </div>
 
       {/* Model Catalog Table */}

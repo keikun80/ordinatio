@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Activity, 
   Zap, 
@@ -20,6 +20,7 @@ export default function OverviewTab({ onNavigateTab }) {
   const [clusterPools, setClusterPools] = useState([]);
   const [modelTraffic, setModelTraffic] = useState([]);
   const [isLiveWs, setIsLiveWs] = useState(false);
+  const isLiveWsRef = useRef(false);
 
   // Helper to map backend ComputePoolStatus to UI
   const mapComputePools = (pools) => {
@@ -42,11 +43,13 @@ export default function OverviewTab({ onNavigateTab }) {
   useEffect(() => {
     let ws = null;
     let fallbackTimer = null;
+    let reconnectTimeout = null;
+    let isUnmounted = false;
 
     // 1. Initial immediate load from summary API
     const loadInitialSummary = async () => {
       const summary = await apiClient.getMetricsSummary();
-      if (summary) {
+      if (summary && !isUnmounted) {
         setKpis((prev) => ({
           ...prev,
           rps: Math.round(summary.current_rps),
@@ -64,57 +67,77 @@ export default function OverviewTab({ onNavigateTab }) {
     };
     loadInitialSummary();
 
-    // 2. Real-time WebSocket connection
-    try {
-      const wsUrl = apiClient.getObservabilityWsUrl();
-      ws = new WebSocket(wsUrl);
+    // 2. Real-time WebSocket connection manager
+    const connectWebSocket = () => {
+      if (isUnmounted) return;
+      try {
+        const wsUrl = apiClient.getObservabilityWsUrl();
+        ws = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
-        setIsLiveWs(true);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const packet = JSON.parse(event.data);
-          if (packet.rps !== undefined) {
-            setKpis((prev) => ({
-              ...prev,
-              rps: Math.round(packet.rps),
-              tps: Math.round(packet.tps),
-              ttft: Math.round(packet.ttft_ms),
-              errorRate: packet.error_rate_5xx,
-              dailyCost: Math.round(packet.cumulative_cost_krw || prev.dailyCost),
-            }));
-
-            if (packet.compute_pools && packet.compute_pools.length > 0) {
-              setClusterPools(mapComputePools(packet.compute_pools));
-            }
-
-            if (packet.model_traffic_breakdown) {
-              setModelTraffic(packet.model_traffic_breakdown);
-            }
+        ws.onopen = () => {
+          if (!isUnmounted) {
+            isLiveWsRef.current = true;
+            setIsLiveWs(true);
           }
-        } catch (e) {
-          // ignore non-JSON or ping/pong
+        };
+
+        ws.onmessage = (event) => {
+          if (isUnmounted) return;
+          try {
+            const packet = JSON.parse(event.data);
+            if (packet.rps !== undefined) {
+              setKpis((prev) => ({
+                ...prev,
+                rps: Math.round(packet.rps),
+                tps: Math.round(packet.tps),
+                ttft: Math.round(packet.ttft_ms),
+                errorRate: packet.error_rate_5xx,
+                dailyCost: Math.round(packet.cumulative_cost_krw || prev.dailyCost),
+              }));
+
+              if (packet.compute_pools && packet.compute_pools.length > 0) {
+                setClusterPools(mapComputePools(packet.compute_pools));
+              }
+
+              if (packet.model_traffic_breakdown) {
+                setModelTraffic(packet.model_traffic_breakdown);
+              }
+            }
+          } catch (e) {
+            // ignore non-JSON or ping/pong
+          }
+        };
+
+        ws.onerror = () => {
+          if (!isUnmounted) {
+            isLiveWsRef.current = false;
+            setIsLiveWs(false);
+          }
+        };
+
+        ws.onclose = () => {
+          if (!isUnmounted) {
+            isLiveWsRef.current = false;
+            setIsLiveWs(false);
+            // Auto reconnect after 3 seconds if disconnected
+            reconnectTimeout = setTimeout(connectWebSocket, 3000);
+          }
+        };
+      } catch (e) {
+        if (!isUnmounted) {
+          isLiveWsRef.current = false;
+          setIsLiveWs(false);
         }
-      };
+      }
+    };
 
-      ws.onerror = () => {
-        setIsLiveWs(false);
-      };
+    connectWebSocket();
 
-      ws.onclose = () => {
-        setIsLiveWs(false);
-      };
-    } catch (e) {
-      setIsLiveWs(false);
-    }
-
-    // Fallback polling if WS is disconnected
+    // 3. Fallback polling only when WebSocket is inactive
     fallbackTimer = setInterval(async () => {
-      if (!isLiveWs) {
+      if (!isLiveWsRef.current && !isUnmounted) {
         const summary = await apiClient.getMetricsSummary();
-        if (summary) {
+        if (summary && !isUnmounted) {
           setKpis((prev) => ({
             ...prev,
             rps: Math.round(summary.current_rps),
@@ -133,10 +156,13 @@ export default function OverviewTab({ onNavigateTab }) {
     }, 2000);
 
     return () => {
+      isUnmounted = true;
+      isLiveWsRef.current = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (ws) ws.close();
       if (fallbackTimer) clearInterval(fallbackTimer);
     };
-  }, [isLiveWs]);
+  }, []);
 
   return (
     <div className="tab-pane">

@@ -43,6 +43,7 @@ def get_observability_metrics_summary(db: Session = Depends(get_db)):
         cache_hit_rate=telemetry.cache_hit_rate,
         total_tokens_today=int(telemetry.tps * 3600 * 2.4),
         compute_pools=telemetry.compute_pools,
+        model_traffic_breakdown=telemetry.model_traffic_breakdown,
         uptime_seconds=round(uptime, 1)
     )
 

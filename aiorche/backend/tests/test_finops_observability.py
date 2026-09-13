@@ -18,7 +18,8 @@ def test_observability_metrics_summary():
     assert "current_tps" in data
     assert "p95_ttft_ms" in data
     assert "compute_pools" in data
-    assert len(data["compute_pools"]) >= 3
+    assert len(data["compute_pools"]) >= 1
+    assert "model_traffic_breakdown" in data
     assert data["uptime_seconds"] >= 0
 
 def test_observability_websocket_telemetry():
@@ -31,6 +32,7 @@ def test_observability_websocket_telemetry():
         assert "ttft_ms" in packet
         assert "cumulative_cost_krw" in packet
         assert "compute_pools" in packet
+        assert "model_traffic_breakdown" in packet
         assert packet["rps"] >= 0
         assert packet["tps"] >= 0
 

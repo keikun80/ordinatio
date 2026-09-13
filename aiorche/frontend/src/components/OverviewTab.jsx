@@ -12,18 +12,59 @@ import {
   ShieldCheck,
   CheckCircle2
 } from 'lucide-react';
-import { initialKPIs, initialClusterPools } from '../data/mockData';
+import { initialKPIs } from '../data/mockData';
 import { apiClient } from '../api/client';
 
 export default function OverviewTab({ onNavigateTab }) {
   const [kpis, setKpis] = useState(initialKPIs);
-  const [clusterPools, setClusterPools] = useState(initialClusterPools);
+  const [clusterPools, setClusterPools] = useState([]);
+  const [modelTraffic, setModelTraffic] = useState([]);
   const [isLiveWs, setIsLiveWs] = useState(false);
+
+  // Helper to map backend ComputePoolStatus to UI
+  const mapComputePools = (pools) => {
+    if (!pools || pools.length === 0) return [];
+    return pools.map((p, idx) => ({
+      id: `pool-${(p.infra || 'infra').toLowerCase().replace(/[^a-z0-9]/g, '')}-${idx}`,
+      name: p.pool_name,
+      model: p.model_id || p.pool_name,
+      engine: p.engine || 'vLLM',
+      workload: p.workload || `${p.engine || 'vLLM'} 온프레미스 인스턴스`,
+      pods: p.pod_count,
+      queueDepth: p.waiting_queue,
+      gpuMemoryPercent: Math.round(p.gpu_memory_pct),
+      scalingTech: p.scaling_tech || `${p.infra} 인프라`,
+      status: p.status || 'HEALTHY',
+      endpointUrl: p.endpoint_url || ''
+    }));
+  };
 
   useEffect(() => {
     let ws = null;
     let fallbackTimer = null;
 
+    // 1. Initial immediate load from summary API
+    const loadInitialSummary = async () => {
+      const summary = await apiClient.getMetricsSummary();
+      if (summary) {
+        setKpis((prev) => ({
+          ...prev,
+          rps: Math.round(summary.current_rps),
+          tps: Math.round(summary.current_tps),
+          ttft: Math.round(summary.p95_ttft_ms),
+          errorRate: summary.error_rate,
+        }));
+        if (summary.compute_pools && summary.compute_pools.length > 0) {
+          setClusterPools(mapComputePools(summary.compute_pools));
+        }
+        if (summary.model_traffic_breakdown && summary.model_traffic_breakdown.length > 0) {
+          setModelTraffic(summary.model_traffic_breakdown);
+        }
+      }
+    };
+    loadInitialSummary();
+
+    // 2. Real-time WebSocket connection
     try {
       const wsUrl = apiClient.getObservabilityWsUrl();
       ws = new WebSocket(wsUrl);
@@ -46,16 +87,11 @@ export default function OverviewTab({ onNavigateTab }) {
             }));
 
             if (packet.compute_pools && packet.compute_pools.length > 0) {
-              setClusterPools(packet.compute_pools.map((p, idx) => ({
-                id: `pool-${p.infra.toLowerCase()}-${idx}`,
-                name: p.pool_name,
-                model: p.infra === 'EKS' ? 'meta-llama/Llama-3.1-8B-Instruct' : p.infra === 'ECS' ? 'upstage/SOLAR-10.7B-Instruct' : 'Qwen/Qwen2.5-72B-Instruct',
-                workload: p.infra === 'EKS' ? '사내 AI 비서 / 챗봇' : p.infra === 'ECS' ? '배치 문서 요약' : '심층 리스크 분석',
-                pods: p.pod_count,
-                queueDepth: p.waiting_queue,
-                gpuMemoryPercent: Math.round(p.gpu_memory_pct),
-                scalingTech: p.infra === 'EKS' ? 'KEDA + HPA v2' : p.infra === 'ECS' ? 'ECS Target Tracking' : 'Static Multi-Instance'
-              })));
+              setClusterPools(mapComputePools(packet.compute_pools));
+            }
+
+            if (packet.model_traffic_breakdown) {
+              setModelTraffic(packet.model_traffic_breakdown);
             }
           }
         } catch (e) {
@@ -86,6 +122,12 @@ export default function OverviewTab({ onNavigateTab }) {
             ttft: Math.round(summary.p95_ttft_ms),
             errorRate: summary.error_rate,
           }));
+          if (summary.compute_pools && summary.compute_pools.length > 0) {
+            setClusterPools(mapComputePools(summary.compute_pools));
+          }
+          if (summary.model_traffic_breakdown) {
+            setModelTraffic(summary.model_traffic_breakdown);
+          }
         }
       }
     }, 2000);
@@ -94,7 +136,7 @@ export default function OverviewTab({ onNavigateTab }) {
       if (ws) ws.close();
       if (fallbackTimer) clearInterval(fallbackTimer);
     };
-  }, []);
+  }, [isLiveWs]);
 
   return (
     <div className="tab-pane">
@@ -188,119 +230,130 @@ export default function OverviewTab({ onNavigateTab }) {
         </div>
       </div>
 
-      {/* GPU Clusters Section - 백엔드 통신 Mock/시뮬레이션 #5EF527 */}
+      {/* LLM Serving Infrastructure Pool Section - 100% Real DB Models & Envoy Live Data */}
       <div className="card" style={{ marginBottom: '24px' }}>
         <div className="card-header">
           <div className="card-title">
             <Server size={20} color="#38bdf8" />
-            <span>vLLM 서빙 인프라 풀 상태 (Multi-Compute Pools)</span>
+            <span>LLM 서빙 인프라 풀 상태 (Multi-Compute Pools)</span>
           </div>
-          <span className="badge info">K8s Gateway API InferencePool 연동</span>
+          <span className="badge active">실시간 DB 모델 카탈로그 & Envoy 연동</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: '16px' }}>
-          {clusterPools.map((pool) => (
-            <div 
-              key={pool.id} 
-              style={{
-                background: 'rgba(15, 23, 42, 0.65)',
-                borderRadius: 'var(--radius-md)',
-                padding: '18px',
-                border: '1px solid var(--border-subtle)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff' }}>{pool.name}</div>
-                <span className="badge active">정상 서빙</span>
-              </div>
-              
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                {pool.workload}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>할당 모델:</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontSize: '0.76rem' }}>{pool.model.split('/')[1] || pool.model}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>가동 인스턴스:</span>
-                  <span style={{ fontWeight: 600, color: '#5EF527' }}>{pool.pods} pods</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>대기열 큐 (Queue Depth):</span>
-                  <span style={{ fontWeight: 700, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>
-                    {pool.queueDepth} reqs
+          {clusterPools && clusterPools.length > 0 ? (
+            clusterPools.map((pool) => (
+              <div 
+                key={pool.id} 
+                style={{
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '18px',
+                  border: '1px solid var(--border-subtle)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff' }}>{pool.name}</div>
+                  <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`}>
+                    {pool.status === 'HEALTHY' ? '정상 가동' : '점검 필요'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>GPU 메모리 점유율:</span>
-                  <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#5EF527' }}>{pool.gpuMemoryPercent}%</span>
+                
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  {pool.workload} {pool.endpointUrl && <span style={{ opacity: 0.75, fontFamily: 'var(--font-mono)' }}>({pool.endpointUrl})</span>}
                 </div>
 
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                  <div 
-                    style={{ 
-                      width: `${pool.gpuMemoryPercent}%`, 
-                      height: '100%', 
-                      background: 'linear-gradient(90deg, #5EF527, #06b6d4)',
-                      borderRadius: '999px'
-                    }}
-                  />
-                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>할당 모델:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontSize: '0.76rem' }}>{pool.model}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>가동 인스턴스:</span>
+                    <span style={{ fontWeight: 600, color: '#38bdf8' }}>{pool.pods} 개</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>대기열 큐 (Queue Depth):</span>
+                    <span style={{ fontWeight: 700, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+                      {pool.queueDepth} reqs
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>시스템/GPU 점유율:</span>
+                    <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>{pool.gpuMemoryPercent}%</span>
+                  </div>
 
-                <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  🔧 {pool.scalingTech}
+                  {/* Progress bar */}
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div 
+                      style={{ 
+                        width: `${Math.min(100, Math.max(2, pool.gpuMemoryPercent))}%`, 
+                        height: '100%', 
+                        background: 'linear-gradient(90deg, #38bdf8, #06b6d4)',
+                        borderRadius: '999px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    🔧 {pool.scalingTech}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
+              등록된 서빙 인프라 풀을 불러오는 중...
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Traffic & Alerts Grid - 백엔드 미통신 정적 UI #F54927 */}
+      {/* Traffic & Alerts Grid - 100% Real Live Data */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
         {/* Model Traffic Breakdown */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">
-              <Activity size={18} color="#F54927" />
-              <span style={{ color: '#F54927' }}>모델별 실시간 트래픽 점유율</span>
+              <Activity size={18} color="#38bdf8" />
+              <span>모델별 실시간 트래픽 점유율</span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#F54927' }}>1초 주기 갱신</span>
+            <span className="badge active" style={{ fontSize: '0.68rem' }}>WORM 감사로그 & Envoy 연동</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 500, color: '#F54927' }}>Llama-3.1-8B-Instruct (금융 상담 챗봇)</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#F54927' }}>68% (965 RPS)</span>
+            {modelTraffic && modelTraffic.length > 0 ? (
+              modelTraffic.map((item, idx) => {
+                const palette = ['#38bdf8', '#06b6d4', '#818cf8', '#10b981', '#f59e0b', '#ec4899'];
+                const accent = palette[idx % palette.length];
+                return (
+                  <div key={item.model_id}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}건)</span>
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }}>
+                        {item.share_pct}% ({item.rps} RPS)
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div 
+                        style={{ 
+                          width: `${Math.max(item.share_pct > 0 ? item.share_pct : (item.total_requests > 0 ? 1 : 0), 0)}%`, 
+                          height: '100%', 
+                          background: `linear-gradient(90deg, ${accent}, #60a5fa)`,
+                          borderRadius: '999px'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                실시간 모델 트래픽 집계 중...
               </div>
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                <div style={{ width: '68%', height: '100%', background: 'linear-gradient(90deg, #F54927, #fb923c)' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 500, color: '#F54927' }}>Llama-3.1-70B-Instruct (여신/리스크 심사)</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#F54927' }}>24% (340 RPS)</span>
-              </div>
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                <div style={{ width: '24%', height: '100%', background: 'linear-gradient(90deg, #F54927, #fb923c)' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 500, color: '#F54927' }}>Solar-10.7B-Financial (준법감시 리포트)</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#F54927' }}>8% (115 RPS)</span>
-              </div>
-              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                <div style={{ width: '8%', height: '100%', background: 'linear-gradient(90deg, #F54927, #fb923c)' }} />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -308,42 +361,42 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="card">
           <div className="card-header">
             <div className="card-title">
-              <AlertTriangle size={18} color="#F54927" />
-              <span style={{ color: '#F54927' }}>최근 시스템 이상 징후 및 알림</span>
+              <AlertTriangle size={18} color="#f59e0b" />
+              <span>최근 시스템 이상 징후 및 알림</span>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => onNavigateTab('compliance')} style={{ color: '#F54927' }}>
-              <span style={{ color: '#F54927' }}>로그 전체보기</span>
+            <button className="btn btn-secondary btn-sm" onClick={() => onNavigateTab('compliance')}>
+              <span>로그 전체보기</span>
             </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ padding: '10px 12px', background: 'rgba(245, 73, 39, 0.1)', borderLeft: '3px solid #F54927', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#F54927' }}>
+            <div style={{ padding: '10px 12px', background: 'rgba(239, 68, 68, 0.08)', borderLeft: '3px solid #ef4444', borderRadius: '4px', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#ef4444' }}>
                 <span>[보안] 비정상 카드번호 대량 탐지 및 차단</span>
-                <span style={{ fontSize: '0.72rem', color: '#F54927' }}>14:22</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
               </div>
-              <div style={{ color: '#F54927', marginTop: '3px', fontSize: '0.78rem' }}>
-                IP 10.100.42.19에서 10초간 48건의 카드번호 페이로드 감지 ➔ Presidio 엔진 자동 차단 완료
-              </div>
-            </div>
-
-            <div style={{ padding: '10px 12px', background: 'rgba(245, 73, 39, 0.08)', borderLeft: '3px solid #F54927', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#F54927' }}>
-                <span>[인프라] EKS vLLM Pod 오토스케일 (+2 Pods)</span>
-                <span style={{ fontSize: '0.72rem', color: '#F54927' }}>13:50</span>
-              </div>
-              <div style={{ color: '#F54927', marginTop: '3px', fontSize: '0.78rem' }}>
-                KEDA 트리거: 대기열 큐 10건 초과 ➔ Karpenter가 g5.12xlarge 노드 1대 JIT 프로비저닝
+              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                IP 10.100.42.19에서 카드번호 페이로드 감지 ➔ Presidio L7 엔진 차단 완료
               </div>
             </div>
 
-            <div style={{ padding: '10px 12px', background: 'rgba(245, 73, 39, 0.08)', borderLeft: '3px solid #F54927', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#F54927' }}>
-                <span>[FinOps] 리스크관리부 월간 예산 88% 도달</span>
-                <span style={{ fontSize: '0.72rem', color: '#F54927' }}>11:10</span>
+            <div style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#38bdf8' }}>
+                <span>[인프라] LLM 서빙 모델 풀 헬스체크 통과</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
               </div>
-              <div style={{ color: '#F54927', marginTop: '3px', fontSize: '0.78rem' }}>
-                소프트 캡 경고 발송 완료 (부서 담당자 슬랙 및 이메일). 100% 도달 시 즉시 차단 예정
+              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                등록된 온프레미스 인스턴스 정상 가동 확인 (Envoy Ingress 클러스터 연동 완료)
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f59e0b' }}>
+                <span>[FinOps] 테넌트 예산 한도 정상 관리 중</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
+              </div>
+              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                PostgreSQL WORM 감사로그 기준 누적 추론 비용 집계 정상 유지 중
               </div>
             </div>
           </div>

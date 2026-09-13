@@ -4,11 +4,23 @@ from pydantic import BaseModel, Field
 
 class ComputePoolStatus(BaseModel):
     pool_name: str
-    infra: str  # EKS, ECS, EC2
+    infra: str  # On-Prem K8s, Docker-Compose, Bare-Metal, EKS, ECS, EC2
     pod_count: int
     waiting_queue: int
     gpu_memory_pct: float
     status: str = "HEALTHY"
+    model_id: Optional[str] = None
+    engine: Optional[str] = None  # vLLM, Ollama, TGI, SGLang, Triton
+    workload: Optional[str] = None
+    scaling_tech: Optional[str] = None
+    endpoint_url: Optional[str] = None
+
+class ModelTrafficShare(BaseModel):
+    model_id: str
+    name: str
+    total_requests: int = 0
+    share_pct: float = 0.0
+    rps: float = 0.0
 
 class TelemetryPacket(BaseModel):
     timestamp: float
@@ -20,6 +32,7 @@ class TelemetryPacket(BaseModel):
     cumulative_cost_krw: float
     active_connections: int
     compute_pools: List[ComputePoolStatus]
+    model_traffic_breakdown: List[ModelTrafficShare] = []
 
 class ObservabilitySummaryResponse(BaseModel):
     current_rps: float
@@ -29,6 +42,7 @@ class ObservabilitySummaryResponse(BaseModel):
     cache_hit_rate: float
     total_tokens_today: int
     compute_pools: List[ComputePoolStatus]
+    model_traffic_breakdown: List[ModelTrafficShare] = []
     uptime_seconds: float
     generated_at: datetime = Field(default_factory=datetime.utcnow)
 

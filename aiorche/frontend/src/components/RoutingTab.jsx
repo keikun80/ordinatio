@@ -605,6 +605,29 @@ export default function RoutingTab({ onNotify }) {
     }
   };
 
+  // Delete Model from Catalog
+  const handleDeleteModel = async (modelId) => {
+    // Check if model is in current route
+    if (currentWeights.some(w => w.model_id === modelId)) {
+      onNotify('ERROR', `모델 '${modelId}'은(는) 현재 활성 라우트 정책에 포함되어 있어 삭제할 수 없습니다. 먼저 라우트에서 제거해 주세요.`);
+      return;
+    }
+
+    if (!window.confirm(`정말 모델 '${modelId}'을(를) 서빙 모델 풀에서 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      await apiClient.deleteModel(modelId);
+      const filtered = models.filter(m => m.id !== modelId);
+      setModels(filtered);
+      localStorage.setItem('aiorche_models', JSON.stringify(filtered));
+      onNotify('SUCCESS', `모델 '${modelId}'이(가) 서빙 모델 풀에서 삭제되었습니다.`);
+    } catch (err) {
+      onNotify('ERROR', `모델 삭제 실패: ${err.message}`);
+    }
+  };
+
   const availableModelsToAdd = models.filter(m => !currentWeights.some(w => w.model_id === m.id));
 
   // Gateway Connection URLs & Snippets
@@ -1393,6 +1416,7 @@ print(response.choices[0].message.content)`;
                 <th>대기 큐</th>
                 <th>상태 & 헬스</th>
                 <th>현재 라우트 포함</th>
+                <th style={{ textAlign: 'center' }}>관리</th>
               </tr>
             </thead>
             <tbody>
@@ -1569,6 +1593,26 @@ print(response.choices[0].message.content)`;
                           + 라우트에 추가
                         </button>
                       )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleDeleteModel(m.id)}
+                        style={{
+                          padding: '3px 8px',
+                          color: '#f87171',
+                          borderColor: 'rgba(239, 68, 68, 0.35)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.72rem',
+                          background: 'rgba(239, 68, 68, 0.08)'
+                        }}
+                        title="서빙 모델 풀에서 영구 삭제"
+                      >
+                        <Trash2 size={12} />
+                        <span>삭제</span>
+                      </button>
                     </td>
                   </tr>
                 );

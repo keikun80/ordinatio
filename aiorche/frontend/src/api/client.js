@@ -176,6 +176,17 @@ export const apiClient = {
     return await res.json();
   },
 
+  async deleteModel(modelId, force = false) {
+    const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}?force=${force}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '모델 삭제 실패');
+    }
+    return await res.json();
+  },
+
   async checkAllModelsHealth() {
     try {
       const res = await fetch(`${API_BASE_URL}/models/health-check`);

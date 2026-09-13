@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.model_catalog import ModelCatalog
+from app.models.routing_policy import RoutingPolicy
 from app.schemas.model_catalog import (
     ModelCatalogCreate,
     ModelCatalogUpdate,
@@ -177,3 +178,38 @@ def update_model(model_id: str, model_in: ModelCatalogUpdate, db: Session = Depe
     db.commit()
     db.refresh(model)
     return model
+
+@router.delete("/{model_id:path}", status_code=status.HTTP_200_OK)
+def delete_model(model_id: str, force: bool = False, db: Session = Depends(get_db)):
+    """Delete a serving model from the catalog (with routing dependency safety check)"""
+    model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model '{model_id}' not found."
+        )
+
+    # Check if model is currently referenced in any active routing policies
+    if not force:
+        policies = db.query(RoutingPolicy).all()
+        referencing_routes = []
+        for pol in policies:
+            # Check traffic_weights
+            weights = pol.traffic_weights or []
+            for item in weights:
+                if isinstance(item, dict) and item.get("model_id") == model_id:
+                    referencing_routes.append(pol.route_name)
+                    break
+            # Check failover_model_id
+            if pol.failover_model_id == model_id and pol.route_name not in referencing_routes:
+                referencing_routes.append(pol.route_name)
+
+        if referencing_routes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"해당 모델은 활성 라우트 정책({', '.join(referencing_routes)})에서 가중치 또는 페일오버 타깃으로 사용 중이므로 삭제할 수 없습니다. 먼저 라우트 설정을 변경해 주세요."
+            )
+
+    db.delete(model)
+    db.commit()
+    return {"status": "success", "message": f"모델 '{model_id}'이(가) 카탈로그에서 성공적으로 삭제되었습니다."}

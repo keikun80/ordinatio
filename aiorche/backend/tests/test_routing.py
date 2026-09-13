@@ -51,6 +51,20 @@ def test_model_catalog_crud():
     assert patch_res.json()["execution_method"] == "k8s"
     assert patch_res.json()["is_active"] is False
 
+    # 5. Delete model (referenced in active route fails with 400)
+    del_fail_res = client.delete("/api/v1/models/meta-llama/Llama-3.1-8B-Instruct")
+    assert del_fail_res.status_code == 400
+    assert "활성 라우트 정책" in del_fail_res.json()["detail"]
+
+    # 6. Delete unreferenced model succeeds
+    del_ok_res = client.delete(f"/api/v1/models/{new_model['model_id']}")
+    assert del_ok_res.status_code == 200
+    assert del_ok_res.json()["status"] == "success"
+
+    # 7. Verify model is gone
+    get_gone_res = client.get(f"/api/v1/models/{new_model['model_id']}")
+    assert get_gone_res.status_code == 404
+
 def test_routing_policy_get_active():
     res = client.get("/api/v1/routing")
     assert res.status_code == 200

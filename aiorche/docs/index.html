@@ -563,7 +563,9 @@
         <ul class="nav-sub-list">
           <li><a href="#input-add-model" class="nav-sub-link">신규 모델 등록 (입력)</a></li>
           <li><a href="#input-compute-target" class="nav-sub-link">인프라 규격 선택</a></li>
+          <li><a href="#input-health-check" class="nav-sub-link">실시간 헬스체크 프로빙</a></li>
           <li><a href="#input-add-route" class="nav-sub-link">신규 라우트 생성 (입력)</a></li>
+          <li><a href="#input-gateway-endpoint" class="nav-sub-link">L7 게이트웨이 엔드포인트 연동</a></li>
         </ul>
       </li>
       <li>
@@ -756,6 +758,12 @@
                   <td>Redis In-Memory</td>
                   <td>분산 속도 제한(RPM/TPM) 및 실시간 예산 카운터</td>
                 </tr>
+                <tr>
+                  <td><code>11434</code></td>
+                  <td>TCP (HTTP)</td>
+                  <td>Ollama LLM Serving Pool</td>
+                  <td>호스트/컨테이너 경량 양자화(GGUF) 오픈소스 LLM 서빙 엔드포인트</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -852,12 +860,14 @@ docker compose up -d
 docker compose ps</code></pre>
 
         <h4>3. 시스템 무결성 자동화 검증 테스트 (DoD Verification)</h4>
-        <pre><code># 43개 백엔드 단위/통합 테스트 100% PASS 검증
+        <pre><code># 46개 백엔드 단위/통합 테스트 100% PASS 검증
 make test
 
 # Phase 0부터 Phase 5까지의 단계별 자동화 스크립트 실행
+bash scripts/verify-phase0.sh
 bash scripts/verify-phase1.sh
 bash scripts/verify-phase2.sh
+bash scripts/verify-phase3.sh
 bash scripts/verify-phase4.sh
 bash scripts/verify-phase5.sh</code></pre>
       </div>
@@ -1069,6 +1079,34 @@ bash scripts/verify-phase5.sh</code></pre>
             <ul style="margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.85rem;">
               <li><strong>vLLM:</strong> 기본 포트 <code>8000</code>, 헬스체크 경로 <code>/health</code>, 대규모 엔터프라이즈 연속 배치(Continuous Batching) 최적화</li>
               <li><strong>Ollama:</strong> 기본 포트 <code>11434</code>, 헬스체크 경로 <code>/api/tags</code>, 단일 노드 GGUF 양자화 경량 추론 최적화</li>
+              <li><strong>SGLang:</strong> 기본 포트 <code>30000</code>, 헬스체크 경로 <code>/health</code>, RadixAttention 기반 다중 턴 고속 서빙</li>
+              <li><strong>Triton:</strong> 기본 포트 <code>8000</code>, 헬스체크 경로 <code>/v2/health/ready</code>, 멀티 프레임워크 대규모 C++ 고성능 런타임</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Feature 1: Model Health Checking -->
+        <div id="input-health-check" style="margin-top: 2rem;">
+          <h4>[운영자 제어 1] 서빙 모델 풀 실시간 헬스체크 프로빙 (Health Probing)</h4>
+          <p>
+            등록된 모든 LLM 서빙 모델 인스턴스(vLLM, Ollama 등)의 네트워크 가용성을 실시간으로 점검하고 응답 레이턴시(ms)를 모니터링합니다.
+          </p>
+
+          <div class="card" style="background: var(--bg-surface); border: 1px solid var(--border-accent); margin: 1rem 0;">
+            <div class="card-header">
+              <span class="card-title">🩺 헬스 프로빙 아키텍처 및 동작 방식</span>
+              <span class="badge badge-success">Active Prober</span>
+            </div>
+            <ul>
+              <li><strong>전체 모델 일괄 헬스체크 (Ping All):</strong> 콘솔 상단의 <code>[전체 헬스체크 (Ping All)]</code> 버튼을 클릭하면 등록된 모든 모델의 <code>target_endpoint</code>로 백엔드가 비동기(HTTPX) 핑 요청을 동시 전송합니다.</li>
+              <li><strong>엔진별 헬스 경로 자동 분기:</strong>
+                <ul>
+                  <li><code>Ollama</code>: <code>/api/tags</code> 엔드포인트 호출 (기본 11434 포트)</li>
+                  <li><code>vLLM</code> / <code>SGLang</code> / <code>Triton</code>: <code>/health</code> 엔드포인트 호출 (기본 8000 포트)</li>
+                </ul>
+              </li>
+              <li><strong>타임아웃 & 안전 보호:</strong> 2.5초 내에 응답이 없으면 즉시 오프라인(Timeout) 판정하여 전체 시스템 블로킹을 방지합니다.</li>
+              <li><strong>개별 모델 재점검:</strong> 각 모델 카드 우측의 <code>[재점검]</code> 버튼을 통해 특정 노드만 단독 핑 점검할 수 있습니다.</li>
             </ul>
           </div>
         </div>
@@ -1089,6 +1127,61 @@ bash scripts/verify-phase5.sh</code></pre>
             <div class="screenshot-desc">
               라우트 이름, 우선순위, 트래픽 매칭 조건, 서빙 모델 가중치 분할(A/B Split), 장애 발생 시 비상 폴백 모델을 설정합니다.
             </div>
+        </div>
+
+        <!-- Feature 2: Envoy Gateway Route Endpoints & Live Testing -->
+        <div id="input-gateway-endpoint" style="margin-top: 2rem;">
+          <h4>[운영자 제어 2] Envoy L7 게이트웨이 전용 API 엔드포인트 & 실시간 테스트 호출</h4>
+          <p>
+            생성된 각 동적 라우팅 규칙마다 사내 애플리케이션 및 AI 챗봇이 호출할 수 있는 <strong>Envoy L7 전용 진입점 URL</strong>이 자동으로 부여됩니다.
+          </p>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>호출 방식</th>
+                  <th>API 엔드포인트 URL 규격</th>
+                  <th>필수 HTTP 헤더</th>
+                  <th>동작 메커니즘</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge badge-primary">경로 기반 (Path-based)</span></td>
+                  <td><code>POST http://localhost:8080/v1/routes/{route_name}</code></td>
+                  <td><code>Authorization: Bearer sk-orch-...</code></td>
+                  <td>Envoy가 <code>prefix_rewrite</code>를 통해 내부 백엔드로 전달하며, 라우트 이름으로 타깃 모델 풀 자동 선택</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-purple">헤더 기반 (Header-based)</span></td>
+                  <td><code>POST http://localhost:8080/v1/chat/completions</code></td>
+                  <td><code>Authorization: Bearer sk-orch-...</code><br><code>x-orche-route: {route_name}</code></td>
+                  <td>OpenAI 표준 엔드포인트를 그대로 유지하면서 <code>x-orche-route</code> 헤더를 통해 라우트 지정</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h5 style="margin-top: 1.5rem; color: var(--text-main);">⚡ 실시간 콘솔 테스트 호출 (Live Test Call)</h5>
+          <p>
+            라우트 상세 패널 하단의 <strong>[⚡ 게이트웨이 즉시 테스트 호출]</strong> 버튼을 클릭하면,
+            실제 Envoy L7 게이트웨이(Port 8080)로 OpenAI 규격의 테스트 프롬프트를 전송하고 
+            <strong>HTTP 상태 코드, 왕복 지연시간(Latency ms), 전달 헤더, 모델 응답 본문</strong>을 모달에서 즉각 확인할 수 있습니다.
+          </p>
+
+          <div class="alert alert-info">
+            <div class="alert-title">💻 사내 AI 클라이언트 연동 코드 예시 (cURL)</div>
+            <pre style="margin-top: 0.5rem; background: #0b1120; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto;"><code>curl -X POST "http://localhost:8080/v1/routes/financial-advisor-v1" \
+  -H "Authorization: Bearer sk-orch-your-virtual-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "안녕하세요. 포트폴리오 자산 배분 조언을 요청합니다."}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 512
+  }'</code></pre>
           </div>
         </div>
       </div>
@@ -1399,6 +1492,18 @@ docker compose down && docker compose up -d</code></pre>
         </div>
         <p><strong>원인 및 해결:</strong> 제공받은 패치 번들의 RSA-4096 디지털 서명 파일(<code>.sig</code>)이 손상되었거나 공인 벤더 루트 인증서와 일치하지 않는 경우입니다.
         파일이 전송 중 깨지지 않았는지 SHA-256 체크섬을 대조하고 벤더로부터 공식 서명본을 재수령하십시오.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Q4. Envoy 게이트웨이(Port 8080) 호출 시 404 Not Found 또는 no healthy upstream이 발생합니다.</span>
+        </div>
+        <p><strong>원인 및 해결:</strong></p>
+        <ul>
+          <li><strong>404 Not Found 발생 시:</strong> 요청 경로가 올바른지 확인하십시오. 라우팅 스튜디오에서 정의된 라우트 명칭에 맞춰 <code>POST http://localhost:8080/v1/routes/{route_name}</code> 또는 <code>POST http://localhost:8080/v1/chat/completions</code> (헤더 <code>x-orche-route: {route_name}</code>) 형식으로 요청해야 합니다.</li>
+          <li><strong>인증 헤더 누락:</strong> <code>Authorization: Bearer sk-orch-...</code> 형식의 가상 API Key 헤더가 반드시 포함되어야 합니다.</li>
+          <li><strong>no healthy upstream 발생 시:</strong> Docker 네트워크 환경에서 IPv4 해석을 위해 <code>envoy.yaml</code>의 <code>backend_service</code> 클러스터에 <code>dns_lookup_family: V4_ONLY</code>가 선언되어 있는지 확인하고 Envoy 컨테이너를 재기동(<code>docker compose restart envoy</code>)하십시오.</li>
+        </ul>
       </div>
     </section>
 

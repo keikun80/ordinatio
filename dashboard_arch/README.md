@@ -18,7 +18,7 @@
 ## 📊 종합 총괄 보고서 (Executive Master Report)
 - 🏆 **[PHASE_0_TO_5_COMPREHENSIVE_REPORT.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/PHASE_0_TO_5_COMPREHENSIVE_REPORT.md)**:
   - Phase 0 ~ Phase 5 구현 내역 및 아키텍처 총괄 요약
-  - 43개 백엔드 단위/통합 테스트 100% 통과 매트릭스
+  - 45개 백엔드 단위/통합 테스트 100% 통과 매트릭스
   - 에어갭 오프라인 RSA-4096 서명 긴급 패치 및 4단계 롤링 핫픽스/롤백 파이프라인
   - Zero-PII 서포트 번들 실제 ZIP 다운로드 스트리밍
   - 브라우저 E2E 실환경 시연 녹화 및 스크린샷 증적 목록
@@ -36,6 +36,13 @@
   - #5EF527(Mock) 및 #F54927(미통신) 요소를 실제 데이터로 전환하기 위한 역할 분담 (나의 영역 vs AI의 영역)
   - 4대 스프린트(Sprint A~D) 마일스톤 로드맵 및 상세 실행 계획표 (RACI)
 
+- 🌐 **[MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)**:
+  - 모델 카탈로그 서빙 풀 및 Envoy L7 게이트웨이 동적 라우팅 아키텍처 상세 설계서
+  - vLLM / Ollama / SGLang / Triton 멀티 엔진 및 k8s / docker-compose / direct 구동 방식 규격
+  - 실시간 비동기 헬스체크 프로빙 파이프라인 (루프백/타임아웃/레이턴시 측정)
+  - Envoy L7 게이트웨이 경로 기반(`prefix_rewrite`) 및 헤더 기반(`x-orche-route`) 라우팅 엔드포인트 규격
+  - 관리자 웹 콘솔 UI 연동 가이드 및 실시간 게이트웨이 테스트 호출 프록시 아키텍처
+
 ---
 
 ## 🗂️ 단계별 구현 계획서 및 테스트 결과 보고서 (Phased Reports)
@@ -44,7 +51,7 @@
 | :--- | :--- | :--- | :---: |
 | **Phase 0** | [phase0_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_implementation_plan_and_test_results.md) | 에어갭 공통 아키텍처, 헬스 프로브, 사전점검, 무결성 번들 | **100% PASS** (5/5 Tests) |
 | **Phase 1** | [phase1_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase1_implementation_plan_and_test_results.md) | 테넌트 거버넌스, `sk-orch-` Argon2id 해싱, 키 수정 영속화, 외부 연동 API | **100% PASS** (15/15 Tests) |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md) | 동적 모델 카탈로그, Envoy L7 xDS 제어 평면, 카나리 80:20 분할, K8s Pod 배포 | **100% PASS** (20/20 Tests) |
+| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md)<br>[MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md) | 동적 모델 카탈로그(vLLM/Ollama), 실시간 헬스체크, Envoy L7 xDS 제어 평면, 게이트웨이 API 엔드포인트 노출 | **100% PASS** (22/22 Tests, 전체 45 Tests) |
 | **Phase 3** | [phase3_implementation_plan.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan.md)<br>[phase3_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan_and_test_results.md) | 1초 WebSocket 텔레메트리, 표준 토큰 과금, Hard Cap 429 차단, UTF-8 BOM CSV | **100% PASS** (26/26 Tests) |
 | **Phase 4** | [phase4_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase4_implementation_plan_and_test_results.md) | 인라인 PII 마스킹 엔진, MASK/HASH/BLOCK, WORM 감사 포렌식, SHA-256 증적 | **100% PASS** (35/35 Tests) |
-| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | RSA-4096 서명 오프라인 패치, 롤링 핫픽스/롤백, Zero-PII ZIP 번들, Preflight 진단 | **100% PASS** (43/43 Tests) |
+| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | RSA-4096 서명 오프라인 패치, 롤링 핫픽스/롤백, Zero-PII ZIP 번들, Preflight 진단 | **100% PASS** (45/45 Tests) |

@@ -260,16 +260,22 @@ CREATE TABLE patch_histories (
        > **[ADR-02] Multi-Compute Pools 메타데이터 상태 수집 채택 배경**: 에어갭 폐쇄망에서 K8s cluster-admin API 서버 권한 제약을 받지 않고 독립 가동되도록, vLLM 추론 풀 메타데이터(EKS, ECS, EC2)와 큐 깊이를 `telemetry_hub`가 실시간 동적 산출하여 WebSocket으로 브로드캐스팅하도록 최적화함.
      - `/api/v1/routing/deploy-canary` 및 `/api/v1/routing/routes` 등록/수정 시 새 xDS 리비전(`xds-rev-...`) 자동 발급 및 즉시 캐싱/배포
      - N-Way 모델 트래픽 분할 드라이런(Dry-run) 검증 시뮬레이터 API (`POST /api/v1/routing/dry-run`)
+     - **서빙 런타임 엔진 & 실행 환경 다변화 (`vLLM`, `Ollama`, `SGLang`, `Triton` / `k8s`, `docker-compose`, `direct`)**: Launch Snippet Box 제공
+     - **서빙 모델 풀 실시간 헬스체크 파이프라인 (`GET /api/v1/models/health-check`, `POST /api/v1/models/{model_id}/health`)**: 2.5s 비동기 핑 프로빙 및 루프백 지원
+     - **Envoy L7 게이트웨이 라우트별 API 엔드포인트 노출 및 실시간 테스트 프록시 (`POST /api/v1/routing/test-call`)**: 경로 재작성(`prefix_rewrite`) 및 `x-orche-route` 헤더 매칭
   2. **Frontend**:
      - **엔터프라이즈 멀티 라우팅 스튜디오 (`RoutingTab.jsx`)**:
-       - 라우트 프로필 스위처(Route Switcher Tabs) 및 신규 라우트 생성/삭제 모달
+       - **Envoy L7 게이트웨이 호출 엔드포인트 전용 패널**: URL 원클릭 복사, 3종 연동 가이드(경로 기반, 공통+헤더, Python OpenAI SDK), 실시간 게이트웨이 테스트 호출 버튼
+       - 모델 카탈로그 테이블: 전체 헬스체크(Ping All) 버튼, 정상(ms 레이턴시)/오프라인 실시간 생존 뱃지, 업스트림 원본 안내 배너
+       - 라우트 프로필 스위처(Route Switcher Tabs) 및 신규 라우트 생성/삭제 모달 (각 라우트별 URL 접두사 배지 표시)
        - N개 모델 타겟 동적 추가/제거 및 비주얼 스택 프로그레스 바 (100% 합계 실시간 검증 & 경고)
        - 원클릭 100% 균등 자동 분배(Auto-Balance) 버튼
        - 테넌트 헤더(`x-orche-tenant`), URL 경로 접두사, 커스텀 HTTP 헤더 조건부 매칭 빌더
        - 다단계 장애 우회 체인(Primary -> Secondary -> Fallback Pool) 시각적 카드
        - 드라이런(Dry-run) 사전 검증 모달 및 컴파일된 Envoy xDS JSON 페이로드 실시간 인스펙터
        - 리비전 번호(`xds-rev-...`) 실시간 배지 표출 및 Envoy 프록시 즉각 배포 연동
-- **완료 정의 (DoD)**: ✅ 다중 라우트 프로필 생성/수정, N-Way 가중치 분할, Envoy REST RDS v3 컴파일 및 무중단 트래픽 분기 통합 테스트(`tests/test_routing.py`) 및 `bash scripts/verify-phase2.sh` 100% 통과.
+- **완료 정의 (DoD)**: ✅ 다중 라우트 프로필 생성/수정, N-Way 가중치 분할, Envoy REST RDS v3 컴파일 및 무중단 트래픽 분기, 모델 풀 실시간 헬스체크 및 게이트웨이 엔드포인트 테스트 통합 테스트(`tests/test_routing.py` 8개 테스트) 및 `bash scripts/verify-phase2.sh` 100% 통과 (전체 백엔드 45개 테스트 100% PASS).
+- **상세 설계서**: 📄 [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)
 
 ---
 
@@ -321,7 +327,7 @@ CREATE TABLE patch_histories (
      - ✅ 5대 핵심 인프라(PostgreSQL, Redis, Envoy, ext_proc, vLLM) Preflight 정밀 진단 API
   2. **Frontend**:
      - ✅ `LifecycleTab.jsx`의 파일 업로드, RSA-4096 서명 검증 배지, 터미널 스트리밍 로그, 원클릭 핫픽스 배포 및 롤백 연동
-- **완료 정의 (DoD)**: ✅ 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 및 롤백 파이프라인, Zero-PII ZIP 다운로드 및 Preflight 진단 `verify-phase5.sh` 100% 통과 (43/43 Tests PASS).
+- **완료 정의 (DoD)**: ✅ 패치 파일 업로드 ➔ 서명 검증 통과 ➔ 롤링 배포 및 롤백 파이프라인, Zero-PII ZIP 다운로드 및 Preflight 진단 `verify-phase5.sh` 100% 통과 (45/45 Tests PASS).
 
 ---
 

@@ -130,3 +130,22 @@
   - 스크린샷: `envoy_l7_rds_verified_1789137173884.png`
   - 브라우저 세션 녹화: `verify_routing_ui_update`
 
+### 2.6 멀티 서빙 엔진(vLLM, Ollama), 실시간 헬스체크 및 라우트별 Envoy 게이트웨이 API 엔드포인트 연동 확장 (2026-09-13 현행화)
+- **상세 설계서**: `dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md`
+- **주요 확장 내역**:
+  1. **서빙 런타임 엔진 & 실행 방식 다변화**:
+     - `serving_engine` (`vLLM`, `Ollama`, `SGLang`, `Triton`) 및 `execution_method` (`k8s`, `docker-compose`, `direct`) 모델링.
+     - 호스트 직접 실행 및 도커 컨테이너 구동 템플릿(Launch Snippet Box) 제공.
+  2. **서빙 모델 풀 실시간 헬스체크 파이프라인**:
+     - 타임아웃 2.5초 기반 비동기 프로빙 엔진(`probe_endpoint`), 엔진별 헬스 경로 분기(Ollama `/api/tags`, vLLM `/health`).
+     - 전체 모델 병렬 점검(`GET /api/v1/models/health-check`) 및 개별 모델 즉시 점검(`POST /api/v1/models/{model_id}/health`).
+     - 콘솔 [전체 헬스체크 (Ping All)] 버튼, 정상(ms 레이턴시)/오프라인 뱃지 및 개별 재점검 지원.
+  3. **Envoy L7 게이트웨이 라우트별 API 엔드포인트 노출 및 연동 가이드**:
+     - 경로 기반 라우팅: `http://localhost:8080/v1/routes/{route_name}` (`prefix_rewrite: "/v1/chat/completions"`).
+     - 헤더 기반 라우팅: `http://localhost:8080/v1/chat/completions` (`x-orche-route: {route_name}`).
+     - 라우트 상세 패널 내 원클릭 URL 복사, cURL 스니펫, Python OpenAI SDK 예제 제공.
+     - 콘솔 내 **[⚡ 게이트웨이 즉시 테스트 호출]** 버튼 및 실시간 HTTP 응답/레이턴시 시각화.
+  4. **테스트 통과 현황**:
+     - `tests/test_routing.py`: **8 / 8 테스트 통과 (100% PASS)**
+     - 전체 백엔드 테스트 스위트: **45 / 45 테스트 통과 (100% PASS)**
+

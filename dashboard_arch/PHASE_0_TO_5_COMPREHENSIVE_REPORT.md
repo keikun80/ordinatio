@@ -17,13 +17,13 @@
 ├─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬───────────────────────────────┤
 │    Phase 0 (기반)   │   Phase 1 (거버넌스)│    Phase 2 (라우팅) │    Phase 3 (FinOps) │  Phase 4 (Compliance│     Phase 5 (Lifecycle)       │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
-│ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 동적 모델 카탈로그│ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명 검증     │
-│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 xDS v3   │ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 핫픽스 배포 │
+│ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 다중 엔진(Ollama등)│ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명 검증     │
+│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 핫픽스 배포 │
 │ • React 18 + Vite   │ • 가상키 수명주기   │ • N-Way 가중치 분할 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 이전 버전 롤백 엔진  │
-│ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Prefix Cache 해시 │ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 인프라 Preflight 자가진단│
+│ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • 실시간 헬스 프로빙│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 인프라 Preflight 자가진단│
 │ • Docker & K8s 배포 │ • Prometheus /metric│ • K8s 5개 Pod 배포  │ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII 암호화 ZIP 번들    │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
-│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│20/20 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    43/43 Tests (100% PASS)    │
+│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│22/22 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    45/45 Tests (100% PASS)    │
 └─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────────────┘
 ```
 
@@ -37,14 +37,14 @@
 | :--- | :--- | :--- | :---: | :---: |
 | **Phase 0** | [phase0_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_implementation_plan_and_test_results.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
 | **Phase 1** | [phase1_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase1_implementation_plan_and_test_results.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md) | 동적 모델 카탈로그, Envoy L7 xDS(RDS) 제어기, N-Way 가중치 분할, K8s 5개 Pod 배포 | `make verify-phase2` | 20 / 20 PASS |
+| **Phase 2** | [phase2_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙, Envoy L7 엔드포인트/RDS, N-Way 분할, K8s Pod | `make verify-phase2` | 22 / 22 PASS |
 | **Phase 3** | [phase3_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
 | **Phase 4** | [phase4_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
-| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 43 / 43 PASS |
+| **Phase 5** | [phase5_implementation_plan_and_test_results.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 45 / 45 PASS |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (43 / 43 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (45 / 45 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
@@ -73,6 +73,8 @@ cd aiorche/backend && uv run pytest -v
 | | `test_dry_run_validation` | 가중치 100% 불일치 오류 및 xDS JSON 미리보기 검증 | **PASSED** |
 | | `test_canary_deployment_lifecycle` | 카나리 80:20 배포 실행, DB 반영 및 신규 xDS 리비전 발급 | **PASSED** |
 | | `test_xds_discovery_routes_endpoint` | Envoy용 RDS 표준 규격 (`RouteConfiguration`) 응답 검증 | **PASSED** |
+| | `test_model_serving_health_check` | 개별/전체 서빙 모델 Upstream 핑 헬스체크 프로빙 검증 | **PASSED** |
+| | `test_route_test_call_endpoint` | Envoy L7 라우팅 경로 실시간 테스트 호출 및 Upstream 프록시 응답 검증 | **PASSED** |
 | `test_finops_observability.py` | `test_observability_metrics_summary` | 대시보드 관제용 실시간 지표 요약 REST API 검증 | **PASSED** |
 | | `test_observability_websocket_telemetry` | 1초 주기 WebSocket 스트림 연결, JSON 패킷 수신 및 ping-pong | **PASSED** |
 | | `test_observability_promql_proxy` | Grafana 및 커스텀 관제용 PromQL 프록시 질의 검증 | **PASSED** |
@@ -153,11 +155,13 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-04** | 전문 관제 대시보드 | Grafana Kiosk 모드 iFrame 직접 임베딩 | **전문 3종 내장 관제 패널 및 외부 Grafana 연동 링크** | Grafana 컨테이너 미구동 상태에서도 L7, GPU, FinOps 3대 화면을 자체 독립적으로 완벽 관제 가능 |
 | **ADR-05** | PII 마스킹 엔진 | 대용량 외부 Presidio spaCy NER 모델 (~500MB) | **자체 정규식 기반 고속 PII 엔진 (`pii_engine.py`)** | 외부 인터넷 불가 에어갭 환경에서 즉시 구동 가능하며, 2ms 미만의 초저지연 처리 보장 |
 | **ADR-06** | WORM 감사 로그 | Kafka ➔ OpenSearch ➔ S3 Object Lock 전체 파이프라인 | **PostgreSQL/SQLite INSERT-only 불변 테이블 & SHA-256 해시 증적** | 별도 빅데이터 클러스터 없이도 원문 비저장 해시 증적으로 금융감독원 규정 준수 및 포렌식 무결성 보장 |
+| **ADR-07** | 핫픽스 롤링 배포 | K8s Deployment API 클러스터 권한 연동 | **어플라이언스 인앱 컴포넌트 레지스트리 핫픽스 & 롤백 엔진** | 고객 폐쇄망에서 복잡한 K8s RBAC/ServiceAccount 권한 부여 없이도 무중단 롤링 업데이트 및 원클릭 롤백 달성 |
+| **ADR-08** | 서빙 런타임 & 인그레스 | 단일 vLLM 전용 엔드포인트 가정 | **이종 런타임 카탈로그(vLLM/Ollama/SGLang/Triton) 및 Envoy 이중 인그레스(Path Prefix Rewrite + Header)** | 사내 다양한 인프라(K8s/Docker/Host CLI) 환경의 오픈소스 LLM을 단일 Envoy 진입점으로 통합 연동 및 실시간 프로빙 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(43/43 테스트)**하였습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(45/45 테스트)**하였습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
 - **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)**으로 즉시 연계가 가능합니다.

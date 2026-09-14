@@ -393,7 +393,7 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
     )
 
 # -----------------------------------------------------------------------------
-# Phase 0.1: AgentRouter Status & Interactive Intent Simulation
+# Phase 0.1: AgentRouter Status & Interactive Intent Simulation & Policy Configs
 # -----------------------------------------------------------------------------
 from pydantic import BaseModel, Field
 from typing import Any, Dict
@@ -405,20 +405,28 @@ from app.core.agent_router import (
     DEFAULT_REASONING_MODEL,
     DEFAULT_FALLBACK_MODEL
 )
+from app.core.agent_router.policy_manager import AgentRouterPolicyManager
+from app.schemas.routing import (
+    AgentRouterPolicyItem,
+    AgentRouterPoliciesResponse,
+    AgentRouterPoliciesUpdate
+)
 
 class AgentRouterSimulateRequest(BaseModel):
     prompt: str = Field(..., description="테스트할 사용자 프롬프트 텍스트")
-    policy: Optional[str] = Field(default="QualityFirst", description="QualityFirst, LeastCost, LatencyOptimized")
+    policy: Optional[str] = Field(default="QualityFirst", description="QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback")
     tools: Optional[List[Dict[str, Any]]] = Field(default=None, description="도구/함수 호출 스키마")
     budget_spent_ratio: Optional[float] = Field(default=0.0, ge=0.0, le=1.0)
 
 @router.get("/agent-router/status")
-def get_agent_router_status():
+def get_agent_router_status(db: Session = Depends(get_db)):
     """AgentRouter 현재 활성 정책 및 모델 풀 상태 조회"""
+    policies = AgentRouterPolicyManager.get_all_policies(db=db)
     return {
         "status": "ACTIVE",
         "engine": "AgentRouter Cognitive Dispatcher v0.1",
         "supported_policies": [p.value for p in RoutingPolicyType],
+        "policies": policies,
         "default_tiers": {
             "fast_8b": {
                 "model": DEFAULT_FAST_MODEL,
@@ -437,6 +445,25 @@ def get_agent_router_status():
             }
         }
     }
+
+@router.get("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+def get_agent_router_policies(db: Session = Depends(get_db)):
+    """AgentRouter 4대 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 상세 설정 조회"""
+    policies = AgentRouterPolicyManager.get_all_policies(db=db)
+    return AgentRouterPoliciesResponse(
+        policies=[AgentRouterPolicyItem(**p) for p in policies],
+        active_policy="QualityFirst"
+    )
+
+@router.put("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+def update_agent_router_policies(payload: AgentRouterPoliciesUpdate, db: Session = Depends(get_db)):
+    """AgentRouter 4대 라우팅 정책 파라미터 및 모델 매핑 업데이트"""
+    raw_list = [p.model_dump() for p in payload.policies]
+    updated = AgentRouterPolicyManager.update_policies(raw_list, db=db)
+    return AgentRouterPoliciesResponse(
+        policies=[AgentRouterPolicyItem(**p) for p in updated],
+        active_policy="QualityFirst"
+    )
 
 @router.post("/agent-router/simulate")
 def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest):
@@ -469,5 +496,6 @@ def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest):
         "has_tool_calling": classification.has_tool_calling,
         "primary_intent": classification.primary_intent
     }
+
 
 

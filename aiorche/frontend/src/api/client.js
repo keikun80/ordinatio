@@ -254,6 +254,87 @@ export const apiClient = {
     }
   },
 
+  async getAgentRouterPolicies() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getAgentRouterPolicies offline, returning default policies');
+      return {
+        policies: [
+          {
+            policy_id: "QualityFirst",
+            name: "QualityFirst (품질 우선)",
+            description: "복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 72B 모델로 우선 분기하고 단순 질의는 8B로 처리합니다.",
+            is_active: true,
+            config: {
+              reasoning_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              fast_model: "meta-llama/Llama-3-8B-Instruct",
+              enforce_reasoning_for_tools: true,
+              reasoning_cluster: "cluster_vllm_reasoning_72b",
+              fast_cluster: "cluster_vllm_fast_8b"
+            }
+          },
+          {
+            policy_id: "LeastCost",
+            name: "LeastCost (비용 최적화)",
+            description: "테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 8B 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.",
+            is_active: true,
+            config: {
+              budget_threshold_pct: 80.0,
+              economic_model: "meta-llama/Llama-3-8B-Instruct",
+              standard_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              economic_cluster: "cluster_vllm_fast_8b",
+              standard_cluster: "cluster_vllm_reasoning_72b"
+            }
+          },
+          {
+            policy_id: "LatencyOptimized",
+            name: "LatencyOptimized (지연시간 최적화)",
+            description: "초저지연(TTFT) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.",
+            is_active: true,
+            config: {
+              target_latency_ms: 200,
+              primary_fast_model: "meta-llama/Llama-3-8B-Instruct",
+              allow_reasoning_override: true,
+              reasoning_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              fast_cluster: "cluster_vllm_fast_8b",
+              reasoning_cluster: "cluster_vllm_reasoning_72b"
+            }
+          },
+          {
+            policy_id: "SelfHealingFallback",
+            name: "SelfHealingFallback (자가 치유 폴백)",
+            description: "업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.",
+            is_active: true,
+            config: {
+              primary_fallback_model: "qwen/Qwen-2.5-7B-Instruct",
+              secondary_fallback_model: "meta-llama/Llama-3-8B-Instruct",
+              max_retries: 2,
+              timeout_seconds: 5,
+              fallback_cluster: "cluster_vllm_inference_pool"
+            }
+          }
+        ]
+      };
+    }
+  },
+
+  async updateAgentRouterPolicies(policies) {
+    const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ policies })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '정책 업데이트 실패');
+    }
+    return await res.json();
+  },
+
+
   async getActiveRoutingPolicy(routeName = null) {
     try {
       const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;

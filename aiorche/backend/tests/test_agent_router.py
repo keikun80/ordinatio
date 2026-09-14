@@ -198,3 +198,62 @@ def test_routing_agent_router_status_and_simulate_apis(client: TestClient):
     assert sim_data["complexity"] == "REASONING_HEAVY"
     assert sim_data["suggested_tier"] == "reasoning_72b"
     assert sim_data["target_cluster"] == "cluster_vllm_reasoning_72b"
+
+def test_agent_router_policies_crud_and_dynamic_evaluation(client: TestClient):
+    # 1. GET Policies
+    res = client.get("/api/v1/routing/agent-router/policies")
+    assert res.status_code == 200
+    data = res.json()
+    assert "policies" in data
+    assert len(data["policies"]) == 4
+    p_ids = [p["policy_id"] for p in data["policies"]]
+    assert "QualityFirst" in p_ids
+    assert "LeastCost" in p_ids
+    assert "LatencyOptimized" in p_ids
+    assert "SelfHealingFallback" in p_ids
+
+    # 2. PUT Policy Update: customize LeastCost threshold to 50%
+    policies = data["policies"]
+    for p in policies:
+        if p["policy_id"] == "LeastCost":
+            p["config"]["budget_threshold_pct"] = 50.0
+            p["config"]["economic_model"] = "custom-budget-saver-3b"
+        elif p["policy_id"] == "QualityFirst":
+            p["config"]["reasoning_model"] = "custom-deep-reasoner-99b"
+
+    put_res = client.put(
+        "/api/v1/routing/agent-router/policies",
+        json={"policies": policies}
+    )
+    assert put_res.status_code == 200
+    updated_data = put_res.json()
+    least_cost_item = next(p for p in updated_data["policies"] if p["policy_id"] == "LeastCost")
+    assert least_cost_item["config"]["budget_threshold_pct"] == 50.0
+    assert least_cost_item["config"]["economic_model"] == "custom-budget-saver-3b"
+
+    # 3. Verify that simulate reflects the updated policy settings!
+    # Test LeastCost with 60% budget spent (exceeds new 50% threshold)
+    sim_budget = client.post(
+        "/api/v1/routing/agent-router/simulate",
+        json={
+            "prompt": "```python\ncomplex_code()\n```",
+            "policy": "LeastCost",
+            "budget_spent_ratio": 0.60
+        }
+    )
+    assert sim_budget.status_code == 200
+    sim_budget_data = sim_budget.json()
+    assert sim_budget_data["selected_model"] == "custom-budget-saver-3b"
+    assert "Budget alert active (60.0% spent >= 50% threshold)" in sim_budget_data["reasons"][1]
+
+    # Test QualityFirst with custom reasoning model
+    sim_q = client.post(
+        "/api/v1/routing/agent-router/simulate",
+        json={
+            "prompt": "알고리즘 시간복잡도를 수학적으로 증명해줘.",
+            "policy": "QualityFirst"
+        }
+    )
+    assert sim_q.status_code == 200
+    assert sim_q.json()["selected_model"] == "custom-deep-reasoner-99b"
+

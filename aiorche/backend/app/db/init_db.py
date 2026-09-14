@@ -8,6 +8,7 @@ from app.models.routing_policy import RoutingPolicy
 from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
+from app.models.agent_router_policy import AgentRouterPolicyModel
 
 logger = logging.getLogger(__name__)
 
@@ -274,6 +275,22 @@ def init_db():
             db.commit()
             logger.info("Initialized database with baseline patch history")
 
+        # 7. AgentRouter 4-Tier Routing Policies
+        if db.query(AgentRouterPolicyModel).count() == 0:
+            from app.core.agent_router.policy_manager import DEFAULT_POLICIES_CONFIG
+            for p_data in DEFAULT_POLICIES_CONFIG:
+                row = AgentRouterPolicyModel(
+                    policy_id=p_data["policy_id"],
+                    name=p_data["name"],
+                    description=p_data["description"],
+                    is_active=p_data["is_active"],
+                    config=p_data["config"]
+                )
+                db.add(row)
+            db.commit()
+            logger.info("Initialized database with default AgentRouter 4-tier policies")
+
         db.close()
     except Exception as e:
         logger.warning(f"Database initialization skipped or deferred: {e}")
+

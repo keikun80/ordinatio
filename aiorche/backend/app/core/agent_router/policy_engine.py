@@ -61,8 +61,12 @@ class AgentRouter:
         tenant_budget_spent_ratio: float = 0.0,
         explicit_model_request: Optional[str] = None
     ) -> RoutingDecision:
+        from app.core.agent_router.policy_manager import AgentRouterPolicyManager
+
         active_policy = policy or self.default_policy
         reasons = list(classification.reasons)
+        policy_item = AgentRouterPolicyManager.get_policy(active_policy.value)
+        cfg = policy_item.get("config", {})
 
         # If client explicitly asked for a concrete known model other than 'auto' or 'agent-auto', respect it
         if explicit_model_request and explicit_model_request not in ["auto", "agent-auto", "default", None]:
@@ -84,12 +88,18 @@ class AgentRouter:
 
         # 1. LeastCost Policy (Budget-Aware)
         if active_policy == RoutingPolicyType.LEAST_COST:
-            # If tenant budget spent ratio >= 80%, force downgrade to fast/economic model
-            if tenant_budget_spent_ratio >= 0.8:
-                reasons.append(f"Budget alert active ({tenant_budget_spent_ratio*100:.1f}% spent): forcing Fast 8B Tier to minimize compute TCO")
+            threshold_ratio = float(cfg.get("budget_threshold_pct", 80.0)) / 100.0
+            economic_model = cfg.get("economic_model", self.fast_model)
+            standard_model = cfg.get("standard_model", self.reasoning_model)
+            economic_cluster = cfg.get("economic_cluster", DEFAULT_CLUSTERS["fast_8b"])
+            standard_cluster = cfg.get("standard_cluster", DEFAULT_CLUSTERS["reasoning_72b"])
+
+            # If tenant budget spent ratio >= threshold, force downgrade to economic model
+            if tenant_budget_spent_ratio >= threshold_ratio:
+                reasons.append(f"Budget alert active ({tenant_budget_spent_ratio*100:.1f}% spent >= {threshold_ratio*100:.0f}% threshold): forcing Economic Model ({economic_model}) to minimize compute TCO")
                 return RoutingDecision(
-                    selected_model=self.fast_model,
-                    target_cluster=DEFAULT_CLUSTERS["fast_8b"],
+                    selected_model=economic_model,
+                    target_cluster=economic_cluster,
                     complexity=classification.complexity,
                     policy_applied=active_policy,
                     tier="fast_8b",
@@ -99,23 +109,23 @@ class AgentRouter:
                     fallback_cluster=DEFAULT_CLUSTERS["fallback"]
                 )
             
-            # Normal budget: light/medium goes to 8B, reasoning goes to 72B
+            # Normal budget: light/medium goes to economic/fast, reasoning goes to standard/72B
             if classification.complexity in [ComplexityLevel.REASONING_HEAVY, ComplexityLevel.AGENT_WORKFLOW]:
                 return RoutingDecision(
-                    selected_model=self.reasoning_model,
-                    target_cluster=DEFAULT_CLUSTERS["reasoning_72b"],
+                    selected_model=standard_model,
+                    target_cluster=standard_cluster,
                     complexity=classification.complexity,
                     policy_applied=active_policy,
                     tier="reasoning_72b",
                     estimated_tokens=classification.estimated_tokens,
                     reasons=reasons,
-                    fallback_model=self.fast_model,
-                    fallback_cluster=DEFAULT_CLUSTERS["fast_8b"]
+                    fallback_model=economic_model,
+                    fallback_cluster=economic_cluster
                 )
             else:
                 return RoutingDecision(
-                    selected_model=self.fast_model,
-                    target_cluster=DEFAULT_CLUSTERS["fast_8b"],
+                    selected_model=economic_model,
+                    target_cluster=economic_cluster,
                     complexity=classification.complexity,
                     policy_applied=active_policy,
                     tier="fast_8b",
@@ -127,25 +137,32 @@ class AgentRouter:
 
         # 2. LatencyOptimized Policy
         if active_policy == RoutingPolicyType.LATENCY_OPTIMIZED:
-            # Prioritize low-latency 8B model unless prompt strictly demands heavy reasoning
-            if classification.complexity == ComplexityLevel.REASONING_HEAVY:
-                reasons.append("LatencyOptimized: complex deductive reasoning required, routing to Reasoning 72B")
+            primary_fast_model = cfg.get("primary_fast_model", self.fast_model)
+            allow_reasoning = cfg.get("allow_reasoning_override", True)
+            reasoning_model = cfg.get("reasoning_model", self.reasoning_model)
+            fast_cluster = cfg.get("fast_cluster", DEFAULT_CLUSTERS["fast_8b"])
+            reasoning_cluster = cfg.get("reasoning_cluster", DEFAULT_CLUSTERS["reasoning_72b"])
+            target_latency = cfg.get("target_latency_ms", 200)
+
+            # Prioritize low-latency fast model unless prompt strictly demands heavy reasoning AND override allowed
+            if classification.complexity == ComplexityLevel.REASONING_HEAVY and allow_reasoning:
+                reasons.append(f"LatencyOptimized (Target {target_latency}ms): complex deductive reasoning required, override to Reasoning Model ({reasoning_model})")
                 return RoutingDecision(
-                    selected_model=self.reasoning_model,
-                    target_cluster=DEFAULT_CLUSTERS["reasoning_72b"],
+                    selected_model=reasoning_model,
+                    target_cluster=reasoning_cluster,
                     complexity=classification.complexity,
                     policy_applied=active_policy,
                     tier="reasoning_72b",
                     estimated_tokens=classification.estimated_tokens,
                     reasons=reasons,
-                    fallback_model=self.fast_model,
-                    fallback_cluster=DEFAULT_CLUSTERS["fast_8b"]
+                    fallback_model=primary_fast_model,
+                    fallback_cluster=fast_cluster
                 )
             else:
-                reasons.append("LatencyOptimized: prioritizing ultra-fast TTFT on Fast 8B Tier")
+                reasons.append(f"LatencyOptimized: prioritizing ultra-fast TTFT on Fast Tier ({primary_fast_model}, Target {target_latency}ms)")
                 return RoutingDecision(
-                    selected_model=self.fast_model,
-                    target_cluster=DEFAULT_CLUSTERS["fast_8b"],
+                    selected_model=primary_fast_model,
+                    target_cluster=fast_cluster,
                     complexity=classification.complexity,
                     policy_applied=active_policy,
                     tier="fast_8b",
@@ -156,24 +173,29 @@ class AgentRouter:
                 )
 
         # 3. QualityFirst Policy (Default)
+        q_reasoning_model = cfg.get("reasoning_model", self.reasoning_model)
+        q_fast_model = cfg.get("fast_model", self.fast_model)
+        q_reasoning_cluster = cfg.get("reasoning_cluster", DEFAULT_CLUSTERS["reasoning_72b"])
+        q_fast_cluster = cfg.get("fast_cluster", DEFAULT_CLUSTERS["fast_8b"])
+
         if classification.complexity in [ComplexityLevel.REASONING_HEAVY, ComplexityLevel.AGENT_WORKFLOW]:
-            reasons.append("QualityFirst: detected heavy reasoning/tool calling, routing to 72B Tier")
+            reasons.append(f"QualityFirst: detected heavy reasoning/tool calling, routing to Reasoning Tier ({q_reasoning_model})")
             return RoutingDecision(
-                selected_model=self.reasoning_model,
-                target_cluster=DEFAULT_CLUSTERS["reasoning_72b"],
+                selected_model=q_reasoning_model,
+                target_cluster=q_reasoning_cluster,
                 complexity=classification.complexity,
                 policy_applied=active_policy,
                 tier="reasoning_72b",
                 estimated_tokens=classification.estimated_tokens,
                 reasons=reasons,
-                fallback_model=self.fast_model,
-                fallback_cluster=DEFAULT_CLUSTERS["fast_8b"]
+                fallback_model=q_fast_model,
+                fallback_cluster=q_fast_cluster
             )
         else:
-            reasons.append("QualityFirst: standard conversational query, routing to Fast 8B Tier")
+            reasons.append(f"QualityFirst: standard conversational query, routing to Fast Tier ({q_fast_model})")
             return RoutingDecision(
-                selected_model=self.fast_model,
-                target_cluster=DEFAULT_CLUSTERS["fast_8b"],
+                selected_model=q_fast_model,
+                target_cluster=q_fast_cluster,
                 complexity=classification.complexity,
                 policy_applied=active_policy,
                 tier="fast_8b",
@@ -182,3 +204,4 @@ class AgentRouter:
                 fallback_model=self.fallback_model,
                 fallback_cluster=DEFAULT_CLUSTERS["fallback"]
             )
+

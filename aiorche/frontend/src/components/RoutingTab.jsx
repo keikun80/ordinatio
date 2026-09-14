@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, 
   Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight, 
-  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code 
+  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code, Settings 
 } from 'lucide-react';
 import { initialModels } from '../data/mockData';
 import { apiClient } from '../api/client';
@@ -103,11 +103,51 @@ export default function RoutingTab({ onNotify }) {
   const [agentSimResult, setAgentSimResult] = useState(null);
   const [isSimulatingAgent, setIsSimulatingAgent] = useState(false);
 
+  // 4대 라우팅 정책 편집 상태
+  const [routerPolicies, setRouterPolicies] = useState([]);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [activePolicyTab, setActivePolicyTab] = useState('QualityFirst');
+  const [isSavingPolicies, setIsSavingPolicies] = useState(false);
+
   useEffect(() => {
     apiClient.getAgentRouterStatus().then(status => {
       if (status) setAgentRouterStatus(status);
     });
+    apiClient.getAgentRouterPolicies().then(res => {
+      if (res?.policies) setRouterPolicies(res.policies);
+    });
   }, []);
+
+  const handleUpdatePolicyConfig = (policyId, key, value) => {
+    setRouterPolicies(prev => prev.map(p => {
+      if (p.policy_id === policyId) {
+        return {
+          ...p,
+          config: {
+            ...p.config,
+            [key]: value
+          }
+        };
+      }
+      return p;
+    }));
+  };
+
+  const handleSavePolicies = async () => {
+    setIsSavingPolicies(true);
+    try {
+      const res = await apiClient.updateAgentRouterPolicies(routerPolicies);
+      if (res?.policies) {
+        setRouterPolicies(res.policies);
+      }
+      setShowPolicyModal(false);
+      if (onNotify) onNotify('SUCCESS', 'AgentRouter 4대 라우팅 정책이 성공적으로 저장 및 게이트웨이에 반영되었습니다.');
+    } catch (err) {
+      if (onNotify) onNotify('ERROR', `정책 저장 실패: ${err.message}`);
+    } finally {
+      setIsSavingPolicies(false);
+    }
+  };
 
   const handleSimulateAgent = async () => {
     if (!agentSimPrompt.trim()) return;
@@ -776,10 +816,28 @@ print(response.choices[0].message.content)`;
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '0.75rem' }}>Fast 8B Tier</span>
             <span className="badge" style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
             <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem' }}>Self-Healing Fallback</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowPolicyModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.75rem',
+                padding: '4px 10px',
+                borderColor: 'rgba(192, 132, 252, 0.4)',
+                background: 'rgba(192, 132, 252, 0.15)',
+                color: '#e9d5ff',
+                cursor: 'pointer'
+              }}
+            >
+              <Settings size={14} color="#c084fc" />
+              <span>4대 정책 상세 편집</span>
+            </button>
           </div>
         </div>
 
@@ -2113,6 +2171,352 @@ print(response.choices[0].message.content)`;
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 0.1: AgentRouter 4-Tier Policy Settings Modal */}
+      {showPolicyModal && (
+        <div className="modal-overlay" onClick={() => setShowPolicyModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', width: '95%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>AgentRouter 4대 지능형 라우팅 정책 편집</span>
+                    <span className="badge active" style={{ fontSize: '0.7rem' }}>Live xDS Sync</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    정책별 매핑 모델, 예산 임계치(%), 목표 지연시간(ms) 및 자가 치유 폴백 설정을 온프레미스 인프라에 맞춰 실시간 제어합니다.
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPolicyModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem', padding: '4px 8px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Policy Navigation Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.8)', padding: '0 16px', gap: '8px', overflowX: 'auto' }}>
+              {[
+                { id: 'QualityFirst', name: '1. QualityFirst (품질 우선)', color: '#c084fc' },
+                { id: 'LeastCost', name: '2. LeastCost (비용 최적화)', color: '#34d399' },
+                { id: 'LatencyOptimized', name: '3. LatencyOptimized (지연시간)', color: '#38bdf8' },
+                { id: 'SelfHealingFallback', name: '4. SelfHealingFallback (폴백)', color: '#f59e0b' }
+              ].map(tab => {
+                const isCurrent = activePolicyTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActivePolicyTab(tab.id)}
+                    style={{
+                      padding: '12px 14px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: isCurrent ? `2px solid ${tab.color}` : '2px solid transparent',
+                      color: isCurrent ? '#ffffff' : 'var(--text-muted)',
+                      fontWeight: isCurrent ? 600 : 400,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tab.color, display: 'inline-block' }} />
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '20px' }}>
+              {/* Tab 1: QualityFirst */}
+              {activePolicyTab === 'QualityFirst' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'QualityFirst') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(192, 132, 252, 0.1)', borderRadius: '6px', border: '1px solid rgba(192, 132, 252, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#e9d5ff' }}>
+                      💡 <strong>QualityFirst 정책:</strong> 복잡한 알고리즘, 파이썬/SQL 코딩 및 심층 논리 추론 질문 감지 시 최고 성능 모델로 우선 분기하고 단순 일상 대화는 경량 고속 모델로 디스패치합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>심층 추론·코딩 전용 고성능 모델 (Reasoning 72B Tier)</span>
+                        <span style={{ color: '#c084fc', fontSize: '0.75rem' }}>클러스터: cluster_vllm_reasoning_72b</span>
+                      </label>
+                      <select
+                        className="form-input"
+                        value={cfg.reasoning_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'reasoning_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                        ))}
+                        <option value="deepseek-ai/DeepSeek-R1-Distill-Qwen-70B">deepseek-ai/DeepSeek-R1-Distill-Qwen-70B (기본 권장)</option>
+                        <option value="meta-llama/Llama-3.1-70B-Instruct">meta-llama/Llama-3.1-70B-Instruct</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>일반 대화 및 단순 질의 모델 (Fast 8B Tier)</span>
+                        <span style={{ color: '#38bdf8', fontSize: '0.75rem' }}>클러스터: cluster_vllm_fast_8b</span>
+                      </label>
+                      <select
+                        className="form-input"
+                        value={cfg.fast_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'fast_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                        ))}
+                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (기본 권장)</option>
+                        <option value="meta-llama/Llama-3.1-8B-Instruct">meta-llama/Llama-3.1-8B-Instruct</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
+                      <input
+                        type="checkbox"
+                        id="enforce_reasoning_tools"
+                        checked={cfg.enforce_reasoning_for_tools ?? true}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'enforce_reasoning_for_tools', e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <label htmlFor="enforce_reasoning_tools" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                        도구/함수 호출(Tool & Function Calling) 스키마 감지 시 강제로 추론 전용 모델로 라우팅
+                      </label>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 2: LeastCost */}
+              {activePolicyTab === 'LeastCost' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'LeastCost') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#a7f3d0' }}>
+                      💡 <strong>LeastCost 정책:</strong> 부서/테넌트의 월간 예산 소진율이 설정된 임계치(%)를 초과하면 무거운 질문이라도 경제형 모델로 강제 다운티어링하여 클라우드 및 GPU 컴퓨팅 비용 초과를 방지합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>예산 경보 및 다운티어링 임계치 (%)</span>
+                        <span style={{ color: '#34d399', fontWeight: 700 }}>{cfg.budget_threshold_pct || 80}% 소진 시 발동</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="20"
+                        max="100"
+                        step="5"
+                        value={cfg.budget_threshold_pct || 80}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'budget_threshold_pct', parseFloat(e.target.value))}
+                        style={{ width: '100%', accentColor: '#34d399' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <span>20% (극단적 절약)</span>
+                        <span>50% (조기 경보)</span>
+                        <span>80% (표준 권장)</span>
+                        <span>100% (완전 소진 시)</span>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">예산 초과 시 다운티어링할 경제형 모델 (Economic Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.economic_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'economic_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - 입력 ₩{m.input_price || m.input_price_per_1k}/1k</option>
+                        ))}
+                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (저비용 경량)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">일반 상태(예산 여유) 시 표준 고성능 모델 (Standard Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.standard_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'standard_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                        <option value="deepseek-ai/DeepSeek-R1-Distill-Qwen-70B">deepseek-ai/DeepSeek-R1-Distill-Qwen-70B</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 3: LatencyOptimized */}
+              {activePolicyTab === 'LatencyOptimized' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'LatencyOptimized') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#bae6fd' }}>
+                      💡 <strong>LatencyOptimized 정책:</strong> P99 응답시간 및 초저지연 TTFT(Time to First Token) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 예외를 허용합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>목표 최대 응답 지연시간 (Target Latency ms)</span>
+                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>{cfg.target_latency_ms || 200} ms</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="50"
+                        max="2000"
+                        step="25"
+                        className="form-input"
+                        value={cfg.target_latency_ms || 200}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'target_latency_ms', parseInt(e.target.value) || 200)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">초저지연 최우선 처리 모델 (Primary Fast Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.primary_fast_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'primary_fast_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (초저지연 경량)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+                      <input
+                        type="checkbox"
+                        id="allow_reasoning_override"
+                        checked={cfg.allow_reasoning_override ?? true}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'allow_reasoning_override', e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <label htmlFor="allow_reasoning_override" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                        심층 논리 추론 필수 질문 시 72B 전용 모델로의 예외 라우팅 허용
+                      </label>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 4: SelfHealingFallback */}
+              {activePolicyTab === 'SelfHealingFallback' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'SelfHealingFallback') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#fde68a' }}>
+                      💡 <strong>SelfHealingFallback 정책:</strong> 업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시, 무중단으로 지정된 예비 모델로 자동 절체(Failover)합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">1차 장애 발생 시 자동 절체 모델 (Primary Fallback Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.primary_fallback_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'primary_fallback_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                        <option value="qwen/Qwen-2.5-7B-Instruct">qwen/Qwen-2.5-7B-Instruct (고신뢰 자가치유 모델)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">2차 예비 모델 (Secondary Fallback Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.secondary_fallback_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'secondary_fallback_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">최대 재시도 횟수 (Max Retries)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          className="form-input"
+                          value={cfg.max_retries || 2}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'max_retries', parseInt(e.target.value) || 2)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">장애 판정 타임아웃 (초)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          className="form-input"
+                          value={cfg.timeout_seconds || 5}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'timeout_seconds', parseInt(e.target.value) || 5)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  apiClient.getAgentRouterPolicies().then(res => {
+                    if (res?.policies) setRouterPolicies(res.policies);
+                    if (onNotify) onNotify('INFO', '정책 설정이 서버 저장값으로 초기화되었습니다.');
+                  });
+                }}
+                style={{ fontSize: '0.8rem' }}
+              >
+                <RefreshCw size={13} style={{ marginRight: '4px' }} /> 설정 초기화
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPolicyModal(false)}>
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSavePolicies}
+                  disabled={isSavingPolicies}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #c084fc, #9333ea)', borderColor: '#a855f7' }}
+                >
+                  {isSavingPolicies ? <RefreshCw className="spin" size={14} /> : <Check size={14} />}
+                  <span>정책 저장 및 게이트웨이 즉시 적용</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

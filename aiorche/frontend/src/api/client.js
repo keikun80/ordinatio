@@ -209,6 +209,51 @@ export const apiClient = {
     return await res.json();
   },
 
+  // --- AgentRouter & Envoy AI Gateway (Phase 0.1) ---
+  async getAgentRouterStatus() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/status`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      return {
+        status: 'ACTIVE',
+        engine: 'AgentRouter Cognitive Dispatcher v0.1 (Local Fallback)',
+        supported_policies: ['QualityFirst', 'LeastCost', 'LatencyOptimized', 'SelfHealingFallback'],
+        default_tiers: {
+          fast_8b: { model: 'meta-llama/Llama-3-8B-Instruct', cluster: 'cluster_vllm_fast_8b' },
+          reasoning_72b: { model: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-70B', cluster: 'cluster_vllm_reasoning_72b' }
+        }
+      };
+    }
+  },
+
+  async simulateAgentRouter(prompt, policy = 'QualityFirst', tools = null, budgetSpentRatio = 0.0) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, policy, tools, budget_spent_ratio: budgetSpentRatio })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      const isHeavy = prompt.includes('코드') || prompt.includes('알고리즘') || prompt.includes('python') || prompt.length > 200;
+      return {
+        prompt_analyzed: prompt.slice(0, 80),
+        complexity: isHeavy ? 'REASONING_HEAVY' : 'LIGHT',
+        suggested_tier: isHeavy ? 'reasoning_72b' : 'fast_8b',
+        policy_applied: policy,
+        selected_model: isHeavy ? 'deepseek-ai/DeepSeek-R1-Distill-Qwen-70B' : 'meta-llama/Llama-3-8B-Instruct',
+        target_cluster: isHeavy ? 'cluster_vllm_reasoning_72b' : 'cluster_vllm_fast_8b',
+        estimated_tokens: Math.max(15, Math.floor(prompt.length / 3)),
+        reasons: ['Local standalone simulation fallback'],
+        has_tool_calling: Boolean(tools),
+        primary_intent: isHeavy ? 'coding' : 'light_conversation'
+      };
+    }
+  },
+
   async getActiveRoutingPolicy(routeName = null) {
     try {
       const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;

@@ -96,6 +96,33 @@ export default function RoutingTab({ onNotify }) {
   const [isTestingRoute, setIsTestingRoute] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
+  // Phase 0.1: AgentRouter & Envoy AI Gateway States
+  const [agentRouterStatus, setAgentRouterStatus] = useState(null);
+  const [agentSimPrompt, setAgentSimPrompt] = useState("파이썬 코드로 비동기 FastAPI 게이트웨이를 구현하고 성능 최적화 방안을 설명해줘.");
+  const [agentSimPolicy, setAgentSimPolicy] = useState("QualityFirst");
+  const [agentSimResult, setAgentSimResult] = useState(null);
+  const [isSimulatingAgent, setIsSimulatingAgent] = useState(false);
+
+  useEffect(() => {
+    apiClient.getAgentRouterStatus().then(status => {
+      if (status) setAgentRouterStatus(status);
+    });
+  }, []);
+
+  const handleSimulateAgent = async () => {
+    if (!agentSimPrompt.trim()) return;
+    setIsSimulatingAgent(true);
+    try {
+      const res = await apiClient.simulateAgentRouter(agentSimPrompt, agentSimPolicy);
+      setAgentSimResult(res);
+      if (onNotify) onNotify('SUCCESS', `AgentRouter 분석 완료: [${res.complexity}] ➔ ${res.suggested_tier}`);
+    } catch (err) {
+      if (onNotify) onNotify('ERROR', 'AgentRouter 시뮬레이션 실패');
+    } finally {
+      setIsSimulatingAgent(false);
+    }
+  };
+
   // Modal States
   const [showNewRouteModal, setShowNewRouteModal] = useState(false);
   const [newRouteForm, setNewRouteForm] = useState({
@@ -716,10 +743,11 @@ print(response.choices[0].message.content)`;
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy L7 REST RDS v3</span>
-            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>멀티 라우팅 지원</span>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
+            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc' }}>AgentRouter 탑재</span>
+            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>Phase 0.1 활성</span>
           </div>
-          <p>업무 도메인별 다중 라우트를 독립 구성하고, N개 모델 간 실시간 가중치 분할 및 조건부 트래픽 분기를 Envoy L7을 통해 무중단 제어합니다.</p>
+          <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
@@ -728,6 +756,110 @@ print(response.choices[0].message.content)`;
           <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
             + 신규 서빙 모델 등록
           </button>
+        </div>
+      </div>
+
+      {/* Phase 0.1: AgentRouter Cognitive Dispatcher Panel */}
+      <div className="card" style={{ marginBottom: '20px', padding: '20px', border: '1px solid rgba(192, 132, 252, 0.3)', background: 'rgba(15, 23, 42, 0.65)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+              <Compass size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>AgentRouter 지능형 디스패치 관제</h3>
+                <span className="badge active" style={{ fontSize: '0.7rem' }}>2-Tier L7 AI Gateway</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Envoy AI Gateway의 L7 ext_proc 파이프라인에서 프롬프트 난이도를 실시간 분석하여 Fast 8B와 Reasoning 72B로 스마트 분기합니다.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '0.75rem' }}>Fast 8B Tier</span>
+            <span className="badge" style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
+            <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem' }}>Self-Healing Fallback</span>
+          </div>
+        </div>
+
+        {/* Live Simulator Form */}
+        <div style={{ background: 'rgba(2, 6, 23, 0.5)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 500px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                프롬프트 인텐트 & 복잡도 실시간 시뮬레이터 (Simulate Live Dispatch)
+              </label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={agentSimPrompt}
+                onChange={(e) => setAgentSimPrompt(e.target.value)}
+                placeholder="테스트할 질문을 입력하십시오. (예: 단순 날씨 질의, 복잡한 파이썬 알고리즘/SQL, 도구 호출 등)"
+                style={{ width: '100%', resize: 'vertical', fontSize: '0.85rem' }}
+              />
+            </div>
+            <div style={{ width: '160px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                라우팅 정책
+              </label>
+              <select
+                className="form-control"
+                value={agentSimPolicy}
+                onChange={(e) => setAgentSimPolicy(e.target.value)}
+                style={{ width: '100%', height: '38px', fontSize: '0.85rem' }}
+              >
+                <option value="QualityFirst">QualityFirst (품질 우선)</option>
+                <option value="LeastCost">LeastCost (비용 최적화)</option>
+                <option value="LatencyOptimized">LatencyOptimized (지연시간)</option>
+                <option value="SelfHealingFallback">SelfHealingFallback (폴백)</option>
+              </select>
+            </div>
+            <div style={{ alignSelf: 'flex-end' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSimulateAgent}
+                disabled={isSimulatingAgent}
+                style={{ height: '38px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                {isSimulatingAgent ? <RefreshCw className="spin" size={15} /> : <Play size={15} />}
+                <span>인텐트 분석 실행</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Simulation Output Card */}
+          {agentSimResult && (
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>판정된 복잡도 (Complexity)</span>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: agentSimResult.complexity === 'REASONING_HEAVY' ? '#c084fc' : (agentSimResult.complexity === 'LIGHT' ? '#38bdf8' : '#34d399'), marginTop: '2px' }}>
+                  {agentSimResult.complexity}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>디스패치 모델 티어</span>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f59e0b', marginTop: '2px' }}>
+                  {agentSimResult.suggested_tier.toUpperCase()}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선택된 타깃 모델</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {agentSimResult.selected_model}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Envoy 업스트림 클러스터</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#38bdf8', marginTop: '4px' }}>
+                  {agentSimResult.target_cluster}
+                </div>
+              </div>
+              <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <strong style={{ color: '#94a3b8' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -132,7 +132,9 @@ def generate_envoy_multi_route_configuration(
     """Compile multiple routing policies into a unified Envoy v3 RouteConfiguration"""
     base_routes = [
         {"match": {"prefix": "/health"}, "route": {"cluster": "backend_service"}},
-        {"match": {"prefix": "/api"}, "route": {"cluster": "backend_service"}}
+        {"match": {"prefix": "/api"}, "route": {"cluster": "backend_service"}},
+        {"match": {"prefix": "/v1/models"}, "route": {"cluster": "backend_service"}},
+        {"match": {"prefix": "/v1/routes"}, "route": {"cluster": "backend_service"}}
     ]
 
     # Sort policies by priority (ascending: priority 1 comes before 10)

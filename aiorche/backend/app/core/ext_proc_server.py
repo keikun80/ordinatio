@@ -1,0 +1,116 @@
+import time
+import logging
+from typing import Dict, Any, Optional
+from pydantic import BaseModel, Field
+
+from app.core.agent_router import (
+    AgentRouter,
+    classify_prompt,
+    SessionAffinityManager
+)
+from app.core.token_limiter import token_rate_limiter
+
+logger = logging.getLogger(__name__)
+
+class ExtProcHeader(BaseModel):
+    key: str
+    value: str
+
+class ExtProcRequest(BaseModel):
+    headers: Dict[str, str] = Field(default_factory=dict)
+    body: Optional[Dict[str, Any]] = None
+    session_id: Optional[str] = None
+
+class ExtProcResponse(BaseModel):
+    status: str = "CONTINUE"            # CONTINUE, OVERRIDE, REJECT
+    status_code: int = 200
+    headers_to_add: Dict[str, str] = Field(default_factory=dict)
+    body_override: Optional[Dict[str, Any]] = None
+    reason: Optional[str] = None
+
+class ExtProcessorService:
+    """
+    Envoy AI Gateway External Processor (ext_proc) Core Adapter.
+    Intercepts L7 HTTP/gRPC streams, enforces token quotas, executes AgentRouter,
+    and returns routing headers to Envoy for low-latency upstream forwarding.
+    """
+
+    def __init__(self):
+        self.router = AgentRouter()
+        self.affinity = SessionAffinityManager()
+
+    def process_request(
+        self,
+        headers: Dict[str, str],
+        body: Optional[Dict[str, Any]],
+        tpm_limit: int = 200000,
+        budget_spent_ratio: float = 0.0
+    ) -> ExtProcResponse:
+        start_time = time.perf_counter()
+
+        # 1. Virtual Key Extraction & Prefix
+        auth_header = headers.get("authorization", "")
+        raw_key = auth_header.replace("Bearer ", "").strip() if "Bearer " in auth_header else headers.get("x-virtual-key", "")
+        key_id = raw_key[:16] if raw_key else "anonymous-dev-key"
+
+        # 2. Extract messages from payload
+        messages = []
+        tools = None
+        requested_model = None
+        if body and isinstance(body, dict):
+            messages = body.get("messages", [])
+            tools = body.get("tools") or body.get("functions")
+            requested_model = body.get("model")
+
+        # 3. Classify Prompt with AgentRouter
+        classification = classify_prompt(messages=messages, tools=tools)
+
+        # 4. Token Rate Limit Check (TPM)
+        estimated_tokens = max(classification.estimated_tokens, 10)
+        is_allowed, current_usage, remaining = token_rate_limiter.check_and_consume(
+            key_id=key_id,
+            requested_tokens=estimated_tokens,
+            tpm_limit=tpm_limit
+        )
+
+        if not is_allowed:
+            logger.warning(f"ext_proc: TPM quota exceeded for key {key_id}. Usage: {current_usage}, Limit: {tpm_limit}")
+            return ExtProcResponse(
+                status="REJECT",
+                status_code=429,
+                headers_to_add={"retry-after": "5"},
+                reason=f"TPM (Tokens Per Minute) limit exceeded ({current_usage}/{tpm_limit}). Please wait."
+            )
+
+        # 5. Determine Route via Policy Engine
+        decision = self.router.evaluate_route(
+            classification=classification,
+            tenant_budget_spent_ratio=budget_spent_ratio,
+            explicit_model_request=requested_model
+        )
+
+        # 6. Session Affinity Headers
+        session_id = headers.get("x-session-id")
+        affinity_headers = self.affinity.get_affinity_headers(session_id=session_id)
+
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+
+        headers_to_add = {
+            "x-orche-upstream-cluster": decision.target_cluster,
+            "x-orche-selected-model": decision.selected_model,
+            "x-agent-complexity": decision.complexity.value,
+            "x-agent-route-tier": decision.tier,
+            "x-agent-router-decision": decision.policy_applied.value,
+            "x-agent-proc-time-ms": f"{duration_ms:.2f}",
+            "x-ratelimit-remaining-tokens": str(remaining),
+            **affinity_headers
+        }
+
+        return ExtProcResponse(
+            status="CONTINUE",
+            status_code=200,
+            headers_to_add=headers_to_add,
+            reason=f"Routed to {decision.selected_model} via {decision.policy_applied.value}"
+        )
+
+ext_processor = ExtProcessorService()

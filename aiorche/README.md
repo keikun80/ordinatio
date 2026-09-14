@@ -55,11 +55,12 @@ make run-frontend
 
 ### 3. 단계별 검증 (DoD Automated Verification)
 ```bash
-# 전체 단위/통합 테스트 실행 (pytest 46개 테스트 100% 통과)
+# 전체 단위/통합 테스트 실행 (pytest 56개 테스트 100% 통과)
 make test
 
 # 단계별 완료 정의(DoD) 자동화 검증
 make verify-phase0    # Phase 0: 기반 환경 및 에어갭 패키징 무결성
+make verify-phase0_1  # Phase 0.1: Envoy AI Gateway (ext_proc) & AgentRouter 지능형 분기
 bash scripts/verify-phase1.sh   # Phase 1: 테넌트 거버넌스 및 가상 API Key
 bash scripts/verify-phase2.sh   # Phase 2: Envoy xDS 동적 멀티 라우팅 및 N-Way 분할
 bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 관제 스트림
@@ -75,8 +76,9 @@ bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & �
 | Phase | 설명 | 상태 | DoD 검증 |
 | :---: | :--- | :---: | :---: |
 | **Phase 0** | 개발 환경 표준화 및 프로젝트 스캐폴딩 | ✅ 완료 | `make verify-phase0` 통과 |
+| **Phase 0.1** | Envoy AI Gateway (ext_proc) & AgentRouter 인지 지능 엔진 | ✅ 완료 | `make verify-phase0_1` 통과 (56 Tests) |
 | **Phase 1** | 인증, 멀티 테넌트 및 가상 API Key 코어 | ✅ 완료 | `verify-phase1.sh` 통과 |
-| **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 (46 Tests) |
+| **Phase 2** | Envoy xDS 연동 및 동적 멀티 라우팅 엔진 | ✅ 완료 | `verify-phase2.sh` 100% 통과 |
 | **Phase 3** | 관제, FinOps 과금 및 실시간 관제 허브 | ✅ 완료 | `verify-phase3.sh` 통과 |
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |

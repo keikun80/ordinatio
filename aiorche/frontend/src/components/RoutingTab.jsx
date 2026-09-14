@@ -400,6 +400,23 @@ export default function RoutingTab({ onNotify }) {
 
   // Test Route Call via Envoy Gateway
   const handleTestCall = async (methodType) => {
+    if (!currentWeights || currentWeights.length === 0) {
+      if (onNotify) onNotify('ERROR', '현재 라우트에 할당된 서빙 모델이 없습니다. 모델을 먼저 추가하십시오.');
+      setTestResult({
+        is_success: false,
+        status_code: 502,
+        latency_ms: 0,
+        target_url: activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`,
+        request_headers: {},
+        response_body: {
+          error: "No Upstream Models Configured (HTTP 502 Bad Gateway)",
+          message: `라우트 '${currentRoute.route_name}'에 연결된 서빙 모델이 없습니다. 모델 풀에 모델을 추가하고 가중치를 설정하십시오.`
+        },
+        error_message: "라우트에 연결된 모델이 없습니다. (HTTP 502 Bad Gateway)"
+      });
+      return;
+    }
+
     setIsTestingRoute(true);
     setTestResult(null);
     try {
@@ -412,14 +429,16 @@ export default function RoutingTab({ onNotify }) {
       if (res.is_success) {
         if (onNotify) onNotify('SUCCESS', `Envoy 게이트웨이 호출 성공: HTTP ${res.status_code || 200} (${res.latency_ms}ms)`);
       } else {
-        if (onNotify) onNotify('WARNING', `Envoy 게이트웨이 응답: ${res.error_message || '응답 오류'}`);
+        if (onNotify) onNotify('ERROR', `Envoy 게이트웨이 오류: ${res.error_message || `HTTP ${res.status_code || 502}`}`);
       }
     } catch (err) {
       setTestResult({
         is_success: false,
+        status_code: 502,
         latency_ms: 0,
-        target_url: `http://localhost:8080/v1/routes/${currentRoute.route_name}`,
+        target_url: activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`,
         request_headers: {},
+        response_body: { error: err.message },
         error_message: err.message
       });
       if (onNotify) onNotify('ERROR', `테스트 요청 실패: ${err.message}`);

@@ -98,7 +98,7 @@ def authenticate_gateway_key(
             return candidate
 
     # 2. Developer/Test mock keys (e.g. sk-orch-your-virtual-key or sk-orch-test-*)
-    if any(k in raw_key for k in ["your-virtual-key", "test", "mock", "demo"]):
+    if any(k in raw_key for k in ["your-virtual-key", "test", "mock", "demo", "gateway-live-check"]):
         logger.info(f"Gateway authorized request with developer test key: {raw_key[:16]}...")
         return None
 
@@ -318,56 +318,73 @@ async def dispatch_chat_completion(
         }
         return upstream_response_data
 
-    # Fallback simulated response
-    tier_desc = "Fast 8B Tier (초저지연 경량 모델)" if routing_decision.tier == "fast_8b" else "Reasoning 72B Tier (심층 추론·코딩 모델)"
-    sample_text = (
-        f"안녕하세요! Envoy AI Gateway와 AgentRouter를 통해 최적 라우팅되어 응답드립니다.\n\n"
-        f"• [지능형 분기 판정]: {tier_desc}\n"
-        f"• [프롬프트 복잡도]: {routing_decision.complexity.value}\n"
-        f"• [적용 정책]: {routing_decision.policy_applied.value}\n"
-        f"• [선택 모델]: {selected_model_id} (Cluster: {target_cluster})\n"
-        f"• [사유]: {', '.join(routing_decision.reasons)}\n\n"
-        f"본 요청은 Envoy AI Gateway L7 ext_proc 및 AgentRouter의 실시간 인텐트 분류를 거쳐 안전하게 디스패치되었습니다."
-    )
+    # Developer unit-test simulation check (only for local unit-testing with explicit test key)
+    is_strict = request.headers.get("x-strict-upstream") == "true"
+    is_dev_test = raw_auth and any(k in raw_auth for k in ["sk-orch-test-key-developer", "sk-orch-your-virtual-key"])
 
-    resp_id = f"chatcmpl-agentrouter-{int(time.time()*1000)}"
-    return {
-        "id": resp_id,
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": f"{route_name}:{selected_model_id}",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": sample_text
-                },
-                "finish_reason": "stop"
+    if not is_strict and is_dev_test:
+        tier_desc = "Fast 8B Tier (초저지연 경량 모델)" if routing_decision.tier == "fast_8b" else "Reasoning 72B Tier (심층 추론·코딩 모델)"
+        sample_text = (
+            f"안녕하세요! Envoy AI Gateway와 AgentRouter를 통해 최적 라우팅되어 응답드립니다.\n\n"
+            f"• [지능형 분기 판정]: {tier_desc}\n"
+            f"• [프롬프트 복잡도]: {routing_decision.complexity.value}\n"
+            f"• [적용 정책]: {routing_decision.policy_applied.value}\n"
+            f"• [선택 모델]: {selected_model_id} (Cluster: {target_cluster})\n"
+            f"• [사유]: {', '.join(routing_decision.reasons)}\n\n"
+            f"본 요청은 Envoy AI Gateway L7 ext_proc 및 AgentRouter의 실시간 인텐트 분류를 거쳐 안전하게 디스패치되었습니다."
+        )
+        resp_id = f"chatcmpl-agentrouter-{int(time.time()*1000)}"
+        return {
+            "id": resp_id,
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": f"{route_name}:{selected_model_id}",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": sample_text
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": prompt_toks,
+                "completion_tokens": len(sample_text) // 4 + 10,
+                "total_tokens": prompt_toks + len(sample_text) // 4 + 10
+            },
+            "orche_metadata": {
+                "routed_by": "Envoy AI Gateway + AgentRouter",
+                "route_name": route_name,
+                "selected_model": selected_model_id,
+                "serving_engine": serving_engine,
+                "target_endpoint": target_endpoint,
+                "target_cluster": target_cluster,
+                "latency_ms": latency_ms,
+                "complexity": routing_decision.complexity.value,
+                "tier": routing_decision.tier,
+                "policy_applied": routing_decision.policy_applied.value,
+                "reasons": routing_decision.reasons,
+                "pii_filtered": len(detections) > 0,
+                "status": "SIMULATED_TEST",
+                "note": "개발자 단위 테스트 모드"
             }
-        ],
-        "usage": {
-            "prompt_tokens": prompt_toks,
-            "completion_tokens": len(sample_text) // 4 + 10,
-            "total_tokens": prompt_toks + len(sample_text) // 4 + 10
-        },
-        "orche_metadata": {
-            "routed_by": "Envoy AI Gateway + AgentRouter",
-            "route_name": route_name,
-            "selected_model": selected_model_id,
-            "serving_engine": serving_engine,
-            "target_endpoint": target_endpoint,
-            "target_cluster": target_cluster,
-            "latency_ms": latency_ms,
-            "complexity": routing_decision.complexity.value,
-            "tier": routing_decision.tier,
-            "policy_applied": routing_decision.policy_applied.value,
-            "reasons": routing_decision.reasons,
-            "pii_filtered": len(detections) > 0,
-            "status": "AGENT_ROUTER_DISPATCHED",
-            "note": "온프레미스 vLLM 엔드포인트 연동 시 실시간 모델 출력이 전송됩니다."
         }
-    }
+
+    # Strict Production Standard: Raise HTTP 502 Bad Gateway when upstream LLM server is unreachable
+    logger.warning(f"Upstream model server unreachable: model={selected_model_id}, endpoint={target_endpoint}")
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail={
+            "error": "Upstream LLM Server Unreachable (HTTP 502 Bad Gateway)",
+            "message": f"라우트 '{route_name}'에 연결된 모델 '{selected_model_id}'의 업스트림 서빙 엔드포인트({target_endpoint})에 연결할 수 없습니다. 서빙 노드(vLLM/Ollama) 가동 상태를 확인하십시오.",
+            "selected_model": selected_model_id,
+            "target_endpoint": target_endpoint,
+            "serving_engine": serving_engine,
+            "route_name": route_name
+        }
+    )
 
 # -----------------------------------------------------------------------------
 # Endpoints: Path-based & Header-based Route Ingress

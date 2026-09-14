@@ -322,14 +322,16 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         target_path = path_prefix
         request_headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer sk-orch-mock-test-key"
+            "Authorization": "Bearer sk-orch-mock-test-key",
+            "x-strict-upstream": "true"
         }
     else:
         target_path = "/v1/chat/completions"
         request_headers = {
             "Content-Type": "application/json",
             "Authorization": "Bearer sk-orch-mock-test-key",
-            "x-orche-route": req.route_name
+            "x-orche-route": req.route_name,
+            "x-strict-upstream": "true"
         }
         if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
             request_headers["x-orche-tenant"] = policy.match_conditions["tenant_codes"][0]
@@ -342,6 +344,23 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         "temperature": 0.7,
         "max_tokens": 128
     }
+
+    weights = policy.traffic_weights or []
+    if not weights:
+        chosen_url = f"{envoy_ingress}{path_prefix if req.method == 'path' else '/v1/chat/completions'}"
+        return RouteTestCallResponse(
+            is_success=False,
+            status_code=502,
+            latency_ms=0.5,
+            target_url=chosen_url,
+            request_headers=request_headers,
+            response_body={
+                "error": "No Upstream Models Configured (HTTP 502 Bad Gateway)",
+                "message": f"라우트 '{req.route_name}'에 연결된 서빙 모델이 없습니다. 모델 카탈로그에서 모델을 추가하십시오."
+            },
+            error_message="라우트에 연결된 모델이 없습니다. (HTTP 502 Bad Gateway)",
+            dispatched_route=req.route_name
+        )
 
     t0 = time.perf_counter()
     status_code = None
@@ -363,6 +382,13 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
                     resp_body = res.text[:200]
 
                 is_success = (res.status_code < 500)
+                error_msg = None
+                if not is_success:
+                    if status_code == 502:
+                        error_msg = "업스트림 모델 서버 오프라인 (HTTP 502 Bad Gateway)"
+                    else:
+                        error_msg = f"Envoy Gateway HTTP {status_code}"
+
                 return RouteTestCallResponse(
                     is_success=is_success,
                     status_code=status_code,
@@ -370,7 +396,7 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
                     target_url=chosen_url,
                     request_headers=request_headers,
                     response_body=resp_body,
-                    error_message=None if is_success else f"Envoy Gateway HTTP {status_code}",
+                    error_message=error_msg,
                     dispatched_route=req.route_name
                 )
             except httpx.ConnectError:

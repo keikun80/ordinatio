@@ -25,9 +25,9 @@ class RoutingDecision(BaseModel):
     fallback_cluster: Optional[str] = None
 
 # Default standard model mappings for air-gapped deployments
-DEFAULT_FAST_MODEL = "meta-llama/Llama-3-8B-Instruct"
-DEFAULT_REASONING_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B"
-DEFAULT_FALLBACK_MODEL = "qwen/Qwen-2.5-7B-Instruct"
+DEFAULT_FAST_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+DEFAULT_REASONING_MODEL = "meta-llama/Llama-3.1-70B-Instruct"
+DEFAULT_FALLBACK_MODEL = "qwen2.5:14b"
 
 DEFAULT_CLUSTERS = {
     "fast_8b": "cluster_vllm_fast_8b",

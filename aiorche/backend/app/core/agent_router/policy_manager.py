@@ -7,11 +7,11 @@ DEFAULT_POLICIES_CONFIG: List[Dict[str, Any]] = [
     {
         "policy_id": "QualityFirst",
         "name": "QualityFirst (품질 우선)",
-        "description": "복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 72B 모델로 우선 분기하고 단순 질의는 8B로 처리합니다.",
+        "description": "복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 70B 모델로 우선 분기하고 단순 질의는 8B로 처리합니다.",
         "is_active": True,
         "config": {
-            "reasoning_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
-            "fast_model": "meta-llama/Llama-3-8B-Instruct",
+            "reasoning_model": "meta-llama/Llama-3.1-70B-Instruct",
+            "fast_model": "meta-llama/Llama-3.1-8B-Instruct",
             "enforce_reasoning_for_tools": True,
             "reasoning_cluster": "cluster_vllm_reasoning_72b",
             "fast_cluster": "cluster_vllm_fast_8b"
@@ -24,8 +24,8 @@ DEFAULT_POLICIES_CONFIG: List[Dict[str, Any]] = [
         "is_active": True,
         "config": {
             "budget_threshold_pct": 80.0,
-            "economic_model": "meta-llama/Llama-3-8B-Instruct",
-            "standard_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+            "economic_model": "meta-llama/Llama-3.1-8B-Instruct",
+            "standard_model": "meta-llama/Llama-3.1-70B-Instruct",
             "economic_cluster": "cluster_vllm_fast_8b",
             "standard_cluster": "cluster_vllm_reasoning_72b"
         }
@@ -37,9 +37,9 @@ DEFAULT_POLICIES_CONFIG: List[Dict[str, Any]] = [
         "is_active": True,
         "config": {
             "target_latency_ms": 200,
-            "primary_fast_model": "meta-llama/Llama-3-8B-Instruct",
+            "primary_fast_model": "meta-llama/Llama-3.1-8B-Instruct",
             "allow_reasoning_override": True,
-            "reasoning_model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+            "reasoning_model": "meta-llama/Llama-3.1-70B-Instruct",
             "fast_cluster": "cluster_vllm_fast_8b",
             "reasoning_cluster": "cluster_vllm_reasoning_72b"
         }
@@ -50,8 +50,8 @@ DEFAULT_POLICIES_CONFIG: List[Dict[str, Any]] = [
         "description": "업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.",
         "is_active": True,
         "config": {
-            "primary_fallback_model": "qwen/Qwen-2.5-7B-Instruct",
-            "secondary_fallback_model": "meta-llama/Llama-3-8B-Instruct",
+            "primary_fallback_model": "qwen2.5:14b",
+            "secondary_fallback_model": "Solar-10.7B-Financial",
             "max_retries": 2,
             "timeout_seconds": 5,
             "fallback_cluster": "cluster_vllm_inference_pool"

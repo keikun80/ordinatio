@@ -2262,8 +2262,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
                         ))}
-                        <option value="deepseek-ai/DeepSeek-R1-Distill-Qwen-70B">deepseek-ai/DeepSeek-R1-Distill-Qwen-70B (기본 권장)</option>
-                        <option value="meta-llama/Llama-3.1-70B-Instruct">meta-llama/Llama-3.1-70B-Instruct</option>
                       </select>
                     </div>
 
@@ -2280,8 +2278,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
                         ))}
-                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (기본 권장)</option>
-                        <option value="meta-llama/Llama-3.1-8B-Instruct">meta-llama/Llama-3.1-8B-Instruct</option>
                       </select>
                     </div>
 
@@ -2343,7 +2339,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias}) - 입력 ₩{m.input_price || m.input_price_per_1k}/1k</option>
                         ))}
-                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (저비용 경량)</option>
                       </select>
                     </div>
 
@@ -2357,7 +2352,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
                         ))}
-                        <option value="deepseek-ai/DeepSeek-R1-Distill-Qwen-70B">deepseek-ai/DeepSeek-R1-Distill-Qwen-70B</option>
                       </select>
                     </div>
                   </div>
@@ -2400,7 +2394,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
                         ))}
-                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct (초저지연 경량)</option>
                       </select>
                     </div>
 
@@ -2440,7 +2433,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
                         ))}
-                        <option value="qwen/Qwen-2.5-7B-Instruct">qwen/Qwen-2.5-7B-Instruct (고신뢰 자가치유 모델)</option>
                       </select>
                     </div>
 
@@ -2454,7 +2446,6 @@ print(response.choices[0].message.content)`;
                         {models.map(m => (
                           <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
                         ))}
-                        <option value="meta-llama/Llama-3-8B-Instruct">meta-llama/Llama-3-8B-Instruct</option>
                       </select>
                     </div>
 

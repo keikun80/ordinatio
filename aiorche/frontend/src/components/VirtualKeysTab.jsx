@@ -44,6 +44,7 @@ export default function VirtualKeysTab({ onNotify }) {
   const [editIp, setEditIp] = useState('10.100.0.0/16');
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [editModels, setEditModels] = useState(['meta-llama/Llama-3.1-8B-Instruct']);
+  const [registeredModels, setRegisteredModels] = useState([]);
 
   // New Key Form State
   const [newKeyName, setNewKeyName] = useState('');
@@ -52,6 +53,7 @@ export default function VirtualKeysTab({ onNotify }) {
   const [newKeyTpm, setNewKeyTpm] = useState(300000);
   const [newKeyHardCap, setNewKeyHardCap] = useState(true);
   const [newKeyIp, setNewKeyIp] = useState('10.100.0.0/16');
+  const [newKeyModels, setNewKeyModels] = useState([]);
 
   // Helper to persist keys to state & localStorage
   const saveKeys = (newKeys) => {
@@ -109,6 +111,21 @@ export default function VirtualKeysTab({ onNotify }) {
             keyPrefix: k.key_prefix
           }));
           saveKeys(mappedKeys);
+        }
+
+        const liveModels = await apiClient.getModels();
+        if (liveModels && liveModels.length > 0) {
+          const mappedModels = liveModels.map((m) => ({
+            id: m.model_id,
+            name: m.name,
+            alias: m.alias
+          }));
+          setRegisteredModels(mappedModels);
+          setNewKeyModels(mappedModels.map((m) => m.id));
+        } else if (initialModels && initialModels.length > 0) {
+          const fallback = initialModels.map((m) => ({ id: m.id, name: m.name, alias: m.alias }));
+          setRegisteredModels(fallback);
+          setNewKeyModels(fallback.map((m) => m.id));
         }
       } catch (err) {
         console.warn('Backend API offline, keeping persisted local data:', err);
@@ -199,13 +216,16 @@ export default function VirtualKeysTab({ onNotify }) {
 
     setIsLoading(true);
     const deptObj = tenants.find((d) => d.id === newKeyDept) || tenants[0];
+    const targetAllowedModels = newKeyModels.length > 0
+      ? newKeyModels
+      : (registeredModels.length > 0 ? [registeredModels[0].id] : ['meta-llama/Llama-3.1-8B-Instruct']);
 
     try {
       // Call Backend API
       const result = await apiClient.createVirtualKey({
         name: newKeyName,
         tenant_id: deptObj.id,
-        allowed_models: ['meta-llama/Llama-3.1-8B-Instruct'],
+        allowed_models: targetAllowedModels,
         allowed_ip_cidrs: [newKeyIp],
         rpm_limit: Number(newKeyRpm),
         tpm_limit: Number(newKeyTpm)
@@ -216,7 +236,7 @@ export default function VirtualKeysTab({ onNotify }) {
         name: result.name,
         tenantName: deptObj.name,
         tenantId: deptObj.id,
-        allowedModels: result.allowed_models || ['meta-llama/Llama-3.1-8B-Instruct'],
+        allowedModels: result.allowed_models && result.allowed_models.length > 0 ? result.allowed_models : targetAllowedModels,
         rpm: result.rpm_limit,
         tpm: result.tpm_limit,
         spent: 0,
@@ -520,6 +540,49 @@ export default function VirtualKeysTab({ onNotify }) {
                     <option value="BLOCKED">🔴 차단됨 (즉시 호출 차단)</option>
                   </select>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>허용 대상 AI 모델 (등록된 모델 풀: {registeredModels.length}개)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{editModels.length}개 모델 허용됨</span>
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    {registeredModels.map(m => {
+                      const isChecked = editModels.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditModels([...editModels, m.id]);
+                              } else {
+                                setEditModels(editModels.filter(id => id !== m.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
@@ -595,6 +658,49 @@ export default function VirtualKeysTab({ onNotify }) {
                     value={newKeyIp}
                     onChange={(e) => setNewKeyIp(e.target.value)}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>허용 대상 AI 모델 (등록된 모델 풀: {registeredModels.length}개)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{newKeyModels.length}개 모델 선택됨</span>
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    {registeredModels.map(m => {
+                      const isChecked = newKeyModels.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewKeyModels([...newKeyModels, m.id]);
+                              } else {
+                                setNewKeyModels(newKeyModels.filter(id => id !== m.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div style={{ background: 'rgba(244, 63, 94, 0.08)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>

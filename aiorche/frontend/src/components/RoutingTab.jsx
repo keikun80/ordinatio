@@ -974,12 +974,17 @@ print(response.choices[0].message.content)`;
           borderRadius: 'var(--radius-md)',
           padding: '20px',
           marginBottom: '20px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          maxWidth: '100%',
+          width: '100%',
+          minWidth: 0,
+          overflow: 'hidden',
+          boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Globe size={18} color="#38bdf8" />
+            <div style={{ minWidth: 0, flex: '1 1 300px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <Globe size={18} color="#38bdf8" style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>
                   Envoy L7 게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
                 </span>
@@ -992,7 +997,7 @@ print(response.choices[0].message.content)`;
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => handleTestCall(activeEndpointTab)}
@@ -1016,29 +1021,35 @@ print(response.choices[0].message.content)`;
             padding: '12px 16px',
             marginBottom: '16px',
             flexWrap: 'wrap',
-            gap: '10px'
+            gap: '10px',
+            maxWidth: '100%',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
-              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 260px', minWidth: 0, flexWrap: 'wrap' }}>
+              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16', flexShrink: 0 }}>
                 POST
               </span>
               <span style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.94rem',
+                fontSize: '0.92rem',
                 fontWeight: 600,
                 color: '#38bdf8',
-                wordBreak: 'break-all'
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere',
+                minWidth: 0
               }}>
                 {activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`}
               </span>
               {activeEndpointTab === 'header' && (
-                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', flexShrink: 0 }}>
                   Header: x-orche-route: {currentRoute.route_name}
                 </span>
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button
                 onClick={() => handleCopy(activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`, 'endpoint')}
                 className="btn btn-secondary btn-sm"
@@ -1051,7 +1062,7 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* Integration Tabs */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '14px', flexWrap: 'wrap' }}>
             {[
               { id: 'path', label: '1. 경로 기반 호출 (Path Prefix / OpenAI base_url 호환)' },
               { id: 'header', label: '2. 공통 엔드포인트 + 라우트 헤더 지정 (Standard OpenAI)' },
@@ -1079,11 +1090,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 1: Path Based */}
           {activeEndpointTab === 'path' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 별도 헤더 없이 고유 URL 접두사로 즉시 라우팅됩니다. OpenAI SDK의 <code style={{ color: '#38bdf8' }}>base_url</code>에 그대로 지정할 수 있습니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -1093,6 +1104,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#a7f3d0',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{curlSnippetPath}</code>
@@ -1111,11 +1127,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 2: Header Based */}
           {activeEndpointTab === 'header' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 공통 엔드포인트(<code style={{ color: '#38bdf8' }}>/v1/chat/completions</code>)를 사용하면서 <code style={{ color: '#fbbf24' }}>x-orche-route</code> 헤더로 목적지 라우트를 지정합니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -1125,6 +1141,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#a7f3d0',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{curlSnippetHeader}</code>
@@ -1143,11 +1164,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 3: Python OpenAI SDK */}
           {activeEndpointTab === 'python' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 파이썬 공식 OpenAI SDK 클라이언트 초기화 코드 예시입니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -1157,6 +1178,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#93c5fd',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{pythonSnippet}</code>
@@ -1177,40 +1203,75 @@ print(response.choices[0].message.content)`;
           {testResult && (
             <div style={{
               marginTop: '16px',
-              padding: '12px 14px',
+              padding: '14px 16px',
               background: 'rgba(15, 23, 42, 0.95)',
               borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+              maxWidth: '100%',
+              width: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
+              boxSizing: 'border-box'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px',
+                flexWrap: 'wrap',
+                gap: '8px',
+                minWidth: 0,
+                width: '100%'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, flex: '1 1 260px' }}>
+                  <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem', flexShrink: 0 }}>
                     {testResult.is_success ? `HTTP ${testResult.status_code || 200} OK` : `HTTP ${testResult.status_code || '오류'}`}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600, flexShrink: 0 }}>
                     게이트웨이 응답 테스트 결과 ({testResult.latency_ms}ms)
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-muted)',
+                    wordBreak: 'break-all',
+                    overflowWrap: 'anywhere',
+                    minWidth: 0
+                  }}>
                     대상 URL: {testResult.target_url}
                   </span>
                 </div>
                 <button
                   onClick={() => setTestResult(null)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    flexShrink: 0,
+                    padding: '2px 6px'
+                  }}
                 >
                   닫기 ✕
                 </button>
               </div>
               <pre style={{
                 margin: 0,
-                padding: '8px 10px',
+                padding: '10px 12px',
                 background: '#040711',
                 borderRadius: '4px',
                 fontSize: '0.72rem',
                 fontFamily: 'var(--font-mono)',
                 color: testResult.is_success ? '#a7f3d0' : '#fca5a5',
                 overflowX: 'auto',
-                maxHeight: '160px'
+                overflowY: 'auto',
+                maxHeight: '220px',
+                maxWidth: '100%',
+                width: '100%',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere',
+                boxSizing: 'border-box'
               }}>
                 <code>
                   {testResult.response_body

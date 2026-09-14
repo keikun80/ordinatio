@@ -23,10 +23,10 @@
 각 Phase(단계)의 구현/검증이 완료되거나 주요 결함 해결/기능 수정이 발생했을 때, 에이전트는 사용자의 별도 요청 없이 아래 문서들을 **반드시 원스톱으로 동시 현행화**해야 합니다:
 1. **단계별 개별 보고서**: `architecture/PRE_{번호}_phase{N}_implementation_plan_and_test_results.md` 작성 및 검증 증적 기록.
 2. **종합 총괄 보고서 (Comprehensive Report)**:
-   - `architecture/PRE_13_PHASE_0_TO_{N}_COMPREHENSIVE_REPORT.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - `architecture/PRE_12_PHASE_0_TO_{N}_COMPREHENSIVE_REPORT.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
    - 다이어그램, 단계별 핵심 성과, 전체 테스트 매트릭스(PASS 건수), 브라우저 E2E 증적, ADR 기록 전면 업데이트.
 3. **엔지니어링 갭 분석서 (Gap Analysis)**:
-   - `architecture/PRE_14_GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - `architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
    - Phase 0부터 {N}까지의 요구사항 대비 구현율(100%), ADR-01~0N, 미구현/미테스트 및 권장 과제 전면 현행화.
 4. **디렉토리 인덱스 및 마스터 계획서 동기화**:
    - `architecture/README.md`, `architecture/PRE_01_dashboard_engineering_plan.md`, `aiorche/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.

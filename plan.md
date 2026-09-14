@@ -200,8 +200,8 @@ flowchart TD
 
 고객사 담당자가 벤더의 도움 없이도 일상적인 운영과 장애 조치를 완결할 수 있도록 특화된 관리 기능입니다.
 > 📌 **상세 설계 및 실구현 계획서 참조**: 
-> - 화면별 UI/UX 와이어프레임 및 제어 API 명세: [admin_dashboard_design.md](file:///Users/jason/project/오케스트레이터/admin_dashboard_design.md)
-> - 소프트웨어 공학 기반 프로덕션 실구현 계획서: [dashboard_engineering_plan.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/dashboard_engineering_plan.md)
+> - 화면별 UI/UX 와이어프레임 및 제어 API 명세: [admin_dashboard_design.md](./admin_dashboard_design.md)
+> - 소프트웨어 공학 기반 프로덕션 실구현 계획서: [PRE_01_dashboard_engineering_plan.md](./architecture/PRE_01_dashboard_engineering_plan.md)
 
 
 ### 5.1 패치 및 라이프사이클 관리 탭 (System Lifecycle & Patch Console)

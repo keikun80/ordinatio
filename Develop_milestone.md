@@ -5,7 +5,7 @@
 **대상 시스템**: AI Orchestrator (`aiorche`) 온프레미스 에어갭 어플라이언스  
 **작성 일자**: 2026-09-14  
 
-상세 설계 문서는 [`architecture/PRE_15_Develop_milestone.md`](file:///Users/jason/project/오케스트레이터/architecture/PRE_15_Develop_milestone.md)에도 동일하게 유지 관리됩니다.
+상세 설계 문서는 [`architecture/PRE_15_Develop_milestone.md`](./architecture/PRE_15_Develop_milestone.md)에도 동일하게 유지 관리됩니다.
 
 ---
 

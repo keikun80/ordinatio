@@ -2,7 +2,7 @@
 
 본 문서는 고객 자율 운영형 폐쇄망 어플라이언스인 **AI Orchestrator (`aiorche`)**와 글로벌 시장의 대표적인 AI 게이트웨이 솔루션인 **LiteLLM**, **Kong AI Gateway**, **Envoy AI Gateway**의 아키텍처, 성능, 보안, 거버넌스 및 운영 모델을 다차원 기술 관점에서 비교 분석한 공식 문서입니다.
 
-상세 문서는 [`architecture/PRE_00_comparison.md`](file:///Users/jason/project/오케스트레이터/architecture/PRE_00_comparison.md)에도 동일하게 유지 관리됩니다.
+상세 문서는 [`architecture/PRE_00_comparison.md`](./architecture/PRE_00_comparison.md)에도 동일하게 유지 관리됩니다.
 
 ---
 

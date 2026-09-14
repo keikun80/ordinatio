@@ -237,7 +237,7 @@ CREATE TABLE patch_histories (
   3. **xDS 동적 제어 평면 연동**: `xds_generator.py` 고도화 및 AgentRouter 결정 룰을 Envoy v3 Dynamic RouteConfiguration으로 실시간 컴파일.
   4. **관제 UI & 검증**: 대시보드 내 AgentRouter 관리 UI 및 `scripts/verify-phase0_1.sh` 자동화 검증.
 - **완료 정의 (DoD)**: `backend/tests/test_agent_router.py` 100% 통과, 프롬프트 복잡도별 자동 모델 분기 검증 완료, `ext_proc` L7 오버헤드 < 2ms, `bash scripts/verify-phase0_1.sh` PASS.
-- **상세 설계서**: [phase0_1_implementation_plan.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_1_implementation_plan.md)
+- **상세 설계서**: [PRE_02_phase0_foundations_and_ai_gateway.md](./PRE_02_phase0_foundations_and_ai_gateway.md)
 
 ---
 
@@ -292,7 +292,7 @@ CREATE TABLE patch_histories (
        - 드라이런(Dry-run) 사전 검증 모달 및 컴파일된 Envoy xDS JSON 페이로드 실시간 인스펙터
        - 리비전 번호(`xds-rev-...`) 실시간 배지 표출 및 Envoy 프록시 즉각 배포 연동
 - **완료 정의 (DoD)**: ✅ 다중 라우트 프로필 생성/수정, N-Way 가중치 분할, Envoy REST RDS v3 컴파일 및 무중단 트래픽 분기, 모델 풀 실시간 헬스체크 및 게이트웨이 엔드포인트 테스트 통합 테스트(`tests/test_routing.py` 9개 테스트) 및 `bash scripts/verify-phase2.sh` 100% 통과 (전체 백엔드 46개 테스트 100% PASS).
-- **상세 설계서**: 📄 [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)
+- **상세 설계서**: 📄 [PRE_04_phase2_model_catalog_and_routing_spec.md](./PRE_04_phase2_model_catalog_and_routing_spec.md)
 
 ---
 
@@ -441,5 +441,5 @@ ai-orchestrator-admin-v1.2.0-offline.tar.gz
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `verify-phase5.sh` 100% 통과 |
 | **Phase 6** | E2E 통합 검증, 보안 감사 및 에어갭 패키징 | 🚧 미구현 | — |
 
-- **산출물 위치**: `/Users/jason/project/오케스트레이터/dashboard_arch/dashboard_engineering_plan.md`
+- **산출물 위치**: `./PRE_01_dashboard_engineering_plan.md`
 - **다음 추천 액션**: **Phase 6 (E2E 통합 검증, 보안 감사 및 에어갭 패키징)** 구현 진행.

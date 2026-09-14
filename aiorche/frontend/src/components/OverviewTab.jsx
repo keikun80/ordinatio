@@ -272,14 +272,14 @@ export default function OverviewTab({ onNavigateTab }) {
               <div 
                 key={pool.id} 
                 style={{
-                  background: 'rgba(15, 23, 42, 0.65)',
+                  background: 'var(--bg-panel)',
                   borderRadius: 'var(--radius-md)',
                   padding: '18px',
                   border: '1px solid var(--border-subtle)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff' }}>{pool.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{pool.name}</div>
                   <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`}>
                     {pool.status === 'HEALTHY' ? '정상 가동' : '점검 필요'}
                   </span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import OverviewTab from './components/OverviewTab';
@@ -14,6 +14,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [unreadPatchCount, setUnreadPatchCount] = useState(1);
   const [toasts, setToasts] = useState([]);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('aiorche_theme') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('aiorche_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Trigger Toast Notification
   const addToast = (type, message) => {
@@ -42,6 +54,8 @@ export default function App() {
         <Header 
           onOpenPatchTab={() => setActiveTab('lifecycle')}
           unreadPatchCount={unreadPatchCount}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         <main className="page-content">

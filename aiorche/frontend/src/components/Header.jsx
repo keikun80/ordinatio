@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Server, Bell, Download, RefreshCw, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Server, Bell, Download, RefreshCw, ExternalLink, Sun, Moon } from 'lucide-react';
 import { apiClient } from '../api/client';
 
-export default function Header({ onOpenPatchTab, unreadPatchCount = 1 }) {
+export default function Header({ onOpenPatchTab, unreadPatchCount = 1, theme = 'dark', onToggleTheme }) {
   const [datacenterName, setDatacenterName] = useState(
     import.meta.env.VITE_DATACENTER_NAME || '온프레미스 주전산센터'
   );
@@ -36,7 +36,7 @@ export default function Header({ onOpenPatchTab, unreadPatchCount = 1 }) {
         </div>
 
         {/* 통신 상태 컬러 범례 배지 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '16px', padding: '4px 10px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.72rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '16px', padding: '4px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.72rem' }}>
           <span style={{ color: 'var(--text-muted)' }}>UI 통신 진단:</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#F54927', fontWeight: 600 }}>
             <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F54927' }}></span>
@@ -50,6 +50,25 @@ export default function Header({ onOpenPatchTab, unreadPatchCount = 1 }) {
       </div>
 
       <div className="header-right">
+        {/* 테마 토글 버튼 (Dark / Light) */}
+        <button 
+          className="theme-toggle-btn"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? '라이트 테마로 전환' : '다크 테마로 전환'}
+          aria-label="컬러 테마 토글"
+        >
+          <span className="theme-toggle-icon">
+            {theme === 'dark' ? (
+              <Sun size={15} color="#fbbf24" />
+            ) : (
+              <Moon size={15} color="#6366f1" />
+            )}
+          </span>
+          <span style={{ textTransform: 'capitalize' }}>
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </span>
+        </button>
+
         {unreadPatchCount > 0 && (
           <button 
             className="header-action-btn"

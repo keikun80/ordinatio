@@ -804,8 +804,8 @@ print(response.choices[0].message.content)`;
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
             <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
-            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc' }}>AgentRouter 탑재</span>
-            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>Phase 0.1 활성</span>
+            <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
+            <span className="badge active" style={{ fontSize: '0.75rem' }}>Phase 0.1 활성</span>
           </div>
           <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
         </div>
@@ -820,10 +820,10 @@ print(response.choices[0].message.content)`;
       </div>
 
       {/* Phase 0.1: AgentRouter Cognitive Dispatcher Panel */}
-      <div className="card" style={{ marginBottom: '20px', padding: '20px', border: '1px solid rgba(192, 132, 252, 0.3)', background: 'rgba(15, 23, 42, 0.65)' }}>
+      <div className="card" style={{ marginBottom: '20px', padding: '20px', borderColor: 'rgba(124, 58, 237, 0.35)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(124, 58, 237, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-purple)' }}>
               <Compass size={18} />
             </div>
             <div>
@@ -837,9 +837,9 @@ print(response.choices[0].message.content)`;
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '0.75rem' }}>Fast 8B Tier</span>
-            <span className="badge" style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
-            <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem' }}>Self-Healing Fallback</span>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Fast 8B Tier</span>
+            <span className="badge purple" style={{ fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
+            <span className="badge active" style={{ fontSize: '0.75rem' }}>Self-Healing Fallback</span>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => setShowPolicyModal(true)}
@@ -849,23 +849,22 @@ print(response.choices[0].message.content)`;
                 gap: '6px',
                 fontSize: '0.75rem',
                 padding: '4px 10px',
-                borderColor: 'rgba(192, 132, 252, 0.4)',
-                background: 'rgba(192, 132, 252, 0.15)',
-                color: '#e9d5ff',
+                color: 'var(--accent-purple)',
+                borderColor: 'rgba(124, 58, 237, 0.4)',
                 cursor: 'pointer'
               }}
             >
-              <Settings size={14} color="#c084fc" />
+              <Settings size={14} color="currentColor" />
               <span>4대 정책 상세 편집</span>
             </button>
           </div>
         </div>
 
         {/* Live Simulator Form */}
-        <div style={{ background: 'rgba(2, 6, 23, 0.5)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+        <div className="panel-nested" style={{ padding: '16px' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 500px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 프롬프트 인텐트 & 복잡도 실시간 시뮬레이터 (Simulate Live Dispatch)
               </label>
               <textarea
@@ -878,7 +877,7 @@ print(response.choices[0].message.content)`;
               />
             </div>
             <div style={{ width: '160px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 라우팅 정책
               </label>
               <select
@@ -908,33 +907,33 @@ print(response.choices[0].message.content)`;
 
           {/* Simulation Output Card */}
           {agentSimResult && (
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div className="panel-kpi-sub">
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>판정된 복잡도 (Complexity)</span>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: agentSimResult.complexity === 'REASONING_HEAVY' ? '#c084fc' : (agentSimResult.complexity === 'LIGHT' ? '#38bdf8' : '#34d399'), marginTop: '2px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: agentSimResult.complexity === 'REASONING_HEAVY' ? 'var(--accent-purple)' : (agentSimResult.complexity === 'LIGHT' ? 'var(--accent-cyan)' : 'var(--accent-emerald)'), marginTop: '2px' }}>
                   {agentSimResult.complexity}
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+              <div className="panel-kpi-sub">
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>디스패치 모델 티어</span>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f59e0b', marginTop: '2px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-amber)', marginTop: '2px' }}>
                   {agentSimResult.suggested_tier.toUpperCase()}
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+              <div className="panel-kpi-sub">
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선택된 타깃 모델</span>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {agentSimResult.selected_model}
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+              <div className="panel-kpi-sub">
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Envoy 업스트림 클러스터</span>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#38bdf8', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-cyan)', marginTop: '4px' }}>
                   {agentSimResult.target_cluster}
                 </div>
               </div>
-              <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                <strong style={{ color: '#94a3b8' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
+              <div style={{ gridColumn: '1 / -1', padding: '10px 14px', background: 'var(--bg-panel)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
               </div>
             </div>
           )}
@@ -945,66 +944,74 @@ print(response.choices[0].message.content)`;
       <div className="card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              가상 라우트 프로필 ({routes.length}개):
-            </span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {routes.map((r) => {
-                const isSelected = r.route_name === selectedRouteName;
-                return (
-                  <button
-                    key={r.route_name}
-                    onClick={() => {
-                      setSelectedRouteName(r.route_name);
-                      localStorage.setItem('aiorche_selected_route', r.route_name);
-                    }}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: isSelected ? '1px solid #38bdf8' : '1px solid var(--border-subtle)',
-                      background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(15, 23, 42, 0.6)',
-                      color: isSelected ? '#38bdf8' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: '0.84rem',
-                      fontWeight: isSelected ? 600 : 500,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <GitFork size={14} color="#F54927" />
-                    <span style={{ color: '#F54927', fontWeight: 700 }}>{r.route_name}</span>
-                    <span style={{
-                      fontSize: '0.68rem',
-                      fontFamily: 'var(--font-mono)',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      background: 'rgba(56, 189, 248, 0.15)',
-                      color: '#38bdf8'
-                    }}>
-                      {r.match_conditions?.path_prefix || `/v1/routes/${r.route_name}`}
-                    </span>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      padding: '2px 6px',
-                      borderRadius: '10px',
-                      background: r.is_active !== false ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: r.is_active !== false ? '#34d399' : '#f87171'
-                    }}>
-                      우선순위 {r.priority || 10}
-                    </span>
-                  </button>
-                );
-              })}
+            <label htmlFor="route-profile-select" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <GitFork size={15} color="var(--accent-cyan)" />
+              <span>가상 라우트 프로필 ({routes.length}개):</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <select
+                id="route-profile-select"
+                className="form-select"
+                value={selectedRouteName}
+                onChange={(e) => {
+                  setSelectedRouteName(e.target.value);
+                  localStorage.setItem('aiorche_selected_route', e.target.value);
+                }}
+                style={{
+                  minWidth: '260px',
+                  padding: '7px 12px',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-card)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer'
+                }}
+              >
+                {routes.map((r) => (
+                  <option key={r.route_name} value={r.route_name} style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}>
+                    {r.route_name} — ({r.match_conditions?.path_prefix || `/v1/routes/${r.route_name}`} · 우선순위 {r.priority || 10})
+                  </option>
+                ))}
+              </select>
+
+              {currentRoute && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: 'var(--bg-panel)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--accent-cyan)'
+                  }}>
+                    {currentRoute.match_conditions?.path_prefix || `/v1/routes/${currentRoute.route_name}`}
+                  </span>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    background: currentRoute.is_active !== false ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
+                    color: currentRoute.is_active !== false ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                    border: currentRoute.is_active !== false ? '1px solid rgba(5, 150, 105, 0.25)' : '1px solid rgba(225, 29, 72, 0.25)'
+                  }}>
+                    우선순위 {currentRoute.priority || 10}
+                  </span>
+                  <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                    {currentRoute.is_active !== false ? '활성 프로필' : '비활성'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
             <span style={{ color: 'var(--text-muted)' }}>Envoy 진입점:</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontWeight: 600 }}>port 8080</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>port 8080</span>
             <span style={{ color: 'var(--border-subtle)' }}>|</span>
             <span style={{ color: 'var(--text-muted)' }}>xDS 리비전:</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: '#34d399', fontWeight: 600 }}>{xdsRevision}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', fontWeight: 600 }}>{xdsRevision}</span>
           </div>
         </div>
       </div>
@@ -1015,7 +1022,7 @@ print(response.choices[0].message.content)`;
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div className="card-title">
-                <GitFork size={20} color="#38bdf8" />
+                <GitFork size={20} color="var(--accent-cyan)" />
                 <span>라우트 정책 편집: "{currentRoute.route_name}"</span>
               </div>
               <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`}>
@@ -1036,7 +1043,7 @@ print(response.choices[0].message.content)`;
             {routes.length > 1 && (
               <button 
                 className="btn btn-secondary btn-sm" 
-                style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                style={{ color: 'var(--accent-rose)', borderColor: 'rgba(225, 29, 72, 0.3)' }}
                 onClick={handleDeleteRoute}
               >
                 <Trash2 size={14} /> 라우트 삭제
@@ -1046,13 +1053,9 @@ print(response.choices[0].message.content)`;
         </div>
 
         {/* 0. Envoy Gateway API Endpoint & Connection Guide */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.85) 100%)',
-          border: '1px solid rgba(56, 189, 248, 0.4)',
-          borderRadius: 'var(--radius-md)',
+        <div className="panel-sub" style={{
           padding: '20px',
           marginBottom: '20px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
           maxWidth: '100%',
           width: '100%',
           minWidth: 0,
@@ -1062,16 +1065,16 @@ print(response.choices[0].message.content)`;
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
             <div style={{ minWidth: 0, flex: '1 1 300px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <Globe size={18} color="#38bdf8" style={{ flexShrink: 0 }} />
-                <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>
+                <Globe size={18} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text-primary)' }}>
                   Envoy L7 게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
                 </span>
-                <span className="badge active" style={{ fontSize: '0.7rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)' }}>
+                <span className="badge active" style={{ fontSize: '0.7rem' }}>
                   무중단 xDS 라우팅 활성
                 </span>
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                외부 애플리케이션 및 개발자는 아래 엔드포인트를 호출하여 <strong style={{ color: '#ffffff' }}>"{currentRoute.route_name}"</strong> 정책에 정의된 모델 풀({currentWeights.length}개 가중치 분할)로 트래픽을 전송합니다.
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                외부 애플리케이션 및 개발자는 아래 엔드포인트를 호출하여 <strong style={{ color: 'var(--text-primary)' }}>"{currentRoute.route_name}"</strong> 정책에 정의된 모델 풀({currentWeights.length}개 가중치 분할)로 트래픽을 전송합니다.
               </div>
             </div>
 
@@ -1080,7 +1083,7 @@ print(response.choices[0].message.content)`;
                 className="btn btn-primary btn-sm"
                 onClick={() => handleTestCall(activeEndpointTab)}
                 disabled={isTestingRoute}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', background: '#0284c7' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
               >
                 <Play size={13} fill="currentColor" />
                 <span>{isTestingRoute ? '게이트웨이 호출 중...' : '⚡ 게이트웨이 즉시 테스트 호출'}</span>
@@ -1089,13 +1092,10 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* Primary Endpoint Box */}
-          <div style={{
+          <div className="panel-nested" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: '#090d16',
-            border: '1px solid #1e293b',
-            borderRadius: 'var(--radius-sm)',
             padding: '12px 16px',
             marginBottom: '16px',
             flexWrap: 'wrap',
@@ -1106,14 +1106,14 @@ print(response.choices[0].message.content)`;
             boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 260px', minWidth: 0, flexWrap: 'wrap' }}>
-              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16', flexShrink: 0 }}>
+              <span className="badge active" style={{ fontSize: '0.72rem', fontWeight: 700, flexShrink: 0 }}>
                 POST
               </span>
               <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.92rem',
                 fontWeight: 600,
-                color: '#38bdf8',
+                color: 'var(--accent-cyan)',
                 wordBreak: 'break-all',
                 overflowWrap: 'anywhere',
                 minWidth: 0
@@ -1121,7 +1121,7 @@ print(response.choices[0].message.content)`;
                 {activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`}
               </span>
               {activeEndpointTab === 'header' && (
-                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', flexShrink: 0 }}>
+                <span className="badge warning" style={{ fontSize: '0.7rem', flexShrink: 0 }}>
                   Header: x-orche-route: {currentRoute.route_name}
                 </span>
               )}
@@ -1133,7 +1133,7 @@ print(response.choices[0].message.content)`;
                 className="btn btn-secondary btn-sm"
                 style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {copiedField === 'endpoint' ? <Check size={14} color="#34d399" /> : <Copy size={14} />}
+                {copiedField === 'endpoint' ? <Check size={14} color="var(--accent-emerald)" /> : <Copy size={14} />}
                 <span>{copiedField === 'endpoint' ? '복사됨!' : 'URL 복사'}</span>
               </button>
             </div>
@@ -1153,8 +1153,8 @@ print(response.choices[0].message.content)`;
                   padding: '8px 14px',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: activeEndpointTab === tab.id ? '2px solid #38bdf8' : '2px solid transparent',
-                  color: activeEndpointTab === tab.id ? '#38bdf8' : 'var(--text-muted)',
+                  borderBottom: activeEndpointTab === tab.id ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                  color: activeEndpointTab === tab.id ? 'var(--accent-cyan)' : 'var(--text-muted)',
                   fontSize: '0.8rem',
                   fontWeight: activeEndpointTab === tab.id ? 700 : 500,
                   cursor: 'pointer',
@@ -1169,8 +1169,8 @@ print(response.choices[0].message.content)`;
           {/* Tab 1: Path Based */}
           {activeEndpointTab === 'path' && (
             <div style={{ minWidth: 0, maxWidth: '100%' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                💡 별도 헤더 없이 고유 URL 접두사로 즉시 라우팅됩니다. OpenAI SDK의 <code style={{ color: '#38bdf8' }}>base_url</code>에 그대로 지정할 수 있습니다.
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                💡 별도 헤더 없이 고유 URL 접두사로 즉시 라우팅됩니다. OpenAI SDK의 <code style={{ color: 'var(--accent-cyan)', background: 'var(--bg-panel)', padding: '2px 4px', borderRadius: '4px' }}>base_url</code>에 그대로 지정할 수 있습니다.
               </div>
               <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
@@ -1196,7 +1196,7 @@ print(response.choices[0].message.content)`;
                   className="btn btn-secondary btn-sm"
                   style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
                 >
-                  {copiedField === 'curl-path' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  {copiedField === 'curl-path' ? <Check size={13} color="var(--accent-emerald)" /> : <Copy size={13} />}
                   <span>{copiedField === 'curl-path' ? '복사됨' : 'cURL 복사'}</span>
                 </button>
               </div>
@@ -1206,8 +1206,8 @@ print(response.choices[0].message.content)`;
           {/* Tab 2: Header Based */}
           {activeEndpointTab === 'header' && (
             <div style={{ minWidth: 0, maxWidth: '100%' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                💡 공통 엔드포인트(<code style={{ color: '#38bdf8' }}>/v1/chat/completions</code>)를 사용하면서 <code style={{ color: '#fbbf24' }}>x-orche-route</code> 헤더로 목적지 라우트를 지정합니다.
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                💡 공통 엔드포인트(<code style={{ color: 'var(--accent-cyan)', background: 'var(--bg-panel)', padding: '2px 4px', borderRadius: '4px' }}>/v1/chat/completions</code>)를 사용하면서 <code style={{ color: 'var(--accent-amber)', background: 'var(--bg-panel)', padding: '2px 4px', borderRadius: '4px' }}>x-orche-route</code> 헤더로 목적지 라우트를 지정합니다.
               </div>
               <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
@@ -1233,7 +1233,7 @@ print(response.choices[0].message.content)`;
                   className="btn btn-secondary btn-sm"
                   style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
                 >
-                  {copiedField === 'curl-header' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  {copiedField === 'curl-header' ? <Check size={13} color="var(--accent-emerald)" /> : <Copy size={13} />}
                   <span>{copiedField === 'curl-header' ? '복사됨' : 'cURL 복사'}</span>
                 </button>
               </div>
@@ -1243,7 +1243,7 @@ print(response.choices[0].message.content)`;
           {/* Tab 3: Python OpenAI SDK */}
           {activeEndpointTab === 'python' && (
             <div style={{ minWidth: 0, maxWidth: '100%' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                 💡 파이썬 공식 OpenAI SDK 클라이언트 초기화 코드 예시입니다.
               </div>
               <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
@@ -1270,7 +1270,7 @@ print(response.choices[0].message.content)`;
                   className="btn btn-secondary btn-sm"
                   style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '0.72rem', padding: '4px 8px' }}
                 >
-                  {copiedField === 'python' ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                  {copiedField === 'python' ? <Check size={13} color="var(--accent-emerald)" /> : <Copy size={13} />}
                   <span>{copiedField === 'python' ? '복사됨' : '코드 복사'}</span>
                 </button>
               </div>
@@ -1279,12 +1279,10 @@ print(response.choices[0].message.content)`;
 
           {/* Test Call Response Box */}
           {testResult && (
-            <div style={{
+            <div className="panel-nested" style={{
               marginTop: '16px',
               padding: '14px 16px',
-              background: 'rgba(15, 23, 42, 0.95)',
-              borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+              border: `1px solid ${testResult.is_success ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
               maxWidth: '100%',
               width: '100%',
               minWidth: 0,
@@ -1305,7 +1303,7 @@ print(response.choices[0].message.content)`;
                   <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem', flexShrink: 0 }}>
                     {testResult.is_success ? `HTTP ${testResult.status_code || 200} OK` : `HTTP ${testResult.status_code || '오류'}`}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600, flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 600, flexShrink: 0 }}>
                     게이트웨이 응답 테스트 결과 ({testResult.latency_ms}ms)
                   </span>
                   <span style={{
@@ -1362,11 +1360,11 @@ print(response.choices[0].message.content)`;
         </div>
 
         {/* 1. N-Way Multi-Model Traffic Splitter */}
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px', border: '1px solid var(--border-subtle)' }}>
+        <div className="panel-sub" style={{ padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} color="#38bdf8" />
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={18} color="var(--accent-cyan)" />
                 <span>1. 다중 모델 가중치 분할기 (N-Target Multi-Weighted Traffic Splitter)</span>
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -1374,17 +1372,17 @@ print(response.choices[0].message.content)`;
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance} style={{ color: '#F54927' }}>
-                <Scale size={14} color="#F54927" /> <span style={{ color: '#F54927' }}>가중치 균등 분할</span>
+              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance}>
+                <Scale size={14} color="var(--accent-cyan)" /> <span>가중치 균등 분할</span>
               </button>
               <div style={{
                 fontSize: '0.85rem',
                 fontWeight: 700,
                 padding: '4px 10px',
                 borderRadius: 'var(--radius-sm)',
-                background: totalWeight === 100 ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                color: totalWeight === 100 ? '#34d399' : '#f87171',
-                border: totalWeight === 100 ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
+                background: totalWeight === 100 ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
+                color: totalWeight === 100 ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                border: totalWeight === 100 ? '1px solid rgba(5, 150, 105, 0.3)' : '1px solid rgba(225, 29, 72, 0.3)'
               }}>
                 {totalWeight === 100 ? '총합: 100% (정상)' : `총합: ${totalWeight}% (차이: ${100 - totalWeight}%)`}
               </div>
@@ -1395,7 +1393,7 @@ print(response.choices[0].message.content)`;
           <div style={{
             height: '24px',
             width: '100%',
-            background: 'rgba(30, 41, 59, 0.8)',
+            background: 'var(--bg-panel)',
             borderRadius: 'var(--radius-sm)',
             overflow: 'hidden',
             display: 'flex',
@@ -1439,20 +1437,19 @@ print(response.choices[0].message.content)`;
               return (
                 <div 
                   key={item.model_id} 
+                  className="panel-nested"
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '16px', 
-                    background: 'rgba(30, 41, 59, 0.4)', 
                     padding: '12px 16px', 
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-subtle)'
+                    borderRadius: 'var(--radius-sm)'
                   }}
                 >
                   <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, flexShrink: 0 }} />
                   
                   <div style={{ width: '260px', flexShrink: 0 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ffffff', wordBreak: 'break-all' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
                       {item.model_id}
                     </div>
                     <div style={{ fontSize: '0.74rem', color: color, fontFamily: 'var(--font-mono)' }}>
@@ -1478,9 +1475,9 @@ print(response.choices[0].message.content)`;
                         value={item.weight}
                         onChange={(e) => handleWeightChange(idx, e.target.value)}
                         className="form-input"
-                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: '#F54927' }}
+                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: 'var(--text-primary)' }}
                       />
-                      <span style={{ fontSize: '0.8rem', color: '#F54927' }}>%</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>%</span>
                     </div>
                   </div>
 
@@ -1488,10 +1485,10 @@ print(response.choices[0].message.content)`;
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => handleRemoveModelFromRoute(idx)}
-                      style={{ padding: '6px', color: '#F54927' }}
+                      style={{ padding: '6px', color: 'var(--accent-rose)' }}
                       title="모델 제외"
                     >
-                      <Trash2 size={14} color="#F54927" />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
@@ -1505,7 +1502,13 @@ print(response.choices[0].message.content)`;
               <select
                 id="addModelSelect"
                 className="form-select"
-                style={{ maxWidth: '360px', fontSize: '0.82rem', color: '#F54927' }}
+                style={{ 
+                  maxWidth: '360px', 
+                  fontSize: '0.82rem',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-card)'
+                }}
                 defaultValue=""
                 onChange={(e) => {
                   if (e.target.value) {
@@ -1514,9 +1517,11 @@ print(response.choices[0].message.content)`;
                   }
                 }}
               >
-                <option value="" disabled>+ 카탈로그에서 추가할 모델 선택...</option>
+                <option value="" disabled style={{ color: 'var(--text-muted)' }}>
+                  + 카탈로그에서 추가할 모델 선택...
+                </option>
                 {availableModelsToAdd.map(m => (
-                  <option key={m.id} value={m.id}>
+                  <option key={m.id} value={m.id} style={{ color: 'var(--text-primary)' }}>
                     {m.id} ({m.alias})
                   </option>
                 ))}
@@ -1530,9 +1535,9 @@ print(response.choices[0].message.content)`;
 
         {/* 2. Routing Match Conditions & Priority */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '22px' }}>
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Compass size={18} color="#38bdf8" />
+          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Compass size={18} color="var(--accent-cyan)" />
               <span>2. 조건부 트래픽 매칭 규칙 (Traffic Matchers)</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem' }}>
@@ -1585,16 +1590,16 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* 3. Load Balancing Strategy & Failover Chain */}
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} color="#34d399" />
+          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} color="var(--accent-emerald)" />
               <span>3. 부하 분산 전략 & 다단계 장애 우회 (Failover Chain)</span>
             </div>
             
             <div style={{ marginBottom: '14px' }}>
               <label className="form-label" style={{ marginBottom: '6px' }}>지능형 부하 분산 알고리즘</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: '#F54927' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#F54927' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     name="strategy"
@@ -1602,9 +1607,9 @@ print(response.choices[0].message.content)`;
                     checked={(currentRoute.load_balancing_strategy || 'LeastQueueDepth') === 'LeastQueueDepth'}
                     onChange={() => updateCurrentRoute({ load_balancing_strategy: 'LeastQueueDepth' })}
                   />
-                  <span style={{ color: '#F54927' }}><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
+                  <span><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#F54927' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     name="strategy"
@@ -1660,15 +1665,7 @@ print(response.choices[0].message.content)`;
       </div>
 
       {/* Upstream Clarification Notice */}
-      <div style={{
-        background: 'rgba(30, 41, 59, 0.5)',
-        borderLeft: '4px solid #38bdf8',
-        padding: '10px 14px',
-        marginBottom: '14px',
-        borderRadius: '0 6px 6px 0',
-        fontSize: '0.78rem',
-        color: 'var(--text-secondary)'
-      }}>
+      <div className="callout-notice" style={{ marginBottom: '14px' }}>
         💡 <strong>안내:</strong> 아래 모델 카탈로그의 엔드포인트는 주전산센터 내부 <strong>'Upstream 원본 서빙 인프라'</strong> 주소입니다. 외부 개발자 및 클라이언트는 상단의 <strong>'Envoy L7 게이트웨이 엔드포인트(포트 8080)'</strong>로 인입되며, 게이트웨이가 가중치에 따라 아래 원본 모델 풀로 트래픽을 자동 분산합니다.
       </div>
 
@@ -1677,7 +1674,7 @@ print(response.choices[0].message.content)`;
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div className="card-title">
-              <Cpu size={20} color="#34d399" />
+              <Cpu size={20} color="var(--accent-emerald)" />
               <span>등록된 LLM 서빙 모델 풀 (vLLM / Ollama: {models.length}개)</span>
             </div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -1727,19 +1724,13 @@ print(response.choices[0].message.content)`;
                 return (
                   <tr key={m.id}>
                     <td>
-                      <div style={{ fontWeight: 600, color: '#ffffff' }}>{m.id}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.id}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
                     </td>
                     <td>
                       <span 
-                        className="badge"
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: isOllama ? 'rgba(249, 115, 22, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                          color: isOllama ? '#fb923c' : '#38bdf8',
-                          border: `1px solid ${isOllama ? 'rgba(249, 115, 22, 0.35)' : 'rgba(56, 189, 248, 0.35)'}`
-                        }}
+                        className={`badge ${isOllama ? 'warning' : 'info'}`}
+                        style={{ fontSize: '0.72rem', fontWeight: 700 }}
                       >
                         {m.engine || (isOllama ? 'Ollama' : 'vLLM')}
                       </span>
@@ -1747,21 +1738,8 @@ print(response.choices[0].message.content)`;
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span 
-                          className="badge" 
-                          style={{
-                            fontSize: '0.72rem',
-                            background: m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.15)' : 
-                                        (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.15)' : 
-                                        (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.1)')),
-                            color: m.backend?.includes('K8s') ? '#38bdf8' : 
-                                   (m.backend?.includes('Bare-Metal') ? '#c084fc' : 
-                                   (m.backend?.includes('VM') ? '#34d399' : '#e2e8f0')),
-                            border: `1px solid ${
-                              m.backend?.includes('K8s') ? 'rgba(56, 189, 248, 0.3)' : 
-                              (m.backend?.includes('Bare-Metal') ? 'rgba(168, 85, 247, 0.3)' : 
-                              (m.backend?.includes('VM') ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.2)'))
-                            }`
-                          }}
+                          className={`badge ${m.backend?.includes('K8s') ? 'info' : (m.backend?.includes('Bare-Metal') ? 'purple' : (m.backend?.includes('VM') ? 'active' : ''))}`}
+                          style={{ fontSize: '0.72rem' }}
                         >
                           {m.backend}
                         </span>
@@ -1770,13 +1748,13 @@ print(response.choices[0].message.content)`;
                         </span>
                       </div>
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                       {m.endpoint}
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
                       ₩{m.inputPricePer1k} / ₩{m.outputPricePer1k} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>/ 1k tok</span>
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {m.waitingQueue} reqs
                     </td>
                     <td>
@@ -1796,7 +1774,7 @@ print(response.choices[0].message.content)`;
                                 style={{ padding: '2px 8px', fontSize: '0.68rem', height: '22px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}
                                 title="실시간 엔드포인트 핑 테스트"
                               >
-                                <Zap size={11} color="#38bdf8" />
+                                <Zap size={11} color="var(--accent-cyan)" />
                                 <span>핑 테스트</span>
                               </button>
                             );
@@ -1804,12 +1782,9 @@ print(response.choices[0].message.content)`;
                           if (hs.checking) {
                             return (
                               <span
-                                className="badge"
+                                className="badge info"
                                 style={{
                                   fontSize: '0.68rem',
-                                  background: 'rgba(56, 189, 248, 0.15)',
-                                  color: '#38bdf8',
-                                  border: '1px solid rgba(56, 189, 248, 0.3)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px',
@@ -1825,12 +1800,9 @@ print(response.choices[0].message.content)`;
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <span
-                                  className="badge"
+                                  className="badge active"
                                   style={{
                                     fontSize: '0.68rem',
-                                    background: 'rgba(52, 211, 153, 0.15)',
-                                    color: '#34d399',
-                                    border: '1px solid rgba(52, 211, 153, 0.3)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '3px'
@@ -1853,12 +1825,9 @@ print(response.choices[0].message.content)`;
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span
-                                className="badge"
+                                className="badge danger"
                                 style={{
                                   fontSize: '0.68rem',
-                                  background: 'rgba(239, 68, 68, 0.15)',
-                                  color: '#f87171',
-                                  border: '1px solid rgba(239, 68, 68, 0.3)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '3px'
@@ -1871,7 +1840,7 @@ print(response.choices[0].message.content)`;
                               <button
                                 onClick={() => handleCheckSingleHealth(m.id)}
                                 title={`재시도: ${hs.error_message || '연결 실패'}`}
-                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#f87171', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-rose)', padding: '2px', display: 'flex', alignItems: 'center' }}
                               >
                                 <RefreshCw size={12} />
                               </button>
@@ -1882,7 +1851,7 @@ print(response.choices[0].message.content)`;
                     </td>
                     <td>
                       {isInCurrentRoute ? (
-                        <span style={{ color: '#34d399', fontSize: '0.8rem', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--accent-emerald)', fontSize: '0.8rem', fontWeight: 600 }}>
                           포함됨 ({currentWeights.find(w => w.model_id === m.id)?.weight}%)
                         </span>
                       ) : (
@@ -1901,13 +1870,12 @@ print(response.choices[0].message.content)`;
                         onClick={() => handleDeleteModel(m.id)}
                         style={{
                           padding: '3px 8px',
-                          color: '#f87171',
-                          borderColor: 'rgba(239, 68, 68, 0.35)',
+                          color: 'var(--accent-rose)',
+                          borderColor: 'rgba(225, 29, 72, 0.35)',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
-                          fontSize: '0.72rem',
-                          background: 'rgba(239, 68, 68, 0.08)'
+                          fontSize: '0.72rem'
                         }}
                         title="서빙 모델 풀에서 영구 삭제"
                       >
@@ -1928,8 +1896,8 @@ print(response.choices[0].message.content)`;
         <div className="modal-overlay" onClick={() => setShowNewRouteModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <GitFork size={18} color="#38bdf8" />
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitFork size={18} color="var(--accent-cyan)" />
                 <span>신규 가상 라우트 프로필 생성</span>
               </div>
             </div>
@@ -2007,8 +1975,8 @@ print(response.choices[0].message.content)`;
         <div className="modal-overlay" onClick={() => setShowNewModelModal(false)}>
           <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Cpu size={20} color="#38bdf8" />
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cpu size={20} color="var(--accent-cyan)" />
                 <span>신규 LLM 서빙 모델 등록 (vLLM / Ollama 카탈로그)</span>
               </div>
             </div>
@@ -2036,8 +2004,8 @@ print(response.choices[0].message.content)`;
                             padding: '9px 12px',
                             borderRadius: 'var(--radius-md)',
                             border: isSelected ? `2px solid ${eng.color}` : '1px solid var(--border-subtle)',
-                            background: isSelected ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.5)',
-                            color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
+                            color: isSelected ? eng.color : 'var(--text-secondary)',
                             fontWeight: isSelected ? 700 : 500,
                             fontSize: '0.8rem',
                             cursor: 'pointer',
@@ -2049,7 +2017,7 @@ print(response.choices[0].message.content)`;
                           }}
                         >
                           <span style={{ color: isSelected ? eng.color : 'inherit', fontSize: '0.88rem' }}>{eng.id}</span>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{eng.label.split(' ')[1]}</span>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{eng.label.split(' ')[1]}</span>
                         </button>
                       );
                     })}
@@ -2072,14 +2040,12 @@ print(response.choices[0].message.content)`;
 
                 {/* 3. 호스트 직접 실행/도커 가이드 스니펫 (Launch Snippet Box) */}
                 {(newModelForm.execution_method === 'direct' || newModelForm.execution_method === 'docker-compose') && (
-                  <div style={{
-                    background: 'rgba(15, 23, 42, 0.85)',
-                    border: '1px dashed var(--border-accent)',
-                    borderRadius: 'var(--radius-md)',
+                  <div className="panel-nested" style={{
+                    border: '1px dashed var(--border-subtle)',
                     padding: '12px',
                     marginBottom: '16px'
                   }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#38bdf8', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>💡 운영자 서버 구동 참고 템플릿 ({newModelForm.serving_engine} / {newModelForm.execution_method}):</span>
                     </div>
                     <pre style={{
@@ -2105,7 +2071,7 @@ print(response.choices[0].message.content)`;
                         )}
                       </code>
                     </pre>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '6px' }}>
                       ※ AI Orchestrator는 기동 완료된 엔드포인트 URL을 등록받아 L7 라우팅을 제어하며 서버에 직접 배포하지 않습니다.
                     </div>
                   </div>
@@ -2199,13 +2165,13 @@ print(response.choices[0].message.content)`;
       {showPolicyModal && (
         <div className="modal-overlay" onClick={() => setShowPolicyModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', width: '95%' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(124, 58, 237, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-purple)' }}>
                   <Settings size={20} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>AgentRouter 4대 지능형 라우팅 정책 편집</span>
                     <span className="badge active" style={{ fontSize: '0.7rem' }}>Live xDS Sync</span>
                   </div>
@@ -2223,7 +2189,7 @@ print(response.choices[0].message.content)`;
             </div>
 
             {/* Policy Navigation Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.8)', padding: '0 16px', gap: '8px', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-panel)', padding: '0 16px', gap: '8px', overflowX: 'auto' }}>
               {[
                 { id: 'QualityFirst', name: '1. QualityFirst (품질 우선)', color: '#c084fc' },
                 { id: 'LeastCost', name: '2. LeastCost (비용 최적화)', color: '#34d399' },
@@ -2241,7 +2207,7 @@ print(response.choices[0].message.content)`;
                       background: 'transparent',
                       border: 'none',
                       borderBottom: isCurrent ? `2px solid ${tab.color}` : '2px solid transparent',
-                      color: isCurrent ? '#ffffff' : 'var(--text-muted)',
+                      color: isCurrent ? 'var(--text-primary)' : 'var(--text-muted)',
                       fontWeight: isCurrent ? 600 : 400,
                       fontSize: '0.82rem',
                       cursor: 'pointer',
@@ -2265,14 +2231,14 @@ print(response.choices[0].message.content)`;
                 const cfg = pol.config || {};
                 return (
                   <div>
-                    <div style={{ padding: '10px 14px', background: 'rgba(192, 132, 252, 0.1)', borderRadius: '6px', border: '1px solid rgba(192, 132, 252, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#e9d5ff' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '6px', border: '1px solid rgba(124, 58, 237, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--accent-purple)' }}>
                       💡 <strong>QualityFirst 정책:</strong> 복잡한 알고리즘, 파이썬/SQL 코딩 및 심층 논리 추론 질문 감지 시 최고 성능 모델로 우선 분기하고 단순 일상 대화는 경량 고속 모델로 디스패치합니다.
                     </div>
 
                     <div className="form-group">
                       <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>심층 추론·코딩 전용 고성능 모델 (Reasoning 72B Tier)</span>
-                        <span style={{ color: '#c084fc', fontSize: '0.75rem' }}>클러스터: cluster_vllm_reasoning_72b</span>
+                        <span style={{ color: 'var(--accent-purple)', fontSize: '0.75rem' }}>클러스터: cluster_vllm_reasoning_72b</span>
                       </label>
                       <select
                         className="form-input"
@@ -2288,7 +2254,7 @@ print(response.choices[0].message.content)`;
                     <div className="form-group">
                       <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>일반 대화 및 단순 질의 모델 (Fast 8B Tier)</span>
-                        <span style={{ color: '#38bdf8', fontSize: '0.75rem' }}>클러스터: cluster_vllm_fast_8b</span>
+                        <span style={{ color: 'var(--accent-cyan)', fontSize: '0.75rem' }}>클러스터: cluster_vllm_fast_8b</span>
                       </label>
                       <select
                         className="form-input"
@@ -2309,7 +2275,7 @@ print(response.choices[0].message.content)`;
                         onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'enforce_reasoning_for_tools', e.target.checked)}
                         style={{ cursor: 'pointer', width: '16px', height: '16px' }}
                       />
-                      <label htmlFor="enforce_reasoning_tools" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                      <label htmlFor="enforce_reasoning_tools" style={{ fontSize: '0.82rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
                         도구/함수 호출(Tool & Function Calling) 스키마 감지 시 강제로 추론 전용 모델로 라우팅
                       </label>
                     </div>
@@ -2323,14 +2289,14 @@ print(response.choices[0].message.content)`;
                 const cfg = pol.config || {};
                 return (
                   <div>
-                    <div style={{ padding: '10px 14px', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#a7f3d0' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(5, 150, 105, 0.08)', borderRadius: '6px', border: '1px solid rgba(5, 150, 105, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>
                       💡 <strong>LeastCost 정책:</strong> 부서/테넌트의 월간 예산 소진율이 설정된 임계치(%)를 초과하면 무거운 질문이라도 경제형 모델로 강제 다운티어링하여 클라우드 및 GPU 컴퓨팅 비용 초과를 방지합니다.
                     </div>
 
                     <div className="form-group">
                       <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>예산 경보 및 다운티어링 임계치 (%)</span>
-                        <span style={{ color: '#34d399', fontWeight: 700 }}>{cfg.budget_threshold_pct || 80}% 소진 시 발동</span>
+                        <span style={{ color: 'var(--accent-emerald)', fontWeight: 700 }}>{cfg.budget_threshold_pct || 80}% 소진 시 발동</span>
                       </label>
                       <input
                         type="range"
@@ -2339,7 +2305,7 @@ print(response.choices[0].message.content)`;
                         step="5"
                         value={cfg.budget_threshold_pct || 80}
                         onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'budget_threshold_pct', parseFloat(e.target.value))}
-                        style={{ width: '100%', accentColor: '#34d399' }}
+                        style={{ width: '100%', accentColor: 'var(--accent-emerald)' }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         <span>20% (극단적 절약)</span>
@@ -2384,14 +2350,14 @@ print(response.choices[0].message.content)`;
                 const cfg = pol.config || {};
                 return (
                   <div>
-                    <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#bae6fd' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: '6px', border: '1px solid rgba(2, 132, 199, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>
                       💡 <strong>LatencyOptimized 정책:</strong> P99 응답시간 및 초저지연 TTFT(Time to First Token) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 예외를 허용합니다.
                     </div>
 
                     <div className="form-group">
                       <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>목표 최대 응답 지연시간 (Target Latency ms)</span>
-                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>{cfg.target_latency_ms || 200} ms</span>
+                        <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>{cfg.target_latency_ms || 200} ms</span>
                       </label>
                       <input
                         type="number"
@@ -2425,7 +2391,7 @@ print(response.choices[0].message.content)`;
                         onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'allow_reasoning_override', e.target.checked)}
                         style={{ cursor: 'pointer', width: '16px', height: '16px' }}
                       />
-                      <label htmlFor="allow_reasoning_override" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                      <label htmlFor="allow_reasoning_override" style={{ fontSize: '0.82rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
                         심층 논리 추론 필수 질문 시 72B 전용 모델로의 예외 라우팅 허용
                       </label>
                     </div>
@@ -2439,7 +2405,7 @@ print(response.choices[0].message.content)`;
                 const cfg = pol.config || {};
                 return (
                   <div>
-                    <div style={{ padding: '10px 14px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#fde68a' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(217, 119, 6, 0.08)', borderRadius: '6px', border: '1px solid rgba(217, 119, 6, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--accent-amber)' }}>
                       💡 <strong>SelfHealingFallback 정책:</strong> 업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시, 무중단으로 지정된 예비 모델로 자동 절체(Failover)합니다.
                     </div>
 
@@ -2521,7 +2487,7 @@ print(response.choices[0].message.content)`;
                   className="btn btn-primary"
                   onClick={handleSavePolicies}
                   disabled={isSavingPolicies}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #c084fc, #9333ea)', borderColor: '#a855f7' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   {isSavingPolicies ? <RefreshCw className="spin" size={14} /> : <Check size={14} />}
                   <span>정책 저장 및 게이트웨이 즉시 적용</span>

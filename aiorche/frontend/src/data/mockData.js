@@ -96,6 +96,18 @@ export const initialModels = [
     status: 'HEALTHY',
     activeRequests: 8,
     waitingQueue: 1
+  },
+  {
+    id: 'qwen2.5:14b',
+    alias: 'ollama-local-advisor',
+    backend: 'Local Server',
+    endpoint: 'http://127.0.0.1:11434',
+    contextWindow: 32000,
+    inputPricePer1k: 0.5,
+    outputPricePer1k: 1.5,
+    status: 'HEALTHY',
+    activeRequests: 2,
+    waitingQueue: 0
   }
 ];
 

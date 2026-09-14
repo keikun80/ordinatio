@@ -142,6 +142,17 @@ export const apiClient = {
     return await res.json();
   },
 
+  async deleteVirtualKey(keyId) {
+    const res = await fetch(`${API_BASE_URL}/virtual-keys/${keyId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '가상키 삭제 실패');
+    }
+    return await res.json();
+  },
+
   async validateVirtualKey(rawKey, modelId = null) {
     const res = await fetch(`${API_BASE_URL}/virtual-keys/validate`, {
       method: 'POST',
@@ -208,6 +219,132 @@ export const apiClient = {
     }
     return await res.json();
   },
+
+  // --- AgentRouter & Envoy AI Gateway (Phase 0.1) ---
+  async getAgentRouterStatus() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/status`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      return {
+        status: 'ACTIVE',
+        engine: 'AgentRouter Cognitive Dispatcher v0.1 (Local Fallback)',
+        supported_policies: ['QualityFirst', 'LeastCost', 'LatencyOptimized', 'SelfHealingFallback'],
+        default_tiers: {
+          fast_8b: { model: 'meta-llama/Llama-3-8B-Instruct', cluster: 'cluster_vllm_fast_8b' },
+          reasoning_72b: { model: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-70B', cluster: 'cluster_vllm_reasoning_72b' }
+        }
+      };
+    }
+  },
+
+  async simulateAgentRouter(prompt, policy = 'QualityFirst', tools = null, budgetSpentRatio = 0.0) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, policy, tools, budget_spent_ratio: budgetSpentRatio })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      const isHeavy = prompt.includes('코드') || prompt.includes('알고리즘') || prompt.includes('python') || prompt.length > 200;
+      return {
+        prompt_analyzed: prompt.slice(0, 80),
+        complexity: isHeavy ? 'REASONING_HEAVY' : 'LIGHT',
+        suggested_tier: isHeavy ? 'reasoning_72b' : 'fast_8b',
+        policy_applied: policy,
+        selected_model: isHeavy ? 'deepseek-ai/DeepSeek-R1-Distill-Qwen-70B' : 'meta-llama/Llama-3-8B-Instruct',
+        target_cluster: isHeavy ? 'cluster_vllm_reasoning_72b' : 'cluster_vllm_fast_8b',
+        estimated_tokens: Math.max(15, Math.floor(prompt.length / 3)),
+        reasons: ['Local standalone simulation fallback'],
+        has_tool_calling: Boolean(tools),
+        primary_intent: isHeavy ? 'coding' : 'light_conversation'
+      };
+    }
+  },
+
+  async getAgentRouterPolicies() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getAgentRouterPolicies offline, returning default policies');
+      return {
+        policies: [
+          {
+            policy_id: "QualityFirst",
+            name: "QualityFirst (품질 우선)",
+            description: "복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 72B 모델로 우선 분기하고 단순 질의는 8B로 처리합니다.",
+            is_active: true,
+            config: {
+              reasoning_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              fast_model: "meta-llama/Llama-3-8B-Instruct",
+              enforce_reasoning_for_tools: true,
+              reasoning_cluster: "cluster_vllm_reasoning_72b",
+              fast_cluster: "cluster_vllm_fast_8b"
+            }
+          },
+          {
+            policy_id: "LeastCost",
+            name: "LeastCost (비용 최적화)",
+            description: "테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 8B 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.",
+            is_active: true,
+            config: {
+              budget_threshold_pct: 80.0,
+              economic_model: "meta-llama/Llama-3-8B-Instruct",
+              standard_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              economic_cluster: "cluster_vllm_fast_8b",
+              standard_cluster: "cluster_vllm_reasoning_72b"
+            }
+          },
+          {
+            policy_id: "LatencyOptimized",
+            name: "LatencyOptimized (지연시간 최적화)",
+            description: "초저지연(TTFT) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.",
+            is_active: true,
+            config: {
+              target_latency_ms: 200,
+              primary_fast_model: "meta-llama/Llama-3-8B-Instruct",
+              allow_reasoning_override: true,
+              reasoning_model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-70B",
+              fast_cluster: "cluster_vllm_fast_8b",
+              reasoning_cluster: "cluster_vllm_reasoning_72b"
+            }
+          },
+          {
+            policy_id: "SelfHealingFallback",
+            name: "SelfHealingFallback (자가 치유 폴백)",
+            description: "업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.",
+            is_active: true,
+            config: {
+              primary_fallback_model: "qwen/Qwen-2.5-7B-Instruct",
+              secondary_fallback_model: "meta-llama/Llama-3-8B-Instruct",
+              max_retries: 2,
+              timeout_seconds: 5,
+              fallback_cluster: "cluster_vllm_inference_pool"
+            }
+          }
+        ]
+      };
+    }
+  },
+
+  async updateAgentRouterPolicies(policies) {
+    const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ policies })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '정책 업데이트 실패');
+    }
+    return await res.json();
+  },
+
 
   async getActiveRoutingPolicy(routeName = null) {
     try {

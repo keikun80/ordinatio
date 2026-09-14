@@ -392,3 +392,110 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         dispatched_route=req.route_name
     )
 
+# -----------------------------------------------------------------------------
+# Phase 0.1: AgentRouter Status & Interactive Intent Simulation & Policy Configs
+# -----------------------------------------------------------------------------
+from pydantic import BaseModel, Field
+from typing import Any, Dict
+from app.core.agent_router import (
+    AgentRouter,
+    classify_prompt,
+    RoutingPolicyType,
+    DEFAULT_FAST_MODEL,
+    DEFAULT_REASONING_MODEL,
+    DEFAULT_FALLBACK_MODEL
+)
+from app.core.agent_router.policy_manager import AgentRouterPolicyManager
+from app.schemas.routing import (
+    AgentRouterPolicyItem,
+    AgentRouterPoliciesResponse,
+    AgentRouterPoliciesUpdate
+)
+
+class AgentRouterSimulateRequest(BaseModel):
+    prompt: str = Field(..., description="테스트할 사용자 프롬프트 텍스트")
+    policy: Optional[str] = Field(default="QualityFirst", description="QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback")
+    tools: Optional[List[Dict[str, Any]]] = Field(default=None, description="도구/함수 호출 스키마")
+    budget_spent_ratio: Optional[float] = Field(default=0.0, ge=0.0, le=1.0)
+
+@router.get("/agent-router/status")
+def get_agent_router_status(db: Session = Depends(get_db)):
+    """AgentRouter 현재 활성 정책 및 모델 풀 상태 조회"""
+    policies = AgentRouterPolicyManager.get_all_policies(db=db)
+    return {
+        "status": "ACTIVE",
+        "engine": "AgentRouter Cognitive Dispatcher v0.1",
+        "supported_policies": [p.value for p in RoutingPolicyType],
+        "policies": policies,
+        "default_tiers": {
+            "fast_8b": {
+                "model": DEFAULT_FAST_MODEL,
+                "cluster": "cluster_vllm_fast_8b",
+                "description": "단순 질의 및 대화형 Q&A를 위한 초저지연 경량 모델"
+            },
+            "reasoning_72b": {
+                "model": DEFAULT_REASONING_MODEL,
+                "cluster": "cluster_vllm_reasoning_72b",
+                "description": "코딩, 수학, 알고리즘 및 심층 추론 전용 대형 모델"
+            },
+            "fallback": {
+                "model": DEFAULT_FALLBACK_MODEL,
+                "cluster": "cluster_vllm_inference_pool",
+                "description": "장애 발생 시 자가 치유(Self-healing) 페일오버 모델"
+            }
+        }
+    }
+
+@router.get("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+def get_agent_router_policies(db: Session = Depends(get_db)):
+    """AgentRouter 4대 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 상세 설정 조회"""
+    policies = AgentRouterPolicyManager.get_all_policies(db=db)
+    return AgentRouterPoliciesResponse(
+        policies=[AgentRouterPolicyItem(**p) for p in policies],
+        active_policy="QualityFirst"
+    )
+
+@router.put("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+def update_agent_router_policies(payload: AgentRouterPoliciesUpdate, db: Session = Depends(get_db)):
+    """AgentRouter 4대 라우팅 정책 파라미터 및 모델 매핑 업데이트"""
+    raw_list = [p.model_dump() for p in payload.policies]
+    updated = AgentRouterPolicyManager.update_policies(raw_list, db=db)
+    return AgentRouterPoliciesResponse(
+        policies=[AgentRouterPolicyItem(**p) for p in updated],
+        active_policy="QualityFirst"
+    )
+
+@router.post("/agent-router/simulate")
+def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest):
+    """프롬프트 인텐트 및 복잡도 분석 실시간 시뮬레이션"""
+    messages = [{"role": "user", "content": req.prompt}]
+    classification = classify_prompt(messages=messages, tools=req.tools)
+
+    policy_enum = RoutingPolicyType.QUALITY_FIRST
+    for p in RoutingPolicyType:
+        if p.value.lower() == (req.policy or "").lower():
+            policy_enum = p
+            break
+
+    router_inst = AgentRouter(default_policy=policy_enum)
+    decision = router_inst.evaluate_route(
+        classification=classification,
+        policy=policy_enum,
+        tenant_budget_spent_ratio=req.budget_spent_ratio or 0.0
+    )
+
+    return {
+        "prompt_analyzed": req.prompt[:100] + ("..." if len(req.prompt) > 100 else ""),
+        "complexity": decision.complexity.value,
+        "suggested_tier": decision.tier,
+        "policy_applied": decision.policy_applied.value,
+        "selected_model": decision.selected_model,
+        "target_cluster": decision.target_cluster,
+        "estimated_tokens": decision.estimated_tokens,
+        "reasons": decision.reasons,
+        "has_tool_calling": classification.has_tool_calling,
+        "primary_intent": classification.primary_intent
+    }
+
+
+

@@ -51,6 +51,9 @@ down:
 verify-phase0:
 	@bash scripts/verify-phase0.sh
 
+verify-phase0_1:
+	@bash scripts/verify-phase0_1.sh
+
 verify-phase1:
 	@bash scripts/verify-phase1.sh
 

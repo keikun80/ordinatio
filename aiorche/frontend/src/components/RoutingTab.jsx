@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, 
   Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight, 
-  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code 
+  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code, Settings 
 } from 'lucide-react';
 import { initialModels } from '../data/mockData';
 import { apiClient } from '../api/client';
@@ -95,6 +95,73 @@ export default function RoutingTab({ onNotify }) {
   const [copiedField, setCopiedField] = useState(null);
   const [isTestingRoute, setIsTestingRoute] = useState(false);
   const [testResult, setTestResult] = useState(null);
+
+  // Phase 0.1: AgentRouter & Envoy AI Gateway States
+  const [agentRouterStatus, setAgentRouterStatus] = useState(null);
+  const [agentSimPrompt, setAgentSimPrompt] = useState("파이썬 코드로 비동기 FastAPI 게이트웨이를 구현하고 성능 최적화 방안을 설명해줘.");
+  const [agentSimPolicy, setAgentSimPolicy] = useState("QualityFirst");
+  const [agentSimResult, setAgentSimResult] = useState(null);
+  const [isSimulatingAgent, setIsSimulatingAgent] = useState(false);
+
+  // 4대 라우팅 정책 편집 상태
+  const [routerPolicies, setRouterPolicies] = useState([]);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [activePolicyTab, setActivePolicyTab] = useState('QualityFirst');
+  const [isSavingPolicies, setIsSavingPolicies] = useState(false);
+
+  useEffect(() => {
+    apiClient.getAgentRouterStatus().then(status => {
+      if (status) setAgentRouterStatus(status);
+    });
+    apiClient.getAgentRouterPolicies().then(res => {
+      if (res?.policies) setRouterPolicies(res.policies);
+    });
+  }, []);
+
+  const handleUpdatePolicyConfig = (policyId, key, value) => {
+    setRouterPolicies(prev => prev.map(p => {
+      if (p.policy_id === policyId) {
+        return {
+          ...p,
+          config: {
+            ...p.config,
+            [key]: value
+          }
+        };
+      }
+      return p;
+    }));
+  };
+
+  const handleSavePolicies = async () => {
+    setIsSavingPolicies(true);
+    try {
+      const res = await apiClient.updateAgentRouterPolicies(routerPolicies);
+      if (res?.policies) {
+        setRouterPolicies(res.policies);
+      }
+      setShowPolicyModal(false);
+      if (onNotify) onNotify('SUCCESS', 'AgentRouter 4대 라우팅 정책이 성공적으로 저장 및 게이트웨이에 반영되었습니다.');
+    } catch (err) {
+      if (onNotify) onNotify('ERROR', `정책 저장 실패: ${err.message}`);
+    } finally {
+      setIsSavingPolicies(false);
+    }
+  };
+
+  const handleSimulateAgent = async () => {
+    if (!agentSimPrompt.trim()) return;
+    setIsSimulatingAgent(true);
+    try {
+      const res = await apiClient.simulateAgentRouter(agentSimPrompt, agentSimPolicy);
+      setAgentSimResult(res);
+      if (onNotify) onNotify('SUCCESS', `AgentRouter 분석 완료: [${res.complexity}] ➔ ${res.suggested_tier}`);
+    } catch (err) {
+      if (onNotify) onNotify('ERROR', 'AgentRouter 시뮬레이션 실패');
+    } finally {
+      setIsSimulatingAgent(false);
+    }
+  };
 
   // Modal States
   const [showNewRouteModal, setShowNewRouteModal] = useState(false);
@@ -716,10 +783,11 @@ print(response.choices[0].message.content)`;
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy L7 REST RDS v3</span>
-            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>멀티 라우팅 지원</span>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
+            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc' }}>AgentRouter 탑재</span>
+            <span className="badge active" style={{ fontSize: '0.75rem', background: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>Phase 0.1 활성</span>
           </div>
-          <p>업무 도메인별 다중 라우트를 독립 구성하고, N개 모델 간 실시간 가중치 분할 및 조건부 트래픽 분기를 Envoy L7을 통해 무중단 제어합니다.</p>
+          <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
@@ -728,6 +796,128 @@ print(response.choices[0].message.content)`;
           <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
             + 신규 서빙 모델 등록
           </button>
+        </div>
+      </div>
+
+      {/* Phase 0.1: AgentRouter Cognitive Dispatcher Panel */}
+      <div className="card" style={{ marginBottom: '20px', padding: '20px', border: '1px solid rgba(192, 132, 252, 0.3)', background: 'rgba(15, 23, 42, 0.65)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+              <Compass size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>AgentRouter 지능형 디스패치 관제</h3>
+                <span className="badge active" style={{ fontSize: '0.7rem' }}>2-Tier L7 AI Gateway</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Envoy AI Gateway의 L7 ext_proc 파이프라인에서 프롬프트 난이도를 실시간 분석하여 Fast 8B와 Reasoning 72B로 스마트 분기합니다.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '0.75rem' }}>Fast 8B Tier</span>
+            <span className="badge" style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
+            <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34d399', fontSize: '0.75rem' }}>Self-Healing Fallback</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowPolicyModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.75rem',
+                padding: '4px 10px',
+                borderColor: 'rgba(192, 132, 252, 0.4)',
+                background: 'rgba(192, 132, 252, 0.15)',
+                color: '#e9d5ff',
+                cursor: 'pointer'
+              }}
+            >
+              <Settings size={14} color="#c084fc" />
+              <span>4대 정책 상세 편집</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Simulator Form */}
+        <div style={{ background: 'rgba(2, 6, 23, 0.5)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 500px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                프롬프트 인텐트 & 복잡도 실시간 시뮬레이터 (Simulate Live Dispatch)
+              </label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={agentSimPrompt}
+                onChange={(e) => setAgentSimPrompt(e.target.value)}
+                placeholder="테스트할 질문을 입력하십시오. (예: 단순 날씨 질의, 복잡한 파이썬 알고리즘/SQL, 도구 호출 등)"
+                style={{ width: '100%', resize: 'vertical', fontSize: '0.85rem' }}
+              />
+            </div>
+            <div style={{ width: '160px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                라우팅 정책
+              </label>
+              <select
+                className="form-control"
+                value={agentSimPolicy}
+                onChange={(e) => setAgentSimPolicy(e.target.value)}
+                style={{ width: '100%', height: '38px', fontSize: '0.85rem' }}
+              >
+                <option value="QualityFirst">QualityFirst (품질 우선)</option>
+                <option value="LeastCost">LeastCost (비용 최적화)</option>
+                <option value="LatencyOptimized">LatencyOptimized (지연시간)</option>
+                <option value="SelfHealingFallback">SelfHealingFallback (폴백)</option>
+              </select>
+            </div>
+            <div style={{ alignSelf: 'flex-end' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSimulateAgent}
+                disabled={isSimulatingAgent}
+                style={{ height: '38px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                {isSimulatingAgent ? <RefreshCw className="spin" size={15} /> : <Play size={15} />}
+                <span>인텐트 분석 실행</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Simulation Output Card */}
+          {agentSimResult && (
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>판정된 복잡도 (Complexity)</span>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: agentSimResult.complexity === 'REASONING_HEAVY' ? '#c084fc' : (agentSimResult.complexity === 'LIGHT' ? '#38bdf8' : '#34d399'), marginTop: '2px' }}>
+                  {agentSimResult.complexity}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>디스패치 모델 티어</span>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f59e0b', marginTop: '2px' }}>
+                  {agentSimResult.suggested_tier.toUpperCase()}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선택된 타깃 모델</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {agentSimResult.selected_model}
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.6)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Envoy 업스트림 클러스터</span>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#38bdf8', marginTop: '4px' }}>
+                  {agentSimResult.target_cluster}
+                </div>
+              </div>
+              <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <strong style={{ color: '#94a3b8' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -842,12 +1032,17 @@ print(response.choices[0].message.content)`;
           borderRadius: 'var(--radius-md)',
           padding: '20px',
           marginBottom: '20px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          maxWidth: '100%',
+          width: '100%',
+          minWidth: 0,
+          overflow: 'hidden',
+          boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Globe size={18} color="#38bdf8" />
+            <div style={{ minWidth: 0, flex: '1 1 300px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <Globe size={18} color="#38bdf8" style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>
                   Envoy L7 게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
                 </span>
@@ -860,7 +1055,7 @@ print(response.choices[0].message.content)`;
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => handleTestCall(activeEndpointTab)}
@@ -884,29 +1079,35 @@ print(response.choices[0].message.content)`;
             padding: '12px 16px',
             marginBottom: '16px',
             flexWrap: 'wrap',
-            gap: '10px'
+            gap: '10px',
+            maxWidth: '100%',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
-              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 260px', minWidth: 0, flexWrap: 'wrap' }}>
+              <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, background: '#10b981', color: '#090d16', flexShrink: 0 }}>
                 POST
               </span>
               <span style={{
                 fontFamily: 'var(--font-mono)',
-                fontSize: '0.94rem',
+                fontSize: '0.92rem',
                 fontWeight: 600,
                 color: '#38bdf8',
-                wordBreak: 'break-all'
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere',
+                minWidth: 0
               }}>
                 {activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`}
               </span>
               {activeEndpointTab === 'header' && (
-                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', flexShrink: 0 }}>
                   Header: x-orche-route: {currentRoute.route_name}
                 </span>
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button
                 onClick={() => handleCopy(activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`, 'endpoint')}
                 className="btn btn-secondary btn-sm"
@@ -919,7 +1120,7 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* Integration Tabs */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '14px', flexWrap: 'wrap' }}>
             {[
               { id: 'path', label: '1. 경로 기반 호출 (Path Prefix / OpenAI base_url 호환)' },
               { id: 'header', label: '2. 공통 엔드포인트 + 라우트 헤더 지정 (Standard OpenAI)' },
@@ -947,11 +1148,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 1: Path Based */}
           {activeEndpointTab === 'path' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 별도 헤더 없이 고유 URL 접두사로 즉시 라우팅됩니다. OpenAI SDK의 <code style={{ color: '#38bdf8' }}>base_url</code>에 그대로 지정할 수 있습니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -961,6 +1162,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#a7f3d0',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{curlSnippetPath}</code>
@@ -979,11 +1185,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 2: Header Based */}
           {activeEndpointTab === 'header' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 공통 엔드포인트(<code style={{ color: '#38bdf8' }}>/v1/chat/completions</code>)를 사용하면서 <code style={{ color: '#fbbf24' }}>x-orche-route</code> 헤더로 목적지 라우트를 지정합니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -993,6 +1199,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#a7f3d0',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{curlSnippetHeader}</code>
@@ -1011,11 +1222,11 @@ print(response.choices[0].message.content)`;
 
           {/* Tab 3: Python OpenAI SDK */}
           {activeEndpointTab === 'python' && (
-            <div>
+            <div style={{ minWidth: 0, maxWidth: '100%' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                 💡 파이썬 공식 OpenAI SDK 클라이언트 초기화 코드 예시입니다.
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', minWidth: 0, maxWidth: '100%' }}>
                 <pre style={{
                   margin: 0,
                   padding: '12px 14px',
@@ -1025,6 +1236,11 @@ print(response.choices[0].message.content)`;
                   fontFamily: 'var(--font-mono)',
                   color: '#93c5fd',
                   overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
+                  boxSizing: 'border-box',
                   border: '1px solid #1e293b'
                 }}>
                   <code>{pythonSnippet}</code>
@@ -1045,40 +1261,75 @@ print(response.choices[0].message.content)`;
           {testResult && (
             <div style={{
               marginTop: '16px',
-              padding: '12px 14px',
+              padding: '14px 16px',
               background: 'rgba(15, 23, 42, 0.95)',
               borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+              border: `1px solid ${testResult.is_success ? 'rgba(52, 211, 153, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+              maxWidth: '100%',
+              width: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
+              boxSizing: 'border-box'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px',
+                flexWrap: 'wrap',
+                gap: '8px',
+                minWidth: 0,
+                width: '100%'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, flex: '1 1 260px' }}>
+                  <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem', flexShrink: 0 }}>
                     {testResult.is_success ? `HTTP ${testResult.status_code || 200} OK` : `HTTP ${testResult.status_code || '오류'}`}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 600, flexShrink: 0 }}>
                     게이트웨이 응답 테스트 결과 ({testResult.latency_ms}ms)
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-muted)',
+                    wordBreak: 'break-all',
+                    overflowWrap: 'anywhere',
+                    minWidth: 0
+                  }}>
                     대상 URL: {testResult.target_url}
                   </span>
                 </div>
                 <button
                   onClick={() => setTestResult(null)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    flexShrink: 0,
+                    padding: '2px 6px'
+                  }}
                 >
                   닫기 ✕
                 </button>
               </div>
               <pre style={{
                 margin: 0,
-                padding: '8px 10px',
+                padding: '10px 12px',
                 background: '#040711',
                 borderRadius: '4px',
                 fontSize: '0.72rem',
                 fontFamily: 'var(--font-mono)',
                 color: testResult.is_success ? '#a7f3d0' : '#fca5a5',
                 overflowX: 'auto',
-                maxHeight: '160px'
+                overflowY: 'auto',
+                maxHeight: '220px',
+                maxWidth: '100%',
+                width: '100%',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere',
+                boxSizing: 'border-box'
               }}>
                 <code>
                   {testResult.response_body
@@ -1920,6 +2171,343 @@ print(response.choices[0].message.content)`;
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 0.1: AgentRouter 4-Tier Policy Settings Modal */}
+      {showPolicyModal && (
+        <div className="modal-overlay" onClick={() => setShowPolicyModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', width: '95%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c084fc' }}>
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>AgentRouter 4대 지능형 라우팅 정책 편집</span>
+                    <span className="badge active" style={{ fontSize: '0.7rem' }}>Live xDS Sync</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    정책별 매핑 모델, 예산 임계치(%), 목표 지연시간(ms) 및 자가 치유 폴백 설정을 온프레미스 인프라에 맞춰 실시간 제어합니다.
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPolicyModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem', padding: '4px 8px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Policy Navigation Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(15, 23, 42, 0.8)', padding: '0 16px', gap: '8px', overflowX: 'auto' }}>
+              {[
+                { id: 'QualityFirst', name: '1. QualityFirst (품질 우선)', color: '#c084fc' },
+                { id: 'LeastCost', name: '2. LeastCost (비용 최적화)', color: '#34d399' },
+                { id: 'LatencyOptimized', name: '3. LatencyOptimized (지연시간)', color: '#38bdf8' },
+                { id: 'SelfHealingFallback', name: '4. SelfHealingFallback (폴백)', color: '#f59e0b' }
+              ].map(tab => {
+                const isCurrent = activePolicyTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActivePolicyTab(tab.id)}
+                    style={{
+                      padding: '12px 14px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: isCurrent ? `2px solid ${tab.color}` : '2px solid transparent',
+                      color: isCurrent ? '#ffffff' : 'var(--text-muted)',
+                      fontWeight: isCurrent ? 600 : 400,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tab.color, display: 'inline-block' }} />
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '20px' }}>
+              {/* Tab 1: QualityFirst */}
+              {activePolicyTab === 'QualityFirst' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'QualityFirst') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(192, 132, 252, 0.1)', borderRadius: '6px', border: '1px solid rgba(192, 132, 252, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#e9d5ff' }}>
+                      💡 <strong>QualityFirst 정책:</strong> 복잡한 알고리즘, 파이썬/SQL 코딩 및 심층 논리 추론 질문 감지 시 최고 성능 모델로 우선 분기하고 단순 일상 대화는 경량 고속 모델로 디스패치합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>심층 추론·코딩 전용 고성능 모델 (Reasoning 72B Tier)</span>
+                        <span style={{ color: '#c084fc', fontSize: '0.75rem' }}>클러스터: cluster_vllm_reasoning_72b</span>
+                      </label>
+                      <select
+                        className="form-input"
+                        value={cfg.reasoning_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'reasoning_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>일반 대화 및 단순 질의 모델 (Fast 8B Tier)</span>
+                        <span style={{ color: '#38bdf8', fontSize: '0.75rem' }}>클러스터: cluster_vllm_fast_8b</span>
+                      </label>
+                      <select
+                        className="form-input"
+                        value={cfg.fast_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'fast_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
+                      <input
+                        type="checkbox"
+                        id="enforce_reasoning_tools"
+                        checked={cfg.enforce_reasoning_for_tools ?? true}
+                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'enforce_reasoning_for_tools', e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <label htmlFor="enforce_reasoning_tools" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                        도구/함수 호출(Tool & Function Calling) 스키마 감지 시 강제로 추론 전용 모델로 라우팅
+                      </label>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 2: LeastCost */}
+              {activePolicyTab === 'LeastCost' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'LeastCost') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(52, 211, 153, 0.1)', borderRadius: '6px', border: '1px solid rgba(52, 211, 153, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#a7f3d0' }}>
+                      💡 <strong>LeastCost 정책:</strong> 부서/테넌트의 월간 예산 소진율이 설정된 임계치(%)를 초과하면 무거운 질문이라도 경제형 모델로 강제 다운티어링하여 클라우드 및 GPU 컴퓨팅 비용 초과를 방지합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>예산 경보 및 다운티어링 임계치 (%)</span>
+                        <span style={{ color: '#34d399', fontWeight: 700 }}>{cfg.budget_threshold_pct || 80}% 소진 시 발동</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="20"
+                        max="100"
+                        step="5"
+                        value={cfg.budget_threshold_pct || 80}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'budget_threshold_pct', parseFloat(e.target.value))}
+                        style={{ width: '100%', accentColor: '#34d399' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <span>20% (극단적 절약)</span>
+                        <span>50% (조기 경보)</span>
+                        <span>80% (표준 권장)</span>
+                        <span>100% (완전 소진 시)</span>
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">예산 초과 시 다운티어링할 경제형 모델 (Economic Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.economic_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'economic_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - 입력 ₩{m.input_price || m.input_price_per_1k}/1k</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">일반 상태(예산 여유) 시 표준 고성능 모델 (Standard Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.standard_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'standard_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 3: LatencyOptimized */}
+              {activePolicyTab === 'LatencyOptimized' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'LatencyOptimized') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#bae6fd' }}>
+                      💡 <strong>LatencyOptimized 정책:</strong> P99 응답시간 및 초저지연 TTFT(Time to First Token) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 예외를 허용합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>목표 최대 응답 지연시간 (Target Latency ms)</span>
+                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>{cfg.target_latency_ms || 200} ms</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="50"
+                        max="2000"
+                        step="25"
+                        className="form-input"
+                        value={cfg.target_latency_ms || 200}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'target_latency_ms', parseInt(e.target.value) || 200)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">초저지연 최우선 처리 모델 (Primary Fast Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.primary_fast_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'primary_fast_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+                      <input
+                        type="checkbox"
+                        id="allow_reasoning_override"
+                        checked={cfg.allow_reasoning_override ?? true}
+                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'allow_reasoning_override', e.target.checked)}
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      />
+                      <label htmlFor="allow_reasoning_override" style={{ fontSize: '0.82rem', color: '#ffffff', cursor: 'pointer' }}>
+                        심층 논리 추론 필수 질문 시 72B 전용 모델로의 예외 라우팅 허용
+                      </label>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tab 4: SelfHealingFallback */}
+              {activePolicyTab === 'SelfHealingFallback' && (() => {
+                const pol = routerPolicies.find(p => p.policy_id === 'SelfHealingFallback') || { config: {} };
+                const cfg = pol.config || {};
+                return (
+                  <div>
+                    <div style={{ padding: '10px 14px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.25)', marginBottom: '16px', fontSize: '0.8rem', color: '#fde68a' }}>
+                      💡 <strong>SelfHealingFallback 정책:</strong> 업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시, 무중단으로 지정된 예비 모델로 자동 절체(Failover)합니다.
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">1차 장애 발생 시 자동 절체 모델 (Primary Fallback Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.primary_fallback_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'primary_fallback_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">2차 예비 모델 (Secondary Fallback Model)</label>
+                      <select
+                        className="form-input"
+                        value={cfg.secondary_fallback_model || ''}
+                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'secondary_fallback_model', e.target.value)}
+                      >
+                        {models.map(m => (
+                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">최대 재시도 횟수 (Max Retries)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          className="form-input"
+                          value={cfg.max_retries || 2}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'max_retries', parseInt(e.target.value) || 2)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">장애 판정 타임아웃 (초)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="30"
+                          className="form-input"
+                          value={cfg.timeout_seconds || 5}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'timeout_seconds', parseInt(e.target.value) || 5)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  apiClient.getAgentRouterPolicies().then(res => {
+                    if (res?.policies) setRouterPolicies(res.policies);
+                    if (onNotify) onNotify('INFO', '정책 설정이 서버 저장값으로 초기화되었습니다.');
+                  });
+                }}
+                style={{ fontSize: '0.8rem' }}
+              >
+                <RefreshCw size={13} style={{ marginRight: '4px' }} /> 설정 초기화
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPolicyModal(false)}>
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSavePolicies}
+                  disabled={isSavingPolicies}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #c084fc, #9333ea)', borderColor: '#a855f7' }}
+                >
+                  {isSavingPolicies ? <RefreshCw className="spin" size={14} /> : <Check size={14} />}
+                  <span>정책 저장 및 게이트웨이 즉시 적용</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

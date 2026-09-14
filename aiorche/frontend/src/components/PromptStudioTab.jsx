@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Play, Sliders, Shield, ArrowRight, CheckCircle2, AlertTriangle, Lock } from 'lucide-react';
-import { api } from '../api/client';
-import { initialModels } from '../data/mockData';
+import { apiClient } from '../api/client';
 
 export default function PromptStudioTab({ onNotify }) {
-  const [selectedModel, setSelectedModel] = useState('meta-llama/Llama-3.1-8B-Instruct');
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(512);
   const [prompt, setPrompt] = useState('고객 홍길동(주민번호 880101-1234567, 계좌 110-123-456789)의 신용대출 심사를 위한 소득 및 상환 능력 분석 요약서를 금융감독 규정에 맞게 작성해줘.');
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState(null);
+
+  useEffect(() => {
+    apiClient.getModels().then(res => {
+      if (res && res.length > 0) {
+        const mapped = res.map(m => ({
+          id: m.model_id,
+          alias: m.alias,
+          backend: m.backend_infra,
+          engine: m.serving_engine
+        }));
+        setModels(mapped);
+        setSelectedModel(mapped[0].id);
+      }
+    }).catch(err => {
+      console.warn('Failed to load registered models in PromptStudioTab:', err);
+    });
+  }, []);
 
   const handleRunInference = async () => {
     setIsRunning(true);
@@ -17,7 +34,7 @@ export default function PromptStudioTab({ onNotify }) {
 
     try {
       // 1. Run Real PII Inspection & Masking via Backend API
-      const simRes = await api.simulatePiiMasking({
+      const simRes = await apiClient.simulatePiiMasking({
         text: prompt,
         requester_id: 'studio-playground',
         model_id: selectedModel
@@ -125,15 +142,16 @@ export default function PromptStudioTab({ onNotify }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label" style={{ color: '#F54927' }}>호출 대상 vLLM 서빙 모델</label>
+            <label className="form-label">호출 대상 서빙 모델 (등록된 모델 풀: {models.length}개)</label>
             <select 
               className="form-select"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              style={{ color: '#F54927' }}
             >
-              {initialModels.map((m) => (
-                <option key={m.id} value={m.id}>{m.id.split('/')[1] || m.id} ({m.backend})</option>
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id} ({m.alias}) [{m.backend || m.engine || 'vLLM'}]
+                </option>
               ))}
             </select>
           </div>

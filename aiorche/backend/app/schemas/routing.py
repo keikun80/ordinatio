@@ -106,3 +106,19 @@ class RouteTestCallResponse(BaseModel):
     error_message: Optional[str] = None
     dispatched_route: str
 
+class AgentRouterPolicyItem(BaseModel):
+    policy_id: str
+    name: str
+    description: Optional[str] = None
+    is_active: bool = True
+    config: Dict[str, Any]
+    updated_at: Optional[datetime] = None
+
+class AgentRouterPoliciesResponse(BaseModel):
+    policies: List[AgentRouterPolicyItem]
+    active_policy: str = "QualityFirst"
+
+class AgentRouterPoliciesUpdate(BaseModel):
+    policies: List[AgentRouterPolicyItem]
+
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle } from 'lucide-react';
+import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle, Trash2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { initialVirtualKeys, initialTenants, initialModels } from '../data/mockData';
 
@@ -44,6 +44,7 @@ export default function VirtualKeysTab({ onNotify }) {
   const [editIp, setEditIp] = useState('10.100.0.0/16');
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [editModels, setEditModels] = useState(['meta-llama/Llama-3.1-8B-Instruct']);
+  const [registeredModels, setRegisteredModels] = useState([]);
 
   // New Key Form State
   const [newKeyName, setNewKeyName] = useState('');
@@ -52,6 +53,7 @@ export default function VirtualKeysTab({ onNotify }) {
   const [newKeyTpm, setNewKeyTpm] = useState(300000);
   const [newKeyHardCap, setNewKeyHardCap] = useState(true);
   const [newKeyIp, setNewKeyIp] = useState('10.100.0.0/16');
+  const [newKeyModels, setNewKeyModels] = useState([]);
 
   // Helper to persist keys to state & localStorage
   const saveKeys = (newKeys) => {
@@ -109,6 +111,21 @@ export default function VirtualKeysTab({ onNotify }) {
             keyPrefix: k.key_prefix
           }));
           saveKeys(mappedKeys);
+        }
+
+        const liveModels = await apiClient.getModels();
+        if (liveModels && liveModels.length > 0) {
+          const mappedModels = liveModels.map((m) => ({
+            id: m.model_id,
+            name: m.name,
+            alias: m.alias
+          }));
+          setRegisteredModels(mappedModels);
+          setNewKeyModels(mappedModels.map((m) => m.id));
+        } else if (initialModels && initialModels.length > 0) {
+          const fallback = initialModels.map((m) => ({ id: m.id, name: m.name, alias: m.alias }));
+          setRegisteredModels(fallback);
+          setNewKeyModels(fallback.map((m) => m.id));
         }
       } catch (err) {
         console.warn('Backend API offline, keeping persisted local data:', err);
@@ -192,6 +209,35 @@ export default function VirtualKeysTab({ onNotify }) {
     }
   };
 
+  // Delete Revoked Key
+  const handleDeleteKey = async (keyId, keyName) => {
+    const targetKey = keys.find((k) => k.keyId === keyId);
+    if (!targetKey) return;
+
+    if (targetKey.status === 'ACTIVE') {
+      onNotify('ERROR', `활성 상태인 가상키 [${keyName}]는 삭제할 수 없습니다. 먼저 파기(Revoke)해 주십시오.`);
+      return;
+    }
+
+    const confirmed = window.confirm(`정말로 파기된 가상 API Key [${keyName} (${keyId})]를 영구 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.`);
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      await apiClient.deleteVirtualKey(keyId);
+      const updatedKeys = keys.filter((k) => k.keyId !== keyId);
+      saveKeys(updatedKeys);
+      onNotify('SUCCESS', `가상 API Key [${keyName}]가 안전하게 영구 삭제되었습니다.`);
+    } catch (err) {
+      console.warn('Backend delete offline, removing from local state:', err);
+      const updatedKeys = keys.filter((k) => k.keyId !== keyId);
+      saveKeys(updatedKeys);
+      onNotify('SUCCESS', `가상 API Key [${keyName}]가 로컬 저장소에서 삭제되었습니다.`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Create Key
   const handleCreateKey = async (e) => {
     e.preventDefault();
@@ -199,13 +245,16 @@ export default function VirtualKeysTab({ onNotify }) {
 
     setIsLoading(true);
     const deptObj = tenants.find((d) => d.id === newKeyDept) || tenants[0];
+    const targetAllowedModels = newKeyModels.length > 0
+      ? newKeyModels
+      : (registeredModels.length > 0 ? [registeredModels[0].id] : ['meta-llama/Llama-3.1-8B-Instruct']);
 
     try {
       // Call Backend API
       const result = await apiClient.createVirtualKey({
         name: newKeyName,
         tenant_id: deptObj.id,
-        allowed_models: ['meta-llama/Llama-3.1-8B-Instruct'],
+        allowed_models: targetAllowedModels,
         allowed_ip_cidrs: [newKeyIp],
         rpm_limit: Number(newKeyRpm),
         tpm_limit: Number(newKeyTpm)
@@ -216,7 +265,7 @@ export default function VirtualKeysTab({ onNotify }) {
         name: result.name,
         tenantName: deptObj.name,
         tenantId: deptObj.id,
-        allowedModels: result.allowed_models || ['meta-llama/Llama-3.1-8B-Instruct'],
+        allowedModels: result.allowed_models && result.allowed_models.length > 0 ? result.allowed_models : targetAllowedModels,
         rpm: result.rpm_limit,
         tpm: result.tpm_limit,
         spent: 0,
@@ -435,6 +484,17 @@ export default function VirtualKeysTab({ onNotify }) {
                         >
                           {k.status === 'BLOCKED' ? '재활성화' : '즉시 파기(Revoke)'}
                         </button>
+                        {k.status === 'BLOCKED' && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDeleteKey(k.keyId, k.name)}
+                            title="파기된 가상키 영구 삭제"
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+                          >
+                            <Trash2 size={13} />
+                            <span>삭제</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -520,12 +580,75 @@ export default function VirtualKeysTab({ onNotify }) {
                     <option value="BLOCKED">🔴 차단됨 (즉시 호출 차단)</option>
                   </select>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>허용 대상 AI 모델 (등록된 모델 풀: {registeredModels.length}개)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{editModels.length}개 모델 허용됨</span>
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    {registeredModels.map(m => {
+                      const isChecked = editModels.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditModels([...editModels, m.id]);
+                              } else {
+                                setEditModels(editModels.filter(id => id !== m.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                  {isLoading ? '저장 중...' : '변경 내용 저장'}
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editingKey.status === 'BLOCKED' ? (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      const id = editingKey.keyId;
+                      const name = editingKey.name;
+                      setEditingKey(null);
+                      handleDeleteKey(id, name);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>파기된 키 영구 삭제</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
+                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                    {isLoading ? '저장 중...' : '변경 내용 저장'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -595,6 +718,49 @@ export default function VirtualKeysTab({ onNotify }) {
                     value={newKeyIp}
                     onChange={(e) => setNewKeyIp(e.target.value)}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>허용 대상 AI 모델 (등록된 모델 풀: {registeredModels.length}개)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{newKeyModels.length}개 모델 선택됨</span>
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    {registeredModels.map(m => {
+                      const isChecked = newKeyModels.includes(m.id);
+                      return (
+                        <label
+                          key={m.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewKeyModels([...newKeyModels, m.id]);
+                              } else {
+                                setNewKeyModels(newKeyModels.filter(id => id !== m.id));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div style={{ background: 'rgba(244, 63, 94, 0.08)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>

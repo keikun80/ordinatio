@@ -97,27 +97,15 @@ export default function ComplianceTab({ onNotify }) {
     setLoadingRules(false);
   };
 
+  const [activeModelId, setActiveModelId] = useState('Solar-10.7B-Financial');
+
   const loadLogs = async () => {
     setLoadingLogs(true);
     const logs = await api.getAuditLogs({ limit: 50 });
-    if (logs && logs.length > 0) {
+    if (logs && Array.isArray(logs)) {
       setAuditLogs(logs);
     } else {
-      setAuditLogs(initialAuditLogs.map(l => ({
-        log_id: l.id,
-        timestamp: l.time,
-        requester_id: l.requester,
-        key_id: l.keyId,
-        model_id: l.model,
-        action_taken: l.action.includes('차단') ? 'BLOCK' : 'MASK',
-        is_blocked: l.status === 'BLOCKED',
-        latency_ms: 1.2,
-        worm_reference_id: l.wormId,
-        original_prompt_hash: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        masked_payload_hash: 'sha256:88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589',
-        detections_json: '[]',
-        pii_count: 1
-      })));
+      setAuditLogs([]);
     }
     setLoadingLogs(false);
   };
@@ -131,6 +119,12 @@ export default function ComplianceTab({ onNotify }) {
     loadRules();
     loadLogs();
     loadStats();
+    api.getModels().then(mList => {
+      if (mList && mList.length > 0) {
+        const active = mList.find(m => m.is_active) || mList[0];
+        setActiveModelId(active.model_id);
+      }
+    }).catch(() => {});
   }, []);
 
   // Live PII Masking Engine (Simulates Presidio + ext_proc)
@@ -141,7 +135,7 @@ export default function ComplianceTab({ onNotify }) {
         text: inputText,
         requester_id: 'Presidio-Live-Admin',
         key_id: 'sk-orch-wm-prod-01',
-        model_id: 'meta-llama/Llama-3.1-8B-Instruct'
+        model_id: activeModelId
       });
 
       setSimulationResult({

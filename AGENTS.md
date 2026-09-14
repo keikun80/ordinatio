@@ -12,7 +12,6 @@
    - 벤더(개발사)는 오케스트레이터의 **긴급 보안 패치/핫픽스 번들**만 오프라인 서명(.tar.gz + RSA-4096) 형태로 제공합니다.
 3. **디렉토리 역할 분리**:
    - `architecture/`: 소프트웨어 공학적 설계 문서, 단계별 엔지니어링 계획서 (`PRE_01_dashboard_engineering_plan.md` 등 `PRE_{번호}_` 체계).
-   - `dashboard/`: 초기 기획 및 UI 프로토타입/Mock 애플리케이션.
    - `aiorche/`: **실제 상용급 구현 모노레포** (`backend/`, `frontend/`, `deploy/`, `scripts/`, `Makefile`, `docker-compose.yml`).
 
 ## 2. 단계별 구현 및 검증 원칙 (Phased Engineering & DoD)

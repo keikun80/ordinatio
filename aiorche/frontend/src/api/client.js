@@ -439,6 +439,32 @@ export const apiClient = {
     return await res.json();
   },
 
+  async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = 'sk-orch-mock-test-key' }) {
+    // Gateway endpoint: fallback to relative /v1/chat/completions or localhost:8000
+    const gatewayUrl = window.location.port === '5173'
+      ? '/v1/chat/completions'
+      : `${(API_BASE_URL.replace(/\/api\/v1\/?$/, '') || 'http://localhost:8000')}/v1/chat/completions`;
+    const res = await fetch(gatewayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detailMsg = typeof err.detail === 'object' ? (err.detail.message || JSON.stringify(err.detail)) : (err.detail || `HTTP ${res.status}`);
+      throw new Error(detailMsg);
+    }
+    return await res.json();
+  },
+
   async deployRouting(data) {
     const res = await fetch(`${API_BASE_URL}/routing/deploy`, {
       method: 'POST',

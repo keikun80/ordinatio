@@ -473,26 +473,57 @@ export default function RoutingTab({ onNotify }) {
     onNotify('INFO', `가중치가 ${count}개 모델에 균등하게 분할되었습니다.`);
   };
 
-  // Add a model to current route
+  // Add a model to current route with automatic 100% weight balancing
   const handleAddModelToRoute = (modelId) => {
     if (!modelId) return;
     if (currentWeights.some(w => w.model_id === modelId)) {
       onNotify('WARNING', '이미 해당 라우트의 가중치 풀에 포함된 모델입니다.');
       return;
     }
-    const updatedWeights = [...currentWeights, { model_id: modelId, weight: 0 }];
+    
+    let updatedWeights;
+    if (currentWeights.length === 0) {
+      updatedWeights = [{ model_id: modelId, weight: 100 }];
+    } else {
+      const nextCount = currentWeights.length + 1;
+      const base = Math.floor(100 / nextCount);
+      const remainder = 100 - (base * nextCount);
+      updatedWeights = [
+        ...currentWeights.map((w, idx) => ({
+          ...w,
+          weight: idx === 0 ? base + remainder : base
+        })),
+        { model_id: modelId, weight: base }
+      ];
+    }
+    
     updateCurrentRoute({ traffic_weights: updatedWeights });
-    onNotify('SUCCESS', `모델 '${modelId}'이(가) 라우트 풀에 추가되었습니다. 가중치를 설정해 주세요.`);
+    onNotify('SUCCESS', `모델 '${modelId}'이(가) 라우트 풀에 추가되었습니다. (100% 균등 가중치 자동 분할)`);
   };
 
-  // Remove a model from current route
+  // Remove a model from current route with automatic 100% weight rebalancing
   const handleRemoveModelFromRoute = (index) => {
     if (currentWeights.length <= 1) {
       onNotify('ERROR', '라우트에는 최소 1개 이상의 서빙 모델이 지정되어야 합니다.');
       return;
     }
-    const updatedWeights = currentWeights.filter((_, idx) => idx !== index);
+    const filtered = currentWeights.filter((_, idx) => idx !== index);
+    
+    let updatedWeights;
+    if (filtered.length === 1) {
+      updatedWeights = [{ ...filtered[0], weight: 100 }];
+    } else {
+      const count = filtered.length;
+      const base = Math.floor(100 / count);
+      const remainder = 100 - (base * count);
+      updatedWeights = filtered.map((w, idx) => ({
+        ...w,
+        weight: idx === 0 ? base + remainder : base
+      }));
+    }
+
     updateCurrentRoute({ traffic_weights: updatedWeights });
+    onNotify('INFO', '모델이 라우트 풀에서 제외되었으며, 남은 모델에 가중치 100%가 자동 재분배되었습니다.');
   };
 
   // Dry-Run Validation
@@ -502,7 +533,7 @@ export default function RoutingTab({ onNotify }) {
       const payload = {
         route_name: currentRoute.route_name,
         traffic_weights: currentRoute.traffic_weights,
-        failover_model_id: currentRoute.failover_model_id,
+        failover_model_id: currentRoute.failover_model_id || null,
         failover_chain: currentRoute.failover_chain || [],
         match_conditions: currentRoute.match_conditions || {}
       };
@@ -523,7 +554,7 @@ export default function RoutingTab({ onNotify }) {
     }
   };
 
-  // Deploy xDS Config without downtime
+  // Deploy xDS Config without downtime & persist to backend
   const handleDeployXds = async () => {
     if (totalWeight !== 100) {
       onNotify('ERROR', `가중치 총합이 반드시 100%여야 배포할 수 있습니다 (현재: ${totalWeight}%).`);
@@ -536,7 +567,7 @@ export default function RoutingTab({ onNotify }) {
         route_name: currentRoute.route_name,
         traffic_weights: currentRoute.traffic_weights,
         load_balancing_strategy: currentRoute.load_balancing_strategy || 'LeastQueueDepth',
-        failover_model_id: currentRoute.failover_model_id,
+        failover_model_id: currentRoute.failover_model_id || null,
         failover_chain: currentRoute.failover_chain || [],
         match_conditions: currentRoute.match_conditions || {},
         priority: currentRoute.priority || 10,
@@ -549,12 +580,22 @@ export default function RoutingTab({ onNotify }) {
       const newRev = res.xds_revision;
       setXdsRevision(newRev);
       localStorage.setItem('aiorche_xds_revision', newRev);
-      onNotify('SUCCESS', `Envoy L7 게이트웨이에 라우트 [${currentRoute.route_name}] 정책이 무중단 실시간 배포되었습니다. (리비전: ${newRev})`);
+      
+      // Resync route list from backend to ensure persistence consistency
+      try {
+        const freshRoutes = await apiClient.getRoutes();
+        if (freshRoutes && freshRoutes.length > 0) {
+          setRoutes(freshRoutes);
+          localStorage.setItem('aiorche_multi_routes', JSON.stringify(freshRoutes));
+        }
+      } catch (syncErr) {
+        console.warn('Could not resync fresh routes after deploy:', syncErr);
+      }
+
+      onNotify('SUCCESS', `Envoy L7 게이트웨이에 라우트 [${currentRoute.route_name}] 정책이 무중단 실시간 배포 및 저장되었습니다. (리비전: ${newRev})`);
     } catch (err) {
-      const fallbackRev = `xds-rev-${Date.now().toString().slice(-8)}`;
-      setXdsRevision(fallbackRev);
-      localStorage.setItem('aiorche_xds_revision', fallbackRev);
-      onNotify('SUCCESS', `Envoy L7 게이트웨이에 라우트 [${currentRoute.route_name}] 정책이 무중단 실시간 배포되었습니다. (리비전: ${fallbackRev})`);
+      console.error('Failed to deploy routing policy:', err);
+      onNotify('ERROR', `라우트 정책 저장 및 배포 실패: ${err.message || '서버 응답 오류'}`);
     } finally {
       setIsDeploying(false);
     }
@@ -802,7 +843,7 @@ print(response.choices[0].message.content)`;
       <div className="page-header">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1>모델 카탈로그 & 동적 라우팅 스튜디오</h1>
+            <h1>모델 & 라우팅</h1>
             <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
             <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
             <span className="badge active" style={{ fontSize: '0.75rem' }}>Phase 0.1 활성</span>
@@ -1067,7 +1108,7 @@ print(response.choices[0].message.content)`;
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <Globe size={18} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
                 <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text-primary)' }}>
-                  Envoy L7 게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
+                  게이트웨이 API 엔드포인트 (Gateway Ingress Port: 8080)
                 </span>
                 <span className="badge active" style={{ fontSize: '0.7rem' }}>
                   무중단 xDS 라우팅 활성
@@ -1640,6 +1681,7 @@ print(response.choices[0].message.content)`;
                 onChange={(e) => updateCurrentRoute({ failover_model_id: e.target.value })}
                 style={{ fontSize: '0.82rem', marginBottom: '8px' }}
               >
+                <option value="">(선택 안 함 - 기본 라운드로빈 유지)</option>
                 {models.map(m => (
                   <option key={m.id} value={m.id}>
                     {m.id} ({m.alias})
@@ -1654,13 +1696,41 @@ print(response.choices[0].message.content)`;
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
-          <button className="btn btn-secondary" onClick={handleDryRun} disabled={isDryRunning}>
-            {isDryRunning ? '검증 중...' : '드라이런 사전 검증'}
-          </button>
-          <button className="btn btn-primary" onClick={handleDeployXds} disabled={isDeploying || totalWeight !== 100}>
-            {isDeploying ? 'Envoy RDS 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 (무중단)'}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {totalWeight === 100 ? (
+              <span style={{ fontSize: '0.84rem', color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Check size={16} />
+                <span>가중치 합계 100% 정상 (저장 및 배포 준비 완료)</span>
+              </span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.84rem', color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={16} />
+                  <span>가중치 합계: {totalWeight}% (100% 일치 시 저장 가능)</span>
+                </span>
+                {currentWeights.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAutoBalance}
+                    style={{ fontSize: '0.76rem', padding: '4px 10px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                  >
+                    ⚡ 100% 균등 자동 맞춤
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-secondary" onClick={handleDryRun} disabled={isDryRunning}>
+              {isDryRunning ? '검증 중...' : '드라이런 사전 검증'}
+            </button>
+            <button className="btn btn-primary" onClick={handleDeployXds} disabled={isDeploying || totalWeight !== 100}>
+              {isDeploying ? '저장 및 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 및 저장'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1675,7 +1745,7 @@ print(response.choices[0].message.content)`;
           <div>
             <div className="card-title">
               <Cpu size={20} color="var(--accent-emerald)" />
-              <span>등록된 LLM 서빙 모델 풀 (vLLM / Ollama: {models.length}개)</span>
+              <span>LLM 서빙 모델 풀</span>
             </div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 실시간 헬스 상태

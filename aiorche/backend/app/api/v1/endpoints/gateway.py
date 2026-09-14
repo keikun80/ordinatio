@@ -231,10 +231,14 @@ async def dispatch_chat_completion(
                     selected_from_route = item.get("model_id")
                     break
 
-    # Determine explicit model: ignore if it matches route_name or auto
+    # Determine explicit model: prioritize known ModelCatalog model_ids
+    is_catalog_model = db.query(ModelCatalog).filter(ModelCatalog.model_id == req.model).first() is not None
     explicit_model = None
-    if req.model and req.model not in ["auto", "agent-auto", route_name, None]:
+    if is_catalog_model:
         explicit_model = req.model
+    elif req.model and req.model not in ["auto", "agent-auto", "default", None]:
+        if req.model != route_name or not db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.model).first():
+            explicit_model = req.model
     elif selected_from_route:
         explicit_model = selected_from_route
 
@@ -293,7 +297,8 @@ async def dispatch_chat_completion(
     upstream_success = False
     upstream_response_data = None
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    client_timeout = httpx.Timeout(90.0, connect=3.0)
+    async with httpx.AsyncClient(timeout=client_timeout) as client:
         for url in candidate_urls:
             try:
                 res = await client.post(url, json=upstream_payload, headers={"Content-Type": "application/json"})
@@ -301,7 +306,10 @@ async def dispatch_chat_completion(
                     upstream_response_data = res.json()
                     upstream_success = True
                     break
-            except Exception:
+                else:
+                    logger.warning(f"Upstream returned HTTP {res.status_code} for URL {url}: {res.text[:100]}")
+            except Exception as e:
+                logger.warning(f"Failed connecting to upstream candidate URL {url}: {e}")
                 continue
 
     latency_ms = round((time.perf_counter() - t0) * 1000, 2)

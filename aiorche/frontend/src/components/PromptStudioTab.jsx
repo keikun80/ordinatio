@@ -6,10 +6,24 @@ export default function PromptStudioTab({ onNotify }) {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(512);
+  const [maxTokens, setMaxTokens] = useState(128);
   const [prompt, setPrompt] = useState('고객 홍길동(주민번호 880101-1234567, 계좌 110-123-456789)의 신용대출 심사를 위한 소득 및 상환 능력 분석 요약서를 금융감독 규정에 맞게 작성해줘.');
   const [isRunning, setIsRunning] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [output, setOutput] = useState(null);
+
+  useEffect(() => {
+    let timer;
+    if (isRunning) {
+      setElapsedSeconds(0);
+      timer = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [isRunning]);
 
   useEffect(() => {
     apiClient.getModels().then(res => {
@@ -32,9 +46,12 @@ export default function PromptStudioTab({ onNotify }) {
     setIsRunning(true);
     setOutput(null);
 
+    const startTime = performance.now();
+    let simRes = null;
+
     try {
       // 1. Run Real PII Inspection & Masking via Backend API
-      const simRes = await apiClient.simulatePiiMasking({
+      simRes = await apiClient.simulatePiiMasking({
         text: prompt,
         requester_id: 'studio-playground',
         model_id: selectedModel
@@ -43,6 +60,7 @@ export default function PromptStudioTab({ onNotify }) {
       if (simRes.is_blocked) {
         setOutput({
           isBlocked: true,
+          error: null,
           maskedPrompt: simRes.masked_text,
           detections: simRes.detections,
           originalHash: simRes.original_hash,
@@ -55,69 +73,69 @@ export default function PromptStudioTab({ onNotify }) {
             totalLatencyMs: simRes.latency_ms
           }
         });
-        onNotify('ERROR', '컴플라이언스 차단: 사내 사번/행번 또는 보안 정책 위반 항목이 감지되어 vLLM 호출이 즉시 차단되었습니다.');
+        onNotify('ERROR', '컴플라이언스 차단: 사내 사번/행번 또는 보안 정책 위반 항목이 감지되어 모델 호출이 즉시 차단되었습니다.');
         setIsRunning(false);
         return;
       }
 
-      // 2. Simulated LLM Response using masked text
-      setTimeout(() => {
-        setOutput({
-          isBlocked: false,
-          maskedPrompt: simRes.masked_text,
-          detections: simRes.detections,
-          originalHash: simRes.original_hash,
-          maskedHash: simRes.masked_hash,
-          auditLogId: simRes.audit_log_id,
-          response: `[금융 대출 심사 분석 요약서]
-1. 신청인 기본 사항: 고객 홍길동 (식별코드: [MASKED_RRN_880101])
-2. 결제 및 상환 계좌: [HASH_ACC_9f2a1b]
-3. 종합 상환 능력 평가:
-   - DSR (총부채원리금상환비율): 34.2% (금융당국 가이드라인 40% 이내 충족)
-   - 최근 3개년 추정 소득 안정성: 상위 25% 이내, 연체 이력 무
-4. 심사 의견:
-   - 본 건 신용대출 신청액(₩50,000,000)에 대해 당행 여신 심사 기준 제14조에 의거 '가결' 의견을 제시합니다.
-   - 단, 금리 변동 위험을 고려하여 거치 기간 없는 원리금균등분할상환을 권고합니다.`,
-          stats: {
-            piiCount: simRes.pii_count,
-            piiLatencyMs: simRes.latency_ms,
-            inputTokens: Math.round(prompt.length / 3),
-            outputTokens: 184,
-            ttftMs: 142,
-            totalLatencyMs: Math.round(1200 + simRes.latency_ms),
-            costKrw: 0.48
-          }
-        });
-        setIsRunning(false);
-        if (simRes.pii_count > 0) {
-          onNotify('SUCCESS', `vLLM 추론 완료: ${simRes.pii_count}건의 PII 마스킹 완료 페이로드가 처리되었습니다. (WORM ID: ${simRes.audit_log_id})`);
-        } else {
-          onNotify('SUCCESS', 'vLLM 추론 완료: 프롬프트에 PII가 감지되지 않아 원문 그대로 처리되었습니다.');
+      // 2. Call Real Model Inference via Gateway API with Temperature & Max Tokens
+      const effectivePrompt = simRes.masked_text || prompt;
+      const chatRes = await apiClient.executeChatCompletion({
+        model: selectedModel,
+        messages: [
+          { role: 'user', content: effectivePrompt }
+        ],
+        temperature: Number(temperature),
+        max_tokens: Number(maxTokens)
+      });
+
+      const totalLatency = Math.round(performance.now() - startTime);
+      const assistantMsg = chatRes.choices?.[0]?.message?.content || '응답 내용 없음';
+      const meta = chatRes.orche_metadata || {};
+      const usage = chatRes.usage || {};
+
+      setOutput({
+        isBlocked: false,
+        error: null,
+        maskedPrompt: simRes.masked_text,
+        detections: simRes.detections,
+        originalHash: simRes.original_hash,
+        maskedHash: simRes.masked_hash,
+        auditLogId: simRes.audit_log_id,
+        response: assistantMsg,
+        stats: {
+          piiCount: simRes.pii_count || 0,
+          piiLatencyMs: simRes.latency_ms || 1.2,
+          inputTokens: usage.prompt_tokens || Math.round(effectivePrompt.length / 4),
+          outputTokens: usage.completion_tokens || Math.round(assistantMsg.length / 4),
+          ttftMs: Math.round(meta.latency_ms ? meta.latency_ms * 0.3 : 120),
+          totalLatencyMs: meta.latency_ms ? Math.round(meta.latency_ms) : totalLatency,
+          costKrw: Number(((usage.total_tokens || 60) * 0.008).toFixed(2)),
+          servingEngine: meta.serving_engine || 'vLLM',
+          routedBy: meta.routed_by || 'Envoy AI Gateway',
+          status: meta.status || 'LIVE_UPSTREAM'
         }
-      }, 800);
+      });
+
+      onNotify('SUCCESS', `실제 모델 [${meta.selected_model || selectedModel}] 추론 완료 (토큰: ${usage.total_tokens || 0}, 소요: ${meta.latency_ms ? Math.round(meta.latency_ms) : totalLatency}ms)`);
     } catch (err) {
-      console.warn('Backend PII simulation offline, fallback to local logic:', err);
-      // Fallback
-      setTimeout(() => {
-        setIsRunning(false);
-        setOutput({
-          isBlocked: false,
-          maskedPrompt: prompt.replace(/\d{6}-[1-4]\d{6}/g, '[MASKED_RRN]'),
-          detections: [],
-          originalHash: 'sha256:e3b0c442...',
-          maskedHash: 'sha256:88d4266f...',
-          response: `[금융 대출 심사 분석 요약서]\n심사 가결`,
-          stats: {
-            piiCount: 1,
-            piiLatencyMs: 1.2,
-            inputTokens: 48,
-            outputTokens: 120,
-            ttftMs: 150,
-            totalLatencyMs: 1250,
-            costKrw: 0.40
-          }
-        });
-      }, 500);
+      console.error('Real model inference error:', err);
+      const totalLatency = Math.round(performance.now() - startTime);
+      setOutput({
+        isBlocked: false,
+        error: err.message || '알 수 없는 오류가 발생했습니다.',
+        maskedPrompt: simRes?.masked_text || '(PII 마스킹 완료 전 실패)',
+        detections: simRes?.detections || [],
+        originalHash: simRes?.original_hash,
+        maskedHash: simRes?.masked_hash,
+        response: null,
+        stats: {
+          totalLatencyMs: totalLatency
+        }
+      });
+      onNotify('ERROR', `추론 요청 실패: ${err.message}`);
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -126,7 +144,7 @@ export default function PromptStudioTab({ onNotify }) {
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-wrap">
-          <h1>엔터프라이즈 프롬프트 스튜디오 & 플레이그라운드</h1>
+          <h1>프롬프트 스튜디오</h1>
           <p>고객사 관리자가 실제 vLLM 모델을 호출하여 PII 마스킹 처리 결과, 추론 응답 품질, 토큰 지연시간을 사전 테스트하는 공간</p>
         </div>
       </div>
@@ -158,8 +176,8 @@ export default function PromptStudioTab({ onNotify }) {
 
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label className="form-label" style={{ margin: 0, color: '#F54927' }}>Temperature</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: '#F54927' }}>{temperature}</span>
+              <label className="form-label" style={{ margin: 0 }}>Temperature</label>
+              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{temperature}</span>
             </div>
             <input 
               type="range" 
@@ -174,14 +192,14 @@ export default function PromptStudioTab({ onNotify }) {
 
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label className="form-label" style={{ margin: 0, color: '#F54927' }}>Max Output Tokens</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: '#F54927' }}>{maxTokens}</span>
+              <label className="form-label" style={{ margin: 0 }}>Max Output Tokens</label>
+              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{maxTokens}</span>
             </div>
             <input 
               type="range" 
-              min="128" 
+              min="16" 
               max="2048" 
-              step="128" 
+              step="16" 
               value={maxTokens} 
               onChange={(e) => setMaxTokens(Number(e.target.value))}
               className="custom-range"
@@ -214,7 +232,7 @@ export default function PromptStudioTab({ onNotify }) {
                 disabled={isRunning}
               >
                 <Play size={14} />
-                <span>{isRunning ? 'PII 검증 및 vLLM 추론 중...' : '추론 실행 (Run)'}</span>
+                <span>{isRunning ? `PII 검증 및 모델 추론 중... (${elapsedSeconds}s)` : '추론 실행 (Run)'}</span>
               </button>
             </div>
 
@@ -224,7 +242,6 @@ export default function PromptStudioTab({ onNotify }) {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="테스트할 프롬프트를 입력하세요..."
-              style={{ color: '#F54927' }}
             />
           </div>
 
@@ -233,7 +250,12 @@ export default function PromptStudioTab({ onNotify }) {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">
-                  {output.isBlocked ? (
+                  {output.error ? (
+                    <>
+                      <AlertTriangle size={18} color="#f59e0b" />
+                      <span style={{ color: '#f59e0b' }}>추론 요청 실패 또는 업스트림 연결 오류</span>
+                    </>
+                  ) : output.isBlocked ? (
                     <>
                       <AlertTriangle size={18} color="#f43f5e" />
                       <span style={{ color: '#f43f5e' }}>컴플라이언스 정책 위반으로 차단됨</span>
@@ -245,7 +267,7 @@ export default function PromptStudioTab({ onNotify }) {
                     </>
                   )}
                 </div>
-                {output.stats && !output.isBlocked && (
+                {output.stats && !output.isBlocked && !output.error && (
                   <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
                     <span>PII 지연: <strong style={{ color: '#38bdf8' }}>{output.stats.piiLatencyMs?.toFixed(2)}ms</strong></span>
                     <span>TTFT: <strong style={{ color: '#38bdf8' }}>{output.stats.ttftMs}ms</strong></span>
@@ -254,7 +276,32 @@ export default function PromptStudioTab({ onNotify }) {
                     <span>추론 비용: <strong style={{ color: '#f59e0b' }}>₩{output.stats.costKrw}</strong></span>
                   </div>
                 )}
+                {output.error && output.stats && (
+                  <div style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                    경과 시간: <strong style={{ color: '#f59e0b' }}>{output.stats.totalLatencyMs}ms</strong>
+                  </div>
+                )}
               </div>
+
+              {/* Error Notice if Present */}
+              {output.error && (
+                <div style={{ 
+                  background: 'rgba(245, 158, 11, 0.1)', 
+                  border: '1px solid rgba(245, 158, 11, 0.3)', 
+                  borderRadius: '6px', 
+                  padding: '12px 16px', 
+                  marginBottom: '16px',
+                  color: '#fbbf24',
+                  fontSize: '0.84rem',
+                  lineHeight: 1.5
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>오류 상세 메시지:</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#fde68a' }}>{output.error}</div>
+                  <div style={{ marginTop: '8px', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                    * 로컬 CPU 환경(Ollama/vLLM)에서는 응답 생성에 수십 초가 소요될 수 있습니다. 'Max Output Tokens'를 64~128 정도로 줄이거나 모델 서빙 컨테이너의 상태를 확인해 주세요.
+                  </div>
+                </div>
+              )}
 
               {/* Side-by-Side Comparison */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
@@ -268,9 +315,9 @@ export default function PromptStudioTab({ onNotify }) {
                     borderRadius: '6px', 
                     fontSize: '0.82rem', 
                     fontFamily: 'var(--font-mono)', 
-                    color: output.isBlocked ? '#fb7185' : '#38bdf8', 
+                    color: output.isBlocked ? '#fb7185' : output.error ? '#fcd34d' : '#38bdf8', 
                     minHeight: '90px',
-                    borderLeft: `3px solid ${output.isBlocked ? '#f43f5e' : '#38bdf8'}`
+                    borderLeft: `3px solid ${output.isBlocked ? '#f43f5e' : output.error ? '#f59e0b' : '#38bdf8'}`
                   }}>
                     {output.maskedPrompt}
                   </div>
@@ -296,13 +343,13 @@ export default function PromptStudioTab({ onNotify }) {
                 </div>
               </div>
 
-              {/* Completion Output - 백엔드 통신 Mock 응답 #5EF527 */}
+              {/* Completion Output - 실제 LLM 서빙 연동 */}
               {output.response && (
                 <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#5EF527', marginBottom: '6px' }}>
-                    생성된 vLLM 스트리밍 완료 텍스트 (Completion Output - 시뮬레이션):
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                    생성된 LLM 추론 완료 텍스트 (Completion Output):
                   </div>
-                  <div style={{ background: '#090d16', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: '#5EF527', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid rgba(94, 245, 39, 0.3)' }}>
+                  <div style={{ background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid var(--border-subtle)' }}>
                     {output.response}
                   </div>
                 </div>

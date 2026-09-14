@@ -217,12 +217,33 @@ async def dispatch_chat_completion(
             elif "latency" in strat_lower or "queue" in strat_lower:
                 selected_policy_type = RoutingPolicyType.LATENCY_OPTIMIZED
 
+    # Resolve target model from route's traffic_weights if configured
+    selected_from_route = None
+    if db_policy and db_policy.traffic_weights:
+        weights = db_policy.traffic_weights
+        total_w = sum(w.get("weight", 0) for w in weights)
+        if total_w > 0:
+            r = random.uniform(0, total_w)
+            cum = 0
+            for item in weights:
+                cum += item.get("weight", 0)
+                if r <= cum:
+                    selected_from_route = item.get("model_id")
+                    break
+
+    # Determine explicit model: ignore if it matches route_name or auto
+    explicit_model = None
+    if req.model and req.model not in ["auto", "agent-auto", route_name, None]:
+        explicit_model = req.model
+    elif selected_from_route:
+        explicit_model = selected_from_route
+
     agent_router = AgentRouter(default_policy=selected_policy_type)
     routing_decision = agent_router.evaluate_route(
         classification=classification,
         policy=selected_policy_type,
         tenant_budget_spent_ratio=tenant_budget_ratio,
-        explicit_model_request=req.model if req.model not in ["auto", "agent-auto", None] else None
+        explicit_model_request=explicit_model
     )
 
     selected_model_id = routing_decision.selected_model

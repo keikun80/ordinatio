@@ -95,6 +95,7 @@ class RouteTestCallRequest(BaseModel):
     route_name: str
     method: str = "path"  # "path" or "header"
     message: str = "안녕하세요. 라우팅 테스트 요청입니다."
+    traffic_weights: Optional[List[Dict[str, Any]]] = None
 
 class RouteTestCallResponse(BaseModel):
     is_success: bool

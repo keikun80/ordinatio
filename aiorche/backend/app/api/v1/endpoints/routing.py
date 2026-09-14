@@ -336,16 +336,7 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
             request_headers["x-orche-tenant"] = policy.match_conditions["tenant_codes"][0]
 
-    payload = {
-        "model": req.route_name,
-        "messages": [
-            {"role": "user", "content": req.message}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 128
-    }
-
-    weights = policy.traffic_weights or []
+    weights = req.traffic_weights if (req.traffic_weights is not None and len(req.traffic_weights) > 0) else (policy.traffic_weights or [])
     if not weights:
         chosen_url = f"{envoy_ingress}{path_prefix if req.method == 'path' else '/v1/chat/completions'}"
         return RouteTestCallResponse(
@@ -361,6 +352,23 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
             error_message="라우트에 연결된 모델이 없습니다. (HTTP 502 Bad Gateway)",
             dispatched_route=req.route_name
         )
+
+    target_model_name = None
+    if weights:
+        first_w = weights[0]
+        if isinstance(first_w, dict):
+            target_model_name = first_w.get("model_id")
+        elif hasattr(first_w, "model_id"):
+            target_model_name = first_w.model_id
+
+    payload = {
+        "model": target_model_name or req.route_name,
+        "messages": [
+            {"role": "user", "content": req.message}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 128
+    }
 
     t0 = time.perf_counter()
     status_code = None

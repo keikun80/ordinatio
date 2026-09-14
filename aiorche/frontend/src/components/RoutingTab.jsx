@@ -423,7 +423,8 @@ export default function RoutingTab({ onNotify }) {
       const res = await apiClient.testRouteCall({
         route_name: currentRoute.route_name,
         method: methodType || activeEndpointTab,
-        message: "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다."
+        message: "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다.",
+        traffic_weights: currentWeights
       });
       setTestResult(res);
       if (res.is_success) {

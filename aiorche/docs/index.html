@@ -627,6 +627,7 @@
         <ul>
           <li><strong>100% 에어갭 / 오프라인 자립성:</strong> 외부 인터넷, 외부 CDN, 외부 원격 측정(Telemetry) 호출이 전면 차단되어 있으며 모든 프론트엔드/백엔드 에셋이 로컬 컨테이너 내부에서 번들링되어 서빙됩니다.</li>
           <li><strong>고객 주도 운영 모델 (Customer-Operated):</strong> 테넌트 발급, 가상 API Key 제어, 동적 라우팅 가중치 변경, PII 마스킹 규칙 수립, WORM 감사 증적 관리는 고객사 운영팀이 100% 자율 제어합니다.</li>
+          <li><strong>Envoy AI Gateway & ext_proc 2-Tier 라우팅:</strong> CNCF 표준 Envoy AI Gateway의 <code>ext_proc</code> 양방향 gRPC 스트림과 <strong>AgentRouter</strong>를 결합하여 초저지연 L7 SSE 스트리밍, 토큰 레이트 리미팅(TPM), 프롬프트 인텐트/복잡도 실시간 분석 및 4대 자율 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback)을 지원합니다.</li>
           <li><strong>Envoy L7 xDS 제어 평면 통합:</strong> L7 프록시 계층으로 클라우드 네이티브 표준인 Envoy를 사용하며, 백엔드 Control Plane이 Dynamic Route Discovery Service (RDS v3)를 통해 무중단으로 트래픽 분할 비율을 즉각 전달합니다.</li>
         </ul>
       </div>
@@ -936,7 +937,28 @@ bash scripts/verify-phase5.sh</code></pre>
             <img src="images/02_routing_main.png" alt="모델 & 라우팅 스튜디오 메인" class="screenshot-img" onclick="openLightbox(this)">
           </div>
           <div class="screenshot-desc">
-            현재 운영 중인 라우팅 프로필(금융 비서 실시간 챗봇, 리스크 심사 초저지연 전용선 등)과 등록된 추론 엔드포인트 목록이 표시됩니다.
+            현재 운영 중인 AgentRouter 2-Tier 관제 배너, 4대 자율 정책 카드(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback), 등록된 모델 카탈로그 및 동적 라우팅 프로필 목록이 표시됩니다.
+          </div>
+        </div>
+
+        <!-- AgentRouter Autonomous Policies -->
+        <div id="agent-router-policies">
+          <h4>[인지 라우팅] 4대 자율 정책(Autonomous Policies) 튜닝 & 편집</h4>
+          <p>
+            Envoy AI Gateway <code>ext_proc</code> 파이프라인과 결합된 <strong>AgentRouter</strong>는 프롬프트의 인텐트와 복잡도를 실시간 분석하여 최적의 모델 풀로 자동 디스패치합니다. 관리자는 웹 UI에서 4대 정책의 가중치, 임계값, 타임아웃을 즉각 편집하고 영속화할 수 있습니다.
+          </p>
+
+          <div class="screenshot-box">
+            <div class="screenshot-header">
+              <span class="screenshot-tag">⚙️ Policy Customization</span>
+              <span class="screenshot-caption">4대 자율 라우팅 정책 편집 모달</span>
+            </div>
+            <div class="screenshot-img-wrapper">
+              <img src="images/02_routing_modal_edit_policy.png" alt="라우팅 정책 편집 모달" class="screenshot-img" onclick="openLightbox(this)">
+            </div>
+            <div class="screenshot-desc">
+              정책 활성화 여부, 적용 우선순위, 복잡도 임계값, 예산 하드캡 연동 비율 및 자동 폴백 제한 시간을 실시간 조정하여 즉시 백엔드 DB 및 Envoy xDS에 반영합니다.
+            </div>
           </div>
         </div>
 
@@ -1230,6 +1252,13 @@ bash scripts/verify-phase5.sh</code></pre>
             발급된 원문 API Key(<code>sk-orch-...</code>)는 모달 생성 직후 <strong>단 1회만 화면에 노출</strong>되며,
             데이터베이스에는 최고 수준의 단방향 솔트 해시 알고리즘인 <strong>Argon2id</strong>로 변환되어 저장됩니다. 
             운영자를 포함한 그 누구도 데이터베이스에서 원문 키를 역산할 수 없습니다.
+          </div>
+
+          <div class="alert alert-info" style="margin-top: 1rem;">
+            <div class="alert-title">🗑️ 가상 API Key 수명주기: 파기(Revoke) 및 영구 삭제(Purge) 가드레일</div>
+            운영 중인 가상 API Key는 오남용 발견 시 즉시 <strong>'파기(Revoke)'</strong>하여 실시간 트래픽을 차단(HTTP 403)할 수 있습니다. 
+            보안 거버넌스 및 키 목록 청결성을 위해, <strong>이미 파기된 키에 한해 휴지통 아이콘을 통한 '영구 삭제(Purge)'</strong>가 허용됩니다. 
+            활성(Active) 상태의 키는 실수로 삭제되지 않도록 엄격한 사전 가드레일이 적용되어 있습니다.
           </div>
         </div>
       </div>

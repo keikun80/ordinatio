@@ -203,18 +203,18 @@ CREATE TABLE patch_histories (
 
 소프트웨어 공학의 애자일(Iterative & Incremental) 개발 방식을 적용하여 7개 단계로 분할 구현합니다.
 
-> **현재 진행 상태**: Phase 0 ~ Phase 5 구현 완료 ✅ | Phase 6 미구현 🚧
+> **현재 진행 상태**: Phase 0, Phase 1 ~ Phase 5 구현 완료 ✅ | **Phase 0.1 계획 수립 (In-Progress)** 🚧 | Phase 6 미구현 🚧
 
 ```
-✅ [Phase 0: 기반 환경 구축] ──► ✅ [Phase 1: 인증 & 테넌트 코어] ──► ✅ [Phase 2: Envoy xDS 연동]
-                                                                              │
+✅ [Phase 0: 기반 환경 구축] ──► 🚧 [Phase 0.1: Envoy AI Gateway & AgentRouter]
+                                              │
+┌─────────────────────────────────────────────┘
+▼
+✅ [Phase 1: 인증 & 테넌트 코어] ──► ✅ [Phase 2: Envoy xDS 연동] ──► ✅ [Phase 3: 관제 & FinOps]
+                                                                                │
 ┌─────────────────────────────────────────────────────────────────────────────┘
 ▼
-✅ [Phase 3: 관제 & FinOps]  ──► ✅ [Phase 4: PII & 감사 연동]   ──► ✅ [Phase 5: 에어갭 패치 엔진]
-                                                                              │
-┌─────────────────────────────────────────────────────────────────────────────┘
-▼
-🚧 [Phase 6: E2E 통합 검증 & 에어갭 번들 릴리즈]
+✅ [Phase 4: PII & 감사 연동]   ──► ✅ [Phase 5: 에어갭 패치 엔진] ──► 🚧 [Phase 6: E2E 통합 릴리즈]
 ```
 
 ---
@@ -226,6 +226,18 @@ CREATE TABLE patch_histories (
   2. ✅ 로컬 폐쇄망 에뮬레이션을 위한 Docker Compose 스택 구축 (Postgres, Redis, Envoy, Backend, Frontend)
   3. ✅ 코드 품질 표준화: ESLint, Prettier, Python-Black, pytest, Makefile 빌드 시스템 구성
 - **완료 정의 (DoD)**: ✅ `docker-compose up` 명령어로 로컬에서 5개 컨테이너(Postgres, Redis, Envoy, Backend, Frontend)가 정상 구동. `make verify-phase0` 통과.
+
+---
+
+### 🚧 Phase 0.1: Envoy AI Gateway (`ext_proc` 기반) 및 AgentRouter 전환 (Next-Gen AI Gateway & Agent Routing) — `계획수립 / 진행예정`
+- **목표**: CNCF 공식 표준 아키텍처인 **Envoy AI Gateway(`ext_proc` 양방향 gRPC 스트림)**와 지능형 에이전트 분기 엔진인 **AgentRouter**를 2-Tier로 결합하여 L7 LLM 프로토콜 네이티브 처리(토큰 레이트 리미트, 제로카피 SSE, TTFT 계측) 및 인텐트/복잡도 기반 스마트 디스패칭을 구현.
+- **주요 작업**:
+  1. **Envoy AI Gateway (`ext_proc` 파이프라인)**: C++ 코어 수정 없이 표준 `ext_proc` gRPC 필터를 통해 LLM 스키마 유효성 검증, L7 토큰 단위 레이트 리미팅(TPM), 제로 카피 SSE 스트리밍 파이프라인 구축 (`deploy/envoy/envoy-ai-gateway.yaml`).
+  2. **AgentRouter Engine**: 프롬프트 인텐트/복잡도 판별기(`classifier.py`: 8B vs 72B), 예산/비용 인식 디스패처, 도구 호출(Tool Calling) 체인 조율, KV-Cache/세션 어피니티, 자가 치유 폴백.
+  3. **xDS 동적 제어 평면 연동**: `xds_generator.py` 고도화 및 AgentRouter 결정 룰을 Envoy v3 Dynamic RouteConfiguration으로 실시간 컴파일.
+  4. **관제 UI & 검증**: 대시보드 내 AgentRouter 관리 UI 및 `scripts/verify-phase0_1.sh` 자동화 검증.
+- **완료 정의 (DoD)**: `backend/tests/test_agent_router.py` 100% 통과, 프롬프트 복잡도별 자동 모델 분기 검증 완료, `ext_proc` L7 오버헤드 < 2ms, `bash scripts/verify-phase0_1.sh` PASS.
+- **상세 설계서**: [phase0_1_implementation_plan.md](file:///Users/jason/project/오케스트레이터/dashboard_arch/phase0_1_implementation_plan.md)
 
 ---
 

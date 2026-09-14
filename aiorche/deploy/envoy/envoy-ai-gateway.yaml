@@ -1,0 +1,148 @@
+# Envoy AI Gateway L7 Configuration (ext_proc & LLM Protocol Native)
+# Phase 0.1 Air-Gapped High Performance AI Gateway Architecture
+
+static_resources:
+  listeners:
+  - name: ai_gateway_ingress
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: envoy_ai_gateway
+          stream_idle_timeout: 300s
+          route_config:
+            name: ai_gateway_routes
+            virtual_hosts:
+            - name: ai_services
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/health"
+                route:
+                  cluster: backend_service
+                  timeout: 5s
+
+              # AgentRouter Native Dispatch Endpoint
+              - match:
+                  prefix: "/v1/chat/completions"
+                route:
+                  cluster: backend_service
+                  timeout: 180s
+                  retry_policy:
+                    retry_on: "5xx,connect-failure,reset"
+                    num_retries: 2
+                    retry_back_off:
+                      base_interval: 0.2s
+                      max_interval: 1s
+
+              - match:
+                  prefix: "/v1/models"
+                route:
+                  cluster: backend_service
+                  timeout: 15s
+
+              - match:
+                  prefix: "/v1/routes"
+                route:
+                  cluster: backend_service
+                  timeout: 60s
+
+              - match:
+                  prefix: "/api/v1/agent-router"
+                route:
+                  cluster: backend_service
+                  timeout: 30s
+
+              - match:
+                  prefix: "/api/v1/ext-proc"
+                route:
+                  cluster: backend_service
+                  timeout: 10s
+
+          http_filters:
+          # Envoy AI Gateway HTTP Filters
+          # In production with Envoy ext_proc filter:
+          # - name: envoy.filters.http.ext_proc
+          #   typed_config:
+          #     "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+          #     grpc_service:
+          #       envoy_grpc:
+          #         cluster_name: agent_router_ext_proc
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  # Backend Orchestrator & AgentRouter Control Plane
+  - name: backend_service
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    connect_timeout: 5s
+    load_assignment:
+      cluster_name: backend_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 8000
+
+  # Fast Tier Model Cluster (e.g. 8B parameter models for light intent / high speed)
+  - name: vllm_fast_8b
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    connect_timeout: 5s
+    load_assignment:
+      cluster_name: vllm_fast_8b
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 8000
+
+  # Reasoning Tier Model Cluster (e.g. 70B/72B/R1 models for complex coding & math)
+  - name: vllm_reasoning_72b
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: LEAST_REQUEST
+    connect_timeout: 10s
+    load_assignment:
+      cluster_name: vllm_reasoning_72b
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 8000
+
+  # General vLLM Inference Pool (legacy fallback)
+  - name: vllm_inference_pool
+    type: STRICT_DNS
+    lb_policy: LEAST_REQUEST
+    connect_timeout: 5s
+    load_assignment:
+      cluster_name: vllm_inference_pool
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend
+                port_value: 8000
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

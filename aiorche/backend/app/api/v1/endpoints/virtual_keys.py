@@ -10,6 +10,7 @@ from app.models.virtual_key import VirtualKey
 from app.schemas.virtual_key import (
     VirtualKeyCreate,
     VirtualKeyCreateResponse,
+    VirtualKeyDeleteResponse,
     VirtualKeyResponse,
     VirtualKeyRevokeRequest,
     VirtualKeyUpdate,
@@ -207,6 +208,36 @@ def update_virtual_key(
         expires_at=key.expires_at,
         created_at=key.created_at,
         updated_at=key.updated_at
+    )
+
+@router.delete("/{key_id}", response_model=VirtualKeyDeleteResponse)
+def delete_virtual_key(
+    key_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    파기(비활성화)된 가상 API Key 영구 삭제
+    - 보안 및 거버넌스 규칙: 활성(ACTIVE) 상태인 키는 직접 삭제 불가하며, 반드시 파기(Revoke)된 후에만 삭제할 수 있습니다.
+    """
+    key = db.query(VirtualKey).filter(VirtualKey.key_id == key_id).first()
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"삭제할 가상 API Key를 찾을 수 없습니다: {key_id}"
+        )
+
+    if key.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="활성 상태(ACTIVE)인 가상 API Key는 삭제할 수 없습니다. 안전을 위해 먼저 키를 파기(Revoke)한 후 삭제하십시오."
+        )
+
+    db.delete(key)
+    db.commit()
+
+    return VirtualKeyDeleteResponse(
+        key_id=key_id,
+        message=f"파기된 가상 API Key [{key_id}]가 성공적으로 영구 삭제되었습니다."
     )
 
 @router.post("/validate", response_model=VirtualKeyValidateResponse)

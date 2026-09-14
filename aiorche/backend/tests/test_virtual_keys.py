@@ -219,3 +219,42 @@ def test_virtual_key_update_lifecycle():
     assert len(matches) == 1
     assert matches[0]["key_id"] == key_id
     assert matches[0]["name"] == "수정된 명칭"
+
+
+def test_virtual_key_delete_lifecycle():
+    # 1. Create active key
+    create_res = client.post(
+        "/api/v1/virtual-keys",
+        json={"name": "삭제 테스트용 키", "tenant_id": "dept-wm", "rpm_limit": 60, "tpm_limit": 50000}
+    )
+    assert create_res.status_code == 201
+    key_id = create_res.json()["key_id"]
+
+    # 2. Attempt to delete ACTIVE key -> Should fail with 400 Bad Request
+    del_active_res = client.delete(f"/api/v1/virtual-keys/{key_id}")
+    assert del_active_res.status_code == 400
+    assert "활성 상태" in del_active_res.json()["detail"]
+
+    # 3. Revoke the key
+    revoke_res = client.patch(
+        f"/api/v1/virtual-keys/{key_id}/revoke",
+        json={"revoked_reason": "삭제 전 파기 테스트"}
+    )
+    assert revoke_res.status_code == 200
+    assert revoke_res.json()["is_active"] is False
+
+    # 4. Now delete the REVOKED key -> Should succeed with 200 OK
+    del_revoked_res = client.delete(f"/api/v1/virtual-keys/{key_id}")
+    assert del_revoked_res.status_code == 200
+    assert del_revoked_res.json()["key_id"] == key_id
+    assert "영구 삭제되었습니다" in del_revoked_res.json()["message"]
+
+    # 5. Verify the key no longer exists on GET
+    get_res = client.get(f"/api/v1/virtual-keys?search=삭제 테스트용")
+    assert get_res.status_code == 200
+    assert len(get_res.json()) == 0
+
+    # 6. Second delete attempt -> Should return 404 Not Found
+    del_again_res = client.delete(f"/api/v1/virtual-keys/{key_id}")
+    assert del_again_res.status_code == 404
+

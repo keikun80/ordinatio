@@ -51,6 +51,10 @@ class VirtualKeyCreateResponse(VirtualKeyResponse):
 class VirtualKeyRevokeRequest(BaseModel):
     revoked_reason: str = Field(default="관리자에 의한 즉시 파기", description="파기/차단 사유")
 
+class VirtualKeyDeleteResponse(BaseModel):
+    key_id: str
+    message: str
+
 class VirtualKeyValidateRequest(BaseModel):
     raw_key: str = Field(..., description="검증할 가상 API Key")
     model_id: Optional[str] = Field(None, description="요청 대상 모델 ID")

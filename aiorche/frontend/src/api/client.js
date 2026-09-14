@@ -142,6 +142,17 @@ export const apiClient = {
     return await res.json();
   },
 
+  async deleteVirtualKey(keyId) {
+    const res = await fetch(`${API_BASE_URL}/virtual-keys/${keyId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '가상키 삭제 실패');
+    }
+    return await res.json();
+  },
+
   async validateVirtualKey(rawKey, modelId = null) {
     const res = await fetch(`${API_BASE_URL}/virtual-keys/validate`, {
       method: 'POST',

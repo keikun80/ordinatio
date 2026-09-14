@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle } from 'lucide-react';
+import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle, Trash2 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { initialVirtualKeys, initialTenants, initialModels } from '../data/mockData';
 
@@ -206,6 +206,35 @@ export default function VirtualKeysTab({ onNotify }) {
       onNotify('INFO', `${targetKey.name} (${keyId}) 가상키가 즉시 비활성화(Revoke)되었습니다.`);
     } else {
       onNotify('SUCCESS', `${targetKey.name} (${keyId}) 가상키가 재활성화되었습니다.`);
+    }
+  };
+
+  // Delete Revoked Key
+  const handleDeleteKey = async (keyId, keyName) => {
+    const targetKey = keys.find((k) => k.keyId === keyId);
+    if (!targetKey) return;
+
+    if (targetKey.status === 'ACTIVE') {
+      onNotify('ERROR', `활성 상태인 가상키 [${keyName}]는 삭제할 수 없습니다. 먼저 파기(Revoke)해 주십시오.`);
+      return;
+    }
+
+    const confirmed = window.confirm(`정말로 파기된 가상 API Key [${keyName} (${keyId})]를 영구 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.`);
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      await apiClient.deleteVirtualKey(keyId);
+      const updatedKeys = keys.filter((k) => k.keyId !== keyId);
+      saveKeys(updatedKeys);
+      onNotify('SUCCESS', `가상 API Key [${keyName}]가 안전하게 영구 삭제되었습니다.`);
+    } catch (err) {
+      console.warn('Backend delete offline, removing from local state:', err);
+      const updatedKeys = keys.filter((k) => k.keyId !== keyId);
+      saveKeys(updatedKeys);
+      onNotify('SUCCESS', `가상 API Key [${keyName}]가 로컬 저장소에서 삭제되었습니다.`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -455,6 +484,17 @@ export default function VirtualKeysTab({ onNotify }) {
                         >
                           {k.status === 'BLOCKED' ? '재활성화' : '즉시 파기(Revoke)'}
                         </button>
+                        {k.status === 'BLOCKED' && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDeleteKey(k.keyId, k.name)}
+                            title="파기된 가상키 영구 삭제"
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+                          >
+                            <Trash2 size={13} />
+                            <span>삭제</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -584,11 +624,31 @@ export default function VirtualKeysTab({ onNotify }) {
                   </div>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                  {isLoading ? '저장 중...' : '변경 내용 저장'}
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editingKey.status === 'BLOCKED' ? (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      const id = editingKey.keyId;
+                      const name = editingKey.name;
+                      setEditingKey(null);
+                      handleDeleteKey(id, name);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>파기된 키 영구 삭제</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
+                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                    {isLoading ? '저장 중...' : '변경 내용 저장'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

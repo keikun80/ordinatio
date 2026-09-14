@@ -11,25 +11,25 @@
    - 모든 제어 평면, 테넌트 관리, 가상 API Key, 모델 라우팅, PII 마스킹, 감사 로그 관리는 고객사 운영팀이 직접 통제합니다.
    - 벤더(개발사)는 오케스트레이터의 **긴급 보안 패치/핫픽스 번들**만 오프라인 서명(.tar.gz + RSA-4096) 형태로 제공합니다.
 3. **디렉토리 역할 분리**:
-   - `architecture/`: 소프트웨어 공학적 설계 문서, 단계별 엔지니어링 계획서 (`dashboard_engineering_plan.md`).
+   - `architecture/`: 소프트웨어 공학적 설계 문서, 단계별 엔지니어링 계획서 (`PRE_01_dashboard_engineering_plan.md` 등 `PRE_{번호}_` 체계).
    - `dashboard/`: 초기 기획 및 UI 프로토타입/Mock 애플리케이션.
    - `aiorche/`: **실제 상용급 구현 모노레포** (`backend/`, `frontend/`, `deploy/`, `scripts/`, `Makefile`, `docker-compose.yml`).
 
 ## 2. 단계별 구현 및 검증 원칙 (Phased Engineering & DoD)
-- 모든 기능 구현은 `architecture/dashboard_engineering_plan.md`의 Phase(0~4) 정의에 따라 순차적으로 진행합니다.
+- 모든 기능 구현은 `architecture/PRE_01_dashboard_engineering_plan.md`의 Phase(0~4) 정의에 따라 순차적으로 진행합니다.
 - 각 단계 완료 시 반드시 Definition of Done(DoD) 자동화 검증 스크립트(`scripts/verify-phase*.sh`) 및 `make test`를 통과해야 합니다.
 
 ## 3. 아키텍처 문서 및 종합 보고서 동기화 표준 (Documentation Synchronization Invariants)
 각 Phase(단계)의 구현/검증이 완료되거나 주요 결함 해결/기능 수정이 발생했을 때, 에이전트는 사용자의 별도 요청 없이 아래 문서들을 **반드시 원스톱으로 동시 현행화**해야 합니다:
-1. **단계별 개별 보고서**: `architecture/phase{N}_implementation_plan_and_test_results.md` 작성 및 검증 증적 기록.
+1. **단계별 개별 보고서**: `architecture/PRE_{번호}_phase{N}_implementation_plan_and_test_results.md` 작성 및 검증 증적 기록.
 2. **종합 총괄 보고서 (Comprehensive Report)**:
-   - `architecture/PHASE_0_TO_{N}_COMPREHENSIVE_REPORT.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - `architecture/PRE_13_PHASE_0_TO_{N}_COMPREHENSIVE_REPORT.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
    - 다이어그램, 단계별 핵심 성과, 전체 테스트 매트릭스(PASS 건수), 브라우저 E2E 증적, ADR 기록 전면 업데이트.
 3. **엔지니어링 갭 분석서 (Gap Analysis)**:
-   - `architecture/GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
+   - `architecture/PRE_14_GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
    - Phase 0부터 {N}까지의 요구사항 대비 구현율(100%), ADR-01~0N, 미구현/미테스트 및 권장 과제 전면 현행화.
 4. **디렉토리 인덱스 및 마스터 계획서 동기화**:
-   - `architecture/README.md`, `architecture/dashboard_engineering_plan.md`, `aiorche/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.
+   - `architecture/README.md`, `architecture/PRE_01_dashboard_engineering_plan.md`, `aiorche/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.
 
 ## 4. 기술 스택별 표준 규칙
 1. **Backend (Python)**:

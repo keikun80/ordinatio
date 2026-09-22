@@ -213,6 +213,9 @@ def seed_data():
             )
         ])
 
+    from app.core.security import ensure_system_diagnostics_key
+    ensure_system_diagnostics_key(db)
+
     db.commit()
     db.close()
 

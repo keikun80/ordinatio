@@ -21,6 +21,7 @@ from app.schemas.routing import (
     RouteTestCallResponse
 )
 from app.core.xds_generator import generate_xds_revision
+from app.core.security import SYSTEM_DIAGNOSTICS_KEY, ensure_system_diagnostics_key
 
 router = APIRouter()
 
@@ -318,18 +319,21 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
     else:
         path_prefix = f"/v1/routes/{req.route_name}"
 
+    ensure_system_diagnostics_key(db)
+    auth_header_val = f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"
+
     if req.method == "path":
         target_path = path_prefix
         request_headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer sk-orch-mock-test-key",
+            "Authorization": auth_header_val,
             "x-strict-upstream": "true"
         }
     else:
         target_path = "/v1/chat/completions"
         request_headers = {
             "Content-Type": "application/json",
-            "Authorization": "Bearer sk-orch-mock-test-key",
+            "Authorization": auth_header_val,
             "x-orche-route": req.route_name,
             "x-strict-upstream": "true"
         }

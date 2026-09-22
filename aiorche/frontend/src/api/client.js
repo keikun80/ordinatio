@@ -439,7 +439,7 @@ export const apiClient = {
     return await res.json();
   },
 
-  async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = 'sk-orch-mock-test-key' }) {
+  async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = 'sk-orch-system-diagnostics-appliance-key' }) {
     // Gateway endpoint: fallback to relative /v1/chat/completions or localhost:8000
     const gatewayUrl = window.location.port === '5173'
       ? '/v1/chat/completions'

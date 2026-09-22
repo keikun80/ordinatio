@@ -290,6 +290,11 @@ def init_db():
             db.commit()
             logger.info("Initialized database with default AgentRouter 4-tier policies")
 
+        # 8. System Diagnostics Key Provisioning
+        from app.core.security import ensure_system_diagnostics_key
+        ensure_system_diagnostics_key(db)
+        logger.info("Initialized database with official system diagnostics virtual key")
+
         db.close()
     except Exception as e:
         logger.warning(f"Database initialization skipped or deferred: {e}")

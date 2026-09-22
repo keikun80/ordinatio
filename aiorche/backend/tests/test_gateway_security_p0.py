@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
-from app.core.security import generate_virtual_key, hash_virtual_key
+from app.core.security import generate_virtual_key, hash_virtual_key, SYSTEM_DIAGNOSTICS_KEY
 from app.models.virtual_key import VirtualKey
 from tests.conftest import TestSessionLocal
 
@@ -180,7 +180,7 @@ def test_model_authorization_restriction(client: TestClient, db_session):
 
     # 2. 허용된 모델 (meta-llama/Llama-3-8B-Instruct) 명시 요청 -> 403 인가 거부 통과
     res_allowed = client.post(
-        "/api/v1/chat/completions",
+        "/v1/chat/completions",
         headers={"Authorization": f"Bearer {raw_key}"},
         json={
             "model": "meta-llama/Llama-3-8B-Instruct",
@@ -188,3 +188,45 @@ def test_model_authorization_restriction(client: TestClient, db_session):
         }
     )
     assert res_allowed.status_code != 403
+
+
+def test_system_diagnostics_key_allowed_in_strict_production(client: TestClient, monkeypatch):
+    """
+    보안 검증 5: settings.ALLOW_DEV_MOCK_KEYS = False 상태에서도
+    DB에 정식 등록된 SYSTEM_DIAGNOSTICS_KEY를 통한 요청은 401/403으로 차단되지 않음
+    """
+    from app.core.security import SYSTEM_DIAGNOSTICS_KEY
+    monkeypatch.setattr(settings, "ALLOW_DEV_MOCK_KEYS", False)
+
+    res = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"},
+        json={
+            "model": "meta-llama/Llama-3-8B-Instruct",
+            "messages": [{"role": "user", "content": "시스템 진단 테스트"}]
+        }
+    )
+    # 인증(401) 또는 권한(403) 거부되지 않고 정상 통과 (업스트림 상태에 따라 200 또는 502)
+    assert res.status_code not in [401, 403]
+
+
+def test_routing_test_call_uses_system_diagnostics_key_and_succeeds(client: TestClient, monkeypatch):
+    """
+    보안 검증 6: 라우팅 탭의 '게이트웨이 즉시 호출 테스트'(/api/v1/routing/test-call)가
+    ALLOW_DEV_MOCK_KEYS = False 상태에서도 401/403 오류 없이 정상 동작함
+    """
+    monkeypatch.setattr(settings, "ALLOW_DEV_MOCK_KEYS", False)
+
+    res = client.post(
+        "/api/v1/routing/test-call",
+        json={
+            "route_name": "financial-advisor-v1",
+            "method": "header",
+            "message": "라우팅 테스트",
+            "traffic_weights": [{"model_id": "meta-llama/Llama-3-8B-Instruct", "weight": 100}]
+        }
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["request_headers"].get("Authorization") == f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"
+    assert data["dispatched_route"] == "financial-advisor-v1"

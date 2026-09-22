@@ -1058,7 +1058,7 @@ print(response.choices[0].message.content)`;
       </div>
 
       {/* Selected Route Configuration Studio */}
-      <div className="card" style={{ marginBottom: '24px' }}>
+      <div className="card" style={{ marginBottom: '24px', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div className="card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1338,9 +1338,10 @@ print(response.choices[0].message.content)`;
                 flexWrap: 'wrap',
                 gap: '8px',
                 minWidth: 0,
+                maxWidth: '100%',
                 width: '100%'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, flex: '1 1 260px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', flex: '1 1 0' }}>
                   <span className={`badge ${testResult.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.72rem', flexShrink: 0 }}>
                     {testResult.is_success ? `HTTP ${testResult.status_code || 200} OK` : `HTTP ${testResult.status_code || '오류'}`}
                   </span>
@@ -1352,50 +1353,169 @@ print(response.choices[0].message.content)`;
                     color: 'var(--text-muted)',
                     wordBreak: 'break-all',
                     overflowWrap: 'anywhere',
-                    minWidth: 0
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    display: 'inline-block'
                   }}>
                     대상 URL: {testResult.target_url}
                   </span>
                 </div>
-                <button
-                  onClick={() => setTestResult(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    flexShrink: 0,
-                    padding: '2px 6px'
-                  }}
-                >
-                  닫기 ✕
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const body = testResult.response_body;
+                      let text = '';
+                      if (!body) text = testResult.error_message || '결과 없음';
+                      else if (typeof body === 'object') {
+                        try { text = JSON.stringify(body, null, 2); } catch { text = String(body); }
+                      } else if (typeof body === 'string') {
+                        try { text = JSON.stringify(JSON.parse(body), null, 2); } catch { text = body; }
+                      } else { text = String(body); }
+                      handleCopy(text, 'test-res-body');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      padding: '2px 8px',
+                      height: '24px'
+                    }}
+                    title="응답 JSON 복사"
+                  >
+                    {copiedField === 'test-res-body' ? <Check size={12} color="var(--accent-emerald)" /> : <Copy size={12} />}
+                    <span>{copiedField === 'test-res-body' ? '복사됨' : '복사'}</span>
+                  </button>
+                  <button
+                    onClick={() => setTestResult(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      flexShrink: 0,
+                      padding: '2px 6px'
+                    }}
+                  >
+                    닫기 ✕
+                  </button>
+                </div>
               </div>
-              <pre style={{
-                margin: 0,
-                padding: '10px 12px',
-                background: '#040711',
-                borderRadius: '4px',
-                fontSize: '0.72rem',
-                fontFamily: 'var(--font-mono)',
-                color: testResult.is_success ? '#a7f3d0' : '#fca5a5',
-                overflowX: 'auto',
-                overflowY: 'auto',
-                maxHeight: '220px',
-                maxWidth: '100%',
-                width: '100%',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-all',
-                overflowWrap: 'anywhere',
-                boxSizing: 'border-box'
-              }}>
-                <code>
-                  {testResult.response_body
-                    ? (typeof testResult.response_body === 'string' ? testResult.response_body : JSON.stringify(testResult.response_body, null, 2))
-                    : (testResult.error_message || '결과 없음')}
-                </code>
-              </pre>
+              {(() => {
+                const body = testResult.response_body;
+                let parsedJson = null;
+                let extractedContent = null;
+
+                if (body) {
+                  if (typeof body === 'object') {
+                    parsedJson = body;
+                  } else if (typeof body === 'string') {
+                    try { parsedJson = JSON.parse(body); } catch { /* raw string */ }
+                  }
+                }
+
+                if (parsedJson && typeof parsedJson === 'object') {
+                  extractedContent = 
+                    parsedJson.choices?.[0]?.message?.content ||
+                    parsedJson.choices?.[0]?.text ||
+                    (typeof parsedJson.response === 'string' ? parsedJson.response : null) ||
+                    parsedJson.message?.content ||
+                    (typeof parsedJson.message === 'string' ? parsedJson.message : null);
+                }
+
+                const rawJsonString = body
+                  ? (parsedJson ? JSON.stringify(parsedJson, null, 2) : String(body))
+                  : (testResult.error_message || '결과 없음');
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                    {/* 1. 모델이 응답한 실제 텍스트 본문 (\\n 개행을 실제 엔터 줄바꿈으로 완벽 렌더링) */}
+                    {extractedContent && (
+                      <div style={{
+                        padding: '12px 14px',
+                        background: 'rgba(6, 182, 212, 0.08)',
+                        border: '1px solid rgba(6, 182, 212, 0.3)',
+                        borderRadius: '6px',
+                        width: '100%',
+                        maxWidth: '100%',
+                        minWidth: 0,
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '8px',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                          minWidth: 0
+                        }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Zap size={14} color="var(--accent-cyan)" />
+                            <span>AI 모델 생성 본문 (줄바꿈 서식 적용 완료):</span>
+                          </span>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleCopy(extractedContent, 'test-res-content')}
+                            style={{ fontSize: '0.7rem', padding: '2px 8px', height: '22px' }}
+                          >
+                            {copiedField === 'test-res-content' ? <Check size={11} color="var(--accent-emerald)" /> : <Copy size={11} />}
+                            <span>{copiedField === 'test-res-content' ? '본문 복사됨' : '본문 복사'}</span>
+                          </button>
+                        </div>
+                        <div style={{
+                          fontSize: '0.82rem',
+                          lineHeight: '1.7',
+                          color: '#f8fafc',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          overflowWrap: 'anywhere',
+                          maxHeight: '260px',
+                          overflowY: 'auto',
+                          fontFamily: 'inherit'
+                        }}>
+                          {extractedContent}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. 전체 JSON 페이로드 (Raw JSON 포맷팅) */}
+                    <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Code size={12} />
+                        <span>{extractedContent ? '전체 게이트웨이 HTTP 원본 JSON 응답 전문 (Full Payload):' : '게이트웨이 응답 JSON 전문:'}</span>
+                      </div>
+                      <textarea
+                        readOnly
+                        value={rawJsonString}
+                        rows={extractedContent ? 8 : 12}
+                        style={{
+                          width: '100%',
+                          maxWidth: '100%',
+                          minWidth: 0,
+                          margin: 0,
+                          padding: '12px 14px',
+                          background: '#040711',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontFamily: 'var(--font-mono)',
+                          color: testResult.is_success ? '#a7f3d0' : '#fca5a5',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          boxSizing: 'border-box',
+                          lineHeight: '1.6',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          overflowWrap: 'anywhere',
+                          resize: 'vertical',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -2127,6 +2247,9 @@ print(response.choices[0].message.content)`;
                       fontFamily: 'var(--font-mono)',
                       color: '#a7f3d0',
                       overflowX: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      overflowWrap: 'anywhere',
                       border: '1px solid #1e293b'
                     }}>
                       <code>

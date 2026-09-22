@@ -144,6 +144,22 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+code {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 7px;

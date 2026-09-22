@@ -2167,7 +2167,7 @@ print(response.choices[0].message.content)`;
             <div className="modal-header">
               <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Cpu size={20} color="var(--accent-cyan)" />
-                <span>신규 LLM 서빙 모델 등록 (vLLM / Ollama 카탈로그)</span>
+                <span>신규 LLM 서빙 모델 등록</span>
               </div>
             </div>
             <form onSubmit={handleCreateModel}>

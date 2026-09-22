@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     DATACENTER_NAME: str = "온프레미스 주전산센터"
     CLUSTER_REGION: str = "DC-1 서울"
     DEPLOY_MODE: str = "air-gap"
+    ALLOW_DEV_MOCK_KEYS: bool = False
     
     # Server
     HOST: str = "0.0.0.0"

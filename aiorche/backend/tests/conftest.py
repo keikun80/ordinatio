@@ -11,6 +11,9 @@ from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
 
+from app.core.config import settings
+settings.ALLOW_DEV_MOCK_KEYS = True
+
 TEST_DATABASE_URL = "sqlite:///:memory:"
 test_engine = create_engine(
     TEST_DATABASE_URL,

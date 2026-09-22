@@ -1,13 +1,16 @@
 import time
 import random
 import logging
+import ipaddress
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import httpx
+
+from app.core.config import settings
 
 from app.db.session import get_db
 from app.models.tenant import Tenant
@@ -53,12 +56,36 @@ class ChatCompletionRequest(BaseModel):
     functions: Optional[List[Dict[str, Any]]] = Field(default=None, description="레거시 함수 호출 스키마")
 
 # -----------------------------------------------------------------------------
+# Helper: IP Address / CIDR Matcher
+# -----------------------------------------------------------------------------
+def is_ip_allowed(client_ip: str, allowed_cidrs: List[str]) -> bool:
+    if not allowed_cidrs:
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(client_ip)
+        for cidr in allowed_cidrs:
+            if not cidr or not str(cidr).strip():
+                continue
+            cidr_str = str(cidr).strip()
+            if "/" in cidr_str:
+                network = ipaddress.ip_network(cidr_str, strict=False)
+                if ip_obj in network:
+                    return True
+            else:
+                if ip_obj == ipaddress.ip_address(cidr_str):
+                    return True
+        return False
+    except ValueError:
+        return False
+
+# -----------------------------------------------------------------------------
 # Helper: Virtual Key Authenticator with Developer/Test Fallback
 # -----------------------------------------------------------------------------
 def authenticate_gateway_key(
     authorization: Optional[str] = Header(None),
     x_virtual_key: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Optional[Request] = None
 ) -> Optional[VirtualKey]:
     raw_key = None
     if authorization and authorization.startswith("Bearer "):
@@ -78,6 +105,15 @@ def authenticate_gateway_key(
             detail="잘못된 가상 API Key 형식입니다. 'sk-orch-' 접두사가 필요합니다."
         )
 
+    # Extract client IP for IP CIDR validation
+    client_ip = "127.0.0.1"
+    if request:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        elif request.client and request.client.host:
+            client_ip = request.client.host
+
     # 1. First check against database
     prefix = raw_key[:16]
     candidates = db.query(VirtualKey).filter(VirtualKey.key_prefix == prefix).all()
@@ -88,6 +124,27 @@ def authenticate_gateway_key(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"차단/파기된 가상키입니다: {candidate.revoked_reason or '관리자에 의한 차단'}"
                 )
+
+            # Check expiration date
+            if candidate.expires_at:
+                exp = candidate.expires_at
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                if exp < datetime.now(timezone.utc):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="유효기간이 만료된 가상 API Key입니다."
+                    )
+
+            # Check IP CIDR whitelist
+            allowed_cidrs = candidate.allowed_ip_cidrs or []
+            if allowed_cidrs and len(allowed_cidrs) > 0:
+                if not is_ip_allowed(client_ip, allowed_cidrs):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"접속이 허용되지 않은 클라이언트 IP 대역입니다: {client_ip}"
+                    )
+
             # Budget / Hard cap check
             tenant = db.query(Tenant).filter(Tenant.tenant_id == candidate.tenant_id).first()
             if tenant and tenant.is_hard_cap_enabled and tenant.spent_budget_krw >= tenant.monthly_budget_krw:
@@ -98,8 +155,9 @@ def authenticate_gateway_key(
             return candidate
 
     # 2. Developer/Test mock keys (e.g. sk-orch-your-virtual-key or sk-orch-test-*)
-    if any(k in raw_key for k in ["your-virtual-key", "test", "mock", "demo", "gateway-live-check"]):
-        logger.info(f"Gateway authorized request with developer test key: {raw_key[:16]}...")
+    # STRICT SECURITY: 개발/테스트 환경에서 명시적으로 허용된 경우(settings.ALLOW_DEV_MOCK_KEYS=True)에만 우회 허용
+    if settings.ALLOW_DEV_MOCK_KEYS and any(k in raw_key for k in ["your-virtual-key", "test", "mock", "demo", "gateway-live-check"]):
+        logger.info(f"Gateway authorized request with developer test key: {raw_key[:16]}... (ALLOW_DEV_MOCK_KEYS=True)")
         return None
 
     # Unknown key
@@ -252,6 +310,15 @@ async def dispatch_chat_completion(
 
     selected_model_id = routing_decision.selected_model
     target_cluster = routing_decision.target_cluster
+
+    # Model authorization check against matched_key.allowed_models
+    if matched_key and matched_key.allowed_models and len(matched_key.allowed_models) > 0:
+        req_or_selected = explicit_model or selected_model_id
+        if selected_model_id not in matched_key.allowed_models and (not explicit_model or explicit_model not in matched_key.allowed_models):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"가상 API Key에 부여된 권한으로는 요청 모델({req_or_selected})을 호출할 수 없습니다. 허용 모델: {matched_key.allowed_models}"
+            )
 
     # Lookup model catalog info if present in DB
     model_entry = db.query(ModelCatalog).filter(ModelCatalog.model_id == selected_model_id).first()
@@ -431,7 +498,7 @@ async def gateway_route_path_ingress(
     """경로 기반 엔드포인트: POST /v1/routes/{route_name}
     Envoy AI Gateway가 prefix_rewrite 로 넘기거나 직접 수신
     """
-    matched_key = authenticate_gateway_key(authorization, x_virtual_key, db)
+    matched_key = authenticate_gateway_key(authorization, x_virtual_key, db, request)
     return await dispatch_chat_completion(
         route_name=route_name,
         req=req,
@@ -455,7 +522,7 @@ async def gateway_chat_completions_ingress(
     """헤더/바디 기반 엔드포인트: POST /v1/chat/completions
     AgentRouter 지능형 분기 디스패처
     """
-    matched_key = authenticate_gateway_key(authorization, x_virtual_key, db)
+    matched_key = authenticate_gateway_key(authorization, x_virtual_key, db, request)
     route_name = x_orche_route or req.model or "financial-advisor-v1"
     return await dispatch_chat_completion(
         route_name=route_name,

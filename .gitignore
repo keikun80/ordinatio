@@ -32,4 +32,5 @@ yarn-error.log*
 
 # Worktrees
 worktrees/
+.worktrees/
 

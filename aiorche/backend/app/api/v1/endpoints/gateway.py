@@ -353,13 +353,17 @@ async def dispatch_chat_completion(
         f"{target_endpoint.rstrip('/')}/v1/chat/completions",
         f"{target_endpoint.rstrip('/')}/chat/completions",
     ]
-    if "127.0.0.1" in target_endpoint or "localhost" in target_endpoint:
+    if any(k in target_endpoint for k in ["127.0.0.1", "localhost", "ollama-qwen", "host.docker.internal"]):
         port = target_endpoint.split(":")[-1].split("/")[0]
         candidate_urls.extend([
             f"http://ollama-qwen:{port}/v1/chat/completions",
             f"http://host.docker.internal:{port}/v1/chat/completions",
-            f"http://172.17.0.1:{port}/v1/chat/completions"
+            f"http://172.17.0.1:{port}/v1/chat/completions",
+            f"http://127.0.0.1:{port}/v1/chat/completions"
         ])
+
+    # De-duplicate candidate URLs preserving order
+    candidate_urls = list(dict.fromkeys(candidate_urls))
 
     upstream_success = False
     upstream_response_data = None

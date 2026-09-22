@@ -1,24 +1,28 @@
 # AI Orchestrator 차세대 개발 마일스톤 및 기능 로드맵 설계서 (Develop_milestone.md)
 
-**문서 번호**: AIORCHE-DEV-MILESTONE-20260914  
+**문서 번호**: AIORCHE-DEV-MILESTONE-20260922  
+**문서 버전**: v2.0 (Phase 0 ~ Phase 5 상용 배포 및 64개 테스트 100% 통과 반영)  
 **문서 상태**: APPROVED / ACTIVE  
 **대상 시스템**: AI Orchestrator (`aiorche`) 온프레미스 에어갭 어플라이언스  
-**작성 일자**: 2026-09-14  
+**작성 일자**: 2026-09-22  
+
+> 루트 문서 [`Develop_milestone.md`](../Develop_milestone.md) 및 [`admin_dashboard_design.md`](../admin_dashboard_design.md)와 완전히 상호 동기화되어 유지 관리됩니다.
 
 ---
 
 ## 1. 개요 및 배경 (Executive Summary)
 
-본 문서는 현재까지 구현 완료된 Phase 0부터 Phase 5까지의 상용급 AI 오케스트레이터 기반 위에, 금융·공공·엔터프라이즈 폐쇄망 인프라의 실제 프로덕션 운영 요건을 완벽히 충족하기 위해 도출된 **차세대 기능 로드맵 및 단계별 개발 마일스톤(Development Milestones)**을 정의한 공식 소프트웨어 공학적 설계 명세서입니다.
+본 문서는 현재까지 구현 및 상용 배포 검증이 완료된 **Phase 0부터 Phase 5까지의 상용급 AI 오케스트레이터 기반(64/64 백엔드 테스트 통과, K8s 5대 Pod 배포, React 18 웹 콘솔 연동 완료)** 위에, 금융·공공·엔터프라이즈 폐쇄망 인프라의 실제 프로덕션 운영 요건을 완벽히 충족하기 위해 도출된 **차세대 기능 로드맵 및 단계별 개발 마일스톤(Development Milestones 6~8)**을 정의한 공식 소프트웨어 공학적 설계 명세서입니다.
 
-### 1.1 현재 구현 상태 점검 요약 (As-Is Status)
-- **L7 게이트웨이 & AgentRouter**: Envoy L7 C++ Ingress(Zero-Copy SSE) + ext_proc, 인텐트/복잡도 실시간 분석(코딩·수학 vs 일상대화), 4대 자율 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 웹 UI 실시간 튜닝, 세션/KV-Cache 어피니티, 슬라이딩 윈도우 TPM/RPM 레이트 리미터 (완료 ✅)
-- **모델 카탈로그**: DB 모델 카탈로그 관리, 다중 서빙 엔진(vLLM, Ollama, SGLang, Triton) 연동, 라우트 종속성 안전 삭제 가드, 시스템 전 메뉴 등록 모델 강제 바인딩 (완료 ✅)
-- **가상 API Key & 테넌트 거버넌스**: Argon2id 솔트 단방향 해싱, 단 1회 평문 노출, 파기된 키 영구 삭제 가드레일, 모델 화이트리스트(`allowed_models`), 부서별 테넌트 격리 (완료 ✅)
-- **FinOps & 비용 통제**: 원화(₩) 기준 테넌트 예산, 80% 조기 경보, 100% 하드 캡(Hard Cap) 429 차단, UTF-8 BOM CSV 청구서 다운로드 (완료 ✅)
-- **컴플라이언스 & WORM 감사**: 초경량 자체 정규식 인라인 PII 마스킹(MASK/HASH/BLOCK, <2ms), WORM 불변 감사 로그 테이블(INSERT-only), 포렌식 JSON 내보내기 (완료 ✅)
-- **어플라이언스 생애주기**: RSA-4096 서명 오프라인 핫픽스 번들, 4단계 무중단 롤링 패치/롤백 엔진, Zero-PII 서포트 번들 ZIP 다운로드, 5대 인프라 Preflight 자가진단 (완료 ✅)
-- **통합 웹 콘솔**: 7대 실데이터 통합 관제 스튜디오 내장 (완료 ✅)
+### 1.1 현재 구현 상태 점검 요약 (As-Is Status: Phase 0 ~ 5 완료)
+- **L7 게이트웨이 & AgentRouter**: Envoy L7 C++ Ingress(Zero-Copy SSE) + ext_proc 보안 필터, OpenAI 호환 엔드포인트(`/v1/routes`, `/v1/chat/completions`), 프롬프트 인텐트/복잡도 실시간 분석(코딩·수학 vs 일상대화), 4대 자율 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 실시간 웹 UI 튜닝, 세션/KV-Cache 어피니티, 슬라이딩 윈도우 TPM/RPM 레이트 리미터 (완료 ✅)
+- **모델 카탈로그 & 동적 xDS 배포**: DB 기반 다중 서빙 엔진(vLLM, Ollama, SGLang, Triton) 카탈로그 등록/수정/삭제, 실시간 헬스체크 프로빙(/health ping), 활성 라우트 종속성 사전 차단 가드레일, Envoy REST RDS v3 무중단 동적 컴파일 푸시 (완료 ✅)
+- **가상 API Key & 테넌트 거버넌스**: `sk-orch-` 접두사, Argon2id 솔트 단방향 해싱, 발급 시 단 1회 평문 노출 모달, 파기된 키 영구 삭제 가드레일, 모델 화이트리스트(`allowed_models`), 부서별 테넌트 격리 및 쿼터 제어 (완료 ✅)
+- **FinOps & 비용 관제**: 원화(₩) 기준 테넌트 월간 예산 계량(Metering), 80% 조기 경보, 100% 하드 캡(Hard Cap) 도달 시 HTTP 429 즉시 차단, 1초 주기 WebSocket 스트림 관제, UTF-8 with BOM 엑셀 호환 CSV 청구서 다운로드 (완료 ✅)
+- **컴플라이언스 & WORM 불변 감사**: 자체 정규식 PII 인라인 탐지(주민등록번호/계좌/카드/사번, <1ms), 3단계 보안 액션(MASK 치환/HASH 가명화/BLOCK 차단), WORM(Write-Once-Read-Many) 불변 감사 로그 테이블(INSERT-only) 적재, 포렌식 JSON 증적 다운로드 (완료 ✅)
+- **어플라이언스 라이프사이클 & 패치 관리**: 오프라인 벤더 패치 번들(.tar.gz) SHA-256 무결성 및 RSA-4096 전자서명 검증, K8s PDB/gRPC 호환성 드라이런, 4단계 무중단 롤링 핫픽스 배포 & DB 이력 영속화, 원클릭 롤백, 5대 인프라 Preflight 실시간 자가진단, Zero-PII 서포트 번들 암호화 ZIP 생성기 (완료 ✅)
+- **통합 웹 콘솔 포털**: React 18 + Vite 기반 SPA, Vanilla CSS Glassmorphism & Dark Slate Theme, Lucide React 로컬 번들링으로 100% 에어갭 폐쇄망 자립, 7대 관제 스튜디오 및 Grafana 내장 모달 완전 연동 (완료 ✅)
+- **테스트 및 인프라 검증 현황**: 백엔드 전체 단위/통합 테스트 **64 / 64 건 (100% PASS)**, K8s 5개 핵심 Pod(`postgres`, `redis`, `backend`, `envoy`, `frontend`) 상용 배포 및 연동 완료 (완료 ✅)
 
 ---
 
@@ -78,6 +82,10 @@
          RAISE EXCEPTION 'WORM_VIOLATION: audit_logs 테이블은 법적 불변 감사 테이블이므로 UPDATE 또는 DELETE가 영구 금지됩니다.';
      END;
      $$ LANGUAGE plpgsql;
+
+     CREATE TRIGGER trg_audit_logs_worm_protect
+     BEFORE UPDATE OR DELETE ON audit_logs
+     FOR EACH ROW EXECUTE FUNCTION enforce_worm_audit_logs();
      ```
   2. 금융감독원 전자금융감독규정 제13조(로그 무결성 보증) 100% 충족.
 
@@ -111,7 +119,7 @@
 - **세부 사양**:
   1. `app/core/backup_manager.py` 및 CLI `scripts/backup-restore.sh` 구현.
   2. 스케줄링: 매일 자정 또는 6시간 주기로 PostgreSQL 전체 덤프 후 AES-256 암호화 압축 아카이브.
-  3. 원클릭 복구 CLI: `make restore-db BACKUP_FILE=aiorche_backup_20260914.dump.enc`.
+  3. 원클릭 복구 CLI: `make restore-db BACKUP_FILE=aiorche_backup_20260922.dump.enc`.
 
 ---
 

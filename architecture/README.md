@@ -25,3 +25,5 @@
 | **PRE_13** | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md) | **Phase 0~5 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 실제 구현율 100% 추적 감사<br>- 에어갭 최적화 아키텍처 결정(ADR) 전수 매핑 및 후속 Phase 6 연계 과제 | 최신 현행화 |
 | **PRE_14** | [PRE_14_GAP_MARKET_PLACE.md](./PRE_14_GAP_MARKET_PLACE.md) | **엔터프라이즈 AI 마켓플레이스 연동 갭 분석서**<br>- 사내 AI 모델 스토어 및 프라이빗 레지스트리 연동 아키텍처 갭 분석<br>- 모델 온보딩 자동화 및 멀티 테넌트 권한 배포 방안 | 분석 완료 |
 | **PRE_15** | [PRE_15_Develop_milestone.md](./PRE_15_Develop_milestone.md) | **차세대 개발 마일스톤 (Milestone 6 ~ 8) 로드맵**<br>- M6: 프로덕션 릴리즈 패키징, 오프라인 Helm, 실시간 웹훅, WORM 불변 트리거<br>- M7: 에어갭 로컬 시맨틱 캐싱, 프롬프트 인젝션 방어, DB 정기 백업 & DR<br>- M8: 엔터프라이즈 SSO/RBAC, 모델 실시간 벤치마크, 스트리밍 PII 가드레일 | 최신 현행화 |
+| **PRE_16** | [PRE_16_gateway_browser_test_troubleshooting_report.md](./PRE_16_gateway_browser_test_troubleshooting_report.md) | **웹브라우저 LLM 테스트 연동 및 게이트웨이 즉시 호출 장애 해결 보고서**<br>- Ollama 미다운로드 모델 기본 설정 불일치 해소<br>- Docker 네트워크 브릿지 격리 해제 및 호스트:컨테이너 포트(11435 vs 11434) 정정<br>- 라우팅 테스트 클라이언트 45초 타임아웃 패치 및 브라우저 E2E 검증(200 OK) 완료 | **검증 완료**<br>(E2E PASS) |
+

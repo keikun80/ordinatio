@@ -146,12 +146,14 @@ kubectl get pods,svc -n aiorche -o wide
    - 증적: `01_overview_main_real_data_1789260326198.png` / `01_overview_no_flicker_1789260605135.png` / `verify_flicker_fixed_1789260588656.webp`
 11. **등록된 LLM 서빙 모델 안전 삭제(Safe Deletion Guard) 검증 (Routing Model Deletion)**:
    - 증적: `02_routing_model_deleted_1789261016387.png` / `verify_model_delete_1789260951060.webp`
+12. **브라우저 게이트웨이 즉시 호출 및 Gemma2 온프레미스 LLM 추론 E2E 검증 (Gateway Immediate Test Call & Gemma2 Live Upstream)**:
+   - 증적: `test_gateway_call_success_*.webp` / `HTTP 200 OK (latency: 2083ms)` 수신 증적 (`PRE_16_gateway_browser_test_troubleshooting_report.md`)
 
 ---
 
 ## 6. 아키텍처 결정 기록 (ADR) 및 설계 문서 현행화 완료 내역
 
-에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 9대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
+에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 10대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
 
 | 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
 | :---: | :---: | :--- | :--- | :--- |
@@ -164,11 +166,13 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-07** | 핫픽스 롤링 배포 | K8s Deployment API 클러스터 권한 연동 | **어플라이언스 인앱 컴포넌트 레지스트리 핫픽스 & 롤백 엔진** | 고객 폐쇄망에서 복잡한 K8s RBAC/ServiceAccount 권한 부여 없이도 무중단 롤링 업데이트 및 원클릭 롤백 달성 |
 | **ADR-08** | 서빙 런타임 & 인그레스 | 단일 vLLM 전용 엔드포인트 가정 | **이종 런타임 카탈로그(vLLM/Ollama/SGLang/Triton) 및 Envoy 이중 인그레스(Path Prefix Rewrite + Header)** | 사내 다양한 인프라(K8s/Docker/Host CLI) 환경의 오픈소스 LLM을 단일 Envoy 진입점으로 통합 연동 및 실시간 프로빙 |
 | **ADR-09** | 관제 수명주기 디커플링 & WORM 기반 트래픽 실측 | 프론트엔드 주기적 REST 폴링 및 정적 하드코딩 모델 점유율 | **`useRef` 수명주기 분리(Zero-Flicker) 및 WORM `audit_logs` 기반 모델 점유율 산출** | WebSocket 상태 갱신 루프로 인한 UI 깜빡임을 100% 제거하고, 실제 추론 호출 이력과 Envoy RPS를 결합하여 정확한 서빙 트래픽 점유율 시각화 |
+| **ADR-10** | 게이트웨이 테스트 클라이언트 타임아웃 & 에러 보존 | 4.0초 하드코딩 타임아웃 및 루프 순회 중 에러 덮어쓰기 | **45.0초 현실적 LLM 추론 타임아웃 및 `TimeoutException` 원문 보존 루프 브레이크** | 로컬 CPU/온프레미스 GPU 환경의 콜드스타트/추론 지연을 안정적으로 대기하고, 오해의 소지가 있는 'Connection Refused' 오표시 완전 차단 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(46/46 테스트)**하였습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(46/46 테스트)**하였으며, 실제 브라우저 E2E 기반 온프레미스 LLM 추론까지 최종 확인되었습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
-- **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)**으로 즉시 연계가 가능합니다.
+- **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)** 및 `PRE_15_Develop_milestone.md`의 **Milestone 6 (P0)** 항목으로 즉시 연계가 가능합니다.
+

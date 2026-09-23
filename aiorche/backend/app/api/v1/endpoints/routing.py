@@ -381,7 +381,8 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
     is_success = False
     chosen_url = f"{envoy_ingress}{target_path}"
 
-    async with httpx.AsyncClient(timeout=4.0) as client:
+    client_timeout = httpx.Timeout(45.0, connect=3.0)
+    async with httpx.AsyncClient(timeout=client_timeout) as client:
         for host in candidate_hosts:
             test_url = f"{host}{target_path}"
             try:
@@ -412,11 +413,14 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
                     dispatched_route=req.route_name
                 )
             except httpx.ConnectError:
-                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
+                if not err_msg:
+                    err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
             except httpx.TimeoutException:
-                err_msg = "게이트웨이 응답 타임아웃 (Timeout)"
+                err_msg = "게이트웨이 LLM 모델 추론 타임아웃 (45초 초과)"
+                break
             except Exception as e:
                 err_msg = str(e)
+                break
 
     total_latency = round((time.perf_counter() - t0) * 1000, 2)
     return RouteTestCallResponse(

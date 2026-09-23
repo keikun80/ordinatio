@@ -164,10 +164,19 @@
   - 모델별 실시간 트래픽 점유율을 PostgreSQL WORM `audit_logs` 불변 감사 테이블의 `COUNT(*) GROUP BY model_id` 집계 쿼리와 Envoy live RPS를 결합하여 실제 서빙 중인 5대 모델별 비율 동적 산출.
 - **영향도**: 긍정적 (더미/Mock 데이터 제로화 및 안정적인 실시간 관제 사용자 경험 확보).
 
-### 3.13 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
+### 3.13 [대체 구현 - 운영] 게이트웨이 테스트 클라이언트 타임아웃 현실화 & 에러 마스킹 방지 [ADR-10]
+- **설계서 명세**: 라우팅 스튜디오 내 즉시 호출 테스트 시 고정 단기 타임아웃(4초) 및 candidate_hosts 순회.
+- **현재 구현 상태**:
+  - LLM 모델(Gemma2/Llama3 등)의 온프레미스 CPU/GPU 콜드스타트 및 긴 생성 지연시간을 수용하기 위해, 백엔드 테스트 클라이언트 타임아웃을 **45.0초(connect=3.0초)**로 상향 조정.
+  - candidate_hosts 순회 중 1차 호스트(`envoy:8080`)에서 `TimeoutException` 발생 시 즉시 루프를 중단하여, 2차 루프백 호스트의 `Connection Refused`로 실제 에러 원인이 덮어써지는(Masking) 결함을 원천 차단.
+  - 브라우저 E2E를 통해 온프레미스 `gemma2:2b` 모델의 실시간 응답 텍스트(HTTP 200 OK) 수신 완료 (`PRE_16_gateway_browser_test_troubleshooting_report.md`).
+- **영향도**: 긍정적 (관리자 라우팅 스튜디오의 진단 신뢰성 100% 확보 및 오진단 방지).
+
+### 3.14 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
 - **현재 구현 상태**: 현재 Docker Compose 기반 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 정식 단일 Helm 패키지 및 Playwright E2E 스위트는 미구현.
 - **영향도**: 높음 (Phase 6 정규 작업 범위).
+
 
 ---
 

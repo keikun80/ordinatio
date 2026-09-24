@@ -929,20 +929,22 @@ bash scripts/verify-phase5.sh</code></pre>
       <div id="menu-routing" class="card">
         <h3>2. 지능형 모델 & 라우팅 스튜디오 (Model & Routing Studio)</h3>
         <p>
-          사내에 배포된 vLLM 고성능 추론 엔드포인트를 관리하고, Envoy L7 xDS 엔진과 연동하여
-          트래픽 가중치 분할(A/B 테스팅, 카나리 롤아웃) 및 장애 시 자동 우회(Failover Chain) 규칙을 정의합니다.
+          사내에 배포된 다양한 LLM 서빙 엔드포인트(vLLM, Ollama, SGLang, Triton, DeepSeek 등)를 등록 및 관리하고, 
+          Envoy L7 xDS 엔진과 연동하여 트래픽 가중치 분할(A/B 테스팅, 카나리 롤아웃) 및 인지 기반 자율 라우팅 정책을 정의합니다.
+          운영 편의를 위해 <strong>1) 라우팅 스튜디오</strong>, <strong>2) 서빙 모델 풀</strong>, <strong>3) AgentRouter & 테스트</strong>의 
+          <strong>3단 아코디언 메뉴</strong>로 구조화되어 있습니다.
         </p>
 
         <div class="screenshot-box">
           <div class="screenshot-header">
             <span class="screenshot-tag">🔀 Main Console Screen</span>
-            <span class="screenshot-caption">모델 & 라우팅 스튜디오 메인 현황</span>
+            <span class="screenshot-caption">서빙 모델 풀 & 헬스체크 타임아웃 조절 콘솔 현황</span>
           </div>
           <div class="screenshot-img-wrapper">
             <img src="images/02_routing_main.png" alt="모델 & 라우팅 스튜디오 메인" class="screenshot-img" onclick="openLightbox(this)">
           </div>
           <div class="screenshot-desc">
-            현재 운영 중인 AgentRouter 2-Tier 관제 배너, 4대 자율 정책 카드(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback), 등록된 모델 카탈로그 및 동적 라우팅 프로필 목록이 표시됩니다.
+            등록된 LLM 모델 풀 카드 목록, 전역 헬스체크 타임아웃 조절 셀렉터(1.0s~30.0s), 전체 헬스체크(Ping All) 및 신규 모델 등록 버튼이 실시간으로 제공됩니다.
           </div>
         </div>
 

@@ -531,6 +531,10 @@
       <span class="topbar-badge">Enterprise v0.1.0</span>
     </div>
     <div class="topbar-actions">
+      <div class="badge-env" style="background: rgba(56, 189, 248, 0.1); color: var(--primary); border-color: rgba(56, 189, 248, 0.3);">
+        <span class="badge-dot" style="background-color: var(--primary); box-shadow: 0 0 8px var(--primary);"></span>
+        <span>66 / 66 Tests (100% PASS)</span>
+      </div>
       <div class="badge-env">
         <span class="badge-dot"></span>
         <span>100% Air-Gapped Appliance (온프레미스 자율 운영)</span>
@@ -561,9 +565,10 @@
       <li>
         <a href="#menu-routing" class="nav-link">2. 모델 & 라우팅 스튜디오</a>
         <ul class="nav-sub-list">
-          <li><a href="#input-add-model" class="nav-sub-link">신규 모델 등록 (입력)</a></li>
+          <li><a href="#input-add-model" class="nav-sub-link">신규 모델 등록 & Provider 규격화 (입력)</a></li>
           <li><a href="#input-compute-target" class="nav-sub-link">인프라 규격 선택</a></li>
-          <li><a href="#input-health-check" class="nav-sub-link">실시간 헬스체크 프로빙</a></li>
+          <li><a href="#input-health-check" class="nav-sub-link">실시간 헬스체크 & 타임아웃 조절 (제어)</a></li>
+          <li><a href="#input-test-call" class="nav-sub-link">엔드포인트 실시간 테스트 호출 (아코디언)</a></li>
           <li><a href="#input-add-route" class="nav-sub-link">신규 라우트 생성 (입력)</a></li>
           <li><a href="#input-gateway-endpoint" class="nav-sub-link">L7 게이트웨이 엔드포인트 연동</a></li>
         </ul>
@@ -992,8 +997,14 @@ bash scripts/verify-phase5.sh</code></pre>
               </thead>
               <tbody>
                 <tr>
+                  <td><strong>LLM Provider 규격 (Serving Provider)</strong></td>
+                  <td><code>OpenAI 호환</code>, <code>DeepSeek</code>, <code>Anthropic Claude</code>, <code>Google Gemini</code>, <code>Cohere v2</code>, <code>직접 지정</code></td>
+                  <td><span class="badge badge-danger">필수</span></td>
+                  <td>호출 프로토콜 및 엔드포인트 규격 선택. 선택 시 베이스 URL에 따라 표준 엔드포인트 자동 합성 (/v1/chat/completions, /v1/messages 등)</td>
+                </tr>
+                <tr>
                   <td><strong>서빙 런타임 엔진 (Serving Runtime)</strong></td>
-                  <td><code>vLLM</code> / <code>Ollama</code> / <code>SGLang</code></td>
+                  <td><code>vLLM</code> / <code>Ollama</code> / <code>SGLang</code> / <code>Triton</code></td>
                   <td><span class="badge badge-danger">필수</span></td>
                   <td>추론 서빙 프레임워크 선택. 대규모 분산 배치(vLLM: Port 8000) 또는 경량 GGUF 양자화(Ollama: Port 11434)</td>
                 </tr>
@@ -1005,7 +1016,7 @@ bash scripts/verify-phase5.sh</code></pre>
                 </tr>
                 <tr>
                   <td><strong>모델 식별자 (Model ID)</strong></td>
-                  <td><code>meta-llama/Llama-3.1-8B-Instruct</code> 또는 <code>qwen2.5:14b</code></td>
+                  <td><code>meta-llama/Llama-3.1-8B-Instruct</code> 또는 <code>deepseek-ai/deepseek-v4.1-flash</code></td>
                   <td><span class="badge badge-danger">필수</span></td>
                   <td>Hugging Face 또는 Ollama 로컬 라이브러리 표준 모델 식별자</td>
                 </tr>
@@ -1016,10 +1027,16 @@ bash scripts/verify-phase5.sh</code></pre>
                   <td>사내 개발팀 및 API 클라이언트가 요청 헤더나 파라미터로 참조할 논리적 별칭</td>
                 </tr>
                 <tr>
-                  <td><strong>대상 엔드포인트 URL</strong></td>
-                  <td><code>http://vllm-service:8000</code> 또는 <code>http://127.0.0.1:11434</code></td>
+                  <td><strong>대상 엔드포인트 URL (Dynamic URL Builder)</strong></td>
+                  <td><code>http://vllm-service:8000/v1/chat/completions</code> 또는 <code>https://integrate.api.nvidia.com/v1/chat/completions</code></td>
                   <td><span class="badge badge-danger">필수</span></td>
-                  <td>실제 모델 추론 서버가 구동 중인 내부 IP/도메인 및 포트 (엔진 선택 시 자동 추천)</td>
+                  <td>실제 모델 추론 서버의 호출 엔드포인트. 베이스 도메인 입력 시 선택된 Provider 규격에 맞추어 실시간으로 자동 합성되며, 직접 수정도 가능</td>
+                </tr>
+                <tr>
+                  <td><strong>헬스체크 타임아웃 (초)</strong></td>
+                  <td><code>3.0</code> (범위: 1.0s ~ 30.0s)</td>
+                  <td>선택 (기본값: 3.0s)</td>
+                  <td>개별 서빙 노드의 헬스 프로빙 응답 대기 한계 시간. 콜드 스타트 노드나 대용량 모델에 맞추어 유연하게 조절 가능</td>
                 </tr>
                 <tr>
                   <td><strong>토큰당 단가 (입력 / 출력)</strong></td>
@@ -1107,28 +1124,51 @@ bash scripts/verify-phase5.sh</code></pre>
           </div>
         </div>
 
-        <!-- Feature 1: Model Health Checking -->
+        <!-- Feature 1: Model Health Checking & Timeout Control -->
         <div id="input-health-check" style="margin-top: 2rem;">
-          <h4>[운영자 제어 1] 서빙 모델 풀 실시간 헬스체크 프로빙 (Health Probing)</h4>
+          <h4>[운영자 제어 1] 서빙 모델 풀 실시간 헬스체크 프로빙 & 타임아웃 수동 조절</h4>
           <p>
-            등록된 모든 LLM 서빙 모델 인스턴스(vLLM, Ollama 등)의 네트워크 가용성을 실시간으로 점검하고 응답 레이턴시(ms)를 모니터링합니다.
+            등록된 모든 LLM 서빙 모델 인스턴스(vLLM, Ollama, DeepSeek 등)의 네트워크 가용성을 실시간으로 점검하고 응답 레이턴시(ms)를 모니터링합니다.
           </p>
 
           <div class="card" style="background: var(--bg-surface); border: 1px solid var(--border-accent); margin: 1rem 0;">
             <div class="card-header">
-              <span class="card-title">🩺 헬스 프로빙 아키텍처 및 동작 방식</span>
-              <span class="badge badge-success">Active Prober</span>
+              <span class="card-title">🩺 헬스 프로빙 아키텍처 및 타임아웃 수동 제어</span>
+              <span class="badge badge-success">Active Prober & Timeout Controller</span>
             </div>
             <ul>
-              <li><strong>전체 모델 일괄 헬스체크 (Ping All):</strong> 콘솔 상단의 <code>[전체 헬스체크 (Ping All)]</code> 버튼을 클릭하면 등록된 모든 모델의 <code>target_endpoint</code>로 백엔드가 비동기(HTTPX) 핑 요청을 동시 전송합니다.</li>
+              <li><strong>전역 타임아웃 조절 셀렉터 (1.0s ~ 30.0s):</strong> 콘솔 상단 툴바의 타임아웃 드롭다운을 통해 헬스 프로빙 대기 제한시간을 <code>1.0s</code>, <code>2.0s</code>, <code>3.0s</code>, <code>5.0s</code>, <code>10.0s</code>, <code>30.0s</code> 단위로 즉시 조절할 수 있습니다.</li>
+              <li><strong>브라우저 자동 영속화:</strong> 선택된 타임아웃 설정은 브라우저 <code>localStorage</code>(<code>aiorche_health_check_timeout</code>)에 자동 보관되어 페이지를 새로고침하거나 재방문해도 유지됩니다.</li>
+              <li><strong>전체 모델 일괄 헬스체크 (Ping All):</strong> <code>[전체 헬스체크 (Ping All)]</code> 버튼을 클릭하면 등록된 모든 모델의 <code>target_endpoint</code>로 백엔드가 설정된 타임아웃 값을 쿼리 파라미터(<code>?timeout=N</code>)로 전달하여 비동기(HTTPX) 핑 요청을 동시 전송합니다.</li>
               <li><strong>엔진별 헬스 경로 자동 분기:</strong>
                 <ul>
                   <li><code>Ollama</code>: <code>/api/tags</code> 엔드포인트 호출 (기본 11434 포트)</li>
                   <li><code>vLLM</code> / <code>SGLang</code> / <code>Triton</code>: <code>/health</code> 엔드포인트 호출 (기본 8000 포트)</li>
                 </ul>
               </li>
-              <li><strong>타임아웃 & 안전 보호:</strong> 2.5초 내에 응답이 없으면 즉시 오프라인(Timeout) 판정하여 전체 시스템 블로킹을 방지합니다.</li>
+              <li><strong>정밀 타임아웃 피드백:</strong> 모델 인스턴스가 지정된 타임아웃 시간 내에 응답하지 못할 경우, <code>응답 대기시간 초과 (Ns 초과)</code>와 같이 정확한 경과 시간과 원인이 실시간 카드에 표기됩니다.</li>
               <li><strong>개별 모델 재점검:</strong> 각 모델 카드 우측의 <code>[재점검]</code> 버튼을 통해 특정 노드만 단독 핑 점검할 수 있습니다.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Feature 2: Real-time Endpoint Test Call -->
+        <div id="input-test-call" style="margin-top: 2rem;">
+          <h4>[운영자 제어 2] 엔드포인트 실시간 테스트 호출 (아코디언 UI)</h4>
+          <p>
+            라우팅 스튜디오 화면은 <strong>1) 라우팅 스튜디오</strong>, <strong>2) LLM 서빙 모델 풀</strong>, <strong>3) 실시간 테스트 호출</strong>의 3단 아코디언 메뉴 구조로 제공됩니다. 운영자는 외부 클라이언트 없이도 관리자 콘솔 내에서 특정 모델 엔드포인트로 직접 추론 테스트 요청을 전송하고 응답을 확인할 수 있습니다.
+          </p>
+
+          <div class="card" style="background: var(--bg-surface); border: 1px solid var(--border-accent); margin: 1rem 0;">
+            <div class="card-header">
+              <span class="card-title">🧪 실시간 인앱 엔드포인트 테스트 호출 사양</span>
+              <span class="badge badge-primary">Interactive Tester</span>
+            </div>
+            <ul>
+              <li><strong>대상 모델 선택:</strong> 등록된 LLM 모델 풀 중 테스트를 수행할 대상 모델을 선택합니다.</li>
+              <li><strong>요청 프롬프트 입력:</strong> 실제 모델로 전송할 시스템/사용자 프롬프트를 입력합니다.</li>
+              <li><strong>하이퍼파라미터 튜닝:</strong> <code>max_tokens</code>(최대 생성 토큰), <code>temperature</code>(창의성/결정성)을 실시간으로 지정할 수 있습니다.</li>
+              <li><strong>직접 호출 보장:</strong> 백엔드 라우터(<code>/api/v1/routing/test-call</code>)는 임의의 URL 변형 없이 데이터베이스에 등록된 정확한 <code>target_endpoint</code>로 클라이언트 요청을 그대로 프록시하여 외부 및 내부 엔드포인트(OpenAI 호환, DeepSeek 등)의 실제 응답과 레이턴시를 포맷팅된 JSON 뷰어로 즉각 반환합니다.</li>
             </ul>
           </div>
         </div>

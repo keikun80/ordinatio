@@ -1,9 +1,9 @@
 # Phase 0 ~ Phase 5 엔지니어링 갭 분석 및 미구현/미테스트 기능 점검 보고서 (현행화 완료)
 
-**문서 번호**: AIORCHE-GAP-ANALYSIS-20260912  
-**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `dashboard_arch/phase5_implementation_plan_and_test_results.md`  
+**문서 번호**: AIORCHE-GAP-ANALYSIS-20260924  
+**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `architecture/PRE_17_model_provider_options_and_url_builder_report.md`  
 **분석 대상**: 상용급 모노레포(`aiorche/`) 및 프로토타입(`dashboard/`)  
-**작성 일자**: 2026-09-12 (Phase 5 완료 및 실시간 핫픽스/서포트 엔진 반영 현행화)  
+**작성 일자**: 2026-09-24 (Phase 5 완료 + LLM Provider 규격화 및 URL 조합기 반영 현행화)  
 
 ---
 
@@ -12,17 +12,20 @@
 마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 5까지의 6개 단계**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 전체)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
-- **자동화 테스트 검증율**: **46 / 46 테스트 100% PASS** (`uv run pytest -v`)
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
+- **자동화 테스트 검증율**: **66 / 66 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
   - Phase 2: Dynamic Routing & xDS (9종)
   - Phase 3: Observability & FinOps (6종)
   - Phase 4: Compliance & PII Governance (8종)
   - Phase 5: Lifecycle & Hotfix Engine (8종)
+  - Phase 0.1: AgentRouter (11종)
+  - Gateway Security P0: (6종)
   - External API: (4종)
+  - Models & Routing: (9종)
 - **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 전체 스크립트(`make verify-phase*`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **9건** (ADR-01 ~ ADR-09 공식 반영 완료)
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **10건** (ADR-01 ~ ADR-10 공식 반영 완료)
 - **미구현 항목**: 총 **2건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림)
 
 ---

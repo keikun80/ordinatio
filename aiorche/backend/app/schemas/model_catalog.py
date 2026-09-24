@@ -25,6 +25,9 @@ class ModelCatalogBase(BaseModel):
     output_price_per_1k: float = Field(default=2.4, ge=0.0)
     cache_discount_ratio: float = Field(default=0.25, ge=0.0, le=1.0)
     is_active: bool = True
+    api_key: Optional[str] = Field(default=None, description="Upstream LLM API Key (optional)")
+    auth_type: Optional[str] = Field(default="none", description="Upstream authentication header option: 'none', 'apikey' (apikey: {key}), or 'bearer' (Authorization: Bearer {key})")
+    provider: Optional[str] = Field(default="openai", description="LLM protocol/provider: 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'")
 
 class ModelCatalogCreate(ModelCatalogBase):
     pass
@@ -39,6 +42,9 @@ class ModelCatalogUpdate(BaseModel):
     output_price_per_1k: Optional[float] = None
     cache_discount_ratio: Optional[float] = None
     is_active: Optional[bool] = None
+    api_key: Optional[str] = None
+    auth_type: Optional[str] = None
+    provider: Optional[str] = None
 
 class ModelCatalogResponse(ModelCatalogBase):
     model_config = ConfigDict(from_attributes=True)
@@ -50,6 +56,7 @@ class ModelHealthCheckResult(BaseModel):
     serving_engine: str
     execution_method: str
     target_endpoint: str
+    provider: Optional[str] = "openai"
     is_healthy: bool
     status_code: Optional[int] = None
     latency_ms: Optional[float] = None

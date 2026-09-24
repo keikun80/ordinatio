@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   GitFork, 
@@ -7,13 +7,61 @@ import {
   ShieldAlert, 
   PackageCheck, 
   Sparkles,
-  Layers
+  Layers,
+  ChevronDown,
+  Cpu,
+  Compass
 } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, unreadPatchCount = 1 }) {
+export default function Sidebar({ 
+  activeTab, 
+  setActiveTab, 
+  routingSubTab = 'routing', 
+  setRoutingSubTab, 
+  unreadPatchCount = 1 
+}) {
+  const [isRoutingExpanded, setIsRoutingExpanded] = useState(true);
+
+  // Automatically expand accordion when routing tab is activated
+  useEffect(() => {
+    if (activeTab === 'routing') {
+      setIsRoutingExpanded(true);
+    }
+  }, [activeTab]);
+
+  const routingSubItems = [
+    { id: 'routing', label: '라우팅 스튜디오', icon: GitFork },
+    { id: 'catalog', label: '서빙 모델 풀', icon: Cpu },
+    { id: 'dispatch', label: 'AgentRouter & 테스트', icon: Compass }
+  ];
+
+  const handleRoutingHeaderClick = () => {
+    if (activeTab !== 'routing') {
+      setActiveTab('routing');
+      setIsRoutingExpanded(true);
+    } else {
+      setIsRoutingExpanded(!isRoutingExpanded);
+    }
+  };
+
+  const handleSubItemClick = (subId, e) => {
+    e.stopPropagation();
+    setActiveTab('routing');
+    if (setRoutingSubTab) {
+      setRoutingSubTab(subId);
+    }
+  };
+
   const navItems = [
     { id: 'overview', label: '글로벌 관제 홈', icon: LayoutDashboard },
-    { id: 'routing', label: '모델 & 라우팅', icon: GitFork, badge: 'Envoy L7' },
+    { 
+      id: 'routing', 
+      label: '모델 & 라우팅', 
+      icon: GitFork, 
+      badge: 'Envoy L7',
+      isAccordion: true,
+      subItems: routingSubItems
+    },
     { id: 'virtual-keys', label: '가상 API Key 거버넌스', icon: KeyRound },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
     { id: 'compliance', label: 'PII 보안 & 감사 포렌식', icon: ShieldAlert },
@@ -43,6 +91,50 @@ export default function Sidebar({ activeTab, setActiveTab, unreadPatchCount = 1 
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+
+          if (item.isAccordion) {
+            return (
+              <div key={item.id} className="nav-accordion-group">
+                <div
+                  className={`nav-accordion-header ${isActive ? 'active' : ''}`}
+                  onClick={handleRoutingHeaderClick}
+                  title="클릭하여 모델 & 라우팅 하위 메뉴 펼치기/접기"
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span className="nav-badge info" style={{ marginRight: '6px' }}>
+                      {item.badge}
+                    </span>
+                  )}
+                  <div className={`nav-accordion-arrow ${isRoutingExpanded ? 'open' : ''}`}>
+                    <ChevronDown size={15} />
+                  </div>
+                </div>
+
+                {isRoutingExpanded && (
+                  <div className="nav-sub-menu">
+                    {item.subItems.map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = isActive && routingSubTab === sub.id;
+                      return (
+                        <div
+                          key={sub.id}
+                          className={`nav-sub-item ${isSubActive ? 'active' : ''}`}
+                          onClick={(e) => handleSubItemClick(sub.id, e)}
+                        >
+                          <SubIcon size={14} color={isSubActive ? 'var(--accent-cyan)' : 'currentColor'} />
+                          <span>{sub.label}</span>
+                          <span className="nav-sub-dot" style={{ marginLeft: 'auto' }}></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <div
               key={item.id}

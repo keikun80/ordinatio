@@ -4,7 +4,7 @@ import { initialTenants } from '../data/mockData';
 import { apiClient } from '../api/client';
 
 export default function FinOpsTab({ onNotify }) {
-  const [tenants, setTenants] = useState(initialTenants);
+  const [tenants, setTenants] = useState([]);
   const [finOpsData, setFinOpsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -13,7 +13,7 @@ export default function FinOpsTab({ onNotify }) {
     setLoading(true);
     try {
       const data = await apiClient.getFinOpsOverview();
-      if (data && data.tenants && data.tenants.length > 0) {
+      if (data && Array.isArray(data.tenants)) {
         setFinOpsData(data);
         setTenants(data.tenants.map(t => ({
           id: t.tenant_id,
@@ -27,7 +27,7 @@ export default function FinOpsTab({ onNotify }) {
         })));
       }
     } catch (err) {
-      console.warn('FinOps overview fetch failed, fallback to mockData');
+      console.warn('FinOps overview fetch failed:', err);
     } finally {
       setLoading(false);
     }
@@ -183,7 +183,17 @@ export default function FinOpsTab({ onNotify }) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {tenants.map((t) => {
+          {tenants.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                등록된 부서(테넌트) 및 예산 데이터가 없습니다
+              </div>
+              <div style={{ fontSize: '0.78rem' }}>
+                부서가 등록되면 실시간 예산 소진율과 토큰 사용량이 표시됩니다.
+              </div>
+            </div>
+          ) : (
+            tenants.map((t) => {
             const percent = t.budget > 0 ? Math.min(100, Math.round((t.spent / t.budget) * 100)) : 0;
             const isBlocked = t.isBlocked || (percent >= 100 && t.hardCap);
             const isWarning = percent >= 80 && percent < 100;
@@ -243,7 +253,7 @@ export default function FinOpsTab({ onNotify }) {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>

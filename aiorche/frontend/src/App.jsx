@@ -12,6 +12,7 @@ import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [routingSubTab, setRoutingSubTab] = useState('routing');
   const [unreadPatchCount, setUnreadPatchCount] = useState(1);
   const [toasts, setToasts] = useState([]);
   const [theme, setTheme] = useState(() => {
@@ -46,6 +47,8 @@ export default function App() {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
+        routingSubTab={routingSubTab}
+        setRoutingSubTab={setRoutingSubTab}
         unreadPatchCount={unreadPatchCount} 
       />
 
@@ -66,7 +69,11 @@ export default function App() {
           )}
 
           {activeTab === 'routing' && (
-            <RoutingTab onNotify={addToast} />
+            <RoutingTab 
+              activeSubTab={routingSubTab}
+              setActiveSubTab={setRoutingSubTab}
+              onNotify={addToast} 
+            />
           )}
 
           {activeTab === 'virtual-keys' && (

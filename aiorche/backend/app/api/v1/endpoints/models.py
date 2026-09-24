@@ -17,9 +17,15 @@ from app.schemas.model_catalog import (
 
 router = APIRouter()
 
-async def probe_endpoint(endpoint: str, engine: str) -> Tuple[bool, Optional[int], Optional[float], Optional[str]]:
+async def probe_endpoint(
+    endpoint: str,
+    engine: str = "vLLM",
+    api_key: Optional[str] = None,
+    auth_type: Optional[str] = None,
+    provider: Optional[str] = "openai"
+) -> Tuple[bool, Optional[int], Optional[float], Optional[str]]:
     """
-    Probe a serving model endpoint (vLLM / Ollama / SGLang / Triton)
+    Probe a serving model endpoint based on its provider protocol.
     Returns: (is_healthy, status_code, latency_ms, error_message)
     """
     base_url = endpoint.rstrip('/')
@@ -29,15 +35,35 @@ async def probe_endpoint(endpoint: str, engine: str) -> Tuple[bool, Optional[int
     elif "localhost" in base_url:
         urls_to_try.append(base_url.replace("localhost", "host.docker.internal"))
 
-    engine_upper = (engine or "").upper()
-    if "OLLAMA" in engine_upper:
-        probe_paths = ["/api/tags", "/"]
-    elif "VLLM" in engine_upper or "SGLANG" in engine_upper:
-        probe_paths = ["/health", "/v1/models"]
-    elif "TRITON" in engine_upper:
-        probe_paths = ["/v1/health/ready", "/v1/models", "/"]
-    else:
-        probe_paths = ["/health", "/v1/models", "/"]
+    # Provider-specific health probe paths
+    prov = (provider or "openai").lower()
+    if prov == "anthropic":
+        probe_paths = ["", "/v1/models", "/"]
+    elif prov == "gemini":
+        probe_paths = ["", "/v1beta/models", "/"]
+    elif prov == "cohere":
+        probe_paths = ["", "/v2/models", "/v1/models", "/"]
+    elif prov == "deepseek":
+        probe_paths = ["", "/models", "/v1/models", "/"]
+    else:  # openai / default
+        probe_paths = ["", "/health", "/v1/models", "/api/tags", "/"]
+
+    # Configure upstream auth headers
+    headers = {}
+    if api_key:
+        if auth_type == "bearer":
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif auth_type == "apikey":
+            headers["apikey"] = api_key
+    if prov == "anthropic":
+        headers["anthropic-version"] = "2023-06-01"
+        if api_key:
+            headers["x-api-key"] = api_key
+    if api_key:
+        if auth_type == "bearer":
+            headers["Authorization"] = f"Bearer {api_key}"
+        elif auth_type == "apikey":
+            headers["apikey"] = api_key
 
     last_err = None
     last_status = None
@@ -49,7 +75,7 @@ async def probe_endpoint(endpoint: str, engine: str) -> Tuple[bool, Optional[int
                 full_url = f"{target}{path}"
                 t0 = time.perf_counter()
                 try:
-                    res = await client.get(full_url)
+                    res = await client.get(full_url, headers=headers if headers else None)
                     latency = round((time.perf_counter() - t0) * 1000, 2)
                     if res.status_code < 400:
                         return True, res.status_code, latency, None
@@ -77,7 +103,10 @@ async def check_all_models_health(db: Session = Depends(get_db)):
     async def _check(m: ModelCatalog) -> ModelHealthCheckResult:
         is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
             m.target_endpoint,
-            m.serving_engine or "vLLM"
+            m.serving_engine or "vLLM",
+            api_key=m.api_key,
+            auth_type=m.auth_type,
+            provider=getattr(m, "provider", "openai")
         )
         return ModelHealthCheckResult(
             model_id=m.model_id,
@@ -85,6 +114,7 @@ async def check_all_models_health(db: Session = Depends(get_db)):
             serving_engine=m.serving_engine or "vLLM",
             execution_method=m.execution_method or "k8s",
             target_endpoint=m.target_endpoint,
+            provider=getattr(m, "provider", "openai"),
             is_healthy=is_healthy,
             status_code=status_code,
             latency_ms=latency_ms,
@@ -107,7 +137,10 @@ async def check_single_model_health(model_id: str, db: Session = Depends(get_db)
 
     is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
         model.target_endpoint,
-        model.serving_engine or "vLLM"
+        model.serving_engine or "vLLM",
+        api_key=model.api_key,
+        auth_type=model.auth_type,
+        provider=getattr(model, "provider", "openai")
     )
     return ModelHealthCheckResult(
         model_id=model.model_id,
@@ -115,6 +148,7 @@ async def check_single_model_health(model_id: str, db: Session = Depends(get_db)
         serving_engine=model.serving_engine or "vLLM",
         execution_method=model.execution_method or "k8s",
         target_endpoint=model.target_endpoint,
+        provider=getattr(model, "provider", "openai"),
         is_healthy=is_healthy,
         status_code=status_code,
         latency_ms=latency_ms,

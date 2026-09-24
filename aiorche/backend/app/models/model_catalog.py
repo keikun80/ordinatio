@@ -14,4 +14,8 @@ class ModelCatalog(Base):
     output_price_per_1k = Column(Numeric(10, 4), default=2.4, nullable=False)
     cache_discount_ratio = Column(Numeric(5, 4), default=0.25, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    api_key = Column(String(255), nullable=True)  # Upstream endpoint API Key
+    auth_type = Column(String(32), nullable=True, default="none")  # 'none', 'apikey', 'bearer'
+    provider = Column(String(32), nullable=True, default="openai")  # 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

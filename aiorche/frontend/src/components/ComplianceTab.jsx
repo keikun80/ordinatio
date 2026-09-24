@@ -36,7 +36,7 @@ export default function ComplianceTab({ onNotify }) {
     } catch (e) {
       console.error('Failed to parse presets from localStorage', e);
     }
-    return samplePrompts;
+    return [];
   });
   const [selectedSample, setSelectedSample] = useState(0);
   const [inputText, setInputText] = useState(() => {
@@ -47,7 +47,7 @@ export default function ComplianceTab({ onNotify }) {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed[0]?.text || '';
       }
     } catch (e) {}
-    return samplePrompts[0]?.text || '';
+    return '';
   });
   const [isAddPresetModalOpen, setIsAddPresetModalOpen] = useState(false);
   const [newPreset, setNewPreset] = useState({ label: '', text: '' });
@@ -83,21 +83,12 @@ export default function ComplianceTab({ onNotify }) {
     if (data && data.length > 0) {
       setRules(data);
     } else {
-      // Fallback to mock mapped to backend format
-      setRules(initialPiiRules.map(r => ({
-        rule_id: r.id,
-        name: r.name,
-        entity_type: r.id.includes('rrn') ? 'RRN' : (r.id.includes('account') ? 'BANK_ACCOUNT' : (r.id.includes('card') ? 'CREDIT_CARD' : 'EMPLOYEE_ID')),
-        regex_pattern: r.pattern,
-        confidence_threshold: r.confidenceThreshold / 100,
-        action: r.action,
-        is_active: true
-      })));
+      setRules([]);
     }
     setLoadingRules(false);
   };
 
-  const [activeModelId, setActiveModelId] = useState('Solar-10.7B-Financial');
+  const [activeModelId, setActiveModelId] = useState('');
 
   const loadLogs = async () => {
     setLoadingLogs(true);

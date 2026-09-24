@@ -79,7 +79,8 @@ def seed_data():
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             ),
             ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-FineTuned-v2",
@@ -91,7 +92,8 @@ def seed_data():
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             ),
             ModelCatalog(
                 model_id="meta-llama/Llama-3.1-70B-Instruct",
@@ -103,7 +105,8 @@ def seed_data():
                 input_price_per_1k=3.5000,
                 output_price_per_1k=10.5000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             ),
             ModelCatalog(
                 model_id="qwen2.5:14b",
@@ -115,7 +118,8 @@ def seed_data():
                 input_price_per_1k=0.5000,
                 output_price_per_1k=1.5000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
         ])
     

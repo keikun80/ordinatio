@@ -7,25 +7,31 @@ const LOCAL_STORAGE_KEY = 'aiorche_virtual_keys_v1';
 const LOCAL_STORAGE_TENANTS_KEY = 'aiorche_tenants_v1';
 
 export default function VirtualKeysTab({ onNotify }) {
-  // Initialize state with localStorage if available, else initial mock
+  // Initialize state with localStorage if available, else empty array
   const [keys, setKeys] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(k => !['vk-live-wm-bot-01', 'vk-dev-risk-eval-09', 'vk-batch-compliance-03', 'vk-temp-marketing-88'].includes(k.keyId));
+      }
     } catch (e) {
       console.warn('Failed to parse saved keys:', e);
     }
-    return initialVirtualKeys;
+    return [];
   });
 
   const [tenants, setTenants] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_TENANTS_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(t => !['dept-01', 'dept-02', 'dept-03', 'dept-04', 'dept-05'].includes(t.id));
+      }
     } catch (e) {
       console.warn('Failed to parse saved tenants:', e);
     }
-    return initialTenants;
+    return [];
   });
 
   const [selectedDept, setSelectedDept] = useState('ALL');
@@ -43,12 +49,12 @@ export default function VirtualKeysTab({ onNotify }) {
   const [editTpm, setEditTpm] = useState(300000);
   const [editIp, setEditIp] = useState('10.100.0.0/16');
   const [editStatus, setEditStatus] = useState('ACTIVE');
-  const [editModels, setEditModels] = useState(['meta-llama/Llama-3.1-8B-Instruct']);
+  const [editModels, setEditModels] = useState([]);
   const [registeredModels, setRegisteredModels] = useState([]);
 
   // New Key Form State
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyDept, setNewKeyDept] = useState('dept-01');
+  const [newKeyDept, setNewKeyDept] = useState('');
   const [newKeyRpm, setNewKeyRpm] = useState(300);
   const [newKeyTpm, setNewKeyTpm] = useState(300000);
   const [newKeyHardCap, setNewKeyHardCap] = useState(true);
@@ -80,7 +86,7 @@ export default function VirtualKeysTab({ onNotify }) {
     async function loadData() {
       try {
         const liveTenants = await apiClient.getTenants();
-        if (liveTenants && liveTenants.length > 0) {
+        if (Array.isArray(liveTenants)) {
           const mappedTenants = liveTenants.map((t) => ({
             id: t.tenant_id,
             name: t.name,
@@ -95,13 +101,13 @@ export default function VirtualKeysTab({ onNotify }) {
         }
 
         const liveKeys = await apiClient.getVirtualKeys();
-        if (liveKeys && liveKeys.length > 0) {
+        if (Array.isArray(liveKeys)) {
           const mappedKeys = liveKeys.map((k) => ({
             keyId: k.key_id,
             name: k.name,
             tenantName: k.tenant_name || k.tenant_id,
             tenantId: k.tenant_id,
-            allowedModels: k.allowed_models && k.allowed_models.length > 0 ? k.allowed_models : ['meta-llama/Llama-3.1-8B-Instruct'],
+            allowedModels: k.allowed_models && k.allowed_models.length > 0 ? k.allowed_models : [],
             rpm: k.rpm_limit,
             tpm: k.tpm_limit,
             spent: 0,
@@ -114,7 +120,7 @@ export default function VirtualKeysTab({ onNotify }) {
         }
 
         const liveModels = await apiClient.getModels();
-        if (liveModels && liveModels.length > 0) {
+        if (Array.isArray(liveModels)) {
           const mappedModels = liveModels.map((m) => ({
             id: m.model_id,
             name: m.name,
@@ -122,10 +128,6 @@ export default function VirtualKeysTab({ onNotify }) {
           }));
           setRegisteredModels(mappedModels);
           setNewKeyModels(mappedModels.map((m) => m.id));
-        } else if (initialModels && initialModels.length > 0) {
-          const fallback = initialModels.map((m) => ({ id: m.id, name: m.name, alias: m.alias }));
-          setRegisteredModels(fallback);
-          setNewKeyModels(fallback.map((m) => m.id));
         }
       } catch (err) {
         console.warn('Backend API offline, keeping persisted local data:', err);
@@ -417,10 +419,25 @@ export default function VirtualKeysTab({ onNotify }) {
               </tr>
             </thead>
             <tbody>
-              {filteredKeys.map((k) => {
-                const percent = Math.min(100, Math.round((k.spent / k.budget) * 100));
-                return (
-                  <tr key={k.keyId}>
+              {filteredKeys.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <KeyRound size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        발급된 가상 API Key가 없습니다
+                      </div>
+                      <div style={{ fontSize: '0.8rem' }}>
+                        상단의 '+ 신규 가상 API Key 발급' 버튼을 눌러 안전한 가상키를 생성하세요.
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredKeys.map((k) => {
+                  const percent = Math.min(100, Math.round((k.spent / k.budget) * 100));
+                  return (
+                    <tr key={k.keyId}>
                     <td>
                       <div style={{ fontWeight: 600, color: '#ffffff' }}>{k.name}</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#38bdf8' }}>
@@ -499,7 +516,7 @@ export default function VirtualKeysTab({ onNotify }) {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

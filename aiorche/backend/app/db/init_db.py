@@ -22,6 +22,8 @@ def init_db():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS serving_engine VARCHAR(32) DEFAULT 'vLLM';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS execution_method VARCHAR(32) DEFAULT 'k8s';"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS api_key TEXT;"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS auth_type VARCHAR(16) DEFAULT 'none';"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS priority INT DEFAULT 10;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS match_conditions JSONB DEFAULT '{}'::jsonb;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS failover_chain JSONB DEFAULT '[]'::jsonb;"))
@@ -66,7 +68,8 @@ def init_db():
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
             m2 = ModelCatalog(
                 model_id="meta-llama/Llama-3.1-8B-FineTuned-v2",
@@ -78,7 +81,8 @@ def init_db():
                 input_price_per_1k=0.8000,
                 output_price_per_1k=2.4000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
             m3 = ModelCatalog(
                 model_id="meta-llama/Llama-3.1-70B-Instruct",
@@ -90,7 +94,8 @@ def init_db():
                 input_price_per_1k=3.5000,
                 output_price_per_1k=10.5000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
             m4 = ModelCatalog(
                 model_id="Solar-10.7B-Financial",
@@ -102,7 +107,8 @@ def init_db():
                 input_price_per_1k=1.2000,
                 output_price_per_1k=3.6000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
             m5 = ModelCatalog(
                 model_id="qwen2.5:14b",
@@ -114,7 +120,8 @@ def init_db():
                 input_price_per_1k=0.5000,
                 output_price_per_1k=1.5000,
                 cache_discount_ratio=0.2500,
-                is_active=True
+                is_active=True,
+                auth_type="none"
             )
             db.add_all([m1, m2, m3, m4, m5])
             db.commit()

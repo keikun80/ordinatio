@@ -44,7 +44,7 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
         status: c.status
       })));
     } else {
-      setComponents(componentVersions);
+      setComponents([]);
     }
     setLoadingComponents(false);
   };

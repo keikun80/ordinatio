@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, 
   Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight, 
-  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code, Settings 
+  Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code, Settings,
+  Key, Lock, Eye, EyeOff, Edit3
 } from 'lucide-react';
 import { initialModels } from '../data/mockData';
 import { apiClient } from '../api/client';
@@ -17,67 +18,130 @@ const DEFAULT_COLOR_PALETTE = [
   '#14b8a6'  // Teal
 ];
 
-const INITIAL_FALLBACK_ROUTES = [
+const INITIAL_FALLBACK_ROUTES = [];
+
+export const LLM_PROVIDERS = [
   {
-    policy_id: "pol-default",
-    route_name: "financial-advisor-v1",
-    description: "자산관리(WM) 및 PB 고객 전용 3-way 카나리 라우팅 풀",
-    priority: 10,
-    traffic_weights: [
-      { model_id: "meta-llama/Llama-3.1-8B-Instruct", weight: 70 },
-      { model_id: "meta-llama/Llama-3.1-8B-FineTuned-v2", weight: 20 },
-      { model_id: "Solar-10.7B-Financial", weight: 10 }
-    ],
-    load_balancing_strategy: "LeastQueueDepth",
-    failover_model_id: "meta-llama/Llama-3.1-70B-Instruct",
-    failover_chain: ["meta-llama/Llama-3.1-70B-Instruct", "Solar-10.7B-Financial"],
-    match_conditions: { tenant_codes: ["WM-01"], path_prefix: "/v1/routes/financial-advisor" },
-    is_active: true
+    id: 'openai',
+    name: 'OpenAI 호환 표준',
+    badge: 'OpenAI / vLLM / NIM',
+    desc: 'OpenAI API 표준 규격 (/v1/chat/completions)',
+    pathSuffix: '/v1/chat/completions',
+    defaultDomain: 'http://127.0.0.1:8000',
+    color: '#38bdf8',
+    isCompatible: true
   },
   {
-    policy_id: "pol-cs-v1",
-    route_name: "customer-service-v1",
-    description: "고객센터 챗봇 및 FAQ 실시간 상담 라우트",
-    priority: 20,
-    traffic_weights: [
-      { model_id: "meta-llama/Llama-3.1-8B-Instruct", weight: 80 },
-      { model_id: "Solar-10.7B-Financial", weight: 20 }
-    ],
-    load_balancing_strategy: "RoundRobin",
-    failover_model_id: "meta-llama/Llama-3.1-70B-Instruct",
-    failover_chain: ["meta-llama/Llama-3.1-70B-Instruct"],
-    match_conditions: { path_prefix: "/v1/routes/customer-service" },
-    is_active: true
+    id: 'deepseek',
+    name: 'DeepSeek API',
+    badge: 'DeepSeek 규격',
+    desc: 'DeepSeek 공식 엔드포인트 규격 (/chat/completions)',
+    pathSuffix: '/chat/completions',
+    defaultDomain: 'https://api.deepseek.com',
+    color: '#2dd4bf',
+    isCompatible: true
   },
   {
-    policy_id: "pol-code-v2",
-    route_name: "code-copilot-v2",
-    description: "사내 개발팀 코드 생성 및 SQL 최적화 전용 라우트",
-    priority: 30,
-    traffic_weights: [
-      { model_id: "meta-llama/Llama-3.1-70B-Instruct", weight: 100 }
-    ],
-    load_balancing_strategy: "PrefixCacheAffinity",
-    failover_model_id: "meta-llama/Llama-3.1-8B-Instruct",
-    failover_chain: ["meta-llama/Llama-3.1-8B-Instruct"],
-    match_conditions: { headers: { "x-route-tag": "coding" }, path_prefix: "/v1/routes/code-copilot" },
-    is_active: true
+    id: 'anthropic',
+    name: 'Anthropic Claude',
+    badge: 'OpenAI 비호환 (Messages)',
+    desc: 'Claude Messages API 규격 (/v1/messages)',
+    pathSuffix: '/v1/messages',
+    defaultDomain: 'https://api.anthropic.com',
+    color: '#fb923c',
+    isCompatible: false
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    badge: 'OpenAI 비호환 (Gemini REST)',
+    desc: 'Google Gemini API 규격 (/v1beta/models/{model}:generateContent)',
+    pathSuffix: '/v1beta/models/{model_id}:generateContent',
+    defaultDomain: 'https://generativelanguage.googleapis.com',
+    color: '#a78bfa',
+    isCompatible: false
+  },
+  {
+    id: 'cohere',
+    name: 'Cohere Command',
+    badge: 'OpenAI 비호환 (Cohere v2)',
+    desc: 'Cohere Chat v2 API 규격 (/v2/chat)',
+    pathSuffix: '/v2/chat',
+    defaultDomain: 'https://api.cohere.com',
+    color: '#f43f5e',
+    isCompatible: false
+  },
+  {
+    id: 'custom',
+    name: '직접 지정 (Custom)',
+    badge: '사용자 정의',
+    desc: '사용자 정의 엔드포인트 전체 경로 직접 입력',
+    pathSuffix: '',
+    defaultDomain: '',
+    color: '#94a3b8',
+    isCompatible: true
   }
 ];
 
-export default function RoutingTab({ onNotify }) {
+export const buildEndpointUrl = (domain, providerId, modelId = '') => {
+  const cleanDomain = (domain || '').trim().replace(/\/+$/, '');
+  if (!cleanDomain) return '';
+  if (providerId === 'custom') return cleanDomain;
+  const prov = LLM_PROVIDERS.find(p => p.id === providerId) || LLM_PROVIDERS[0];
+  let suffix = prov.pathSuffix;
+  if (suffix.includes('{model_id}')) {
+    suffix = suffix.replace('{model_id}', modelId || '{model_id}');
+  }
+  if (cleanDomain.endsWith(suffix)) {
+    return cleanDomain;
+  }
+  return `${cleanDomain}${suffix}`;
+};
+
+export const extractDomainAndProvider = (endpointUrl) => {
+  if (!endpointUrl) return { domain: '', provider: 'openai' };
+  const clean = endpointUrl.trim();
+  for (const prov of LLM_PROVIDERS) {
+    if (!prov.pathSuffix) continue;
+    const baseSuffix = prov.pathSuffix.split('{model_id}')[0];
+    if (clean.includes(baseSuffix)) {
+      const parts = clean.split(baseSuffix);
+      return { domain: parts[0], provider: prov.id };
+    }
+  }
+  return { domain: clean, provider: 'custom' };
+};
+
+export default function RoutingTab({ 
+  onNotify, 
+  activeSubTab: externalActiveSubTab, 
+  setActiveSubTab: externalSetActiveSubTab 
+}) {
   const [models, setModels] = useState(() => {
-    const saved = localStorage.getItem('aiorche_models');
-    return saved ? JSON.parse(saved) : initialModels;
+    try {
+      const saved = localStorage.getItem('aiorche_models');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Exclude legacy mock models if any
+        return parsed.filter(m => !['meta-llama/Llama-3.1-8B-Instruct', 'meta-llama/Llama-3.1-8B-FineTuned-v2', 'meta-llama/Llama-3.1-70B-Instruct', 'Solar-10.7B-Financial'].includes(m.id));
+      }
+    } catch (e) {}
+    return [];
   });
 
   const [routes, setRoutes] = useState(() => {
-    const saved = localStorage.getItem('aiorche_multi_routes');
-    return saved ? JSON.parse(saved) : INITIAL_FALLBACK_ROUTES;
+    try {
+      const saved = localStorage.getItem('aiorche_multi_routes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(r => !['pol-default', 'pol-cs-v1', 'pol-code-v2'].includes(r.policy_id));
+      }
+    } catch (e) {}
+    return [];
   });
 
   const [selectedRouteName, setSelectedRouteName] = useState(() => {
-    return localStorage.getItem('aiorche_selected_route') || "financial-advisor-v1";
+    return localStorage.getItem('aiorche_selected_route') || "";
   });
 
   const [isDeploying, setIsDeploying] = useState(false);
@@ -173,59 +237,158 @@ export default function RoutingTab({ onNotify }) {
     match_path: ''
   });
 
+  // Sub-Tab Navigation: 'routing' (라우팅 스튜디오) | 'catalog' (서빙 모델 풀) | 'dispatch' (AgentRouter & 테스트)
+  const [internalActiveSubTab, setInternalActiveSubTab] = useState('routing');
+  const activeSubTab = externalActiveSubTab !== undefined ? externalActiveSubTab : internalActiveSubTab;
+  const setActiveSubTab = externalSetActiveSubTab || setInternalActiveSubTab;
+
   const [showNewModelModal, setShowNewModelModal] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [newModelForm, setNewModelForm] = useState({
-    model_id: 'Qwen/Qwen2.5-14B-Instruct',
-    alias: 'qwen-14b-enterprise',
-    serving_engine: 'vLLM',
-    execution_method: 'k8s',
-    backend_infra: 'On-Prem K8s',
-    target_endpoint: 'http://vllm-qwen14b.ai-serving:8000',
+    model_id: 'deepseek-ai/deepseek-v4.1-flash',
+    alias: 'deepseek-v4.1-flash',
+    provider: 'openai',
+    base_domain: 'https://integrate.api.nvidia.com',
+    target_endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
     input_price_per_1k: 1.2,
-    output_price_per_1k: 3.6
+    output_price_per_1k: 3.6,
+    api_key: '',
+    auth_type: 'bearer' // 'none' | 'apikey' | 'bearer'
   });
 
-  const handleEngineChange = (engine) => {
-    let defaultEndpoint = newModelForm.target_endpoint;
-    let infra = newModelForm.backend_infra;
-    if (engine === 'Ollama') {
-      defaultEndpoint = newModelForm.execution_method === 'direct' 
-        ? 'http://127.0.0.1:11434' 
-        : (newModelForm.execution_method === 'docker-compose' ? 'http://ollama:11434' : 'http://ollama-service.ai-serving:11434');
-      infra = newModelForm.execution_method === 'direct' ? 'Local Server' : (newModelForm.execution_method === 'docker-compose' ? 'Private VM' : 'On-Prem K8s');
-    } else {
-      defaultEndpoint = newModelForm.execution_method === 'direct'
-        ? 'http://127.0.0.1:8000'
-        : (newModelForm.execution_method === 'docker-compose' ? 'http://vllm:8000' : 'http://vllm-qwen14b.ai-serving:8000');
-      infra = newModelForm.execution_method === 'direct' ? 'Bare-Metal GPU' : (newModelForm.execution_method === 'docker-compose' ? 'Private VM' : 'On-Prem K8s');
-    }
-    setNewModelForm({
-      ...newModelForm,
-      serving_engine: engine,
-      target_endpoint: defaultEndpoint,
-      backend_infra: infra
-    });
+  const handleNewModelProviderChange = (provId) => {
+    const computed = buildEndpointUrl(newModelForm.base_domain, provId, newModelForm.model_id);
+    setNewModelForm(prev => ({
+      ...prev,
+      provider: provId,
+      target_endpoint: computed
+    }));
   };
 
-  const handleExecutionMethodChange = (method) => {
-    let defaultEndpoint = newModelForm.target_endpoint;
-    let infra = newModelForm.backend_infra;
-    if (method === 'direct') {
-      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://127.0.0.1:11434' : 'http://127.0.0.1:8000';
-      infra = newModelForm.serving_engine === 'Ollama' ? 'Local Server' : 'Bare-Metal GPU';
-    } else if (method === 'docker-compose') {
-      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://ollama:11434' : 'http://vllm:8000';
-      infra = 'Private VM';
-    } else {
-      defaultEndpoint = newModelForm.serving_engine === 'Ollama' ? 'http://ollama-service.ai-serving:11434' : 'http://vllm-qwen14b.ai-serving:8000';
-      infra = 'On-Prem K8s';
-    }
-    setNewModelForm({
-      ...newModelForm,
-      execution_method: method,
-      target_endpoint: defaultEndpoint,
-      backend_infra: infra
+  const handleNewModelDomainChange = (domain) => {
+    const computed = buildEndpointUrl(domain, newModelForm.provider, newModelForm.model_id);
+    setNewModelForm(prev => ({
+      ...prev,
+      base_domain: domain,
+      target_endpoint: computed
+    }));
+  };
+
+  const handleNewModelIdChange = (modelId) => {
+    const computed = buildEndpointUrl(newModelForm.base_domain, newModelForm.provider, modelId);
+    setNewModelForm(prev => ({
+      ...prev,
+      model_id: modelId,
+      target_endpoint: computed
+    }));
+  };
+
+  // Edit Model States & Handlers
+  const [editingModel, setEditingModel] = useState(null);
+  const [showEditApiKey, setShowEditApiKey] = useState(false);
+  const [editModelForm, setEditModelForm] = useState({
+    model_id: '',
+    alias: '',
+    provider: 'openai',
+    base_domain: '',
+    target_endpoint: '',
+    input_price_per_1k: 0.8,
+    output_price_per_1k: 2.4,
+    cache_discount_ratio: 0.25,
+    api_key: '',
+    auth_type: 'none',
+    is_active: true
+  });
+
+  const handleOpenEditModal = (model) => {
+    setEditingModel(model);
+    const { domain, provider } = extractDomainAndProvider(model.endpoint || '');
+    const activeProvider = model.provider || provider || 'openai';
+    setEditModelForm({
+      model_id: model.id,
+      alias: model.alias || '',
+      provider: activeProvider,
+      base_domain: domain || model.endpoint || '',
+      target_endpoint: model.endpoint || '',
+      input_price_per_1k: model.inputPricePer1k !== undefined ? model.inputPricePer1k : 0.8,
+      output_price_per_1k: model.outputPricePer1k !== undefined ? model.outputPricePer1k : 2.4,
+      cache_discount_ratio: model.cache_discount_ratio !== undefined ? model.cache_discount_ratio : 0.25,
+      api_key: model.apiKey || '',
+      auth_type: model.authType || 'none',
+      is_active: model.active !== false
     });
+    setShowEditApiKey(false);
+  };
+
+  const handleEditModelProviderChange = (provId) => {
+    const computed = buildEndpointUrl(editModelForm.base_domain, provId, editModelForm.model_id);
+    setEditModelForm(prev => ({
+      ...prev,
+      provider: provId,
+      target_endpoint: computed
+    }));
+  };
+
+  const handleEditModelDomainChange = (domain) => {
+    const computed = buildEndpointUrl(domain, editModelForm.provider, editModelForm.model_id);
+    setEditModelForm(prev => ({
+      ...prev,
+      base_domain: domain,
+      target_endpoint: computed
+    }));
+  };
+
+  const handleUpdateModel = async (e) => {
+    e.preventDefault();
+    if (!editingModel) return;
+
+    try {
+      const res = await apiClient.updateModel(editingModel.id, {
+        alias: editModelForm.alias,
+        target_endpoint: editModelForm.target_endpoint,
+        provider: editModelForm.provider,
+        input_price_per_1k: Number(editModelForm.input_price_per_1k),
+        output_price_per_1k: Number(editModelForm.output_price_per_1k),
+        cache_discount_ratio: Number(editModelForm.cache_discount_ratio || 0.25),
+        is_active: editModelForm.is_active,
+        api_key: editModelForm.api_key?.trim() || null,
+        auth_type: editModelForm.auth_type || 'none'
+      });
+
+      const updated = models.map(m => m.id === editingModel.id ? {
+        ...m,
+        alias: res.alias || editModelForm.alias,
+        endpoint: res.target_endpoint || editModelForm.target_endpoint,
+        provider: res.provider || editModelForm.provider || 'openai',
+        inputPricePer1k: res.input_price_per_1k !== undefined ? res.input_price_per_1k : Number(editModelForm.input_price_per_1k),
+        outputPricePer1k: res.output_price_per_1k !== undefined ? res.output_price_per_1k : Number(editModelForm.output_price_per_1k),
+        apiKey: res.api_key !== undefined ? res.api_key : editModelForm.api_key,
+        authType: res.auth_type || editModelForm.auth_type || 'none',
+        active: res.is_active !== undefined ? res.is_active : editModelForm.is_active
+      } : m);
+
+      setModels(updated);
+      localStorage.setItem('aiorche_models', JSON.stringify(updated));
+      setEditingModel(null);
+      onNotify('SUCCESS', `모델 '${editModelForm.alias}' 정보가 성공적으로 수정되었습니다.`);
+    } catch (err) {
+      console.warn('Update model via API failed, updating locally:', err);
+      const updated = models.map(m => m.id === editingModel.id ? {
+        ...m,
+        alias: editModelForm.alias,
+        endpoint: editModelForm.target_endpoint,
+        provider: editModelForm.provider || 'openai',
+        inputPricePer1k: Number(editModelForm.input_price_per_1k),
+        outputPricePer1k: Number(editModelForm.output_price_per_1k),
+        apiKey: editModelForm.api_key,
+        authType: editModelForm.auth_type || 'none',
+        active: editModelForm.is_active
+      } : m);
+      setModels(updated);
+      localStorage.setItem('aiorche_models', JSON.stringify(updated));
+      setEditingModel(null);
+      onNotify('SUCCESS', `모델 '${editModelForm.alias}' 정보가 수정되었습니다.`);
+    }
   };
 
   // Load Models and Multi-Routes on Mount
@@ -238,7 +401,7 @@ export default function RoutingTab({ onNotify }) {
           apiClient.getActiveRoutingPolicy()
         ]);
 
-        if (modelsRes && modelsRes.length > 0) {
+        if (Array.isArray(modelsRes)) {
           const mapped = modelsRes.map(m => ({
             id: m.model_id,
             alias: m.alias,
@@ -246,8 +409,11 @@ export default function RoutingTab({ onNotify }) {
             engine: m.serving_engine || (m.backend_infra?.toLowerCase().includes('ollama') ? 'Ollama' : 'vLLM'),
             executionMethod: m.execution_method || 'k8s',
             endpoint: m.target_endpoint,
+            provider: m.provider || 'openai',
             inputPricePer1k: m.input_price_per_1k,
             outputPricePer1k: m.output_price_per_1k,
+            apiKey: m.api_key || '',
+            authType: m.auth_type || 'none',
             waitingQueue: 0,
             active: m.is_active
           }));
@@ -255,10 +421,10 @@ export default function RoutingTab({ onNotify }) {
           localStorage.setItem('aiorche_models', JSON.stringify(mapped));
         }
 
-        if (routesRes && routesRes.length > 0) {
+        if (Array.isArray(routesRes)) {
           setRoutes(routesRes);
           localStorage.setItem('aiorche_multi_routes', JSON.stringify(routesRes));
-          if (!routesRes.some(r => r.route_name === selectedRouteName)) {
+          if (routesRes.length > 0 && !routesRes.some(r => r.route_name === selectedRouteName)) {
             setSelectedRouteName(routesRes[0].route_name);
           }
         }
@@ -684,25 +850,25 @@ export default function RoutingTab({ onNotify }) {
       const res = await apiClient.createModel({
         model_id: newModelForm.model_id,
         alias: newModelForm.alias,
-        serving_engine: newModelForm.serving_engine,
-        execution_method: newModelForm.execution_method,
-        backend_infra: newModelForm.backend_infra,
         target_endpoint: newModelForm.target_endpoint,
+        provider: newModelForm.provider || 'openai',
         input_price_per_1k: Number(newModelForm.input_price_per_1k),
         output_price_per_1k: Number(newModelForm.output_price_per_1k),
         cache_discount_ratio: 0.25,
-        is_active: true
+        is_active: true,
+        api_key: newModelForm.api_key?.trim() || null,
+        auth_type: newModelForm.auth_type || 'none'
       });
 
       const newEntry = {
         id: res.model_id,
         alias: res.alias,
-        backend: res.backend_infra,
-        engine: res.serving_engine || newModelForm.serving_engine,
-        executionMethod: res.execution_method || newModelForm.execution_method,
         endpoint: res.target_endpoint,
+        provider: res.provider || newModelForm.provider || 'openai',
         inputPricePer1k: res.input_price_per_1k,
         outputPricePer1k: res.output_price_per_1k,
+        apiKey: res.api_key || newModelForm.api_key,
+        authType: res.auth_type || newModelForm.auth_type || 'none',
         waitingQueue: 0,
         active: true
       };
@@ -711,17 +877,17 @@ export default function RoutingTab({ onNotify }) {
       setModels(updated);
       localStorage.setItem('aiorche_models', JSON.stringify(updated));
       setShowNewModelModal(false);
-      onNotify('SUCCESS', `신규 모델 '${res.alias}' (${newEntry.engine})이(가) 서빙 풀에 추가되었습니다.`);
+      onNotify('SUCCESS', `신규 모델 '${res.alias}'이(가) 서빙 풀에 추가되었습니다.`);
     } catch (err) {
       const fallbackEntry = {
         id: newModelForm.model_id,
         alias: newModelForm.alias,
-        backend: newModelForm.backend_infra,
-        engine: newModelForm.serving_engine,
-        executionMethod: newModelForm.execution_method,
         endpoint: newModelForm.target_endpoint,
+        provider: newModelForm.provider || 'openai',
         inputPricePer1k: Number(newModelForm.input_price_per_1k),
         outputPricePer1k: Number(newModelForm.output_price_per_1k),
+        apiKey: newModelForm.api_key,
+        authType: newModelForm.auth_type || 'none',
         waitingQueue: 0,
         active: true
       };
@@ -729,7 +895,7 @@ export default function RoutingTab({ onNotify }) {
       setModels(updated);
       localStorage.setItem('aiorche_models', JSON.stringify(updated));
       setShowNewModelModal(false);
-      onNotify('SUCCESS', `신규 모델 '${newModelForm.alias}' (${newModelForm.serving_engine})이(가) 등록되었습니다.`);
+      onNotify('SUCCESS', `신규 모델 '${newModelForm.alias}'이(가) 등록되었습니다.`);
     }
   };
 
@@ -837,29 +1003,751 @@ response = client.chat.completions.create(
 
 print(response.choices[0].message.content)`;
 
-  return (
-    <div className="tab-pane">
-      {/* Page Header */}
-      <div className="page-header">
-        <div className="page-title-wrap">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1>모델 & 라우팅</h1>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
-            <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
-            <span className="badge active" style={{ fontSize: '0.75rem' }}>Phase 0.1 활성</span>
+
+  // ==========================================
+  // Sub-Tab 1: 라우팅 스튜디오 (Routing Studio)
+  // ==========================================
+  const renderRoutingStudio = () => (
+    <div className="subtab-content" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
+      {/* Multi-Route Selector Bar */}
+      <div className="card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <label htmlFor="route-profile-select" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <GitFork size={15} color="var(--accent-cyan)" />
+              <span>가상 라우트 프로필 ({routes.length}개):</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <select
+                id="route-profile-select"
+                className="form-select"
+                value={selectedRouteName}
+                onChange={(e) => {
+                  setSelectedRouteName(e.target.value);
+                  localStorage.setItem('aiorche_selected_route', e.target.value);
+                }}
+                style={{
+                  minWidth: '260px',
+                  padding: '7px 12px',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-card)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer'
+                }}
+              >
+                {routes.map((r) => (
+                  <option key={r.route_name} value={r.route_name} style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}>
+                    {r.route_name} — ({r.match_conditions?.path_prefix || `/v1/routes/${r.route_name}`} · 우선순위 {r.priority || 10})
+                  </option>
+                ))}
+              </select>
+
+              {currentRoute && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: 'var(--bg-panel)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--accent-cyan)'
+                  }}>
+                    {currentRoute.match_conditions?.path_prefix || `/v1/routes/${currentRoute.route_name}`}
+                  </span>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    background: currentRoute.is_active !== false ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
+                    color: currentRoute.is_active !== false ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                    border: currentRoute.is_active !== false ? '1px solid rgba(5, 150, 105, 0.25)' : '1px solid rgba(225, 29, 72, 0.25)'
+                  }}>
+                    우선순위 {currentRoute.priority || 10}
+                  </span>
+                  <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                    {currentRoute.is_active !== false ? '활성 프로필' : '비활성'}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-          <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
-            <Plus size={16} /> 신규 라우트 생성
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
-            + 신규 서빙 모델 등록
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Envoy 진입점:</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>port 8080</span>
+            <span style={{ color: 'var(--border-subtle)' }}>|</span>
+            <span style={{ color: 'var(--text-muted)' }}>xDS 리비전:</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', fontWeight: 600 }}>{xdsRevision}</span>
+          </div>
         </div>
       </div>
 
+      {/* Selected Route Configuration Studio */}
+      <div className="card" style={{ marginBottom: '24px', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+        <div className="card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="card-title">
+                <GitFork size={20} color="var(--accent-cyan)" />
+                <span>라우트 정책 편집: "{currentRoute.route_name}"</span>
+              </div>
+              <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`}>
+                {currentRoute.is_active !== false ? '활성 상태' : '비활성'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {currentRoute.description || "등록된 설명이 없습니다."}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+              className="btn btn-secondary btn-sm"
+              onClick={() => updateCurrentRoute({ is_active: !currentRoute.is_active })}
+            >
+              {currentRoute.is_active !== false ? '라우트 비활성화' : '라우트 활성화'}
+            </button>
+            {routes.length > 1 && (
+              <button 
+                className="btn btn-secondary btn-sm" 
+                style={{ color: 'var(--accent-rose)', borderColor: 'rgba(225, 29, 72, 0.3)' }}
+                onClick={handleDeleteRoute}
+              >
+                <Trash2 size={14} /> 라우트 삭제
+              </button>
+            )}
+          </div>
+        </div>
+        {/* 1. N-Way Multi-Model Traffic Splitter */}
+        <div className="panel-sub" style={{ padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={18} color="var(--accent-cyan)" />
+                <span>1. 다중 모델 가중치 분할기 (N-Target Multi-Weighted Traffic Splitter)</span>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                이 라우트로 인입되는 추론 요청을 {currentWeights.length}개 모델 풀 간에 실시간 비율로 분산 처리합니다.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance}>
+                <Scale size={14} color="var(--accent-cyan)" /> <span>가중치 균등 분할</span>
+              </button>
+              <div style={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-sm)',
+                background: totalWeight === 100 ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
+                color: totalWeight === 100 ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                border: totalWeight === 100 ? '1px solid rgba(5, 150, 105, 0.3)' : '1px solid rgba(225, 29, 72, 0.3)'
+              }}>
+                {totalWeight === 100 ? '총합: 100% (정상)' : `총합: ${totalWeight}% (차이: ${100 - totalWeight}%)`}
+              </div>
+            </div>
+          </div>
+
+          {/* Visual Stacked Progress Bar */}
+          <div style={{
+            height: '24px',
+            width: '100%',
+            background: 'var(--bg-panel)',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+            display: 'flex',
+            marginBottom: '18px',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            {currentWeights.map((item, idx) => {
+              const color = DEFAULT_COLOR_PALETTE[idx % DEFAULT_COLOR_PALETTE.length];
+              if (item.weight <= 0) return null;
+              return (
+                <div
+                  key={item.model_id}
+                  style={{
+                    width: `${item.weight}%`,
+                    background: color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    transition: 'width 0.2s ease',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    padding: '0 4px'
+                  }}
+                  title={`${item.model_id}: ${item.weight}%`}
+                >
+                  {item.weight >= 10 ? `${item.weight}%` : ''}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Model Weights List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {currentWeights.map((item, idx) => {
+              const color = DEFAULT_COLOR_PALETTE[idx % DEFAULT_COLOR_PALETTE.length];
+              const modelMeta = models.find(m => m.id === item.model_id);
+              return (
+                <div 
+                  key={item.model_id} 
+                  className="panel-nested"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '16px', 
+                    padding: '12px 16px', 
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  
+                  <div style={{ width: '260px', flexShrink: 0 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                      {item.model_id}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: color, fontFamily: 'var(--font-mono)' }}>
+                      alias: {modelMeta?.alias || 'vllm-serving'} ({modelMeta?.backend || 'EKS'})
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={item.weight}
+                      onChange={(e) => handleWeightChange(idx, e.target.value)}
+                      className="custom-range"
+                      style={{ flex: 1 }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '75px' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={item.weight}
+                        onChange={(e) => handleWeightChange(idx, e.target.value)}
+                        className="form-input"
+                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: 'var(--text-primary)' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>%</span>
+                    </div>
+                  </div>
+
+                  {currentWeights.length > 1 && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleRemoveModelFromRoute(idx)}
+                      style={{ padding: '6px', color: 'var(--accent-rose)' }}
+                      title="모델 제외"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add Model Selector */}
+          {availableModelsToAdd.length > 0 && (
+            <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <select
+                id="addModelSelect"
+                className="form-select"
+                style={{ 
+                  maxWidth: '360px', 
+                  fontSize: '0.82rem',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-input)',
+                  borderColor: 'var(--border-card)'
+                }}
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleAddModelToRoute(e.target.value);
+                    e.target.value = "";
+                  }
+                }}
+              >
+                <option value="" disabled style={{ color: 'var(--text-muted)' }}>
+                  + 카탈로그에서 추가할 모델 선택...
+                </option>
+                {availableModelsToAdd.map(m => (
+                  <option key={m.id} value={m.id} style={{ color: 'var(--text-primary)' }}>
+                    {m.id} ({m.alias})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                등록된 서빙 모델을 이 라우트의 트래픽 분할 대상에 포함시킵니다.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Routing Match Conditions & Priority */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '22px' }}>
+          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Compass size={18} color="var(--accent-cyan)" />
+              <span>2. 조건부 트래픽 매칭 규칙 (Traffic Matchers)</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem' }}>
+              <div>
+                <label className="form-label" style={{ marginBottom: '4px' }}>가상 엔드포인트 URL 접두사 (Path Prefix)</label>
+                <input
+                  className="form-input"
+                  placeholder="예: /v1/routes/financial-advisor"
+                  value={currentRoute.match_conditions?.path_prefix || ''}
+                  onChange={(e) => {
+                    updateCurrentRoute({
+                      match_conditions: { ...currentRoute.match_conditions, path_prefix: e.target.value }
+                    });
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ marginBottom: '4px' }}>적용 대상 부서/테넌트 코드 (쉼표로 구분)</label>
+                <input
+                  className="form-input"
+                  placeholder="예: WM-01, LOAN-01"
+                  value={(currentRoute.match_conditions?.tenant_codes || []).join(', ')}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const codes = raw.split(',').map(s => s.trim()).filter(Boolean);
+                    updateCurrentRoute({
+                      match_conditions: { ...currentRoute.match_conditions, tenant_codes: codes }
+                    });
+                  }}
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  해당 테넌트의 가상 API Key(헤더 `x-orche-tenant`)로 호출 시 이 라우트가 자동 선택됩니다.
+                </span>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ marginBottom: '4px' }}>매칭 우선순위 (Priority: 1~100, 낮을수록 우선)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="form-input"
+                  value={currentRoute.priority || 10}
+                  onChange={(e) => updateCurrentRoute({ priority: Number(e.target.value) })}
+                  style={{ maxWidth: '120px' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Load Balancing Strategy & Failover Chain */}
+          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} color="var(--accent-emerald)" />
+              <span>3. 부하 분산 전략 & 다단계 장애 우회 (Failover Chain)</span>
+            </div>
+            
+            <div style={{ marginBottom: '14px' }}>
+              <label className="form-label" style={{ marginBottom: '6px' }}>지능형 부하 분산 알고리즘</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="strategy"
+                    value="LeastQueueDepth"
+                    checked={(currentRoute.load_balancing_strategy || 'LeastQueueDepth') === 'LeastQueueDepth'}
+                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'LeastQueueDepth' })}
+                  />
+                  <span><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="strategy"
+                    value="PrefixCacheAffinity"
+                    checked={currentRoute.load_balancing_strategy === 'PrefixCacheAffinity'}
+                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'PrefixCacheAffinity' })}
+                  />
+                  <span><strong>프롬프트 캐시 친화도 (Prefix Cache Affinity)</strong> - 동일 시스템 프롬프트 캐시 적중률 극대화</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="strategy"
+                    value="RoundRobin"
+                    checked={currentRoute.load_balancing_strategy === 'RoundRobin'}
+                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'RoundRobin' })}
+                  />
+                  <span><strong>단순 라운드로빈 (Weighted Round Robin)</strong> - 단순 분할</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label" style={{ marginBottom: '4px' }}>1차 장애 우회 (Failover Target)</label>
+              <select
+                className="form-select"
+                value={currentRoute.failover_model_id || ''}
+                onChange={(e) => updateCurrentRoute({ failover_model_id: e.target.value })}
+                style={{ fontSize: '0.82rem', marginBottom: '8px' }}
+              >
+                <option value="">(선택 안 함 - 기본 라운드로빈 유지)</option>
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.id} ({m.alias})
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Envoy L7 헬스체크 실패(5xx/Timeout) 시 무중단 자동 페일오버되는 대상 모델입니다.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {totalWeight === 100 ? (
+              <span style={{ fontSize: '0.84rem', color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Check size={16} />
+                <span>가중치 합계 100% 정상 (저장 및 배포 준비 완료)</span>
+              </span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.84rem', color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={16} />
+                  <span>가중치 합계: {totalWeight}% (100% 일치 시 저장 가능)</span>
+                </span>
+                {currentWeights.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAutoBalance}
+                    style={{ fontSize: '0.76rem', padding: '4px 10px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                  >
+                    ⚡ 100% 균등 자동 맞춤
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-secondary" onClick={handleDryRun} disabled={isDryRunning}>
+              {isDryRunning ? '검증 중...' : '드라이런 사전 검증'}
+            </button>
+            <button className="btn btn-primary" onClick={handleDeployXds} disabled={isDeploying || totalWeight !== 100}>
+              {isDeploying ? '저장 및 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 및 저장'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ==========================================
+  // Sub-Tab 2: 서빙 모델 풀 (Model Catalog)
+  // ==========================================
+  const renderModelCatalog = () => (
+    <div className="subtab-content" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
+      {/* Upstream Clarification Notice */}
+      <div className="callout-notice" style={{ marginBottom: '14px' }}>
+        💡 <strong>안내:</strong> 아래 모델 카탈로그의 엔드포인트는 주전산센터 내부 <strong>'Upstream 원본 서빙 인프라'</strong> 주소입니다. 외부 개발자 및 클라이언트는 상단의 <strong>'Envoy L7 게이트웨이 엔드포인트(포트 8080)'</strong>로 인입되며, 게이트웨이가 가중치에 따라 아래 원본 모델 풀로 트래픽을 자동 분산합니다.
+      </div>
+
+      {/* Model Catalog Table */}
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="card-title">
+              <Cpu size={20} color="var(--accent-emerald)" />
+              <span>LLM 서빙 모델 풀</span>
+            </div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 실시간 헬스 상태
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleCheckAllHealth}
+              disabled={isHealthCheckingAll}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+            >
+              <RefreshCw size={14} className={isHealthCheckingAll ? 'spin' : ''} />
+              <span>{isHealthCheckingAll ? '전체 점검 중...' : '전체 헬스체크 (Ping All)'}</span>
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowNewModelModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+            >
+              <Plus size={14} />
+              <span>신규 모델 등록</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="table-responsive">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>모델 식별자 / 별칭</th>
+                <th>엔드포인트 URL & 인증 방식</th>
+                <th>토큰 단가 (입력/출력)</th>
+                <th>대기 큐</th>
+                <th>상태 & 헬스</th>
+                <th>현재 라우트 포함</th>
+                <th style={{ textAlign: 'center' }}>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <Cpu size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        등록된 LLM 서빙 모델이 없습니다
+                      </div>
+                      <div style={{ fontSize: '0.8rem' }}>
+                        우측 상단의 '+ 신규 모델 등록' 버튼을 눌러 첫 번째 추론 엔드포인트를 등록하세요.
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                models.map((m) => {
+                  const isInCurrentRoute = currentWeights.some(w => w.model_id === m.id);
+                  return (
+                    <tr key={m.id}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.id}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
+                      {(() => {
+                        const prov = LLM_PROVIDERS.find(p => p.id === m.provider) || LLM_PROVIDERS[0];
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                            <span 
+                              style={{ 
+                                fontSize: '0.66rem', 
+                                fontWeight: 700, 
+                                padding: '1px 6px', 
+                                borderRadius: '4px', 
+                                background: `${prov.color}20`, 
+                                color: prov.color, 
+                                border: `1px solid ${prov.color}50` 
+                              }}
+                              title={prov.desc}
+                            >
+                              {prov.name}
+                            </span>
+                            {!prov.isCompatible && prov.id !== 'custom' && (
+                              <span style={{ fontSize: '0.62rem', color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.1)', padding: '1px 4px', borderRadius: '3px' }}>
+                                비호환
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div style={{ wordBreak: 'break-all', color: 'var(--text-secondary)' }}>{m.endpoint}</div>
+                      <div style={{ marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {m.authType === 'apikey' ? (
+                          <span className="badge warning" style={{ fontSize: '0.65rem', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }} title={`엔드포인트 연결 시 header 'apikey = {api_key}' 전송`}>
+                            <Key size={10} />
+                            <span>apikey Header</span>
+                          </span>
+                        ) : m.authType === 'bearer' ? (
+                          <span className="badge info" style={{ fontSize: '0.65rem', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }} title={`엔드포인트 연결 시 header 'Authorization: Bearer {api_key}' 전송`}>
+                            <Lock size={10} />
+                            <span>Bearer Token</span>
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            인증 없음
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                      ₩{m.inputPricePer1k} / ₩{m.outputPricePer1k} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>/ 1k tok</span>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {m.waitingQueue} reqs
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div>
+                          <span className={`badge ${m.active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem' }}>
+                            {m.active !== false ? '정상 서빙' : '비활성'}
+                          </span>
+                        </div>
+                        {(() => {
+                          const hs = healthStatus[m.id];
+                          if (!hs) {
+                            return (
+                              <button
+                                onClick={() => handleCheckSingleHealth(m.id)}
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '2px 8px', fontSize: '0.68rem', height: '22px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}
+                                title="실시간 엔드포인트 핑 테스트"
+                              >
+                                <Zap size={11} color="var(--accent-cyan)" />
+                                <span>핑 테스트</span>
+                              </button>
+                            );
+                          }
+                          if (hs.checking) {
+                            return (
+                              <span
+                                className="badge info"
+                                style={{
+                                  fontSize: '0.68rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  width: 'fit-content'
+                                }}
+                              >
+                                <RefreshCw size={11} className="spin" />
+                                <span>점검 중...</span>
+                              </span>
+                            );
+                          }
+                          if (hs.is_healthy) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span
+                                  className="badge active"
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}
+                                  title={`HTTP ${hs.status_code || 200} OK | 지연시간: ${hs.latency_ms}ms`}
+                                >
+                                  <CheckCircle2 size={11} />
+                                  <span>정상 ({hs.latency_ms}ms)</span>
+                                </span>
+                                <button
+                                  onClick={() => handleCheckSingleHealth(m.id)}
+                                  title="다시 점검"
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span
+                                className="badge danger"
+                                style={{
+                                  fontSize: '0.68rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                                title={hs.error_message || '연결 불가'}
+                              >
+                                <AlertCircle size={11} />
+                                <span>오프라인</span>
+                              </span>
+                              <button
+                                onClick={() => handleCheckSingleHealth(m.id)}
+                                title={`재시도: ${hs.error_message || '연결 실패'}`}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-rose)', padding: '2px', display: 'flex', alignItems: 'center' }}
+                              >
+                                <RefreshCw size={12} />
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </td>
+                    <td>
+                      {isInCurrentRoute ? (
+                        <span style={{ color: 'var(--accent-emerald)', fontSize: '0.8rem', fontWeight: 600 }}>
+                          포함됨 ({currentWeights.find(w => w.model_id === m.id)?.weight}%)
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleAddModelToRoute(m.id)}
+                          style={{ fontSize: '0.75rem' }}
+                        >
+                          + 라우트에 추가
+                        </button>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenEditModal(m)}
+                          style={{
+                            padding: '3px 8px',
+                            color: 'var(--accent-cyan)',
+                            borderColor: 'rgba(56, 189, 248, 0.35)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.72rem'
+                          }}
+                          title="서빙 모델 속성 및 엔드포인트/인증 정보 수정"
+                        >
+                          <Edit3 size={12} />
+                          <span>수정</span>
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleDeleteModel(m.id)}
+                          style={{
+                            padding: '3px 8px',
+                            color: 'var(--accent-rose)',
+                            borderColor: 'rgba(225, 29, 72, 0.35)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.72rem'
+                          }}
+                          title="서빙 모델 풀에서 영구 삭제"
+                        >
+                          <Trash2 size={12} />
+                          <span>삭제</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ========================================================
+  // Sub-Tab 3: AgentRouter 관제 & 테스트 (Dispatch & Testbench)
+  // ========================================================
+  const renderDispatchAndTestbench = () => (
+    <div className="subtab-content" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
       {/* Phase 0.1: AgentRouter Cognitive Dispatcher Panel */}
       <div className="card" style={{ marginBottom: '20px', padding: '20px', borderColor: 'rgba(124, 58, 237, 0.35)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -981,115 +1869,39 @@ print(response.choices[0].message.content)`;
         </div>
       </div>
 
-      {/* Multi-Route Selector Bar */}
-      <div className="card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <label htmlFor="route-profile-select" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <GitFork size={15} color="var(--accent-cyan)" />
-              <span>가상 라우트 프로필 ({routes.length}개):</span>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <select
-                id="route-profile-select"
-                className="form-select"
-                value={selectedRouteName}
-                onChange={(e) => {
-                  setSelectedRouteName(e.target.value);
-                  localStorage.setItem('aiorche_selected_route', e.target.value);
-                }}
-                style={{
-                  minWidth: '260px',
-                  padding: '7px 12px',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'var(--bg-input)',
-                  borderColor: 'var(--border-card)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer'
-                }}
-              >
-                {routes.map((r) => (
-                  <option key={r.route_name} value={r.route_name} style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)' }}>
-                    {r.route_name} — ({r.match_conditions?.path_prefix || `/v1/routes/${r.route_name}`} · 우선순위 {r.priority || 10})
-                  </option>
-                ))}
-              </select>
-
-              {currentRoute && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)',
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    background: 'var(--bg-panel)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--accent-cyan)'
-                  }}>
-                    {currentRoute.match_conditions?.path_prefix || `/v1/routes/${currentRoute.route_name}`}
-                  </span>
-                  <span style={{
-                    padding: '3px 8px',
-                    borderRadius: '10px',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    background: currentRoute.is_active !== false ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
-                    color: currentRoute.is_active !== false ? 'var(--accent-emerald)' : 'var(--accent-rose)',
-                    border: currentRoute.is_active !== false ? '1px solid rgba(5, 150, 105, 0.25)' : '1px solid rgba(225, 29, 72, 0.25)'
-                  }}>
-                    우선순위 {currentRoute.priority || 10}
-                  </span>
-                  <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                    {currentRoute.is_active !== false ? '활성 프로필' : '비활성'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Envoy 진입점:</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>port 8080</span>
-            <span style={{ color: 'var(--border-subtle)' }}>|</span>
-            <span style={{ color: 'var(--text-muted)' }}>xDS 리비전:</span>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', fontWeight: 600 }}>{xdsRevision}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Selected Route Configuration Studio */}
+      {/* Envoy Gateway API 엔드포인트 & 실시간 테스트 벤치 카드 */}
       <div className="card" style={{ marginBottom: '24px', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
-        <div className="card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
+        <div className="card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div className="card-title">
-                <GitFork size={20} color="var(--accent-cyan)" />
-                <span>라우트 정책 편집: "{currentRoute.route_name}"</span>
+                <Globe size={20} color="var(--accent-cyan)" />
+                <span>Envoy Gateway API 엔드포인트 & 실시간 테스트 벤치</span>
               </div>
-              <span className={`badge ${currentRoute.is_active !== false ? 'active' : 'revoked'}`}>
-                {currentRoute.is_active !== false ? '활성 상태' : '비활성'}
-              </span>
+              <span className="badge active">포트 8080 Ingress</span>
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {currentRoute.description || "등록된 설명이 없습니다."}
+              현재 선택된 라우트 프로필(<strong>"{currentRoute.route_name}"</strong>)로 실제 인그레스 HTTP 요청을 전송하고 L7 xDS 라우팅 응답을 실시간 검증합니다.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button 
-              className="btn btn-secondary btn-sm"
-              onClick={() => updateCurrentRoute({ is_active: !currentRoute.is_active })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label htmlFor="testbench-route-select" style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>테스트 라우트:</label>
+            <select
+              id="testbench-route-select"
+              className="form-select"
+              value={selectedRouteName}
+              onChange={(e) => {
+                setSelectedRouteName(e.target.value);
+                localStorage.setItem('aiorche_selected_route', e.target.value);
+              }}
+              style={{ fontSize: '0.82rem', padding: '5px 10px', minWidth: '180px' }}
             >
-              {currentRoute.is_active !== false ? '라우트 비활성화' : '라우트 활성화'}
-            </button>
-            {routes.length > 1 && (
-              <button 
-                className="btn btn-secondary btn-sm" 
-                style={{ color: 'var(--accent-rose)', borderColor: 'rgba(225, 29, 72, 0.3)' }}
-                onClick={handleDeleteRoute}
-              >
-                <Trash2 size={14} /> 라우트 삭제
-              </button>
-            )}
+              {routes.map(r => (
+                <option key={r.route_name} value={r.route_name}>
+                  {r.route_name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -1519,567 +2331,131 @@ print(response.choices[0].message.content)`;
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
 
-        {/* 1. N-Way Multi-Model Traffic Splitter */}
-        <div className="panel-sub" style={{ padding: '20px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} color="var(--accent-cyan)" />
-                <span>1. 다중 모델 가중치 분할기 (N-Target Multi-Weighted Traffic Splitter)</span>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                이 라우트로 인입되는 추론 요청을 {currentWeights.length}개 모델 풀 간에 실시간 비율로 분산 처리합니다.
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={handleAutoBalance}>
-                <Scale size={14} color="var(--accent-cyan)" /> <span>가중치 균등 분할</span>
-              </button>
-              <div style={{
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-sm)',
-                background: totalWeight === 100 ? 'rgba(5, 150, 105, 0.12)' : 'rgba(225, 29, 72, 0.12)',
-                color: totalWeight === 100 ? 'var(--accent-emerald)' : 'var(--accent-rose)',
-                border: totalWeight === 100 ? '1px solid rgba(5, 150, 105, 0.3)' : '1px solid rgba(225, 29, 72, 0.3)'
-              }}>
-                {totalWeight === 100 ? '총합: 100% (정상)' : `총합: ${totalWeight}% (차이: ${100 - totalWeight}%)`}
-              </div>
-            </div>
+  return (
+    <div className="tab-pane">
+      {/* Page Header */}
+      <div className="page-header">
+        <div className="page-title-wrap">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1>모델 & 라우팅</h1>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
+            <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
+            <span className="badge active" style={{ fontSize: '0.75rem' }}>Phase 0.1 활성</span>
           </div>
+          <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
+            <Plus size={16} /> 신규 라우트 생성
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
+            + 신규 서빙 모델 등록
+          </button>
+        </div>
+      </div>
 
-          {/* Visual Stacked Progress Bar */}
-          <div style={{
-            height: '24px',
-            width: '100%',
-            background: 'var(--bg-panel)',
-            borderRadius: 'var(--radius-sm)',
-            overflow: 'hidden',
-            display: 'flex',
-            marginBottom: '18px',
-            border: '1px solid var(--border-subtle)'
-          }}>
-            {currentWeights.map((item, idx) => {
-              const color = DEFAULT_COLOR_PALETTE[idx % DEFAULT_COLOR_PALETTE.length];
-              if (item.weight <= 0) return null;
-              return (
-                <div
-                  key={item.model_id}
-                  style={{
-                    width: `${item.weight}%`,
-                    background: color,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    transition: 'width 0.2s ease',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    padding: '0 4px'
-                  }}
-                  title={`${item.model_id}: ${item.weight}%`}
-                >
-                  {item.weight >= 10 ? `${item.weight}%` : ''}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Model Weights List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {currentWeights.map((item, idx) => {
-              const color = DEFAULT_COLOR_PALETTE[idx % DEFAULT_COLOR_PALETTE.length];
-              const modelMeta = models.find(m => m.id === item.model_id);
-              return (
-                <div 
-                  key={item.model_id} 
-                  className="panel-nested"
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '16px', 
-                    padding: '12px 16px', 
-                    borderRadius: 'var(--radius-sm)'
-                  }}
-                >
-                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, flexShrink: 0 }} />
-                  
-                  <div style={{ width: '260px', flexShrink: 0 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                      {item.model_id}
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: color, fontFamily: 'var(--font-mono)' }}>
-                      alias: {modelMeta?.alias || 'vllm-serving'} ({modelMeta?.backend || 'EKS'})
-                    </div>
-                  </div>
-
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={item.weight}
-                      onChange={(e) => handleWeightChange(idx, e.target.value)}
-                      className="custom-range"
-                      style={{ flex: 1 }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '75px' }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.weight}
-                        onChange={(e) => handleWeightChange(idx, e.target.value)}
-                        className="form-input"
-                        style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: 'var(--text-primary)' }}
-                      />
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>%</span>
-                    </div>
-                  </div>
-
-                  {currentWeights.length > 1 && (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleRemoveModelFromRoute(idx)}
-                      style={{ padding: '6px', color: 'var(--accent-rose)' }}
-                      title="모델 제외"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Add Model Selector */}
-          {availableModelsToAdd.length > 0 && (
-            <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <select
-                id="addModelSelect"
-                className="form-select"
-                style={{ 
-                  maxWidth: '360px', 
-                  fontSize: '0.82rem',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'var(--bg-input)',
-                  borderColor: 'var(--border-card)'
-                }}
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleAddModelToRoute(e.target.value);
-                    e.target.value = "";
-                  }
+      {/* Sub-Tab Navigation Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        marginBottom: '20px',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '12px',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {[
+            {
+              id: 'routing',
+              label: '라우팅 스튜디오 (Routing Studio)',
+              icon: GitFork,
+              badge: `${routes.length}개 프로필`,
+              badgeColor: 'info'
+            },
+            {
+              id: 'catalog',
+              label: '서빙 모델 풀 (Model Catalog)',
+              icon: Cpu,
+              badge: `${models.length}개 모델`,
+              badgeColor: 'active'
+            },
+            {
+              id: 'dispatch',
+              label: 'AgentRouter & 테스트 (Dispatch & Testbench)',
+              icon: Compass,
+              badge: 'Live Ingress',
+              badgeColor: 'purple'
+            }
+          ].map(tab => {
+            const isActive = activeSubTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSubTab(tab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  border: isActive ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid var(--border-subtle)',
+                  background: isActive ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-panel)',
+                  color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isActive ? '0 0 12px rgba(56, 189, 248, 0.12)' : 'none'
                 }}
               >
-                <option value="" disabled style={{ color: 'var(--text-muted)' }}>
-                  + 카탈로그에서 추가할 모델 선택...
-                </option>
-                {availableModelsToAdd.map(m => (
-                  <option key={m.id} value={m.id} style={{ color: 'var(--text-primary)' }}>
-                    {m.id} ({m.alias})
-                  </option>
-                ))}
-              </select>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                등록된 서빙 모델을 이 라우트의 트래픽 분할 대상에 포함시킵니다.
-              </span>
-            </div>
+                <Icon size={16} color={isActive ? 'var(--accent-cyan)' : 'currentColor'} />
+                <span>{tab.label}</span>
+                <span className={`badge ${tab.badgeColor}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                  {tab.badge}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* SubTab Specific Quick Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {activeSubTab === 'routing' && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowNewRouteModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Plus size={14} /> <span>신규 라우트 생성</span>
+            </button>
+          )}
+          {activeSubTab === 'catalog' && (
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={handleCheckAllHealth} disabled={isHealthCheckingAll} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={14} color="var(--accent-cyan)" /> <span>{isHealthCheckingAll ? '점검 중...' : '전체 헬스체크 (Ping All)'}</span>
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowNewModelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={14} /> <span>신규 모델 등록</span>
+              </button>
+            </>
+          )}
+          {activeSubTab === 'dispatch' && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowPolicyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', borderColor: 'rgba(124, 58, 237, 0.4)' }}>
+              <Settings size={14} /> <span>4대 정책 상세 편집</span>
+            </button>
           )}
         </div>
-
-        {/* 2. Routing Match Conditions & Priority */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginBottom: '22px' }}>
-          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Compass size={18} color="var(--accent-cyan)" />
-              <span>2. 조건부 트래픽 매칭 규칙 (Traffic Matchers)</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem' }}>
-              <div>
-                <label className="form-label" style={{ marginBottom: '4px' }}>가상 엔드포인트 URL 접두사 (Path Prefix)</label>
-                <input
-                  className="form-input"
-                  placeholder="예: /v1/routes/financial-advisor"
-                  value={currentRoute.match_conditions?.path_prefix || ''}
-                  onChange={(e) => {
-                    updateCurrentRoute({
-                      match_conditions: { ...currentRoute.match_conditions, path_prefix: e.target.value }
-                    });
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="form-label" style={{ marginBottom: '4px' }}>적용 대상 부서/테넌트 코드 (쉼표로 구분)</label>
-                <input
-                  className="form-input"
-                  placeholder="예: WM-01, LOAN-01"
-                  value={(currentRoute.match_conditions?.tenant_codes || []).join(', ')}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const codes = raw.split(',').map(s => s.trim()).filter(Boolean);
-                    updateCurrentRoute({
-                      match_conditions: { ...currentRoute.match_conditions, tenant_codes: codes }
-                    });
-                  }}
-                />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  해당 테넌트의 가상 API Key(헤더 `x-orche-tenant`)로 호출 시 이 라우트가 자동 선택됩니다.
-                </span>
-              </div>
-
-              <div>
-                <label className="form-label" style={{ marginBottom: '4px' }}>매칭 우선순위 (Priority: 1~100, 낮을수록 우선)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  className="form-input"
-                  value={currentRoute.priority || 10}
-                  onChange={(e) => updateCurrentRoute({ priority: Number(e.target.value) })}
-                  style={{ maxWidth: '120px' }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Load Balancing Strategy & Failover Chain */}
-          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} color="var(--accent-emerald)" />
-              <span>3. 부하 분산 전략 & 다단계 장애 우회 (Failover Chain)</span>
-            </div>
-            
-            <div style={{ marginBottom: '14px' }}>
-              <label className="form-label" style={{ marginBottom: '6px' }}>지능형 부하 분산 알고리즘</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="strategy"
-                    value="LeastQueueDepth"
-                    checked={(currentRoute.load_balancing_strategy || 'LeastQueueDepth') === 'LeastQueueDepth'}
-                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'LeastQueueDepth' })}
-                  />
-                  <span><strong>최소 큐 깊이 (Least Queue Depth)</strong> - KV-Cache 및 vLLM 대기 큐 최적 분산</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="strategy"
-                    value="PrefixCacheAffinity"
-                    checked={currentRoute.load_balancing_strategy === 'PrefixCacheAffinity'}
-                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'PrefixCacheAffinity' })}
-                  />
-                  <span><strong>프롬프트 캐시 친화도 (Prefix Cache Affinity)</strong> - 동일 시스템 프롬프트 캐시 적중률 극대화</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="strategy"
-                    value="RoundRobin"
-                    checked={currentRoute.load_balancing_strategy === 'RoundRobin'}
-                    onChange={() => updateCurrentRoute({ load_balancing_strategy: 'RoundRobin' })}
-                  />
-                  <span><strong>단순 라운드로빈 (Weighted Round Robin)</strong> - 단순 분할</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="form-label" style={{ marginBottom: '4px' }}>1차 장애 우회 (Failover Target)</label>
-              <select
-                className="form-select"
-                value={currentRoute.failover_model_id || ''}
-                onChange={(e) => updateCurrentRoute({ failover_model_id: e.target.value })}
-                style={{ fontSize: '0.82rem', marginBottom: '8px' }}
-              >
-                <option value="">(선택 안 함 - 기본 라운드로빈 유지)</option>
-                {models.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.id} ({m.alias})
-                  </option>
-                ))}
-              </select>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Envoy L7 헬스체크 실패(5xx/Timeout) 시 무중단 자동 페일오버되는 대상 모델입니다.
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {totalWeight === 100 ? (
-              <span style={{ fontSize: '0.84rem', color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Check size={16} />
-                <span>가중치 합계 100% 정상 (저장 및 배포 준비 완료)</span>
-              </span>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.84rem', color: 'var(--accent-amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <AlertCircle size={16} />
-                  <span>가중치 합계: {totalWeight}% (100% 일치 시 저장 가능)</span>
-                </span>
-                {currentWeights.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleAutoBalance}
-                    style={{ fontSize: '0.76rem', padding: '4px 10px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
-                  >
-                    ⚡ 100% 균등 자동 맞춤
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-secondary" onClick={handleDryRun} disabled={isDryRunning}>
-              {isDryRunning ? '검증 중...' : '드라이런 사전 검증'}
-            </button>
-            <button className="btn btn-primary" onClick={handleDeployXds} disabled={isDeploying || totalWeight !== 100}>
-              {isDeploying ? '저장 및 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 및 저장'}
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Upstream Clarification Notice */}
-      <div className="callout-notice" style={{ marginBottom: '14px' }}>
-        💡 <strong>안내:</strong> 아래 모델 카탈로그의 엔드포인트는 주전산센터 내부 <strong>'Upstream 원본 서빙 인프라'</strong> 주소입니다. 외부 개발자 및 클라이언트는 상단의 <strong>'Envoy L7 게이트웨이 엔드포인트(포트 8080)'</strong>로 인입되며, 게이트웨이가 가중치에 따라 아래 원본 모델 풀로 트래픽을 자동 분산합니다.
-      </div>
+      {/* Render Active Sub-Tab View */}
+      {activeSubTab === 'routing' && renderRoutingStudio()}
+      {activeSubTab === 'catalog' && renderModelCatalog()}
+      {activeSubTab === 'dispatch' && renderDispatchAndTestbench()}
 
-      {/* Model Catalog Table */}
-      <div className="card">
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div className="card-title">
-              <Cpu size={20} color="var(--accent-emerald)" />
-              <span>LLM 서빙 모델 풀</span>
-            </div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              주전산센터(K8s/Bare-Metal/VM/Host) 내 배포된 실제 추론 엔드포인트 실시간 헬스 상태
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={handleCheckAllHealth}
-              disabled={isHealthCheckingAll}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
-            >
-              <RefreshCw size={14} className={isHealthCheckingAll ? 'spin' : ''} />
-              <span>{isHealthCheckingAll ? '전체 점검 중...' : '전체 헬스체크 (Ping All)'}</span>
-            </button>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => setShowNewModelModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
-            >
-              <Plus size={14} />
-              <span>신규 모델 등록</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="table-responsive">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>모델 식별자 / 별칭</th>
-                <th>런타임 엔진</th>
-                <th>구동 인프라 & 방식</th>
-                <th>엔드포인트 URL</th>
-                <th>토큰 단가 (입력/출력)</th>
-                <th>대기 큐</th>
-                <th>상태 & 헬스</th>
-                <th>현재 라우트 포함</th>
-                <th style={{ textAlign: 'center' }}>관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.map((m) => {
-                const isInCurrentRoute = currentWeights.some(w => w.model_id === m.id);
-                const isOllama = m.engine === 'Ollama' || m.backend?.toLowerCase().includes('ollama');
-                return (
-                  <tr key={m.id}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.id}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
-                    </td>
-                    <td>
-                      <span 
-                        className={`badge ${isOllama ? 'warning' : 'info'}`}
-                        style={{ fontSize: '0.72rem', fontWeight: 700 }}
-                      >
-                        {m.engine || (isOllama ? 'Ollama' : 'vLLM')}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span 
-                          className={`badge ${m.backend?.includes('K8s') ? 'info' : (m.backend?.includes('Bare-Metal') ? 'purple' : (m.backend?.includes('VM') ? 'active' : ''))}`}
-                          style={{ fontSize: '0.72rem' }}
-                        >
-                          {m.backend}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          [{m.executionMethod || 'k8s'}]
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
-                      {m.endpoint}
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                      ₩{m.inputPricePer1k} / ₩{m.outputPricePer1k} <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>/ 1k tok</span>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {m.waitingQueue} reqs
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div>
-                          <span className={`badge ${m.active !== false ? 'active' : 'revoked'}`} style={{ fontSize: '0.7rem' }}>
-                            {m.active !== false ? '정상 서빙' : '비활성'}
-                          </span>
-                        </div>
-                        {(() => {
-                          const hs = healthStatus[m.id];
-                          if (!hs) {
-                            return (
-                              <button
-                                onClick={() => handleCheckSingleHealth(m.id)}
-                                className="btn btn-secondary btn-sm"
-                                style={{ padding: '2px 8px', fontSize: '0.68rem', height: '22px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}
-                                title="실시간 엔드포인트 핑 테스트"
-                              >
-                                <Zap size={11} color="var(--accent-cyan)" />
-                                <span>핑 테스트</span>
-                              </button>
-                            );
-                          }
-                          if (hs.checking) {
-                            return (
-                              <span
-                                className="badge info"
-                                style={{
-                                  fontSize: '0.68rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  width: 'fit-content'
-                                }}
-                              >
-                                <RefreshCw size={11} className="spin" />
-                                <span>점검 중...</span>
-                              </span>
-                            );
-                          }
-                          if (hs.is_healthy) {
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span
-                                  className="badge active"
-                                  style={{
-                                    fontSize: '0.68rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
-                                  }}
-                                  title={`HTTP ${hs.status_code || 200} OK | 지연시간: ${hs.latency_ms}ms`}
-                                >
-                                  <CheckCircle2 size={11} />
-                                  <span>정상 ({hs.latency_ms}ms)</span>
-                                </span>
-                                <button
-                                  onClick={() => handleCheckSingleHealth(m.id)}
-                                  title="다시 점검"
-                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}
-                                >
-                                  <RefreshCw size={12} />
-                                </button>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span
-                                className="badge danger"
-                                style={{
-                                  fontSize: '0.68rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '3px'
-                                }}
-                                title={hs.error_message || '연결 불가'}
-                              >
-                                <AlertCircle size={11} />
-                                <span>오프라인</span>
-                              </span>
-                              <button
-                                onClick={() => handleCheckSingleHealth(m.id)}
-                                title={`재시도: ${hs.error_message || '연결 실패'}`}
-                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-rose)', padding: '2px', display: 'flex', alignItems: 'center' }}
-                              >
-                                <RefreshCw size={12} />
-                              </button>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                    <td>
-                      {isInCurrentRoute ? (
-                        <span style={{ color: 'var(--accent-emerald)', fontSize: '0.8rem', fontWeight: 600 }}>
-                          포함됨 ({currentWeights.find(w => w.model_id === m.id)?.weight}%)
-                        </span>
-                      ) : (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleAddModelToRoute(m.id)}
-                          style={{ fontSize: '0.75rem' }}
-                        >
-                          + 라우트에 추가
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleDeleteModel(m.id)}
-                        style={{
-                          padding: '3px 8px',
-                          color: 'var(--accent-rose)',
-                          borderColor: 'rgba(225, 29, 72, 0.35)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.72rem'
-                        }}
-                        title="서빙 모델 풀에서 영구 삭제"
-                      >
-                        <Trash2 size={12} />
-                        <span>삭제</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* New Route Modal */}
       {showNewRouteModal && (
@@ -2172,104 +2548,6 @@ print(response.choices[0].message.content)`;
             </div>
             <form onSubmit={handleCreateModel}>
               <div className="modal-body">
-                {/* 1. 런타임 서빙 엔진 선택 */}
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>서빙 런타임 엔진 (Serving Runtime)</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>* 고처리량 분산 vs 경량 GGUF</span>
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                    {[
-                      { id: 'vLLM', label: 'vLLM (고성능/연속배치)', color: '#38bdf8' },
-                      { id: 'Ollama', label: 'Ollama (경량/GGUF)', color: '#fb923c' },
-                      { id: 'SGLang', label: 'SGLang (고속/구조화)', color: '#c084fc' }
-                    ].map(eng => {
-                      const isSelected = newModelForm.serving_engine === eng.id;
-                      return (
-                        <button
-                          key={eng.id}
-                          type="button"
-                          onClick={() => handleEngineChange(eng.id)}
-                          style={{
-                            padding: '9px 12px',
-                            borderRadius: 'var(--radius-md)',
-                            border: isSelected ? `2px solid ${eng.color}` : '1px solid var(--border-subtle)',
-                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
-                            color: isSelected ? eng.color : 'var(--text-secondary)',
-                            fontWeight: isSelected ? 700 : 500,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <span style={{ color: isSelected ? eng.color : 'inherit', fontSize: '0.88rem' }}>{eng.id}</span>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{eng.label.split(' ')[1]}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. 실행 / 배포 환경 선택 */}
-                <div className="form-group">
-                  <label className="form-label">실행 및 배포 환경 (Execution Method)</label>
-                  <select 
-                    className="form-select"
-                    value={newModelForm.execution_method}
-                    onChange={(e) => handleExecutionMethodChange(e.target.value)}
-                  >
-                    <option value="k8s">Kubernetes (사내 온프레미스 K8s 클러스터 파드 배포)</option>
-                    <option value="docker-compose">Docker Compose (도커 컨테이너 / 격리 VM)</option>
-                    <option value="direct">Direct Host CLI (서버 호스트 OS 직접 백그라운드 명령어 실행)</option>
-                  </select>
-                </div>
-
-                {/* 3. 호스트 직접 실행/도커 가이드 스니펫 (Launch Snippet Box) */}
-                {(newModelForm.execution_method === 'direct' || newModelForm.execution_method === 'docker-compose') && (
-                  <div className="panel-nested" style={{
-                    border: '1px dashed var(--border-subtle)',
-                    padding: '12px',
-                    marginBottom: '16px'
-                  }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>💡 운영자 서버 구동 참고 템플릿 ({newModelForm.serving_engine} / {newModelForm.execution_method}):</span>
-                    </div>
-                    <pre style={{
-                      margin: 0,
-                      padding: '8px 10px',
-                      background: '#090d16',
-                      borderRadius: '4px',
-                      fontSize: '0.72rem',
-                      fontFamily: 'var(--font-mono)',
-                      color: '#a7f3d0',
-                      overflowX: 'auto',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-all',
-                      overflowWrap: 'anywhere',
-                      border: '1px solid #1e293b'
-                    }}>
-                      <code>
-                        {newModelForm.serving_engine === 'Ollama' ? (
-                          newModelForm.execution_method === 'direct' 
-                            ? `OLLAMA_HOST=0.0.0.0:11434 ollama serve\nollama run ${newModelForm.model_id || 'qwen2.5:14b'}`
-                            : `docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama\ndocker exec -it ollama ollama run ${newModelForm.model_id || 'qwen2.5:14b'}`
-                        ) : (
-                          newModelForm.execution_method === 'direct'
-                            ? `python3 -m vllm.entrypoints.openai.api_server \\\n  --model ${newModelForm.model_id || 'meta-llama/Llama-3.1-8B-Instruct'} \\\n  --port 8000 --max-model-len 8192`
-                            : `docker run --gpus all -v ~/.cache/huggingface:/root/.cache/huggingface \\\n  -p 8000:8000 --ipc=host vllm/vllm-openai:latest \\\n  --model ${newModelForm.model_id || 'meta-llama/Llama-3.1-8B-Instruct'}`
-                        )}
-                      </code>
-                    </pre>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                      ※ AI Orchestrator는 기동 완료된 엔드포인트 URL을 등록받아 L7 라우팅을 제어하며 서버에 직접 배포하지 않습니다.
-                    </div>
-                  </div>
-                )}
-
                 <div className="form-group">
                   <label className="form-label">모델 식별자 (Model ID)</label>
                   <input 
@@ -2290,33 +2568,230 @@ print(response.choices[0].message.content)`;
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">배포 대상 인프라 (Compute Target)</label>
-                  <select 
-                    className="form-select"
-                    value={newModelForm.backend_infra}
-                    onChange={(e) => setNewModelForm({...newModelForm, backend_infra: e.target.value})}
-                  >
-                    <optgroup label="온프레미스 / 폐쇄망 표준 인프라 (On-Premises Air-Gap)">
-                      <option value="On-Prem K8s">Kubernetes (사내 온프레미스 K8s 클러스터)</option>
-                      <option value="Bare-Metal GPU">Bare-Metal GPU (사내 DGX/HGX 전용 고성능 GPU 서버)</option>
-                      <option value="Private VM">Private VM (사내 VMware/Nutanix 가상화 GPU VM)</option>
-                      <option value="Local Server">Local Server / Host (사내 호스트 서버/워크스테이션)</option>
-                    </optgroup>
-                    <optgroup label="하이브리드 클라우드 연동 (Hybrid Cloud Extensions)">
-                      <option value="Cloud GPU (EKS)">Cloud GPU K8s (AWS EKS / NCP InferencePool)</option>
-                      <option value="Cloud GPU (VM)">Cloud GPU Instance (AWS EC2 / NCP GPU)</option>
-                    </optgroup>
-                  </select>
+                {/* Provider 규격 선택 세그먼트 */}
+                <div className="form-group" style={{
+                  background: 'rgba(15, 23, 42, 0.45)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                      <Globe size={14} color="var(--accent-cyan)" />
+                      <span>LLM Provider 규격 선택</span>
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>* 선택 시 URL 접미사 자동 완성</span>
+                  </label>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '10px' }}>
+                    {LLM_PROVIDERS.map(p => {
+                      const isSelected = newModelForm.provider === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleNewModelProviderChange(p.id)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? `2px solid ${p.color}` : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
+                            color: isSelected ? p.color : 'var(--text-secondary)',
+                            fontWeight: isSelected ? 700 : 500,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            gap: '3px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ color: isSelected ? p.color : 'inherit', fontSize: '0.82rem' }}>{p.name}</span>
+                            {!p.isCompatible && p.id !== 'custom' && (
+                              <span style={{ fontSize: '0.6rem', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 4px', borderRadius: '3px' }}>
+                                비호환
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textAlign: 'left', wordBreak: 'break-all' }}>
+                            {p.pathSuffix || '직접 지정'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 베이스 도메인 입력 */}
+                  <div style={{ marginTop: '8px' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>베이스 도메인 / 호스트 (Base Domain / Host)</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>도메인만 입력하면 완성</span>
+                    </label>
+                    <input 
+                      className="form-input" 
+                      placeholder="예: https://integrate.api.nvidia.com 또는 http://192.168.1.100:8000" 
+                      value={newModelForm.base_domain}
+                      onChange={(e) => handleNewModelDomainChange(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 자동 완성된 최종 Target Endpoint */}
+                  <div style={{ marginTop: '10px' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--heading-color)' }}>
+                        완성된 최종 엔드포인트 URL (Target Endpoint)
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)' }}>
+                        실제 호출 대상
+                      </span>
+                    </label>
+                    <input 
+                      className="form-input" 
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', background: 'rgba(15, 23, 42, 0.7)' }}
+                      placeholder="예: https://integrate.api.nvidia.com/v1/chat/completions"
+                      value={newModelForm.target_endpoint}
+                      onChange={(e) => setNewModelForm({...newModelForm, target_endpoint: e.target.value})}
+                      required
+                    />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      * 선택한 Provider 규격의 접미사가 베이스 도메인 뒤에 덧붙여 완성됩니다. 필요한 경우 직접 미세 조정할 수 있습니다.
+                    </div>
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">엔드포인트 URL (Target Endpoint)</label>
-                  <input 
-                    className="form-input" 
-                    value={newModelForm.target_endpoint}
-                    onChange={(e) => setNewModelForm({...newModelForm, target_endpoint: e.target.value})}
-                    required
-                  />
+
+                {/* 4. 업스트림 엔드포인트 연결 인증 (API Key 및 전송 헤더 옵션) */}
+                <div className="form-group" style={{
+                  background: 'rgba(15, 23, 42, 0.45)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                      <Key size={14} color="var(--accent-cyan)" />
+                      <span>엔드포인트 연결 인증 옵션 (Auth Header Option)</span>
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>* 업스트림 호출 시 주입</span>
+                  </label>
+
+                  {/* 3가지 인증 방식 선택 세그먼트 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                    {[
+                      { 
+                        id: 'none', 
+                        label: '인증 없음', 
+                        sub: '사내 폐쇄망 / No Auth', 
+                        color: 'var(--text-muted)' 
+                      },
+                      { 
+                        id: 'apikey', 
+                        label: 'header: apikey', 
+                        sub: 'apikey = {API Key}', 
+                        color: '#fb923c' 
+                      },
+                      { 
+                        id: 'bearer', 
+                        label: 'Authorization: Bearer', 
+                        sub: 'Bearer {API Key}', 
+                        color: '#38bdf8' 
+                      }
+                    ].map(opt => {
+                      const isSelected = newModelForm.auth_type === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setNewModelForm({ ...newModelForm, auth_type: opt.id })}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? `2px solid ${opt.color}` : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
+                            color: isSelected ? opt.color : 'var(--text-secondary)',
+                            fontWeight: isSelected ? 700 : 500,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '3px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ color: isSelected ? opt.color : 'inherit', fontSize: '0.82rem' }}>{opt.label}</span>
+                          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>{opt.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* API Key 입력창 (auth_type !== 'none' 일 때 표시) */}
+                  {newModelForm.auth_type !== 'none' && (
+                    <div style={{ marginTop: '10px' }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>
+                          {newModelForm.auth_type === 'apikey' ? 'API Key (헤더 apikey 로 전송)' : 'API Key (Bearer 토큰으로 전송)'}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)' }}>필수 입력</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+                        <input 
+                          type={showApiKey ? 'text' : 'password'}
+                          className="form-input" 
+                          style={{ paddingLeft: '36px', paddingRight: '40px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}
+                          placeholder={newModelForm.auth_type === 'apikey' 
+                            ? 'header 에 apikey = {입력받은 api key} 로 전송됩니다' 
+                            : 'header 에 Authorization: Bearer {입력받은 api key} 로 전송됩니다'}
+                          value={newModelForm.api_key}
+                          onChange={(e) => setNewModelForm({...newModelForm, api_key: e.target.value})}
+                          required={newModelForm.auth_type !== 'none'}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '4px'
+                          }}
+                          title={showApiKey ? 'API 키 숨기기' : 'API 키 표시'}
+                        >
+                          {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+
+                      {/* 실시간 HTTP 헤더 전송 미리보기 */}
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 10px',
+                        background: '#090d16',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontFamily: 'var(--font-mono)',
+                        border: '1px solid #1e293b'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--accent-cyan)', marginBottom: '3px', fontWeight: 600 }}>
+                          ⚡ 엔드포인트 연결 시 전송되는 HTTP 헤더 미리보기:
+                        </div>
+                        <div style={{ color: '#94a3b8' }}>Content-Type: application/json</div>
+                        <div style={{ color: newModelForm.auth_type === 'apikey' ? '#fb923c' : '#38bdf8', fontWeight: 600 }}>
+                          {newModelForm.auth_type === 'apikey' 
+                            ? `apikey: ${newModelForm.api_key ? (showApiKey ? newModelForm.api_key : '••••••••••••••••') : '{입력받은 api key}'}`
+                            : `Authorization: Bearer ${newModelForm.api_key ? (showApiKey ? newModelForm.api_key : '••••••••••••••••') : '{입력받은 api key}'}`
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
@@ -2347,6 +2822,282 @@ print(response.choices[0].message.content)`;
                 <button type="button" className="btn btn-secondary" onClick={() => setShowNewModelModal(false)}>취소</button>
                 <button type="submit" className="btn btn-primary">
                   등록 완료
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Model Modal */}
+      {editingModel && (
+        <div className="modal-overlay" onClick={() => setEditingModel(null)}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit3 size={20} color="var(--accent-cyan)" />
+                <span>LLM 서빙 모델 정보 수정</span>
+              </div>
+            </div>
+            <form onSubmit={handleUpdateModel}>
+              <div className="modal-body">
+                {/* Model ID (고유 식별자 - 비활성화 표시) */}
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>모델 식별자 (Model ID)</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>* 고유 식별자는 수정 불가</span>
+                  </label>
+                  <input 
+                    className="form-input" 
+                    value={editModelForm.model_id}
+                    disabled
+                    style={{ opacity: 0.65, cursor: 'not-allowed', fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+
+                {/* Route Alias */}
+                <div className="form-group">
+                  <label className="form-label">서비스 가상 별칭 (Route Alias)</label>
+                  <input 
+                    className="form-input" 
+                    placeholder="예: qwen-14b-enterprise" 
+                    value={editModelForm.alias}
+                    onChange={(e) => setEditModelForm({...editModelForm, alias: e.target.value})}
+                    required
+                  />
+                </div>
+
+                {/* Provider 규격 선택 세그먼트 */}
+                <div className="form-group" style={{
+                  background: 'rgba(15, 23, 42, 0.45)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                      <Globe size={14} color="var(--accent-cyan)" />
+                      <span>LLM Provider 규격 선택</span>
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>* 선택 시 URL 접미사 자동 완성</span>
+                  </label>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '10px' }}>
+                    {LLM_PROVIDERS.map(p => {
+                      const isSelected = editModelForm.provider === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleEditModelProviderChange(p.id)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? `2px solid ${p.color}` : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
+                            color: isSelected ? p.color : 'var(--text-secondary)',
+                            fontWeight: isSelected ? 700 : 500,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            gap: '3px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ color: isSelected ? p.color : 'inherit', fontSize: '0.82rem' }}>{p.name}</span>
+                            {!p.isCompatible && p.id !== 'custom' && (
+                              <span style={{ fontSize: '0.6rem', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 4px', borderRadius: '3px' }}>
+                                비호환
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textAlign: 'left', wordBreak: 'break-all' }}>
+                            {p.pathSuffix || '직접 지정'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 베이스 도메인 입력 */}
+                  <div style={{ marginTop: '8px' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>베이스 도메인 / 호스트 (Base Domain / Host)</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>도메인만 입력하면 완성</span>
+                    </label>
+                    <input 
+                      className="form-input" 
+                      placeholder="예: https://integrate.api.nvidia.com 또는 http://192.168.1.100:8000" 
+                      value={editModelForm.base_domain}
+                      onChange={(e) => handleEditModelDomainChange(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 자동 완성된 최종 Target Endpoint */}
+                  <div style={{ marginTop: '10px' }}>
+                    <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--heading-color)' }}>
+                        완성된 최종 엔드포인트 URL (Target Endpoint)
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)' }}>
+                        실제 호출 대상
+                      </span>
+                    </label>
+                    <input 
+                      className="form-input" 
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', background: 'rgba(15, 23, 42, 0.7)' }}
+                      placeholder="예: https://integrate.api.nvidia.com/v1/chat/completions"
+                      value={editModelForm.target_endpoint}
+                      onChange={(e) => setEditModelForm({...editModelForm, target_endpoint: e.target.value})}
+                      required
+                    />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      * 선택한 Provider 규격의 접미사가 베이스 도메인 뒤에 덧붙여 완성됩니다. 필요한 경우 직접 미세 조정할 수 있습니다.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auth Type & API Key */}
+                <div className="form-group" style={{
+                  background: 'rgba(15, 23, 42, 0.45)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                      <Key size={14} color="var(--accent-cyan)" />
+                      <span>엔드포인트 연결 인증 옵션 (Auth Header Option)</span>
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>* 업스트림 호출 시 주입</span>
+                  </label>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                    {[
+                      { id: 'none', label: '인증 없음', sub: '사내 폐쇄망 / No Auth', color: 'var(--text-muted)' },
+                      { id: 'apikey', label: 'header: apikey', sub: 'apikey = {API Key}', color: '#fb923c' },
+                      { id: 'bearer', label: 'Authorization: Bearer', sub: 'Bearer {API Key}', color: '#38bdf8' }
+                    ].map(opt => {
+                      const isSelected = editModelForm.auth_type === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setEditModelForm({ ...editModelForm, auth_type: opt.id })}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? `2px solid ${opt.color}` : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'var(--bg-active)' : 'var(--bg-panel)',
+                            color: isSelected ? opt.color : 'var(--text-secondary)',
+                            fontWeight: isSelected ? 700 : 500,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '3px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ color: isSelected ? opt.color : 'inherit', fontSize: '0.82rem' }}>{opt.label}</span>
+                          <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>{opt.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {editModelForm.auth_type !== 'none' && (
+                    <div style={{ marginTop: '10px' }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>
+                          {editModelForm.auth_type === 'apikey' ? 'API Key (헤더 apikey 로 전송)' : 'API Key (Bearer 토큰으로 전송)'}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)' }}>필수 입력</span>
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Lock size={15} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)' }} />
+                        <input 
+                          type={showEditApiKey ? 'text' : 'password'}
+                          className="form-input" 
+                          style={{ paddingLeft: '36px', paddingRight: '40px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}
+                          placeholder={editModelForm.auth_type === 'apikey' 
+                            ? "header apikey 로 전달할 인증키 입력 (예: sec-key-1234)" 
+                            : "Authorization: Bearer 로 전달할 토큰 입력 (예: sk-proj-...)"
+                          }
+                          value={editModelForm.api_key}
+                          onChange={(e) => setEditModelForm({...editModelForm, api_key: e.target.value})}
+                          required={editModelForm.auth_type !== 'none'}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEditApiKey(!showEditApiKey)}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '4px'
+                          }}
+                        >
+                          {showEditApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Token Pricing */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">입력 토큰 단가 (₩/1k)</label>
+                    <input 
+                      type="number"
+                      step="0.1"
+                      className="form-input" 
+                      value={editModelForm.input_price_per_1k}
+                      onChange={(e) => setEditModelForm({...editModelForm, input_price_per_1k: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">출력 토큰 단가 (₩/1k)</label>
+                    <input 
+                      type="number"
+                      step="0.1"
+                      className="form-input" 
+                      value={editModelForm.output_price_per_1k}
+                      onChange={(e) => setEditModelForm({...editModelForm, output_price_per_1k: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Active / Inactive Status */}
+                <div className="form-group">
+                  <label className="form-label">서비스 활성화 상태 (Status)</label>
+                  <select 
+                    className="form-select"
+                    value={editModelForm.is_active ? 'active' : 'inactive'}
+                    onChange={(e) => setEditModelForm({...editModelForm, is_active: e.target.value === 'active'})}
+                  >
+                    <option value="active">정상 서빙 활성화 (Active)</option>
+                    <option value="inactive">비활성화 / 점검 모드 (Inactive)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditingModel(null)}>취소</button>
+                <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle2 size={16} />
+                  <span>수정 내용 저장</span>
                 </button>
               </div>
             </form>

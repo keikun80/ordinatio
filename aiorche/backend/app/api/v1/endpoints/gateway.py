@@ -349,10 +349,15 @@ async def dispatch_chat_completion(
         "stream": False
     }
 
-    candidate_urls = [
-        f"{target_endpoint.rstrip('/')}/v1/chat/completions",
-        f"{target_endpoint.rstrip('/')}/chat/completions",
-    ]
+    # 3번 자동 정규화 조치 롤백: 사용자가 완성하여 저장한 target_endpoint URL을 직접 최우선 호출
+    endpoint_clean = target_endpoint.rstrip('/')
+    candidate_urls = [endpoint_clean]
+    
+    # 만약 완성된 경로(/chat/completions, /messages, /chat 등)가 없는 단순 도메인인 경우 호환성 보완
+    if not any(endpoint_clean.endswith(ext) for ext in ['/chat/completions', '/messages', '/chat', ':generateContent']):
+        candidate_urls.append(f"{endpoint_clean}/v1/chat/completions")
+        candidate_urls.append(f"{endpoint_clean}/chat/completions")
+
     if any(k in target_endpoint for k in ["127.0.0.1", "localhost", "ollama-qwen", "host.docker.internal"]):
         port = target_endpoint.split(":")[-1].split("/")[0]
         candidate_urls.extend([
@@ -368,13 +373,38 @@ async def dispatch_chat_completion(
     upstream_success = False
     upstream_response_data = None
 
-    client_timeout = httpx.Timeout(90.0, connect=3.0)
+    # Build upstream request headers including API key auth if configured
+    upstream_headers = {"Content-Type": "application/json"}
+    model_provider = getattr(model_entry, 'provider', 'openai') or 'openai'
+    if model_provider.lower() == 'anthropic':
+        upstream_headers["anthropic-version"] = "2023-06-01"
+        if model_entry and model_entry.api_key:
+            upstream_headers["x-api-key"] = model_entry.api_key
+
+    if model_entry and model_entry.api_key:
+        auth_type_norm = (model_entry.auth_type or "none").lower()
+        if auth_type_norm == "bearer":
+            upstream_headers["Authorization"] = f"Bearer {model_entry.api_key}"
+        elif auth_type_norm == "apikey":
+            upstream_headers["apikey"] = model_entry.api_key
+
+    client_timeout = httpx.Timeout(90.0, connect=5.0)
     async with httpx.AsyncClient(timeout=client_timeout) as client:
         for url in candidate_urls:
             try:
-                res = await client.post(url, json=upstream_payload, headers={"Content-Type": "application/json"})
+                res = await client.post(url, json=upstream_payload, headers=upstream_headers)
                 if res.status_code == 200:
                     upstream_response_data = res.json()
+                    # Ensure choices[0].message.content has fallback for reasoning models (e.g. DeepSeek)
+                    if upstream_response_data and "choices" in upstream_response_data:
+                        choices = upstream_response_data.get("choices", [])
+                        if choices and isinstance(choices, list):
+                            first_choice = choices[0]
+                            msg = first_choice.get("message", {})
+                            if isinstance(msg, dict) and msg.get("content") is None:
+                                reasoning = msg.get("reasoning_content")
+                                if reasoning:
+                                    msg["content"] = reasoning
                     upstream_success = True
                     break
                 else:
@@ -407,6 +437,7 @@ async def dispatch_chat_completion(
             "selected_model": selected_model_id,
             "serving_engine": serving_engine,
             "target_endpoint": target_endpoint,
+            "auth_type": getattr(model_entry, 'auth_type', 'none'),
             "target_cluster": target_cluster,
             "latency_ms": latency_ms,
             "complexity": routing_decision.complexity.value,

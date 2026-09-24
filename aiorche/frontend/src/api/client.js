@@ -187,6 +187,19 @@ export const apiClient = {
     return await res.json();
   },
 
+  async updateModel(modelId, data) {
+    const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '모델 정보 수정 실패');
+    }
+    return await res.json();
+  },
+
   async deleteModel(modelId, force = true) {
     const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}?force=${force}`, {
       method: 'DELETE'

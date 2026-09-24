@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -12,7 +13,7 @@ def test_model_catalog_crud():
     model_ids = [m["model_id"] for m in models]
     assert "meta-llama/Llama-3.1-8B-Instruct" in model_ids
 
-    # 2. Register a new model (Ollama direct)
+    # 2. Register a new model (Ollama direct with apikey auth)
     new_model = {
         "model_id": "Upstage/Solar-Pro-22B-Instruct",
         "alias": "solar-pro-financial",
@@ -23,7 +24,9 @@ def test_model_catalog_crud():
         "input_price_per_1k": 1.5000,
         "output_price_per_1k": 4.5000,
         "cache_discount_ratio": 0.3000,
-        "is_active": True
+        "is_active": True,
+        "api_key": "sec-apikey-12345",
+        "auth_type": "apikey"
     }
     create_res = client.post("/api/v1/models", json=new_model)
     assert create_res.status_code == 201
@@ -32,6 +35,8 @@ def test_model_catalog_crud():
     assert created_data["alias"] == "solar-pro-financial"
     assert created_data["serving_engine"] == "Ollama"
     assert created_data["execution_method"] == "direct"
+    assert created_data["api_key"] == "sec-apikey-12345"
+    assert created_data["auth_type"] == "apikey"
 
     # 3. Get model details
     get_res = client.get(f"/api/v1/models/{new_model['model_id']}")
@@ -39,17 +44,28 @@ def test_model_catalog_crud():
     assert get_res.json()["backend_infra"] == "On-Prem K8s"
     assert get_res.json()["serving_engine"] == "Ollama"
     assert get_res.json()["execution_method"] == "direct"
+    assert get_res.json()["api_key"] == "sec-apikey-12345"
+    assert get_res.json()["auth_type"] == "apikey"
 
-    # 4. Update model
+    # 4. Update model (change to bearer)
     patch_res = client.patch(
         f"/api/v1/models/{new_model['model_id']}",
-        json={"input_price_per_1k": 1.4000, "serving_engine": "vLLM", "execution_method": "k8s", "is_active": False}
+        json={
+            "input_price_per_1k": 1.4000,
+            "serving_engine": "vLLM",
+            "execution_method": "k8s",
+            "is_active": False,
+            "api_key": "sec-bearer-67890",
+            "auth_type": "bearer"
+        }
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["input_price_per_1k"] == 1.4
     assert patch_res.json()["serving_engine"] == "vLLM"
     assert patch_res.json()["execution_method"] == "k8s"
     assert patch_res.json()["is_active"] is False
+    assert patch_res.json()["api_key"] == "sec-bearer-67890"
+    assert patch_res.json()["auth_type"] == "bearer"
 
     # 5. Delete model (referenced in active route fails with 400 when force=false)
     del_fail_res = client.delete("/api/v1/models/meta-llama/Llama-3.1-8B-Instruct")
@@ -382,5 +398,123 @@ def test_gateway_openai_chat_completions_ingress():
     models_data = res_models.json()
     assert models_data["object"] == "list"
     assert len(models_data["data"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_model_catalog_endpoint_auth_options():
+    """Test model registration with 'apikey' and 'bearer' auth options and verify probe_endpoint behavior"""
+    from app.api.v1.endpoints.models import probe_endpoint
+    from unittest.mock import patch, AsyncMock
+
+    # 1. Register a model with 'apikey' option
+    model_apikey = {
+        "model_id": "test-org/apikey-model-v1",
+        "alias": "test-apikey-alias",
+        "backend_infra": "Bare-Metal GPU",
+        "serving_engine": "vLLM",
+        "execution_method": "direct",
+        "target_endpoint": "http://127.0.0.1:8000",
+        "api_key": "my-secret-apikey-123",
+        "auth_type": "apikey"
+    }
+    res_api = client.post("/api/v1/models", json=model_apikey)
+    assert res_api.status_code == 201
+    assert res_api.json()["api_key"] == "my-secret-apikey-123"
+    assert res_api.json()["auth_type"] == "apikey"
+
+    # 2. Register a model with 'bearer' option
+    model_bearer = {
+        "model_id": "test-org/bearer-model-v1",
+        "alias": "test-bearer-alias",
+        "backend_infra": "On-Prem K8s",
+        "serving_engine": "vLLM",
+        "execution_method": "k8s",
+        "target_endpoint": "http://127.0.0.1:8000",
+        "api_key": "sk-proj-bearer-secret-456",
+        "auth_type": "bearer"
+    }
+    res_bearer = client.post("/api/v1/models", json=model_bearer)
+    assert res_bearer.status_code == 201
+    assert res_bearer.json()["api_key"] == "sk-proj-bearer-secret-456"
+    assert res_bearer.json()["auth_type"] == "bearer"
+
+    # 3. Test probe_endpoint with apikey header injection
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        # Probe with apikey
+        is_healthy, status_code, _, _ = await probe_endpoint(
+            endpoint="http://127.0.0.1:8000",
+            engine="vLLM",
+            api_key="my-secret-apikey-123",
+            auth_type="apikey"
+        )
+        assert is_healthy is True
+        assert status_code == 200
+        # Verify that apikey header was sent
+        sent_headers = mock_get.call_args[1].get("headers", {})
+        assert sent_headers.get("apikey") == "my-secret-apikey-123"
+
+        # Probe with bearer
+        is_healthy_b, status_code_b, _, _ = await probe_endpoint(
+            endpoint="http://127.0.0.1:8000",
+            engine="vLLM",
+            api_key="sk-proj-bearer-secret-456",
+            auth_type="bearer"
+        )
+        assert is_healthy_b is True
+        assert status_code_b == 200
+        sent_headers_b = mock_get.call_args[1].get("headers", {})
+        assert sent_headers_b.get("Authorization") == "Bearer sk-proj-bearer-secret-456"
+
+    # 4. Clean up registered models
+    client.delete(f"/api/v1/models/{model_apikey['model_id']}?force=true")
+    client.delete(f"/api/v1/models/{model_bearer['model_id']}?force=true")
+
+def test_update_model_attributes():
+    # 1. Register a model
+    model_payload = {
+        "model_id": "test/model-for-update",
+        "alias": "update-test-orig",
+        "backend_infra": "On-Prem K8s",
+        "serving_engine": "vLLM",
+        "execution_method": "k8s",
+        "target_endpoint": "http://127.0.0.1:8000",
+        "input_price_per_1k": 1.0,
+        "output_price_per_1k": 2.0,
+        "api_key": "old-key",
+        "auth_type": "apikey",
+        "is_active": True
+    }
+    create_res = client.post("/api/v1/models", json=model_payload)
+    assert create_res.status_code == 201
+
+    # 2. Update model attributes via PATCH
+    update_payload = {
+        "alias": "update-test-modified",
+        "target_endpoint": "http://127.0.0.1:9000",
+        "input_price_per_1k": 1.5,
+        "output_price_per_1k": 3.0,
+        "api_key": "new-bearer-token",
+        "auth_type": "bearer",
+        "is_active": False
+    }
+    patch_res = client.patch(f"/api/v1/models/{model_payload['model_id']}", json=update_payload)
+    assert patch_res.status_code == 200
+    updated_data = patch_res.json()
+    assert updated_data["alias"] == "update-test-modified"
+    assert updated_data["target_endpoint"] == "http://127.0.0.1:9000"
+    assert updated_data["input_price_per_1k"] == 1.5
+    assert updated_data["output_price_per_1k"] == 3.0
+    assert updated_data["api_key"] == "new-bearer-token"
+    assert updated_data["auth_type"] == "bearer"
+    assert updated_data["is_active"] is False
+
+    # 3. Clean up
+    del_res = client.delete(f"/api/v1/models/{model_payload['model_id']}?force=true")
+    assert del_res.status_code == 200
+
 
 

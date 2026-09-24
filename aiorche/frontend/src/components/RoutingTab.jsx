@@ -3,7 +3,7 @@ import {
   GitFork, Cpu, CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldAlert, 
   Plus, Trash2, Sliders, Scale, Zap, Compass, Tag, ArrowRight, 
   Copy, Check, Globe, Terminal, Play, Send, ExternalLink, Code, Settings,
-  Key, Lock, Eye, EyeOff, Edit3
+  Key, Lock, Eye, EyeOff, Edit3, Timer
 } from 'lucide-react';
 import { initialModels } from '../data/mockData';
 import { apiClient } from '../api/client';
@@ -153,6 +153,17 @@ export default function RoutingTab({
   // Health Check States
   const [healthStatus, setHealthStatus] = useState({});
   const [isHealthCheckingAll, setIsHealthCheckingAll] = useState(false);
+  const [healthCheckTimeout, setHealthCheckTimeout] = useState(() => {
+    const saved = localStorage.getItem('aiorche_health_timeout');
+    return saved ? Number(saved) : 3.0;
+  });
+
+  const handleHealthTimeoutChange = (val) => {
+    const num = Number(val);
+    setHealthCheckTimeout(num);
+    localStorage.setItem('aiorche_health_timeout', num);
+    if (onNotify) onNotify('INFO', `헬스체크 타임아웃이 ${num}초로 변경되었습니다.`);
+  };
 
   // Gateway Endpoint & Developer Guide States
   const [activeEndpointTab, setActiveEndpointTab] = useState('path'); // 'path' | 'header' | 'python'
@@ -252,6 +263,7 @@ export default function RoutingTab({
     target_endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
     input_price_per_1k: 1.2,
     output_price_per_1k: 3.6,
+    health_check_timeout: 3.0,
     api_key: '',
     auth_type: 'bearer' // 'none' | 'apikey' | 'bearer'
   });
@@ -294,6 +306,7 @@ export default function RoutingTab({
     target_endpoint: '',
     input_price_per_1k: 0.8,
     output_price_per_1k: 2.4,
+    health_check_timeout: 3.0,
     cache_discount_ratio: 0.25,
     api_key: '',
     auth_type: 'none',
@@ -312,6 +325,7 @@ export default function RoutingTab({
       target_endpoint: model.endpoint || '',
       input_price_per_1k: model.inputPricePer1k !== undefined ? model.inputPricePer1k : 0.8,
       output_price_per_1k: model.outputPricePer1k !== undefined ? model.outputPricePer1k : 2.4,
+      health_check_timeout: model.healthCheckTimeout !== undefined ? model.healthCheckTimeout : 3.0,
       cache_discount_ratio: model.cache_discount_ratio !== undefined ? model.cache_discount_ratio : 0.25,
       api_key: model.apiKey || '',
       auth_type: model.authType || 'none',
@@ -349,6 +363,7 @@ export default function RoutingTab({
         provider: editModelForm.provider,
         input_price_per_1k: Number(editModelForm.input_price_per_1k),
         output_price_per_1k: Number(editModelForm.output_price_per_1k),
+        health_check_timeout: Number(editModelForm.health_check_timeout || 3.0),
         cache_discount_ratio: Number(editModelForm.cache_discount_ratio || 0.25),
         is_active: editModelForm.is_active,
         api_key: editModelForm.api_key?.trim() || null,
@@ -362,6 +377,7 @@ export default function RoutingTab({
         provider: res.provider || editModelForm.provider || 'openai',
         inputPricePer1k: res.input_price_per_1k !== undefined ? res.input_price_per_1k : Number(editModelForm.input_price_per_1k),
         outputPricePer1k: res.output_price_per_1k !== undefined ? res.output_price_per_1k : Number(editModelForm.output_price_per_1k),
+        healthCheckTimeout: res.health_check_timeout !== undefined ? Number(res.health_check_timeout) : Number(editModelForm.health_check_timeout || 3.0),
         apiKey: res.api_key !== undefined ? res.api_key : editModelForm.api_key,
         authType: res.auth_type || editModelForm.auth_type || 'none',
         active: res.is_active !== undefined ? res.is_active : editModelForm.is_active
@@ -380,6 +396,7 @@ export default function RoutingTab({
         provider: editModelForm.provider || 'openai',
         inputPricePer1k: Number(editModelForm.input_price_per_1k),
         outputPricePer1k: Number(editModelForm.output_price_per_1k),
+        healthCheckTimeout: Number(editModelForm.health_check_timeout || 3.0),
         apiKey: editModelForm.api_key,
         authType: editModelForm.auth_type || 'none',
         active: editModelForm.is_active
@@ -410,6 +427,7 @@ export default function RoutingTab({
             executionMethod: m.execution_method || 'k8s',
             endpoint: m.target_endpoint,
             provider: m.provider || 'openai',
+            healthCheckTimeout: m.health_check_timeout !== undefined && m.health_check_timeout !== null ? Number(m.health_check_timeout) : 3.0,
             inputPricePer1k: m.input_price_per_1k,
             outputPricePer1k: m.output_price_per_1k,
             apiKey: m.api_key || '',
@@ -487,10 +505,11 @@ export default function RoutingTab({
   };
 
   // Health Check Handlers
-  const handleCheckAllHealth = async () => {
+  const handleCheckAllHealth = async (customTimeout = null) => {
+    const effTimeout = customTimeout || healthCheckTimeout;
     setIsHealthCheckingAll(true);
     try {
-      const results = await apiClient.checkAllModelsHealth();
+      const results = await apiClient.checkAllModelsHealth(effTimeout);
       if (results && Array.isArray(results)) {
         const statusMap = {};
         results.forEach(r => {
@@ -506,7 +525,7 @@ export default function RoutingTab({
         setHealthStatus(prev => ({ ...prev, ...statusMap }));
         const healthyCount = results.filter(r => r.is_healthy).length;
         if (onNotify) {
-          onNotify('SUCCESS', `전체 ${results.length}개 모델 헬스체크 완료 (정상: ${healthyCount}개, 오프라인: ${results.length - healthyCount}개)`);
+          onNotify('SUCCESS', `전체 ${results.length}개 모델 헬스체크 완료 (타임아웃: ${effTimeout}초 | 정상: ${healthyCount}개, 오프라인: ${results.length - healthyCount}개)`);
         }
       } else {
         if (onNotify) onNotify('WARNING', '헬스체크 응답을 가져오지 못했습니다.');
@@ -518,13 +537,14 @@ export default function RoutingTab({
     }
   };
 
-  const handleCheckSingleHealth = async (modelId) => {
+  const handleCheckSingleHealth = async (modelId, overrideTimeout = null) => {
+    const effTimeout = overrideTimeout || healthCheckTimeout;
     setHealthStatus(prev => ({
       ...prev,
       [modelId]: { ...(prev[modelId] || {}), checking: true }
     }));
     try {
-      const res = await apiClient.checkModelHealth(modelId);
+      const res = await apiClient.checkModelHealth(modelId, effTimeout);
       setHealthStatus(prev => ({
         ...prev,
         [modelId]: {
@@ -538,9 +558,9 @@ export default function RoutingTab({
       }));
       if (onNotify) {
         if (res.is_healthy) {
-          onNotify('SUCCESS', `[${res.alias || modelId}] 헬스체크 정상: ${res.latency_ms}ms (HTTP ${res.status_code})`);
+          onNotify('SUCCESS', `[${res.alias || modelId}] 헬스체크 정상: ${res.latency_ms}ms (HTTP ${res.status_code} | 타임아웃 ${effTimeout}s)`);
         } else {
-          onNotify('WARNING', `[${res.alias || modelId}] 헬스체크 실패: ${res.error_message || '응답 없음'}`);
+          onNotify('WARNING', `[${res.alias || modelId}] 헬스체크 실패: ${res.error_message || '응답 없음'} (타임아웃 ${effTimeout}s)`);
         }
       }
     } catch (err) {
@@ -854,6 +874,7 @@ export default function RoutingTab({
         provider: newModelForm.provider || 'openai',
         input_price_per_1k: Number(newModelForm.input_price_per_1k),
         output_price_per_1k: Number(newModelForm.output_price_per_1k),
+        health_check_timeout: Number(newModelForm.health_check_timeout || 3.0),
         cache_discount_ratio: 0.25,
         is_active: true,
         api_key: newModelForm.api_key?.trim() || null,
@@ -865,6 +886,7 @@ export default function RoutingTab({
         alias: res.alias,
         endpoint: res.target_endpoint,
         provider: res.provider || newModelForm.provider || 'openai',
+        healthCheckTimeout: res.health_check_timeout !== undefined ? Number(res.health_check_timeout) : Number(newModelForm.health_check_timeout || 3.0),
         inputPricePer1k: res.input_price_per_1k,
         outputPricePer1k: res.output_price_per_1k,
         apiKey: res.api_key || newModelForm.api_key,
@@ -884,6 +906,7 @@ export default function RoutingTab({
         alias: newModelForm.alias,
         endpoint: newModelForm.target_endpoint,
         provider: newModelForm.provider || 'openai',
+        healthCheckTimeout: Number(newModelForm.health_check_timeout || 3.0),
         inputPricePer1k: Number(newModelForm.input_price_per_1k),
         outputPricePer1k: Number(newModelForm.output_price_per_1k),
         apiKey: newModelForm.api_key,
@@ -1479,11 +1502,49 @@ print(response.choices[0].message.content)`;
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* 수동 타임아웃 조절 컨트롤러 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(15, 23, 42, 0.65)',
+              padding: '3px 8px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-subtle)',
+              fontSize: '0.76rem'
+            }}>
+              <Timer size={13} color="var(--accent-amber)" />
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>타임아웃:</span>
+              <select
+                value={healthCheckTimeout}
+                onChange={(e) => handleHealthTimeoutChange(Number(e.target.value))}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--accent-amber)',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: 'var(--font-mono)'
+                }}
+                title="헬스체크 응답 대기 최대 시간 (초)"
+              >
+                <option value={1.0} style={{ background: '#0f172a', color: '#fff' }}>1.0초 (초고속)</option>
+                <option value={2.0} style={{ background: '#0f172a', color: '#fff' }}>2.0초 (사내망 권장)</option>
+                <option value={3.0} style={{ background: '#0f172a', color: '#fff' }}>3.0초 (기본값)</option>
+                <option value={5.0} style={{ background: '#0f172a', color: '#fff' }}>5.0초 (원격 서버)</option>
+                <option value={10.0} style={{ background: '#0f172a', color: '#fff' }}>10.0초 (외부 API)</option>
+                <option value={15.0} style={{ background: '#0f172a', color: '#fff' }}>15.0초 (대형 LLM)</option>
+                <option value={30.0} style={{ background: '#0f172a', color: '#fff' }}>30.0초 (최대 대기)</option>
+              </select>
+            </div>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={handleCheckAllHealth}
+              onClick={() => handleCheckAllHealth()}
               disabled={isHealthCheckingAll}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+              title={`설정된 타임아웃(${healthCheckTimeout}초)으로 전체 서빙 모델 엔드포인트 헬스체크 수행`}
             >
               <RefreshCw size={14} className={isHealthCheckingAll ? 'spin' : ''} />
               <span>{isHealthCheckingAll ? '전체 점검 중...' : '전체 헬스체크 (Ping All)'}</span>
@@ -1597,13 +1658,14 @@ print(response.choices[0].message.content)`;
                         </div>
                         {(() => {
                           const hs = healthStatus[m.id];
+                          const effTimeout = m.healthCheckTimeout || healthCheckTimeout;
                           if (!hs) {
                             return (
                               <button
-                                onClick={() => handleCheckSingleHealth(m.id)}
+                                onClick={() => handleCheckSingleHealth(m.id, effTimeout)}
                                 className="btn btn-secondary btn-sm"
                                 style={{ padding: '2px 8px', fontSize: '0.68rem', height: '22px', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}
-                                title="실시간 엔드포인트 핑 테스트"
+                                title={`실시간 엔드포인트 핑 테스트 (타임아웃: ${effTimeout}초)`}
                               >
                                 <Zap size={11} color="var(--accent-cyan)" />
                                 <span>핑 테스트</span>
@@ -1623,7 +1685,7 @@ print(response.choices[0].message.content)`;
                                 }}
                               >
                                 <RefreshCw size={11} className="spin" />
-                                <span>점검 중...</span>
+                                <span>점검 중 ({effTimeout}s)...</span>
                               </span>
                             );
                           }
@@ -1638,14 +1700,14 @@ print(response.choices[0].message.content)`;
                                     alignItems: 'center',
                                     gap: '3px'
                                   }}
-                                  title={`HTTP ${hs.status_code || 200} OK | 지연시간: ${hs.latency_ms}ms`}
+                                  title={`HTTP ${hs.status_code || 200} OK | 지연시간: ${hs.latency_ms}ms (타임아웃: ${effTimeout}s)`}
                                 >
                                   <CheckCircle2 size={11} />
                                   <span>정상 ({hs.latency_ms}ms)</span>
                                 </span>
                                 <button
-                                  onClick={() => handleCheckSingleHealth(m.id)}
-                                  title="다시 점검"
+                                  onClick={() => handleCheckSingleHealth(m.id, effTimeout)}
+                                  title={`다시 점검 (타임아웃: ${effTimeout}초)`}
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}
                                 >
                                   <RefreshCw size={12} />
@@ -1669,8 +1731,8 @@ print(response.choices[0].message.content)`;
                                 <span>오프라인</span>
                               </span>
                               <button
-                                onClick={() => handleCheckSingleHealth(m.id)}
-                                title={`재시도: ${hs.error_message || '연결 실패'}`}
+                                onClick={() => handleCheckSingleHealth(m.id, effTimeout)}
+                                title={`재시도 (타임아웃: ${effTimeout}초): ${hs.error_message || '연결 실패'}`}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-rose)', padding: '2px', display: 'flex', alignItems: 'center' }}
                               >
                                 <RefreshCw size={12} />
@@ -2435,7 +2497,43 @@ print(response.choices[0].message.content)`;
           )}
           {activeSubTab === 'catalog' && (
             <>
-              <button className="btn btn-secondary btn-sm" onClick={handleCheckAllHealth} disabled={isHealthCheckingAll} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(15, 23, 42, 0.65)',
+                padding: '3px 8px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '0.76rem'
+              }}>
+                <Timer size={13} color="var(--accent-amber)" />
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>타임아웃:</span>
+                <select
+                  value={healthCheckTimeout}
+                  onChange={(e) => handleHealthTimeoutChange(Number(e.target.value))}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--accent-amber)',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontFamily: 'var(--font-mono)'
+                  }}
+                  title="헬스체크 응답 대기 최대 시간 (초)"
+                >
+                  <option value={1.0} style={{ background: '#0f172a', color: '#fff' }}>1.0초 (초고속)</option>
+                  <option value={2.0} style={{ background: '#0f172a', color: '#fff' }}>2.0초 (사내망 권장)</option>
+                  <option value={3.0} style={{ background: '#0f172a', color: '#fff' }}>3.0초 (기본값)</option>
+                  <option value={5.0} style={{ background: '#0f172a', color: '#fff' }}>5.0초 (원격 서버)</option>
+                  <option value={10.0} style={{ background: '#0f172a', color: '#fff' }}>10.0초 (외부 API)</option>
+                  <option value={15.0} style={{ background: '#0f172a', color: '#fff' }}>15.0초 (대형 LLM)</option>
+                  <option value={30.0} style={{ background: '#0f172a', color: '#fff' }}>30.0초 (최대 대기)</option>
+                </select>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => handleCheckAllHealth()} disabled={isHealthCheckingAll} style={{ display: 'flex', alignItems: 'center', gap: '6px' }} title={`설정된 타임아웃(${healthCheckTimeout}초)으로 전체 헬스체크`}>
                 <Zap size={14} color="var(--accent-cyan)" /> <span>{isHealthCheckingAll ? '점검 중...' : '전체 헬스체크 (Ping All)'}</span>
               </button>
               <button className="btn btn-primary btn-sm" onClick={() => setShowNewModelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2793,9 +2891,9 @@ print(response.choices[0].message.content)`;
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">입력 토큰 단가 (₩/1k)</label>
+                    <label className="form-label">입력 단가 (₩/1k)</label>
                     <input 
                       type="number"
                       step="0.1"
@@ -2806,13 +2904,30 @@ print(response.choices[0].message.content)`;
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">출력 토큰 단가 (₩/1k)</label>
+                    <label className="form-label">출력 단가 (₩/1k)</label>
                     <input 
                       type="number"
                       step="0.1"
                       className="form-input" 
                       value={newModelForm.output_price_per_1k}
                       onChange={(e) => setNewModelForm({...newModelForm, output_price_per_1k: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Timer size={13} color="var(--accent-amber)" />
+                      <span>타임아웃 (초)</span>
+                    </label>
+                    <input 
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      max="60"
+                      className="form-input" 
+                      placeholder="기본: 3.0"
+                      value={newModelForm.health_check_timeout}
+                      onChange={(e) => setNewModelForm({...newModelForm, health_check_timeout: e.target.value})}
                       required
                     />
                   </div>
@@ -3055,9 +3170,9 @@ print(response.choices[0].message.content)`;
                 </div>
 
                 {/* Token Pricing */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
-                    <label className="form-label">입력 토큰 단가 (₩/1k)</label>
+                    <label className="form-label">입력 단가 (₩/1k)</label>
                     <input 
                       type="number"
                       step="0.1"
@@ -3068,13 +3183,30 @@ print(response.choices[0].message.content)`;
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">출력 토큰 단가 (₩/1k)</label>
+                    <label className="form-label">출력 단가 (₩/1k)</label>
                     <input 
                       type="number"
                       step="0.1"
                       className="form-input" 
                       value={editModelForm.output_price_per_1k}
                       onChange={(e) => setEditModelForm({...editModelForm, output_price_per_1k: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Timer size={13} color="var(--accent-amber)" />
+                      <span>타임아웃 (초)</span>
+                    </label>
+                    <input 
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      max="60"
+                      className="form-input" 
+                      placeholder="기본: 3.0"
+                      value={editModelForm.health_check_timeout}
+                      onChange={(e) => setEditModelForm({...editModelForm, health_check_timeout: e.target.value})}
                       required
                     />
                   </div>

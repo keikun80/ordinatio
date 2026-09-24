@@ -17,5 +17,6 @@ class ModelCatalog(Base):
     api_key = Column(String(255), nullable=True)  # Upstream endpoint API Key
     auth_type = Column(String(32), nullable=True, default="none")  # 'none', 'apikey', 'bearer'
     provider = Column(String(32), nullable=True, default="openai")  # 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'
+    health_check_timeout = Column(Numeric(5, 2), default=3.0, nullable=True)  # Health check timeout in seconds
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

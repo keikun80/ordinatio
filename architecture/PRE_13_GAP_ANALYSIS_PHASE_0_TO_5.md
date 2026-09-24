@@ -1,9 +1,9 @@
 # Phase 0 ~ Phase 5 엔지니어링 갭 분석 및 미구현/미테스트 기능 점검 보고서 (현행화 완료)
 
 **문서 번호**: AIORCHE-GAP-ANALYSIS-20260924  
-**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `architecture/PRE_17_model_provider_options_and_url_builder_report.md`  
+**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `architecture/PRE_17_model_provider_options_and_url_builder_report.md`, `architecture/PRE_18_model_health_check_timeout_report.md`  
 **분석 대상**: 상용급 모노레포(`aiorche/`) 및 프로토타입(`dashboard/`)  
-**작성 일자**: 2026-09-24 (Phase 5 완료 + LLM Provider 규격화 및 URL 조합기 반영 현행화)  
+**작성 일자**: 2026-09-24 (Phase 5 완료 + LLM Provider 규격화 및 헬스체크 타임아웃 수동 조절 반영 현행화)  
 
 ---
 
@@ -12,7 +12,7 @@
 마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 5까지의 6개 단계**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 전체)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, **헬스체크 타임아웃 수동 조절(1.0s~30.0s) 및 모달별 개별 설정/DB 영속화**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
 - **자동화 테스트 검증율**: **66 / 66 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
@@ -25,7 +25,7 @@
   - External API: (4종)
   - Models & Routing: (9종)
 - **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 전체 스크립트(`make verify-phase*`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **10건** (ADR-01 ~ ADR-10 공식 반영 완료)
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **12건** (ADR-01 ~ ADR-12 공식 반영 완료)
 - **미구현 항목**: 총 **2건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림)
 
 ---
@@ -49,7 +49,7 @@
 | | **Keycloak OIDC JWT 검증 미들웨어** | ⚠️ **설정만 존재** | ❌ **미테스트** | 상세 내용 3.1 참조 |
 | | **Alembic 점진적 DB 마이그레이션** | ⚠️ **init.sql 대체** | ❌ **미테스트** | 상세 내용 3.2 참조 |
 | **Phase 2** | 서빙 모델 카탈로그 CRUD & 다중 엔진 (vLLM/Ollama/SGLang/Triton) 및 안전 삭제(Safe Deletion Guard) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_catalog_crud` (삭제 및 종속성 차단) |
-| | 모델 서빙 풀 실시간 헬스체크 프로빙 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_serving_health_check` |
+| | 모델 서빙 풀 실시간 헬스체크 프로빙 & 타임아웃 수동 조절(1.0s~30.0s) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_model_serving_health_check` |
 | | Envoy L7 전용 라우팅 엔드포인트 및 실시간 테스트콜 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_route_test_call_endpoint` |
 | | OpenAI 규격 L7 게이트웨이 인그레스 (`/v1/routes`, `/v1/chat/completions`) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_gateway_openai_chat_completions_ingress` |
 | | 동적 멀티 라우팅 프로필 CRUD & RDS 라우트 병합 컴파일 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_multi_route_crud_and_xds_compilation` |
@@ -175,7 +175,23 @@
   - 브라우저 E2E를 통해 온프레미스 `gemma2:2b` 모델의 실시간 응답 텍스트(HTTP 200 OK) 수신 완료 (`PRE_16_gateway_browser_test_troubleshooting_report.md`).
 - **영향도**: 긍정적 (관리자 라우팅 스튜디오의 진단 신뢰성 100% 확보 및 오진단 방지).
 
-### 3.14 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
+### 3.14 [대체 구현 - Phase 2] LLM 서빙 모델 Provider 규격화 & Dynamic URL Builder [ADR-11]
+- **설계서 명세**: 단일 OpenAI 엔드포인트 URL 수동 입력 및 백엔드 임의 접미사 슬라이싱.
+- **현재 구현 상태**:
+  - 6종 Provider(OpenAI 호환, DeepSeek 공식, Anthropic Claude, Google Gemini, Cohere, 직접 지정) 규격화 지원.
+  - 베이스 도메인 입력 시 프론트엔드가 각 Provider API 경로 접미사를 실시간 자동 합성하는 Dynamic URL Builder 구현.
+  - 백엔드의 임의 URL 정규화/스트리핑 조치를 롤백하고 관리자가 지정한 정확한 타깃 엔드포인트로 무결하게 직접 프록시 호출 (`PRE_17_model_provider_options_and_url_builder_report.md`).
+- **영향도**: 긍정적 (비호환 Provider 무결 연동 및 사용자 편의성 극대화).
+
+### 3.15 [대체 구현 - Phase 2] 헬스체크 타임아웃 계층형 수동 조절 & 예외 상세화 [ADR-12]
+- **설계서 명세**: 3.0초 고정 단일 헬스체크 타임아웃.
+- **현재 구현 상태**:
+  - 서빙 모델 풀 툴바 및 서브탭 헤더에 전역 타임아웃 선택 드롭다운(1.0s~30.0s) 배치 및 `localStorage` 자동 영속화.
+  - `model_catalogs` 테이블에 `health_check_timeout` 컬럼 추가 및 신규 등록/수정 모달에 타임아웃(초) 입력 필드 구현.
+  - 백엔드 `httpx` 타임아웃 발생 시 `"응답 대기시간 초과 ({timeout}s 초과)"` 등 지정된 시간 초과 사실을 명확히 반환 (`PRE_18_model_health_check_timeout_report.md`).
+- **영향도**: 긍정적 (초고속 사내망부터 느린 원격 클라우드까지 네트워크 지연 환경에 유연하게 적응).
+
+### 3.16 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
 - **현재 구현 상태**: 현재 Docker Compose 기반 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 정식 단일 Helm 패키지 및 Playwright E2E 스위트는 미구현.
 - **영향도**: 높음 (Phase 6 정규 작업 범위).

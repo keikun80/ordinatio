@@ -28,6 +28,7 @@ class ModelCatalogBase(BaseModel):
     api_key: Optional[str] = Field(default=None, description="Upstream LLM API Key (optional)")
     auth_type: Optional[str] = Field(default="none", description="Upstream authentication header option: 'none', 'apikey' (apikey: {key}), or 'bearer' (Authorization: Bearer {key})")
     provider: Optional[str] = Field(default="openai", description="LLM protocol/provider: 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'")
+    health_check_timeout: Optional[float] = Field(default=3.0, ge=0.5, le=60.0, description="Health check timeout in seconds (default: 3.0s)")
 
 class ModelCatalogCreate(ModelCatalogBase):
     pass
@@ -45,6 +46,7 @@ class ModelCatalogUpdate(BaseModel):
     api_key: Optional[str] = None
     auth_type: Optional[str] = None
     provider: Optional[str] = None
+    health_check_timeout: Optional[float] = None
 
 class ModelCatalogResponse(ModelCatalogBase):
     model_config = ConfigDict(from_attributes=True)
@@ -57,6 +59,7 @@ class ModelHealthCheckResult(BaseModel):
     execution_method: str
     target_endpoint: str
     provider: Optional[str] = "openai"
+    health_check_timeout: Optional[float] = 3.0
     is_healthy: bool
     status_code: Optional[int] = None
     latency_ms: Optional[float] = None

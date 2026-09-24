@@ -211,9 +211,12 @@ export const apiClient = {
     return await res.json();
   },
 
-  async checkAllModelsHealth() {
+  async checkAllModelsHealth(timeout = null) {
     try {
-      const res = await fetch(`${API_BASE_URL}/models/health-check`);
+      const url = timeout 
+        ? `${API_BASE_URL}/models/health-check?timeout=${encodeURIComponent(timeout)}` 
+        : `${API_BASE_URL}/models/health-check`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -222,8 +225,11 @@ export const apiClient = {
     }
   },
 
-  async checkModelHealth(modelId) {
-    const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health`, {
+  async checkModelHealth(modelId, timeout = null) {
+    const url = timeout 
+      ? `${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health?timeout=${encodeURIComponent(timeout)}` 
+      : `${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health`;
+    const res = await fetch(url, {
       method: 'POST'
     });
     if (!res.ok) {

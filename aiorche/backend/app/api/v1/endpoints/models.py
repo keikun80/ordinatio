@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.model_catalog import ModelCatalog
@@ -22,7 +22,8 @@ async def probe_endpoint(
     engine: str = "vLLM",
     api_key: Optional[str] = None,
     auth_type: Optional[str] = None,
-    provider: Optional[str] = "openai"
+    provider: Optional[str] = "openai",
+    timeout: float = 3.0
 ) -> Tuple[bool, Optional[int], Optional[float], Optional[str]]:
     """
     Probe a serving model endpoint based on its provider protocol.
@@ -69,7 +70,7 @@ async def probe_endpoint(
     last_status = None
     start_time = time.perf_counter()
 
-    async with httpx.AsyncClient(timeout=2.5, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         for target in urls_to_try:
             for path in probe_paths:
                 full_url = f"{target}{path}"
@@ -84,9 +85,11 @@ async def probe_endpoint(
                 except httpx.ConnectError:
                     last_err = "연결 거부 (Connection Refused)"
                 except httpx.ConnectTimeout:
-                    last_err = "연결 타임아웃 (Connect Timeout)"
+                    last_err = f"연결 타임아웃 ({timeout}s 초과)"
                 except httpx.ReadTimeout:
-                    last_err = "응답 대기시간 초과 (Read Timeout)"
+                    last_err = f"응답 대기시간 초과 ({timeout}s 초과)"
+                except httpx.TimeoutException:
+                    last_err = f"요청 타임아웃 ({timeout}s 초과)"
                 except Exception as e:
                     last_err = str(e)
 
@@ -94,19 +97,24 @@ async def probe_endpoint(
     return False, last_status, total_latency, last_err
 
 @router.get("/health-check", response_model=List[ModelHealthCheckResult])
-async def check_all_models_health(db: Session = Depends(get_db)):
+async def check_all_models_health(
+    timeout: Optional[float] = Query(default=None, ge=0.5, le=60.0, description="수동 지정 헬스체크 타임아웃 (초)"),
+    db: Session = Depends(get_db)
+):
     """Check live health status of all registered serving models concurrently"""
     models = db.query(ModelCatalog).all()
     if not models:
         return []
 
     async def _check(m: ModelCatalog) -> ModelHealthCheckResult:
+        eff_timeout = timeout if timeout is not None else float(getattr(m, "health_check_timeout", None) or 3.0)
         is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
             m.target_endpoint,
             m.serving_engine or "vLLM",
             api_key=m.api_key,
             auth_type=m.auth_type,
-            provider=getattr(m, "provider", "openai")
+            provider=getattr(m, "provider", "openai"),
+            timeout=eff_timeout
         )
         return ModelHealthCheckResult(
             model_id=m.model_id,
@@ -115,6 +123,7 @@ async def check_all_models_health(db: Session = Depends(get_db)):
             execution_method=m.execution_method or "k8s",
             target_endpoint=m.target_endpoint,
             provider=getattr(m, "provider", "openai"),
+            health_check_timeout=eff_timeout,
             is_healthy=is_healthy,
             status_code=status_code,
             latency_ms=latency_ms,
@@ -126,7 +135,11 @@ async def check_all_models_health(db: Session = Depends(get_db)):
     return results
 
 @router.post("/{model_id:path}/health", response_model=ModelHealthCheckResult)
-async def check_single_model_health(model_id: str, db: Session = Depends(get_db)):
+async def check_single_model_health(
+    model_id: str,
+    timeout: Optional[float] = Query(default=None, ge=0.5, le=60.0, description="수동 지정 헬스체크 타임아웃 (초)"),
+    db: Session = Depends(get_db)
+):
     """Check live health status of a specific serving model"""
     model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()
     if not model:
@@ -135,12 +148,14 @@ async def check_single_model_health(model_id: str, db: Session = Depends(get_db)
             detail=f"Model '{model_id}' not found."
         )
 
+    eff_timeout = timeout if timeout is not None else float(getattr(model, "health_check_timeout", None) or 3.0)
     is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
         model.target_endpoint,
         model.serving_engine or "vLLM",
         api_key=model.api_key,
         auth_type=model.auth_type,
-        provider=getattr(model, "provider", "openai")
+        provider=getattr(model, "provider", "openai"),
+        timeout=eff_timeout
     )
     return ModelHealthCheckResult(
         model_id=model.model_id,
@@ -149,6 +164,7 @@ async def check_single_model_health(model_id: str, db: Session = Depends(get_db)
         execution_method=model.execution_method or "k8s",
         target_endpoint=model.target_endpoint,
         provider=getattr(model, "provider", "openai"),
+        health_check_timeout=eff_timeout,
         is_healthy=is_healthy,
         status_code=status_code,
         latency_ms=latency_ms,

@@ -16,7 +16,7 @@
 
 ### 1.1 현재 구현 상태 점검 요약 (As-Is Status: Phase 0 ~ 5 완료)
 - **L7 게이트웨이 & AgentRouter**: Envoy L7 C++ Ingress(Zero-Copy SSE) + ext_proc 보안 필터, OpenAI 호환 엔드포인트(`/v1/routes`, `/v1/chat/completions`), 프롬프트 인텐트/복잡도 실시간 분석(코딩·수학 vs 일상대화), 4대 자율 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 실시간 웹 UI 튜닝, 세션/KV-Cache 어피니티, 슬라이딩 윈도우 TPM/RPM 레이트 리미터 (완료 ✅)
-- **모델 카탈로그 & 동적 xDS 배포**: DB 기반 다중 서빙 엔진(vLLM, Ollama, SGLang, Triton) 카탈로그 등록/수정/삭제, 실시간 헬스체크 프로빙(/health ping), 활성 라우트 종속성 사전 차단 가드레일, Envoy REST RDS v3 무중단 동적 컴파일 푸시 (완료 ✅)
+- **모델 카탈로그 & 동적 xDS 배포**: DB 기반 다중 서빙 엔진(vLLM, Ollama, SGLang, Triton) 카탈로그 등록/수정/삭제, 실시간 헬스체크 프로빙(/health ping), 헬스체크 타임아웃(1.0s~30.0s) 수동 조절 및 localStorage 자동 영속화, 상세 타임아웃 피드백(`응답 대기시간 초과 (Ns 초과)`), 활성 라우트 종속성 사전 차단 가드레일, Envoy REST RDS v3 무중단 동적 컴파일 푸시 (완료 ✅)
 - **LLM 서빙 모델 Provider 규격화 & Dynamic URL Builder**: 6종 Provider(OpenAI 호환, DeepSeek 공식, Anthropic Claude 비호환, Google Gemini 비호환, Cohere v2 비호환, 직접 지정) 선택 지원, 베이스 도메인 입력 기반 실시간 엔드포인트 URL 동적 조합기, 백엔드 임의 URL 정규화/스트리핑 롤백 및 정확한 target_endpoint 직접 프록시 호출 보장 (완료 ✅)
 - **가상 API Key & 테넌트 거버넌스**: `sk-orch-` 접두사, Argon2id 솔트 단방향 해싱, 발급 시 단 1회 평문 노출 모달, 파기된 키 영구 삭제 가드레일, 모델 화이트리스트(`allowed_models`), 부서별 테넌트 격리 및 쿼터 제어 (완료 ✅)
 - **FinOps & 비용 관제**: 원화(₩) 기준 테넌트 월간 예산 계량(Metering), 80% 조기 경보, 100% 하드 캡(Hard Cap) 도달 시 HTTP 429 즉시 차단, 1초 주기 WebSocket 스트림 관제, UTF-8 with BOM 엑셀 호환 CSV 청구서 다운로드 (완료 ✅)

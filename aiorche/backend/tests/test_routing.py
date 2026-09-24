@@ -304,13 +304,21 @@ def test_model_serving_health_check():
 
     # 2. Check single model health (existing)
     model_id = first["model_id"]
-    single_res = client.post(f"/api/v1/models/{model_id}/health")
+    single_res = client.post(f"/api/v1/models/{model_id}/health?timeout=4.5")
     assert single_res.status_code == 200
     single_data = single_res.json()
     assert single_data["model_id"] == model_id
     assert isinstance(single_data["is_healthy"], bool)
+    assert single_data.get("health_check_timeout") == 4.5
 
-    # 3. Check single model health (non-existent)
+    # 3. Check health check all with timeout query
+    all_timeout_res = client.get("/api/v1/models/health-check?timeout=5.0")
+    assert all_timeout_res.status_code == 200
+    all_timeout_data = all_timeout_res.json()
+    assert len(all_timeout_data) >= 1
+    assert all_timeout_data[0].get("health_check_timeout") == 5.0
+
+    # 4. Check single model health (non-existent)
     not_found_res = client.post("/api/v1/models/non-existent-model-xyz/health")
     assert not_found_res.status_code == 404
 

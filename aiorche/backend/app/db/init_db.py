@@ -24,6 +24,8 @@ def init_db():
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS execution_method VARCHAR(32) DEFAULT 'k8s';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS api_key TEXT;"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS auth_type VARCHAR(16) DEFAULT 'none';"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS provider VARCHAR(32) DEFAULT 'openai';"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS health_check_timeout NUMERIC(5, 2) DEFAULT 3.0;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS priority INT DEFAULT 10;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS match_conditions JSONB DEFAULT '{}'::jsonb;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS failover_chain JSONB DEFAULT '[]'::jsonb;"))

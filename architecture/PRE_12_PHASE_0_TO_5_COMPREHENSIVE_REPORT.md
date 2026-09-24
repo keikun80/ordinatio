@@ -21,7 +21,7 @@
 │ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 핫픽스 배포 │
 │ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 이전 버전 롤백 엔진  │
 │ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Dynamic URL 조합기│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 인프라 Preflight 자가진단│
-│ • Docker & K8s 배포 │ • Prometheus /metric│ • 실시간 헬스 프로빙│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII 암호화 ZIP 번들    │
+│ • Docker & K8s 배포 │ • Prometheus /metric│ • 수동 타임아웃 조절│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII 암호화 ZIP 번들    │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┤
 │ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│    66/66 Tests (100% PASS)    │
 └─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────────────┘
@@ -37,7 +37,7 @@
 | :--- | :--- | :--- | :---: | :---: |
 | **Phase 0** | [phase0_implementation_plan_and_test_results.md](./phase0_implementation_plan_and_test_results.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
 | **Phase 1** | [phase1_implementation_plan_and_test_results.md](./phase1_implementation_plan_and_test_results.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](./phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](./MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙, Envoy L7 엔드포인트/RDS, N-Way 분할, K8s Pod | `make verify-phase2` | 23 / 23 PASS |
+| **Phase 2** | [phase2_implementation_plan_and_test_results.md](./phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](./MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)<br>• [PRE_17_model_provider_options_and_url_builder_report.md](./PRE_17_model_provider_options_and_url_builder_report.md)<br>• [PRE_18_model_health_check_timeout_report.md](./PRE_18_model_health_check_timeout_report.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙 & 타임아웃 수동 조절(1.0s~30.0s), 6종 Provider 규격화, Envoy L7 엔드포인트/RDS, N-Way 분할 | `make verify-phase2` | 23 / 23 PASS |
 | **Phase 3** | [phase3_implementation_plan_and_test_results.md](./phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
 | **Phase 4** | [phase4_implementation_plan_and_test_results.md](./phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
 | **Phase 5** | [phase5_implementation_plan_and_test_results.md](./phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
@@ -74,7 +74,7 @@ cd aiorche/backend && uv run pytest -v
 | | `test_canary_deployment_lifecycle` | 카나리 80:20 배포 실행, DB 반영 및 신규 xDS 리비전 발급 | **PASSED** |
 | | `test_xds_discovery_routes_endpoint` | Envoy용 RDS 표준 규격 (`RouteConfiguration`) 응답 검증 | **PASSED** |
 | | `test_multi_route_crud_and_xds_compilation` | 멀티 가상 라우트 프로필 생성/조회/삭제 및 RDS 라우트 병합 컴파일 검증 | **PASSED** |
-| | `test_model_serving_health_check` | 개별/전체 서빙 모델 Upstream 핑 헬스체크 프로빙 검증 | **PASSED** |
+| | `test_model_serving_health_check` | 개별/전체 서빙 모델 Upstream 핑 헬스체크 프로빙 및 수동 타임아웃(?timeout=) 검증 | **PASSED** |
 | | `test_route_test_call_endpoint` | Envoy L7 라우팅 경로 실시간 테스트 호출 및 Upstream 프록시 응답 검증 | **PASSED** |
 | | `test_gateway_openai_chat_completions_ingress` | OpenAI 호환 게이트웨이 인그레스(`/v1/routes`, `/v1/chat/completions`) E2E 검증 | **PASSED** |
 | `test_finops_observability.py` | `test_observability_metrics_summary` | 대시보드 관제용 실시간 지표 요약 REST API 검증 | **PASSED** |
@@ -148,12 +148,16 @@ kubectl get pods,svc -n aiorche -o wide
    - 증적: `02_routing_model_deleted_1789261016387.png` / `verify_model_delete_1789260951060.webp`
 12. **브라우저 게이트웨이 즉시 호출 및 Gemma2 온프레미스 LLM 추론 E2E 검증 (Gateway Immediate Test Call & Gemma2 Live Upstream)**:
    - 증적: `test_gateway_call_success_*.webp` / `HTTP 200 OK (latency: 2083ms)` 수신 증적 (`PRE_16_gateway_browser_test_troubleshooting_report.md`)
+13. **LLM 서빙 모델 Provider 규격화 및 동적 URL 조합기 (PRE-17)**:
+   - 증적: `model_provider_modal_1790259608160.png` / 6종 Provider 자동 경로 매핑
+14. **LLM 모델 헬스체크 타임아웃 수동 조절 및 모달별 개별 설정 (PRE-18)**:
+   - 증적: `new_model_modal_1790263523413.png` (신규 모델 등록 타임아웃 필드) / `edit_model_modal_1790263671096.png` (모델 수정 모달 타임아웃 필드) / 툴바 1.0s~30.0s 선택 드롭다운 연동
 
 ---
 
 ## 6. 아키텍처 결정 기록 (ADR) 및 설계 문서 현행화 완료 내역
 
-에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 10대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
+에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 12대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
 
 | 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
 | :---: | :---: | :--- | :--- | :--- |
@@ -167,12 +171,14 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-08** | 서빙 런타임 & 인그레스 | 단일 vLLM 전용 엔드포인트 가정 | **이종 런타임 카탈로그(vLLM/Ollama/SGLang/Triton) 및 Envoy 이중 인그레스(Path Prefix Rewrite + Header)** | 사내 다양한 인프라(K8s/Docker/Host CLI) 환경의 오픈소스 LLM을 단일 Envoy 진입점으로 통합 연동 및 실시간 프로빙 |
 | **ADR-09** | 관제 수명주기 디커플링 & WORM 기반 트래픽 실측 | 프론트엔드 주기적 REST 폴링 및 정적 하드코딩 모델 점유율 | **`useRef` 수명주기 분리(Zero-Flicker) 및 WORM `audit_logs` 기반 모델 점유율 산출** | WebSocket 상태 갱신 루프로 인한 UI 깜빡임을 100% 제거하고, 실제 추론 호출 이력과 Envoy RPS를 결합하여 정확한 서빙 트래픽 점유율 시각화 |
 | **ADR-10** | 게이트웨이 테스트 클라이언트 타임아웃 & 에러 보존 | 4.0초 하드코딩 타임아웃 및 루프 순회 중 에러 덮어쓰기 | **45.0초 현실적 LLM 추론 타임아웃 및 `TimeoutException` 원문 보존 루프 브레이크** | 로컬 CPU/온프레미스 GPU 환경의 콜드스타트/추론 지연을 안정적으로 대기하고, 오해의 소지가 있는 'Connection Refused' 오표시 완전 차단 |
+| **ADR-11** | 서빙 모델 엔드포인트 조립 | 백엔드 임의 접미사 슬라이싱/유추 | **동적 URL 조합기(Dynamic URL Builder) & 타깃 경로 직접 호출** | Provider별 고유 접미사를 프론트엔드에서 즉시 조립하고 백엔드의 임의 정규화를 배제하여 Anthropic, Gemini, Cohere 등 비호환 Provider 무결 연동 보장 |
+| **ADR-12** | 헬스체크 타임아웃 제어 | 3.0초 하드코딩 타임아웃 고정 | **계층형 수동 조절(전역 툴바 1.0s~30.0s + 모델별 DB 영속화) & 원인 명시적 예외 처리** | 초고속 온프레미스 LAN(1.0s)부터 분산 클라우드(30.0s)까지 네트워크 지연 환경에 유연하게 대응하고 '응답 대기시간 초과' 원인 상세 안내 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(46/46 테스트)**하였으며, 실제 브라우저 E2E 기반 온프레미스 LLM 추론까지 최종 확인되었습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`)와 `make test`를 **100% 통과(66/66 테스트)**하였으며, 실제 브라우저 E2E 기반 온프레미스 LLM 추론 및 헬스체크 수동 타임아웃 제어까지 최종 확인되었습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
 - **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)** 및 `PRE_15_Develop_milestone.md`의 **Milestone 6 (P0)** 항목으로 즉시 연계가 가능합니다.
 

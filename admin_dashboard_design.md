@@ -1,9 +1,9 @@
 # 고객사 자체 운영을 위한 AI 오케스트레이터 관리 툴 및 대시보드 상세 설계서
 
-> **문서 버전**: v2.0 (Phase 0 ~ Phase 5 전체 100% 구현 완료 현행화)  
-> **최종 갱신일**: 2026-09-22  
+> **문서 버전**: v2.3 (Phase 0 ~ Phase 5 전체 100% 구현 완료 현행화, 6종 Provider 규격화 & 헬스체크 타임아웃 수동 제어 반영)  
+> **최종 갱신일**: 2026-09-25  
 > **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-> **검증 상태**: **Phase 0 ~ Phase 5 전체 100% PASS (64 / 64 백엔드 테스트 통과 & React 18 웹 콘솔 연동 완료)**
+> **검증 상태**: **Phase 0 ~ Phase 5 전체 100% PASS (66 / 66 백엔드 테스트 통과 & React 18 웹 콘솔 연동 완료)**
 
 ---
 
@@ -42,11 +42,12 @@
 │    └── ✅ 📈 Grafana 전문 대시보드 내장 모달 (Traffic / Serving / FinOps 3종)
 │
 ├── ✅ 🧭 2. 모델 카탈로그 & 라우팅 스튜디오 (Model & Multi-Routing Studio) — 구현완료 (Phase 2)
-│    ├── ✅ 동적 모델 레지스트리 (다중 엔진: vLLM, Ollama, SGLang, Triton)
-│    ├── ✅ 서빙 모델 실시간 헬스체크 프로빙 (/health ping)
+│    ├── ✅ 동적 모델 레지스트리 (다중 엔진: vLLM, Ollama, SGLang, Triton) & 6종 Provider 규격화
+│    ├── ✅ 서빙 모델 실시간 헬스체크 프로빙 (/health ping) & 타임아웃 수동 조절(1.0s~30.0s) 및 localStorage 영속화
+│    ├── ✅ LLM 베이스 도메인 기반 Dynamic URL 자동 조합기 및 개별 엔드포인트 직접 호출
 │    ├── ✅ 비주얼 N-Way 멀티 라우팅 룰 빌더 (가중치 슬라이더, 조건부 매칭, Failover Chain)
 │    ├── ✅ Envoy REST RDS v3 무중단 정책 배포 및 배포 이력
-│    └── ✅ 인앱 엔드포인트 실시간 테스트 호출 (/v1/routes/test-call, /v1/chat/completions)
+│    └── ✅ 인앱 엔드포인트 실시간 테스트 호출 (/v1/routes/test-call, /v1/chat/completions) 및 상세 타임아웃 피드백
 │
 ├── ✅ 🔑 3. 가상 API 키 & 테넌트 거버넌스 (Virtual Key & Tenants) — 구현완료 (Phase 1)
 │    ├── ✅ 조직/부서/프로젝트 테넌트 계층 관리 및 월간 예산 설정
@@ -800,19 +801,19 @@ Content-Type: application/json
 ```bash
 # 전체 테스트 실행 명령어
 cd aiorche/backend && uv run pytest -v
-# 결과: 64 passed in 14.32s (100% PASS)
+# 결과: 66 passed in 10.97s (100% PASS)
 ```
 
 | 검증 단계 | 검증 대상 범위 | 테스트 케이스 파일 | 합격 수치 |
 | :--- | :--- | :--- | :---: |
 | **Phase 0 (기반 아키텍처)** | 에어갭 100%, Liveness/Readiness, 무결성 해시 | `test_health.py` | 5 / 5 PASS (100%) |
 | **Phase 1 (거버넌스 & 가상키)** | 테넌트 계층, Argon2id 해싱, 1회성 시크릿, 외부 REST 4종 | `test_virtual_keys.py`<br>`test_external_api.py` | 15 / 15 PASS (100%) |
-| **Phase 2 (모델 카탈로그 & xDS)** | 다중 서빙 엔진, 헬스 프로빙, N-Way 가중치, RDS 컴파일 | `test_routing.py` | 23 / 23 PASS (100%) |
+| **Phase 2 (모델 카탈로그 & xDS)** | 다중 서빙 엔진, 헬스 프로빙 & 타임아웃 수동 조절, 6종 Provider, N-Way 가중치, RDS 컴파일 | `test_routing.py` | 25 / 25 PASS (100%) |
 | **Phase 3 (FinOps & 관제)** | 1초 WebSocket, 토큰 표준과금, Hard Cap 429 차단, UTF-8 BOM CSV | `test_finops_observability.py` | 26 / 26 PASS (100%) |
 | **Phase 4 (PII 보안 & WORM)** | 자체 정규식 엔진(MASK/HASH/BLOCK), 룰 CRUD, WORM 감사로그 | `test_compliance.py` | 35 / 35 PASS (100%) |
 | **Phase 5 (라이프사이클 & 패치)** | RSA-4096 서명 검증, 무중단 롤링 패치, 롤백, Preflight, Zero-PII ZIP | `test_lifecycle.py` | 46 / 46 PASS (100%) |
-| **End-to-End 및 통합 검증** | 실데이터 통합 파이프라인 및 L7 게이트웨이 인그레스 검증 | `test_gateway.py` 등 통합 | 64 / 64 PASS (100%) |
-| **총계** | **Phase 0 ~ Phase 5 전 기능 상용 배포 및 UI 연동 완료** | **전체 테스트 스위트** | **64 / 64 PASS (100%)** |
+| **End-to-End 및 통합 검증** | 실데이터 통합 파이프라인 및 L7 게이트웨이 인그레스 검증 | `test_gateway.py` 등 통합 | 66 / 66 PASS (100%) |
+| **총계** | **Phase 0 ~ Phase 5 전 기능 상용 배포 및 UI 연동 완료** | **전체 테스트 스위트** | **66 / 66 PASS (100%)** |
 
 ### 7.1 Kubernetes 클러스터 상용 배포 상태 (`aiorche` 네임스페이스)
 - `postgres`: RDBMS 메타데이터 및 WORM 감사로그 불변 스토어 (Running)

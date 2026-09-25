@@ -142,8 +142,11 @@ export const apiClient = {
     return await res.json();
   },
 
-  async deleteVirtualKey(keyId) {
-    const res = await fetch(`${API_BASE_URL}/virtual-keys/${keyId}`, {
+  async deleteVirtualKey(keyId, force = false) {
+    const url = force
+      ? `${API_BASE_URL}/virtual-keys/${keyId}?force=true`
+      : `${API_BASE_URL}/virtual-keys/${keyId}`;
+    const res = await fetch(url, {
       method: 'DELETE'
     });
     if (!res.ok) {
@@ -759,6 +762,72 @@ export const apiClient = {
 
   getSupportBundleDownloadUrl(bundleId) {
     return `${API_BASE_URL}/lifecycle/support-bundle/download/${bundleId}`;
+  },
+
+  // --- System Prompt Governance (Phase 1~4) ---
+  async getSystemPrompts(params = {}) {
+    try {
+      const url = new URL(`${API_BASE_URL}/system-prompts`);
+      if (params.target_type) url.searchParams.append('target_type', params.target_type);
+      if (params.is_active !== undefined) url.searchParams.append('is_active', params.is_active);
+      if (params.search) url.searchParams.append('search', params.search);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('API getSystemPrompts offline:', err);
+      return [];
+    }
+  },
+
+  async createSystemPrompt(data) {
+    const res = await fetch(`${API_BASE_URL}/system-prompts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '시스템 프롬프트 생성 실패' }));
+      throw new Error(err.detail || '시스템 프롬프트 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async updateSystemPrompt(promptId, data) {
+    const res = await fetch(`${API_BASE_URL}/system-prompts/${promptId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '시스템 프롬프트 수정 실패' }));
+      throw new Error(err.detail || '시스템 프롬프트 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteSystemPrompt(promptId) {
+    const res = await fetch(`${API_BASE_URL}/system-prompts/${promptId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '시스템 프롬프트 삭제 실패' }));
+      throw new Error(err.detail || '시스템 프롬프트 삭제 실패');
+    }
+    return await res.json();
+  },
+
+  async resolveSystemPrompt(data) {
+    const res = await fetch(`${API_BASE_URL}/system-prompts/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '시스템 프롬프트 시뮬레이션 실패' }));
+      throw new Error(err.detail || '시스템 프롬프트 시뮬레이션 실패');
+    }
+    return await res.json();
   }
 };
 

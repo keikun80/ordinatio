@@ -219,7 +219,7 @@ export default function RoutingTab({
         setRouterPolicies(res.policies);
       }
       setShowPolicyModal(false);
-      if (onNotify) onNotify('SUCCESS', 'AgentRouter 4대 라우팅 정책이 성공적으로 저장 및 게이트웨이에 반영되었습니다.');
+      if (onNotify) onNotify('SUCCESS', '지능형 정책이 성공적으로 저장 및 게이트웨이에 반영되었습니다.');
     } catch (err) {
       if (onNotify) onNotify('ERROR', `정책 저장 실패: ${err.message}`);
     } finally {
@@ -1894,7 +1894,7 @@ print(response.choices[0].message.content)`;
               }}
             >
               <Settings size={14} color="currentColor" />
-              <span>4대 정책 상세 편집</span>
+              <span>지능형 정책 상세 편집</span>
             </button>
           </div>
         </div>
@@ -2060,10 +2060,10 @@ print(response.choices[0].message.content)`;
                   }}
                   title="게이트웨이로 테스트 요청을 보낼 대상 LLM을 선택합니다."
                 >
-                  <option value="all">🌐 전체 연동 LLM 일괄 동시 테스트 ({modelPool.length}개 모델)</option>
-                  <option value="route">🔀 현재 라우트 모델 풀 ({currentWeights.length}개 가중치)</option>
+                  <option value="all">🌐 전체 연동 LLM 일괄 동시 테스트 ({(models || []).length}개 모델)</option>
+                  <option value="route">🔀 현재 라우트 모델 풀 ({(currentWeights || []).length}개 가중치)</option>
                   <optgroup label="── 개별 연동 LLM 단독 테스트 ──">
-                    {modelPool.map(m => (
+                    {(models || []).map(m => (
                       <option key={m.id} value={m.id}>
                         🤖 {m.alias || m.id} ({m.engine || 'LLM'})
                       </option>
@@ -2084,9 +2084,9 @@ print(response.choices[0].message.content)`;
                   {isTestingRoute
                     ? '게이트웨이 호출 중...'
                     : testTargetScope === 'all'
-                      ? `⚡ 전체 LLM 동시 테스트 (${modelPool.length}개)`
+                      ? `⚡ 전체 LLM 동시 테스트 (${(models || []).length}개)`
                       : testTargetScope === 'route'
-                        ? `⚡ 라우트 모델 풀 테스트 (${currentWeights.length}개)`
+                        ? `⚡ 라우트 모델 풀 테스트 (${(currentWeights || []).length}개)`
                         : `⚡ [${testTargetScope.split('/').pop()}] 즉시 테스트`}
                 </span>
               </button>
@@ -2809,7 +2809,7 @@ print(response.choices[0].message.content)`;
           )}
           {activeSubTab === 'dispatch' && (
             <button className="btn btn-secondary btn-sm" onClick={() => setShowPolicyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', borderColor: 'rgba(124, 58, 237, 0.4)' }}>
-              <Settings size={14} /> <span>4대 정책 상세 편집</span>
+              <Settings size={14} /> <span>지능형 정책 상세 편집</span>
             </button>
           )}
         </div>
@@ -3514,7 +3514,7 @@ print(response.choices[0].message.content)`;
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>AgentRouter 4대 지능형 라우팅 정책 편집</span>
+                    <span>지능형 정책</span>
                     <span className="badge active" style={{ fontSize: '0.7rem' }}>Live xDS Sync</span>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>

@@ -9,6 +9,7 @@ from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.agent_router_policy import AgentRouterPolicyModel
+from app.models.system_prompt import SystemPrompt
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,48 @@ def init_db():
         from app.core.security import ensure_system_diagnostics_key
         ensure_system_diagnostics_key(db)
         logger.info("Initialized database with official system diagnostics virtual key")
+
+        # 9. Default System Prompts Seed (Phase 1)
+        if db.query(SystemPrompt).count() == 0:
+            sp1 = SystemPrompt(
+                prompt_id="sp-global-guardrail",
+                name="전사 공통 금융 보안 및 컴플라이언스 가드레일",
+                description="모든 LLM 추론에 적용되는 기본 개인정보 보호 및 사내 기밀 반출 방지 지침",
+                content="[사내 보안 및 금융 컴플라이언스 기본 지침]\n1. 금융거래정보, 주민등록번호, 계좌 비밀번호 등 개인 식별 정보를 절대 외부로 유출하거나 요구하지 마십시오.\n2. 사내 규정과 금융소비자보호법을 철저히 준수하며 객관적이고 신뢰할 수 있는 정보를 제공하십시오.\n3. 불확실한 투자 조언이나 확정적 수익률 보장은 엄격히 금지됩니다.",
+                target_type="GLOBAL",
+                target_id=None,
+                target_name="전사 공통 (Global)",
+                injection_mode="PREPEND",
+                estimated_tokens=75,
+                is_active=True
+            )
+            sp2 = SystemPrompt(
+                prompt_id="sp-wm-advisor",
+                name="자산관리(WM)혁신부 고객 상담 표준 페르소나",
+                description="자산관리부 소속 가상키 및 라우트 호출 시 적용되는 전문 PB 상담 페르소나",
+                content="[자산관리(WM) 고객 상담 표준 페르소나]\n- 귀하는 최고 수준의 금융 전문 프라이빗 뱅커(PB) 어시스턴트입니다.\n- 고객의 자산 포트폴리오를 다각도로 분석하고, 위험 성향에 맞춘 최적의 자산 배분 방안을 정중하고 격조 높은 어조로 제안하십시오.\n- 답변 시 항상 고객의 투자 리스크 관리 방안을 함께 안내해야 합니다.",
+                target_type="TENANT",
+                target_id="dept-wm",
+                target_name="자산관리부 (WM-01)",
+                injection_mode="PREPEND",
+                estimated_tokens=70,
+                is_active=True
+            )
+            sp3 = SystemPrompt(
+                prompt_id="sp-route-code",
+                name="사내 개발팀 코드 생성 및 SQL 최적화 가이드",
+                description="code-copilot-v2 라우트 전용 시큐어 코딩 및 성능 가이드라인",
+                content="[사내 개발 표준 시큐어 코딩 지침]\n- 생성되는 모든 코드는 SQL Injection, XSS, 하드코딩된 Secret이 없는지 엄격히 점검하십시오.\n- PEP8 및 표준 린트 규칙을 준수하고, 시간 복잡도와 메모리 효율성을 고려한 최적화 코드를 작성하십시오.\n- 가능한 한 단위 테스트 코드(Unit Test)를 함께 작성하여 신뢰성을 확보하십시오.",
+                target_type="ROUTE",
+                target_id="code-copilot-v2",
+                target_name="code-copilot-v2 라우트",
+                injection_mode="PREPEND",
+                estimated_tokens=65,
+                is_active=True
+            )
+            db.add_all([sp1, sp2, sp3])
+            db.commit()
+            logger.info("Initialized database with default system prompts catalog")
 
         db.close()
     except Exception as e:

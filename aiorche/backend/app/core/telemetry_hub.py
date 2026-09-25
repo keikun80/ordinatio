@@ -264,14 +264,10 @@ class TelemetryHub:
                 count_dict = {m_id: int(cnt) for m_id, cnt in counts if m_id}
                 total_reqs = sum(count_dict.values())
 
-                all_model_ids = list(model_map.keys())
-                for m_id in count_dict:
-                    if m_id not in all_model_ids:
-                        all_model_ids.append(m_id)
-
-                for m_id in all_model_ids:
+                for m_id, req_cnt in count_dict.items():
+                    if req_cnt <= 0:
+                        continue
                     name = model_map.get(m_id, m_id.split("/")[-1] if "/" in m_id else m_id)
-                    req_cnt = count_dict.get(m_id, 0)
                     share_pct = round((req_cnt / total_reqs * 100.0), 1) if total_reqs > 0 else 0.0
                     model_rps = round(current_total_rps * (share_pct / 100.0), 1) if share_pct > 0 else 0.0
 

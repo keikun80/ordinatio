@@ -1,31 +1,32 @@
 # Phase 0 ~ Phase 5 엔지니어링 갭 분석 및 미구현/미테스트 기능 점검 보고서 (현행화 완료)
 
-**문서 번호**: AIORCHE-GAP-ANALYSIS-20260924  
-**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `architecture/PRE_17_model_provider_options_and_url_builder_report.md`, `architecture/PRE_18_model_health_check_timeout_report.md`  
+**문서 번호**: AIORCHE-GAP-ANALYSIS-20260925  
+**기준 문서**: `dashboard_arch/dashboard_engineering_plan.md` (마스터 엔지니어링 계획서), `architecture/PRE_19_system_prompt_governance_and_dynamic_injection_plan.md`, `architecture/PRE_20_phase_system_prompt_implementation_and_test_results.md`  
 **분석 대상**: 상용급 모노레포(`aiorche/`) 및 프로토타입(`dashboard/`)  
-**작성 일자**: 2026-09-24 (Phase 5 완료 + LLM Provider 규격화 및 헬스체크 타임아웃 수동 조절 반영 현행화)  
+**작성 일자**: 2026-09-25 (Phase 5 완료 + 동적 시스템 프롬프트 거버넌스 & L7 인라인 주입 반영 현행화)  
 
 ---
 
 ## 1. 종합 점검 결과 요약 (Executive Summary)
 
-마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 5까지의 6개 단계**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
+마스터 엔지니어링 계획서(`dashboard_engineering_plan.md`)에 정의된 **Phase 0부터 Phase 5, 그리고 신규 추가된 동적 시스템 프롬프트 거버넌스 엔진**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 현행화하였습니다.
 
-- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 전체)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, **헬스체크 타임아웃 수동 조절(1.0s~30.0s) 및 모달별 개별 설정/DB 영속화**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**.
-- **자동화 테스트 검증율**: **66 / 66 테스트 100% PASS** (`uv run pytest -v`)
+- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 + 시스템 프롬프트 거버넌스)**
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, **헬스체크 타임아웃 수동 조절(1.0s~30.0s) 및 모달별 개별 설정/DB 영속화**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**, **동적 시스템 프롬프트 거버넌스 포털 및 L7 Envoy ext_proc 스트림 인라인 주입 엔진 (1:1 라우팅/가상키/테넌트 바인딩, PREPEND/OVERRIDE/FALLBACK_ONLY)**.
+- **자동화 테스트 검증율**: **78 / 78 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
   - Phase 2: Dynamic Routing & xDS (9종)
   - Phase 3: Observability & FinOps (6종)
   - Phase 4: Compliance & PII Governance (8종)
   - Phase 5: Lifecycle & Hotfix Engine (8종)
+  - 시스템 프롬프트 거버넌스 & L7 ext_proc 주입: (12종)
   - Phase 0.1: AgentRouter (11종)
   - Gateway Security P0: (6종)
   - External API: (4종)
-  - Models & Routing: (9종)
-- **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 전체 스크립트(`make verify-phase*`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **12건** (ADR-01 ~ ADR-12 공식 반영 완료)
+  - Models & Routing: (3종)
+- **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5 및 시스템 프롬프트 스크립트(`bash scripts/verify-phase-system-prompt.sh`) 100% 통과
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **13건** (ADR-01 ~ ADR-13 공식 반영 완료)
 - **미구현 항목**: 총 **2건** (Keycloak OIDC JWT 미들웨어, 예산 임계치 외부 웹훅 알림)
 
 ---
@@ -191,17 +192,24 @@
   - 백엔드 `httpx` 타임아웃 발생 시 `"응답 대기시간 초과 ({timeout}s 초과)"` 등 지정된 시간 초과 사실을 명확히 반환 (`PRE_18_model_health_check_timeout_report.md`).
 - **영향도**: 긍정적 (초고속 사내망부터 느린 원격 클라우드까지 네트워크 지연 환경에 유연하게 적응).
 
-### 3.16 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
+### 3.16 [신규 구현 - 거버넌스] L7 동적 시스템 프롬프트 인라인 주입 & 1:1 거버넌스 바인딩 [ADR-13]
+- **설계서 명세**: 클라이언트가 자체 전달한 프롬프트에만 의존하거나 단일 정적 프롬프트 전제.
+- **현재 구현 상태**:
+  - 독립적인 시스템 프롬프트 카탈로그 테이블(`system_prompts`) 구축 및 라우팅 정책(`ROUTE`), 가상 API Key(`VIRTUAL_KEY`), 테넌트(`TENANT`), 전사 공통(`GLOBAL`) 중 하나를 선택하는 1:1 바인딩 아키텍처 구현.
+  - Envoy AI Gateway의 L7 `ext_proc` gRPC 파이프라인에서 인입 요청의 `messages` 배열을 가로채, 위계적 우선순위(`VIRTUAL_KEY` > `ROUTE` > `TENANT` > `GLOBAL`)에 따라 매칭된 프롬프트를 3대 모드(`PREPEND`, `OVERRIDE`, `FALLBACK_ONLY`)로 인라인 실시간 합성.
+  - 라우팅 스튜디오 내 즉시 호출 테스트벤치 및 프론트엔드 전용 거버넌스 대시보드(`SystemPromptsTab.jsx`)에 실시간 토큰/글자수 카운터와 1:1 바인딩 마법사 연동 완료 (`PRE_19`, `PRE_20`).
+- **영향도**: 긍정적 (클라이언트 코드 수정 없이 전사 보안 가드레일 및 부서별 페르소나를 L7 레벨에서 100% 강제 적용 가능).
+
+### 3.17 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
 - **현재 구현 상태**: 현재 Docker Compose 기반 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 정식 단일 Helm 패키지 및 Playwright E2E 스위트는 미구현.
 - **영향도**: 높음 (Phase 6 정규 작업 범위).
-
 
 ---
 
 ## 4. 미테스트 시나리오 목록 (Untested Scenarios)
 
-현재 백엔드 단위/통합 테스트 46개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
+현재 백엔드 단위/통합 테스트 78개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
 
 1. **대규모 정규식 처리량 부하 테스트 (High-Throughput PII Matching)**:
    - 초당 10,000건 이상의 동시 프롬프트 인입 시 정규식 컴파일 캐시 및 CPU 점유율 측정.

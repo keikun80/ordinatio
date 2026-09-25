@@ -108,6 +108,8 @@ class RouteTestCallResponse(BaseModel):
     error_message: Optional[str] = None
     dispatched_route: str
     model_id: Optional[str] = None
+    applied_system_prompt: Optional[str] = None
+    prompt_resolved_by: Optional[str] = None
 
 class AllModelsTestCallRequest(BaseModel):
     route_name: Optional[str] = "financial-advisor-v1"

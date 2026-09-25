@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, system, tenants, virtual_keys, external, metrics, models, routing, xds, observability, finops, compliance, lifecycle
+from app.api.v1.endpoints import health, system, tenants, virtual_keys, external, metrics, models, routing, xds, observability, finops, compliance, lifecycle, system_prompts
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["Health & Probes"])
@@ -15,4 +15,5 @@ api_router.include_router(observability.router, prefix="/observability", tags=["
 api_router.include_router(finops.router, prefix="/finops", tags=["FinOps & Billing Invoices"])
 api_router.include_router(compliance.router, tags=["PII Compliance & Audit Forensics"])
 api_router.include_router(lifecycle.router, prefix="/lifecycle", tags=["Lifecycle & Patch Management"])
+api_router.include_router(system_prompts.router, tags=["System Prompt Governance"])
 

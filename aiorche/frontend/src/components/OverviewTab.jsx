@@ -27,7 +27,7 @@ export default function OverviewTab({ onNavigateTab }) {
     if (!pools || pools.length === 0) return [];
     return pools.map((p, idx) => ({
       id: `pool-${(p.infra || 'infra').toLowerCase().replace(/[^a-z0-9]/g, '')}-${idx}`,
-      name: p.pool_name,
+      name: p.model_id || p.pool_name,
       model: p.model_id || p.pool_name,
       engine: p.engine || 'vLLM',
       workload: p.workload || `${p.engine || 'vLLM'} 온프레미스 인스턴스`,
@@ -279,8 +279,22 @@ export default function OverviewTab({ onNavigateTab }) {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{pool.name}</div>
-                  <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`}>
+                  <div 
+                    style={{ 
+                      fontWeight: 600, 
+                      fontSize: '0.92rem', 
+                      color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginRight: '8px'
+                    }}
+                    title={pool.model || pool.name}
+                  >
+                    {pool.model || pool.name}
+                  </div>
+                  <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`} style={{ flexShrink: 0 }}>
                     {pool.status === 'HEALTHY' ? '정상 가동' : '점검 필요'}
                   </span>
                 </div>
@@ -348,36 +362,38 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {modelTraffic && modelTraffic.length > 0 ? (
-              modelTraffic.map((item, idx) => {
-                const palette = ['#38bdf8', '#06b6d4', '#818cf8', '#10b981', '#f59e0b', '#ec4899'];
-                const accent = palette[idx % palette.length];
-                return (
-                  <div key={item.model_id}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}건)</span>
-                      </span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }}>
-                        {item.share_pct}% ({item.rps} RPS)
-                      </span>
+            {modelTraffic && modelTraffic.filter((item) => item.total_requests > 0 || item.share_pct > 0).length > 0 ? (
+              modelTraffic
+                .filter((item) => item.total_requests > 0 || item.share_pct > 0)
+                .map((item, idx) => {
+                  const palette = ['#38bdf8', '#06b6d4', '#818cf8', '#10b981', '#f59e0b', '#ec4899'];
+                  const accent = palette[idx % palette.length];
+                  return (
+                    <div key={item.model_id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}건)</span>
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }}>
+                          {item.share_pct}% ({item.rps} RPS)
+                        </span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div 
+                          style={{ 
+                            width: `${Math.max(item.share_pct > 0 ? item.share_pct : (item.total_requests > 0 ? 1 : 0), 0)}%`, 
+                            height: '100%', 
+                            background: `linear-gradient(90deg, ${accent}, #60a5fa)`,
+                            borderRadius: '999px'
+                          }} 
+                        />
+                      </div>
                     </div>
-                    <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                      <div 
-                        style={{ 
-                          width: `${Math.max(item.share_pct > 0 ? item.share_pct : (item.total_requests > 0 ? 1 : 0), 0)}%`, 
-                          height: '100%', 
-                          background: `linear-gradient(90deg, ${accent}, #60a5fa)`,
-                          borderRadius: '999px'
-                        }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })
             ) : (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                실시간 모델 트래픽 집계 중...
+                기록된 모델 트래픽 데이터가 없습니다 (0건)
               </div>
             )}
           </div>

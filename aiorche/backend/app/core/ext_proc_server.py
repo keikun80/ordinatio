@@ -93,6 +93,32 @@ class ExtProcessorService:
         session_id = headers.get("x-session-id")
         affinity_headers = self.affinity.get_affinity_headers(session_id=session_id)
 
+        # 7. System Prompt Governance Auto-Injection (Phase 3)
+        body_override = None
+        prompt_meta_headers = {}
+        route_name = headers.get("x-orche-route") or headers.get("x-route-name")
+        tenant_id = headers.get("x-orche-tenant") or headers.get("x-tenant-id")
+
+        try:
+            from app.db.session import SessionLocal
+            from app.core.prompt_injector import resolve_and_inject_system_prompt
+            with SessionLocal() as db:
+                injected_messages, matched_p, resolved_by = resolve_and_inject_system_prompt(
+                    db=db,
+                    messages=messages,
+                    key_id=key_id,
+                    route_name=route_name,
+                    tenant_id=tenant_id
+                )
+                if matched_p and body and isinstance(body, dict):
+                    body_override = dict(body)
+                    body_override["messages"] = injected_messages
+                    prompt_meta_headers["x-orche-prompt-injected"] = matched_p.prompt_id
+                    prompt_meta_headers["x-orche-prompt-target"] = resolved_by or "NONE"
+                    prompt_meta_headers["x-orche-prompt-mode"] = matched_p.injection_mode
+        except Exception as pe:
+            logger.debug(f"ext_proc prompt injection skipped: {pe}")
+
         duration_ms = (time.perf_counter() - start_time) * 1000.0
 
         headers_to_add = {
@@ -103,13 +129,15 @@ class ExtProcessorService:
             "x-agent-router-decision": decision.policy_applied.value,
             "x-agent-proc-time-ms": f"{duration_ms:.2f}",
             "x-ratelimit-remaining-tokens": str(remaining),
-            **affinity_headers
+            **affinity_headers,
+            **prompt_meta_headers
         }
 
         return ExtProcResponse(
             status="CONTINUE",
             status_code=200,
             headers_to_add=headers_to_add,
+            body_override=body_override,
             reason=f"Routed to {decision.selected_model} via {decision.policy_applied.value}"
         )
 

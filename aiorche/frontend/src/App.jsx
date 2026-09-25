@@ -8,6 +8,7 @@ import FinOpsTab from './components/FinOpsTab';
 import ComplianceTab from './components/ComplianceTab';
 import LifecycleTab from './components/LifecycleTab';
 import PromptStudioTab from './components/PromptStudioTab';
+import SystemPromptsTab from './components/SystemPromptsTab';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export default function App() {
@@ -78,6 +79,10 @@ export default function App() {
 
           {activeTab === 'virtual-keys' && (
             <VirtualKeysTab onNotify={addToast} />
+          )}
+
+          {activeTab === 'system-prompts' && (
+            <SystemPromptsTab onNotify={addToast} />
           )}
 
           {activeTab === 'finops' && (

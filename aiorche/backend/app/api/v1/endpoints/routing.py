@@ -371,11 +371,29 @@ async def _execute_single_test_call(
             model_id=target_model_id
         )
 
+    # 4. System Prompt Auto-Injection (Phase 3)
+    tenant_code = None
+    if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
+        tenant_code = policy.match_conditions["tenant_codes"][0]
+
+    raw_messages = [{"role": "user", "content": message}]
+    from app.core.prompt_injector import resolve_and_inject_system_prompt
+    injected_messages, applied_prompt, resolved_by = resolve_and_inject_system_prompt(
+        db=db,
+        messages=raw_messages,
+        key_id=SYSTEM_DIAGNOSTICS_KEY[:16],
+        route_name=route_name,
+        tenant_id=tenant_code
+    )
+
+    applied_prompt_name = applied_prompt.name if applied_prompt else None
+    if applied_prompt:
+        request_headers["x-orche-prompt-injected"] = applied_prompt.prompt_id
+        request_headers["x-orche-prompt-target"] = resolved_by or "NONE"
+
     payload = {
         "model": target_model_name or route_name,
-        "messages": [
-            {"role": "user", "content": message}
-        ],
+        "messages": injected_messages,
         "temperature": 0.7,
         "max_tokens": 128
     }
@@ -417,7 +435,9 @@ async def _execute_single_test_call(
                     response_body=resp_body,
                     error_message=error_msg,
                     dispatched_route=route_name,
-                    model_id=target_model_name
+                    model_id=target_model_name,
+                    applied_system_prompt=applied_prompt_name,
+                    prompt_resolved_by=resolved_by
                 )
             except httpx.ConnectError:
                 if not err_msg:

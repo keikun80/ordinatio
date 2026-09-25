@@ -25,6 +25,7 @@
 - ✅ **FR-04 (컴플라이언스 & PII 보안 거버넌스)** `구현완료 — Phase 4`: 국내 금융 특화 정규표현식 및 Presidio 마스킹 엔진, 입력 프롬프트 실시간 마스킹 검증 시뮬레이터, WORM 불변 감사 추적(INSERT-only, SHA-256 해시) 및 감사 증적 뷰어.
 - ✅ **FR-05 (에어갭 긴급 패치 및 자가진단)** `구현완료 — Phase 5`: 오프라인 서명 패치 번들(`.tar.gz`) 업로드, RSA-4096 서명 무결성 검증, 4단계 무중단 롤링 핫픽스 및 원클릭 롤백, 시스템 의존성 사전점검(Pre-Flight Check), Zero-PII 암호화 기술지원 번들 생성 및 다운로드.
 - ✅ **FR-06 (엔터프라이즈 프롬프트 스튜디오)** `구현완료 — Phase 4`: 모델 파라미터 튜닝 및 테스트, 마스킹 전 원문과 마스킹 후 실제 vLLM 인입 페이로드의 Side-by-Side 비교 분석.
+- ✅ **FR-07 (시스템 프롬프트 거버넌스 & L7 동적 인라인 주입)** `구현완료 — PRE-19/20`: 사내 표준 보안 가드레일/페르소나 카탈로그 관리, 라우팅 정책(ROUTE)/가상키(VIRTUAL_KEY)/테넌트(TENANT) 1:1 유연 바인딩, 위계적 우선순위(`KEY` > `ROUTE` > `TENANT` > `GLOBAL`), L7 Envoy ext_proc 스트림 페이로드 변조, PREPEND/OVERRIDE/FALLBACK_ONLY 3대 주입 모드, 관리자 대시보드 UI 및 실시간 토큰/글자수 카운터.
 
 ### 1.2 비기능적 요구사항 (Non-Functional Requirements: FURPS+ 모델)
 | 분류 | 속성 | 목표 기준 (Target SLA / SLO) | 검증 방법 |

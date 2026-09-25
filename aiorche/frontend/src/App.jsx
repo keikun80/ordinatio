@@ -9,6 +9,7 @@ import ComplianceTab from './components/ComplianceTab';
 import LifecycleTab from './components/LifecycleTab';
 import PromptStudioTab from './components/PromptStudioTab';
 import SystemPromptsTab from './components/SystemPromptsTab';
+import DevInspector from './components/DevInspector';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const [routingSubTab, setRoutingSubTab] = useState('routing');
   const [unreadPatchCount, setUnreadPatchCount] = useState(1);
   const [toasts, setToasts] = useState([]);
+  const [isInspectorActive, setIsInspectorActive] = useState(false);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('aiorche_theme') || 'dark';
   });
@@ -54,15 +56,17 @@ export default function App() {
       />
 
       {/* Main Wrapper */}
-      <div className="main-wrapper">
+      <div className="main-wrapper" data-screen-id="SCR-COM-00">
         <Header 
           onOpenPatchTab={() => setActiveTab('lifecycle')}
           unreadPatchCount={unreadPatchCount}
           theme={theme}
           onToggleTheme={toggleTheme}
+          isInspectorActive={isInspectorActive}
+          onToggleInspector={() => setIsInspectorActive((prev) => !prev)}
         />
 
-        <main className="page-content">
+        <main className="page-content" data-testid="main-page-content">
           {activeTab === 'overview' && (
             <OverviewTab 
               onNavigateTab={(tab) => setActiveTab(tab)}
@@ -105,6 +109,12 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Dev UI Inspector Overlay */}
+      <DevInspector 
+        isActive={isInspectorActive} 
+        onToggle={() => setIsInspectorActive((prev) => !prev)} 
+      />
 
       {/* Global Toast Notification Container */}
       <div className="toast-container">

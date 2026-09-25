@@ -32,6 +32,7 @@
 | **PRE_20** | [PRE_20_phase_system_prompt_implementation_and_test_results.md](./PRE_20_phase_system_prompt_implementation_and_test_results.md) | **시스템 프롬프트 거버넌스 & 동적 인라인 주입 구현 및 검증 결과서**<br>- DB 스키마/모델, RESTful API, L7 ext_proc 및 AgentRouter 테스트벤치 연동<br>- React 18 Vanilla CSS 관리 포털 대시보드 및 1:1 바인딩 마법사<br>- DoD 자동화 검증 스크립트(`verify-phase-system-prompt.sh`) 및 전체 78개 테스트 무회귀 검증 | **100% PASS**<br>(78/78 Tests) |
 | **PRE_21** | [PRE_21_make_commands_test_plan.md](./PRE_21_make_commands_test_plan.md) | **전체 Make 명령어 테스트 계획서 (Make Commands Comprehensive Test Plan)**<br>- 모노레포 루트 및 aiorche 서브모듈 30여 개 Make 타겟 전수 인벤토리<br>- 3계층(로컬 CLI, Docker Compose, Kubernetes) 테스트 매트릭스 및 시나리오<br>- 안전성, 멱등성, 에어갭 컴플라이언스 및 Makefile 정합성 개선 방안 정의 | **계획 완료** |
 | **PRE_22** | [PRE_22_make_commands_test_results.md](./PRE_22_make_commands_test_results.md) | **전체 Make 명령어 테스트 결과 보고서 (Make Commands Test Results)**<br>- 33개 Make 타겟 Dry-run 및 Tier 1~3 실환경 전수 검증 결과 (100% PASS)<br>- 백엔드 78개 Pytest 무회귀, Vite 빌드, Docker Compose 및 K8s 라이프사이클 증적<br>- 인메모리 테스트 격리 패치 및 Makefile 결함 해소 내역 기록 | **100% PASS**<br>(33/33 Targets) |
+| **PRE_23** | [PRE_23_ui_taxonomy_and_element_specification.md](./PRE_23_ui_taxonomy_and_element_specification.md) | **UI 택소노미 체계 및 화면/기능 식별자 명세서 (UI Element Taxonomy & Spec)**<br>- 4대 식별자 계층(`Screen ID`, `Function ID`, `data-testid`, `Element Class`) 표준화<br>- 주요 관리 탭 컴포넌트 locator 주입 및 DevInspector(`Ctrl+Shift+D`) 실시간 오버레이 탑재<br>- E2E 테스트 및 원격 커뮤니케이션용 UI 요소 전수 인벤토리 매핑표 수립 | **구현 완료**<br>(Vite Build PASS) |
 
 ---
 

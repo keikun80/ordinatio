@@ -1079,9 +1079,9 @@ print(response.choices[0].message.content)`;
   // Sub-Tab 1: 라우팅 스튜디오 (Routing Studio)
   // ==========================================
   const renderRoutingStudio = () => (
-    <div className="subtab-content" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
+    <div className="subtab-content" data-testid="rt-studio-content" data-screen-id="SCR-RT-01" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
       {/* Multi-Route Selector Bar */}
-      <div className="card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
+      <div className="card" data-testid="rt-card-selector" style={{ marginBottom: '20px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <label htmlFor="route-profile-select" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1091,6 +1091,7 @@ print(response.choices[0].message.content)`;
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <select
                 id="route-profile-select"
+                data-testid="rt-select-profile"
                 className="form-select"
                 value={selectedRouteName}
                 onChange={(e) => {
@@ -1262,7 +1263,7 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* Model Weights List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div data-testid="rt-splitter-weights-list" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {currentWeights.map((item, idx) => {
               const color = DEFAULT_COLOR_PALETTE[idx % DEFAULT_COLOR_PALETTE.length];
               const modelMeta = models.find(m => m.id === item.model_id);
@@ -1270,6 +1271,7 @@ print(response.choices[0].message.content)`;
                 <div 
                   key={item.model_id} 
                   className="panel-nested"
+                  data-testid={`rt-splitter-row-${item.model_id}`}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -1295,6 +1297,7 @@ print(response.choices[0].message.content)`;
                       min="0"
                       max="100"
                       value={item.weight}
+                      data-testid={`rt-splitter-slider-${item.model_id}`}
                       onChange={(e) => handleWeightChange(idx, e.target.value)}
                       className="custom-range"
                       style={{ flex: 1 }}
@@ -1305,6 +1308,7 @@ print(response.choices[0].message.content)`;
                         min="0"
                         max="100"
                         value={item.weight}
+                        data-testid={`rt-splitter-input-${item.model_id}`}
                         onChange={(e) => handleWeightChange(idx, e.target.value)}
                         className="form-input"
                         style={{ padding: '4px 8px', fontSize: '0.85rem', textAlign: 'right', color: 'var(--text-primary)' }}
@@ -1316,6 +1320,7 @@ print(response.choices[0].message.content)`;
                   {currentWeights.length > 1 && (
                     <button
                       className="btn btn-secondary btn-sm"
+                      data-testid={`rt-splitter-btn-remove-${item.model_id}`}
                       onClick={() => handleRemoveModelFromRoute(idx)}
                       style={{ padding: '6px', color: 'var(--accent-rose)' }}
                       title="모델 제외"
@@ -1333,6 +1338,7 @@ print(response.choices[0].message.content)`;
             <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <select
                 id="addModelSelect"
+                data-testid="rt-splitter-select-add-model"
                 className="form-select"
                 style={{ 
                   maxWidth: '360px', 
@@ -1422,7 +1428,7 @@ print(response.choices[0].message.content)`;
           </div>
 
           {/* 3. Load Balancing Strategy & Failover Chain */}
-          <div className="panel-sub" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
+          <div className="panel-sub" data-testid="rt-panel-failover" style={{ padding: '18px', borderRadius: 'var(--radius-md)' }}>
             <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '10px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldAlert size={18} color="var(--accent-emerald)" />
               <span>3. 부하 분산 전략 & 다단계 장애 우회 (Failover Chain)</span>
@@ -1435,6 +1441,7 @@ print(response.choices[0].message.content)`;
                   <input
                     type="radio"
                     name="strategy"
+                    data-testid="rt-radio-strategy-leastqueue"
                     value="LeastQueueDepth"
                     checked={(currentRoute.load_balancing_strategy || 'LeastQueueDepth') === 'LeastQueueDepth'}
                     onChange={() => updateCurrentRoute({ load_balancing_strategy: 'LeastQueueDepth' })}
@@ -1445,6 +1452,7 @@ print(response.choices[0].message.content)`;
                   <input
                     type="radio"
                     name="strategy"
+                    data-testid="rt-radio-strategy-prefixcache"
                     value="PrefixCacheAffinity"
                     checked={currentRoute.load_balancing_strategy === 'PrefixCacheAffinity'}
                     onChange={() => updateCurrentRoute({ load_balancing_strategy: 'PrefixCacheAffinity' })}
@@ -1455,6 +1463,7 @@ print(response.choices[0].message.content)`;
                   <input
                     type="radio"
                     name="strategy"
+                    data-testid="rt-radio-strategy-roundrobin"
                     value="RoundRobin"
                     checked={currentRoute.load_balancing_strategy === 'RoundRobin'}
                     onChange={() => updateCurrentRoute({ load_balancing_strategy: 'RoundRobin' })}
@@ -1468,6 +1477,8 @@ print(response.choices[0].message.content)`;
               <label className="form-label" style={{ marginBottom: '4px' }}>1차 장애 우회 (Failover Target)</label>
               <select
                 className="form-select"
+                data-testid="rt-select-failover-target"
+                data-function-id="FNC-RT-SET-FAILOVER"
                 value={currentRoute.failover_model_id || ''}
                 onChange={(e) => updateCurrentRoute({ failover_model_id: e.target.value })}
                 style={{ fontSize: '0.82rem', marginBottom: '8px' }}
@@ -1504,6 +1515,8 @@ print(response.choices[0].message.content)`;
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
+                    data-testid="rt-btn-auto-balance"
+                    data-function-id="FNC-RT-AUTOBALANCE"
                     onClick={handleAutoBalance}
                     style={{ fontSize: '0.76rem', padding: '4px 10px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
                   >
@@ -1515,10 +1528,22 @@ print(response.choices[0].message.content)`;
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-secondary" onClick={handleDryRun} disabled={isDryRunning}>
+            <button 
+              className="btn btn-secondary" 
+              data-testid="rt-btn-dry-run"
+              data-function-id="FNC-RT-DRY-RUN"
+              onClick={handleDryRun} 
+              disabled={isDryRunning}
+            >
               {isDryRunning ? '검증 중...' : '드라이런 사전 검증'}
             </button>
-            <button className="btn btn-primary" onClick={handleDeployXds} disabled={isDeploying || totalWeight !== 100}>
+            <button 
+              className="btn btn-primary" 
+              data-testid="rt-btn-deploy-xds"
+              data-function-id="FNC-RT-DEPLOY"
+              onClick={handleDeployXds} 
+              disabled={isDeploying || totalWeight !== 100}
+            >
               {isDeploying ? '저장 및 배포 중...' : 'Envoy xDS 라우팅 즉시 배포 및 저장'}
             </button>
           </div>
@@ -1538,7 +1563,7 @@ print(response.choices[0].message.content)`;
       </div>
 
       {/* Model Catalog Table */}
-      <div className="card">
+      <div className="card" data-testid="rt-card-catalog" data-screen-id="SCR-RT-02">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div className="card-title">
@@ -1564,6 +1589,7 @@ print(response.choices[0].message.content)`;
               <Timer size={13} color="var(--accent-amber)" />
               <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>타임아웃:</span>
               <select
+                data-testid="rt-catalog-select-timeout"
                 value={healthCheckTimeout}
                 onChange={(e) => handleHealthTimeoutChange(Number(e.target.value))}
                 style={{
@@ -1589,6 +1615,8 @@ print(response.choices[0].message.content)`;
             </div>
             <button
               className="btn btn-secondary btn-sm"
+              data-testid="rt-catalog-btn-ping-all"
+              data-function-id="FNC-RT-PING-ALL"
               onClick={() => handleCheckAllHealth()}
               disabled={isHealthCheckingAll}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
@@ -1599,6 +1627,8 @@ print(response.choices[0].message.content)`;
             </button>
             <button
               className="btn btn-primary btn-sm"
+              data-testid="rt-catalog-btn-register"
+              data-function-id="FNC-RT-REGISTER-MODEL"
               onClick={() => setShowNewModelModal(true)}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
             >
@@ -1609,7 +1639,7 @@ print(response.choices[0].message.content)`;
         </div>
 
         <div className="table-responsive">
-          <table className="table">
+          <table className="table" data-testid="rt-catalog-table">
             <thead>
               <tr>
                 <th>모델 식별자 / 별칭</th>
@@ -1980,7 +2010,7 @@ print(response.choices[0].message.content)`;
       </div>
 
       {/* Envoy Gateway API 엔드포인트 & 실시간 테스트 벤치 카드 */}
-      <div className="card" style={{ marginBottom: '24px', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div className="card" data-testid="rt-card-testbench" data-screen-id="SCR-RT-03" style={{ marginBottom: '24px', width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
         <div className="card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1998,6 +2028,7 @@ print(response.choices[0].message.content)`;
             <label htmlFor="testbench-route-select" style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>테스트 라우트:</label>
             <select
               id="testbench-route-select"
+              data-testid="rt-testbench-select-route"
               className="form-select"
               value={selectedRouteName}
               onChange={(e) => {
@@ -2046,6 +2077,7 @@ print(response.choices[0].message.content)`;
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>테스트 대상:</span>
                 <select
                   className="form-select"
+                  data-testid="rt-testbench-select-target"
                   value={testTargetScope}
                   onChange={(e) => setTestTargetScope(e.target.value)}
                   style={{
@@ -2074,6 +2106,8 @@ print(response.choices[0].message.content)`;
 
               <button
                 className="btn btn-primary btn-sm"
+                data-testid="rt-testbench-btn-send"
+                data-function-id="FNC-RT-TEST"
                 onClick={() => handleTestCall(activeEndpointTab)}
                 disabled={isTestingRoute}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', height: '32px' }}
@@ -2109,6 +2143,7 @@ print(response.choices[0].message.content)`;
             </span>
             <input
               type="text"
+              data-testid="rt-testbench-input-msg"
               className="form-input"
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
@@ -2305,7 +2340,7 @@ print(response.choices[0].message.content)`;
 
           {/* Test Call Response Box */}
           {testResult && (
-            <div className="panel-nested" style={{
+            <div className="panel-nested" data-testid="rt-testbench-output" style={{
               marginTop: '16px',
               padding: '14px 16px',
               border: `1px solid ${testResult.is_success ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
@@ -2727,6 +2762,7 @@ print(response.choices[0].message.content)`;
               <button
                 key={tab.id}
                 type="button"
+                data-testid={`rt-subtab-${tab.id}`}
                 onClick={() => setActiveSubTab(tab.id)}
                 style={{
                   display: 'flex',
@@ -2757,7 +2793,13 @@ print(response.choices[0].message.content)`;
         {/* SubTab Specific Quick Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {activeSubTab === 'routing' && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowNewRouteModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button 
+              className="btn btn-secondary btn-sm" 
+              data-testid="rt-btn-open-create-route"
+              data-function-id="FNC-RT-OPEN-CREATE"
+              onClick={() => setShowNewRouteModal(true)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
               <Plus size={14} /> <span>신규 라우트 생성</span>
             </button>
           )}
@@ -2776,6 +2818,7 @@ print(response.choices[0].message.content)`;
                 <Timer size={13} color="var(--accent-amber)" />
                 <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>타임아웃:</span>
                 <select
+                  data-testid="rt-select-health-timeout"
                   value={healthCheckTimeout}
                   onChange={(e) => handleHealthTimeoutChange(Number(e.target.value))}
                   style={{
@@ -2799,16 +2842,35 @@ print(response.choices[0].message.content)`;
                   <option value={30.0} style={{ background: '#0f172a', color: '#fff' }}>30.0초 (최대 대기)</option>
                 </select>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => handleCheckAllHealth()} disabled={isHealthCheckingAll} style={{ display: 'flex', alignItems: 'center', gap: '6px' }} title={`설정된 타임아웃(${healthCheckTimeout}초)으로 전체 헬스체크`}>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                data-testid="rt-btn-check-all-health"
+                data-function-id="FNC-RT-HEALTH-CHECK-ALL"
+                onClick={() => handleCheckAllHealth()} 
+                disabled={isHealthCheckingAll} 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }} 
+                title={`설정된 타임아웃(${healthCheckTimeout}초)으로 전체 헬스체크`}
+              >
                 <Zap size={14} color="var(--accent-cyan)" /> <span>{isHealthCheckingAll ? '점검 중...' : '전체 헬스체크 (Ping All)'}</span>
               </button>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowNewModelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button 
+                className="btn btn-primary btn-sm" 
+                data-testid="rt-btn-open-create-model"
+                data-function-id="FNC-RT-OPEN-CREATE-MODEL"
+                onClick={() => setShowNewModelModal(true)} 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
                 <Plus size={14} /> <span>신규 모델 등록</span>
               </button>
             </>
           )}
           {activeSubTab === 'dispatch' && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowPolicyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', borderColor: 'rgba(124, 58, 237, 0.4)' }}>
+            <button 
+              className="btn btn-secondary btn-sm" 
+              data-testid="rt-btn-open-policy-modal"
+              onClick={() => setShowPolicyModal(true)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', borderColor: 'rgba(124, 58, 237, 0.4)' }}
+            >
               <Settings size={14} /> <span>지능형 정책 상세 편집</span>
             </button>
           )}

@@ -1296,3 +1296,76 @@ code {
   color: #0284c7;
   border-color: rgba(14, 165, 233, 0.3);
 }
+
+/* ==========================================================================
+   Dev UI Inspector Overlay Styles
+   ========================================================================== */
+.dev-inspector-panel {
+  position: fixed;
+  top: 14px;
+  right: 280px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 20px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.2s ease-out;
+}
+
+.dev-inspector-tooltip {
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(139, 92, 246, 0.2);
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dev-inspector-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.dev-inspector-badge.screen {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.dev-inspector-badge.testid {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.dev-inspector-badge.fnc {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+body.dev-inspector-active [data-testid],
+body.dev-inspector-active [data-screen-id] {
+  outline: 1.5px dashed rgba(168, 85, 247, 0.5) !important;
+  outline-offset: 1px;
+  cursor: crosshair !important;
+  transition: outline 0.15s ease, background-color 0.15s ease;
+}
+
+body.dev-inspector-active [data-testid]:hover,
+body.dev-inspector-active [data-screen-id]:hover {
+  outline: 2px solid #a855f7 !important;
+  background-color: rgba(168, 85, 247, 0.08) !important;
+}
+

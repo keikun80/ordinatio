@@ -360,15 +360,20 @@ export default function VirtualKeysTab({ onNotify }) {
   });
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="vk-page-container" data-screen-id="SCR-VK-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="vk-header-section">
         <div className="page-title-wrap">
           <h1>가상 API Key & 테넌트 거버넌스</h1>
           <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+          <button 
+            className="btn btn-primary" 
+            data-testid="vk-btn-open-create"
+            data-function-id="FNC-VK-OPEN-MODAL"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus size={16} />
             <span>신규 가상 API Key 발급</span>
           </button>
@@ -376,13 +381,14 @@ export default function VirtualKeysTab({ onNotify }) {
       </div>
 
       {/* Filter Bar */}
-      <div className="card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
+      <div className="card" data-testid="vk-filter-card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1, minWidth: '260px' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#F54927' }} />
               <input
                 className="form-input"
+                data-testid="vk-input-search"
                 style={{ paddingLeft: '36px', color: '#F54927' }}
                 placeholder="키 명칭, Key ID, 또는 접두사 검색..."
                 value={searchTerm}
@@ -395,6 +401,7 @@ export default function VirtualKeysTab({ onNotify }) {
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>소속 부서 필터:</span>
             <select
               className="form-select"
+              data-testid="vk-select-tenant-filter"
               style={{ width: 'auto' }}
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
@@ -409,9 +416,9 @@ export default function VirtualKeysTab({ onNotify }) {
       </div>
 
       {/* Virtual Keys Table */}
-      <div className="card">
+      <div className="card" data-testid="vk-table-card">
         <div className="table-container">
-          <table className="data-table">
+          <table className="data-table" data-testid="vk-table-keys">
             <thead>
               <tr>
                 <th>가상 Key ID / 명칭</th>
@@ -425,7 +432,7 @@ export default function VirtualKeysTab({ onNotify }) {
             </thead>
             <tbody>
               {filteredKeys.length === 0 ? (
-                <tr>
+                <tr data-testid="vk-row-empty">
                   <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                       <KeyRound size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
@@ -442,7 +449,7 @@ export default function VirtualKeysTab({ onNotify }) {
                 filteredKeys.map((k) => {
                   const percent = Math.min(100, Math.round((k.spent / k.budget) * 100));
                   return (
-                    <tr key={k.keyId}>
+                    <tr key={k.keyId} data-testid={`vk-row-${k.keyId}`}>
                     <td>
                       <div style={{ fontWeight: 600, color: '#ffffff' }}>{k.name}</div>
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#38bdf8' }}>
@@ -486,14 +493,15 @@ export default function VirtualKeysTab({ onNotify }) {
                       </div>
                     </td>
                     <td>
-                      {k.status === 'ACTIVE' && <span className="badge active">🟢 활성 (정상)</span>}
-                      {k.status === 'WARNING' && <span className="badge warning">🟡 예산주의 (88%)</span>}
-                      {k.status === 'BLOCKED' && <span className="badge danger">🔴 차단됨 (Revoked)</span>}
+                      {k.status === 'ACTIVE' && <span className="badge active" data-testid={`vk-badge-status-${k.keyId}`}>🟢 활성 (정상)</span>}
+                      {k.status === 'WARNING' && <span className="badge warning" data-testid={`vk-badge-status-${k.keyId}`}>🟡 예산주의 (88%)</span>}
+                      {k.status === 'BLOCKED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>🔴 차단됨 (Revoked)</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
                           className="btn btn-sm btn-secondary"
+                          data-testid={`vk-btn-edit-${k.keyId}`}
                           onClick={() => handleOpenEdit(k)}
                           title="키 정보 및 속도제한 한도 수정"
                         >
@@ -502,12 +510,16 @@ export default function VirtualKeysTab({ onNotify }) {
                         </button>
                         <button
                           className={`btn btn-sm ${k.status === 'BLOCKED' ? 'btn-secondary' : 'btn-danger'}`}
+                          data-testid={`vk-btn-toggle-${k.keyId}`}
+                          data-function-id="FNC-VK-REVOKE"
                           onClick={() => toggleKeyStatus(k.keyId)}
                         >
                           {k.status === 'BLOCKED' ? '재활성화' : '즉시 파기(Revoke)'}
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
+                          data-testid={`vk-btn-delete-${k.keyId}`}
+                          data-function-id="FNC-VK-DELETE"
                           onClick={() => handleDeleteKey(k)}
                           title={k.status === 'ACTIVE' ? '가상키 즉시 파기 및 영구 삭제' : '파기된 가상키 영구 삭제'}
                           style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
@@ -528,7 +540,7 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* Edit Key Modal (설정 변경 모달) */}
       {editingKey && (
         <div className="modal-overlay" onClick={() => setEditingKey(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" data-testid="vk-modal-edit" data-screen-id="SCR-VK-M03" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleSaveEdit}>
               <div className="modal-header">
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -541,6 +553,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">키 식별 명칭 (Key Name)</label>
                   <input
                     className="form-input"
+                    data-testid="vk-modal-edit-input-name"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     required
@@ -551,6 +564,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">소속 부서 (테넌트)</label>
                   <input
                     className="form-input"
+                    data-testid="vk-modal-edit-input-tenant"
                     value={editingKey.tenantName}
                     disabled
                     style={{ opacity: 0.7, cursor: 'not-allowed' }}
@@ -563,6 +577,7 @@ export default function VirtualKeysTab({ onNotify }) {
                     <input
                       type="number"
                       className="form-input"
+                      data-testid="vk-modal-edit-input-rpm"
                       value={editRpm}
                       onChange={(e) => setEditRpm(e.target.value)}
                       required
@@ -573,6 +588,7 @@ export default function VirtualKeysTab({ onNotify }) {
                     <input
                       type="number"
                       className="form-input"
+                      data-testid="vk-modal-edit-input-tpm"
                       value={editTpm}
                       onChange={(e) => setEditTpm(e.target.value)}
                       required
@@ -584,6 +600,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">사내 허용 IP 대역 (CIDR Whitelist)</label>
                   <input
                     className="form-input"
+                    data-testid="vk-modal-edit-input-cidr"
                     value={editIp}
                     onChange={(e) => setEditIp(e.target.value)}
                   />
@@ -593,6 +610,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">키 상태 (Status)</label>
                   <select
                     className="form-select"
+                    data-testid="vk-modal-edit-select-status"
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
                   >
@@ -648,6 +666,8 @@ export default function VirtualKeysTab({ onNotify }) {
                 <button
                   type="button"
                   className="btn btn-danger"
+                  data-testid="vk-modal-edit-btn-delete"
+                  data-function-id="FNC-VK-DELETE"
                   onClick={() => {
                     const target = { keyId: editingKey.keyId, name: editingKey.name, status: editingKey.status };
                     setEditingKey(null);
@@ -659,8 +679,21 @@ export default function VirtualKeysTab({ onNotify }) {
                   <span>가상키 영구 삭제</span>
                 </button>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setEditingKey(null)}>취소</button>
-                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    data-testid="vk-modal-edit-btn-cancel"
+                    onClick={() => setEditingKey(null)}
+                  >
+                    취소
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    data-testid="vk-modal-edit-btn-submit"
+                    data-function-id="FNC-VK-UPDATE"
+                    disabled={isLoading}
+                  >
                     {isLoading ? '저장 중...' : '변경 내용 저장'}
                   </button>
                 </div>
@@ -673,7 +706,7 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* New Key Creation Modal */}
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" data-testid="vk-modal-create" data-screen-id="SCR-VK-M01" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleCreateKey}>
               <div className="modal-header">
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff' }}>
@@ -685,6 +718,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">키 식별 명칭 (Key Name)</label>
                   <input
                     className="form-input"
+                    data-testid="vk-modal-input-name"
                     placeholder="예: 여신심사 자동화 봇 v2"
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
@@ -696,6 +730,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">소속 부서 / 테넌트</label>
                   <select
                     className="form-select"
+                    data-testid="vk-modal-select-tenant"
                     value={newKeyDept}
                     onChange={(e) => setNewKeyDept(e.target.value)}
                   >
@@ -711,6 +746,7 @@ export default function VirtualKeysTab({ onNotify }) {
                     <input
                       type="number"
                       className="form-input"
+                      data-testid="vk-modal-input-rpm"
                       value={newKeyRpm}
                       onChange={(e) => setNewKeyRpm(e.target.value)}
                     />
@@ -720,6 +756,7 @@ export default function VirtualKeysTab({ onNotify }) {
                     <input
                       type="number"
                       className="form-input"
+                      data-testid="vk-modal-input-tpm"
                       value={newKeyTpm}
                       onChange={(e) => setNewKeyTpm(e.target.value)}
                     />
@@ -730,6 +767,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label className="form-label">사내 허용 IP 대역 (CIDR Whitelist)</label>
                   <input
                     className="form-input"
+                    data-testid="vk-modal-input-cidr"
                     value={newKeyIp}
                     onChange={(e) => setNewKeyIp(e.target.value)}
                   />
@@ -782,6 +820,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.82rem', cursor: 'pointer', color: '#fda4af' }}>
                     <input
                       type="checkbox"
+                      data-testid="vk-modal-toggle-hardcap"
                       checked={newKeyHardCap}
                       onChange={(e) => setNewKeyHardCap(e.target.checked)}
                     />
@@ -790,8 +829,21 @@ export default function VirtualKeysTab({ onNotify }) {
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>취소</button>
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  data-testid="vk-modal-btn-cancel"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  data-testid="vk-modal-btn-submit"
+                  data-function-id="FNC-VK-ISSUE"
+                  disabled={isLoading}
+                >
                   {isLoading ? '생성 및 암호화 중...' : '발급 완료'}
                 </button>
               </div>
@@ -803,7 +855,7 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* Single Exposure Secret Key Reveal Modal (보안 1회성 토큰 팝업) */}
       {showSecretModal && createdSecret && (
         <div className="modal-overlay" onClick={() => setShowSecretModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" data-testid="vk-modal-secret" data-screen-id="SCR-VK-M02" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header" style={{ borderColor: 'rgba(245, 158, 11, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f59e0b', fontWeight: 700, fontSize: '1.08rem' }}>
                 <ShieldCheck size={22} />
@@ -834,6 +886,7 @@ export default function VirtualKeysTab({ onNotify }) {
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     readOnly
+                    data-testid="vk-modal-secret-value"
                     value={createdSecret.rawKey}
                     className="form-input"
                     style={{
@@ -848,6 +901,8 @@ export default function VirtualKeysTab({ onNotify }) {
                   <button
                     type="button"
                     className="btn btn-primary"
+                    data-testid="vk-modal-btn-copy-secret"
+                    data-function-id="FNC-VK-COPY-SECRET"
                     onClick={handleCopySecret}
                     style={{ minWidth: '110px', color: '#F54927' }}
                   >
@@ -875,6 +930,7 @@ export default function VirtualKeysTab({ onNotify }) {
               <button
                 type="button"
                 className="btn btn-primary"
+                data-testid="vk-modal-btn-close-secret"
                 onClick={() => {
                   setShowSecretModal(false);
                   setCreatedSecret(null);
@@ -891,7 +947,7 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* Key Permanent Deletion Confirmation Modal (영구 삭제 확인 모달) */}
       {keyToDelete && (
         <div className="modal-overlay" onClick={() => !isLoading && setKeyToDelete(null)}>
-          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" data-testid="vk-modal-delete" data-screen-id="SCR-VK-M04" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', fontWeight: 700, fontSize: '1.05rem' }}>
                 <Trash2 size={20} />
@@ -937,6 +993,7 @@ export default function VirtualKeysTab({ onNotify }) {
               <button
                 type="button"
                 className="btn btn-secondary"
+                data-testid="vk-modal-delete-btn-cancel"
                 onClick={() => setKeyToDelete(null)}
                 disabled={isLoading}
               >
@@ -945,6 +1002,8 @@ export default function VirtualKeysTab({ onNotify }) {
               <button
                 type="button"
                 className="btn btn-danger"
+                data-testid="vk-modal-delete-btn-confirm"
+                data-function-id="FNC-VK-CONFIRM-DELETE"
                 onClick={confirmDeleteKey}
                 disabled={isLoading}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}

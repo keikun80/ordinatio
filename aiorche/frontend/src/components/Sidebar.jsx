@@ -78,8 +78,8 @@ export default function Sidebar({
   ];
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
+    <aside className="sidebar" data-testid="com-sidebar-nav" data-screen-id="SCR-COM-01">
+      <div className="sidebar-header" data-testid="com-sidebar-brand">
         <div className="brand-badge">
           <Layers size={20} />
         </div>
@@ -96,10 +96,12 @@ export default function Sidebar({
 
           if (item.isAccordion) {
             return (
-              <div key={item.id} className="nav-accordion-group">
+              <div key={item.id} className="nav-accordion-group" data-testid={`com-tab-group-${item.id}`}>
                 <div
                   className={`nav-accordion-header ${isActive ? 'active' : ''}`}
                   onClick={handleRoutingHeaderClick}
+                  data-testid={`com-tab-${item.id}`}
+                  data-screen-id="SCR-RT-00"
                   title="클릭하여 모델 & 라우팅 하위 메뉴 펼치기/접기"
                 >
                   <Icon size={18} />
@@ -115,7 +117,7 @@ export default function Sidebar({
                 </div>
 
                 {isRoutingExpanded && (
-                  <div className="nav-sub-menu">
+                  <div className="nav-sub-menu" data-testid="com-sidebar-routing-submenu">
                     {item.subItems.map((sub) => {
                       const SubIcon = sub.icon;
                       const isSubActive = isActive && routingSubTab === sub.id;
@@ -124,6 +126,7 @@ export default function Sidebar({
                           key={sub.id}
                           className={`nav-sub-item ${isSubActive ? 'active' : ''}`}
                           onClick={(e) => handleSubItemClick(sub.id, e)}
+                          data-testid={`com-subtab-routing-${sub.id}`}
                         >
                           <SubIcon size={14} color={isSubActive ? 'var(--accent-cyan)' : 'currentColor'} />
                           <span>{sub.label}</span>
@@ -142,6 +145,7 @@ export default function Sidebar({
               key={item.id}
               className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setActiveTab(item.id)}
+              data-testid={`com-tab-${item.id}`}
             >
               <Icon size={18} />
               <span>{item.label}</span>
@@ -155,8 +159,8 @@ export default function Sidebar({
         })}
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="sidebar-status-pill">
+      <div className="sidebar-footer" data-testid="com-sidebar-footer">
+        <div className="sidebar-status-pill" data-testid="com-sidebar-status-pill">
           <span className="status-dot"></span>
           <span>에어갭 자체 운영 모드</span>
         </div>

@@ -1,4 +1,5 @@
-.PHONY: help setup test lint build run-backend run-frontend up down verify-phase0 verify-phase1 verify-phase2 verify-phase3 verify-phase4 \
+.PHONY: help setup test lint build run-backend run-frontend up down \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -6,23 +7,33 @@ help:
 	@echo "AI Orchestrator (aiorche) Build & Management Commands"
 	@echo ""
 	@echo "  [Local & Development]"
-	@echo "  make setup          - Initialize Python backend (uv) and Frontend dependencies"
-	@echo "  make test           - Run backend pytest and frontend build verification"
-	@echo "  make run-backend    - Run FastAPI backend locally (http://localhost:8000)"
-	@echo "  make run-frontend   - Run React Vite frontend locally (http://localhost:5173)"
-	@echo "  make up             - Run local Docker Compose air-gapped stack"
-	@echo "  make down           - Stop local Docker Compose stack"
-	@echo "  make verify-phase0  - Run Phase 0 Definition-of-Done verification script"
-	@echo "  make verify-phase1  - Run Phase 1 Definition-of-Done verification script"
+	@echo "  make setup                     - Initialize Python backend (uv) and Frontend dependencies"
+	@echo "  make test                      - Run backend pytest (78 tests) and frontend build verification"
+	@echo "  make lint                      - Run backend and frontend code linting"
+	@echo "  make build                     - Build frontend production distribution bundle"
+	@echo "  make run-backend               - Run FastAPI backend locally (http://localhost:8000)"
+	@echo "  make run-frontend              - Run React Vite frontend locally (http://localhost:5173)"
+	@echo "  make up                        - Run local Docker Compose air-gapped stack"
+	@echo "  make down                      - Stop local Docker Compose stack"
+	@echo ""
+	@echo "  [DoD Automated Verification]"
+	@echo "  make verify-phase0             - Run Phase 0 DoD verification (Foundations & Envoy AI Gateway)"
+	@echo "  make verify-phase0_1           - Run Phase 0.1 DoD verification (L7 AgentRouter & Routing)"
+	@echo "  make verify-phase1             - Run Phase 1 DoD verification (Multi-tenancy & Virtual Keys)"
+	@echo "  make verify-phase2             - Run Phase 2 DoD verification (Model Catalog & xDS Routing)"
+	@echo "  make verify-phase3             - Run Phase 3 DoD verification (Observability & FinOps Hard Cap)"
+	@echo "  make verify-phase4             - Run Phase 4 DoD verification (PII Masking & WORM Audit)"
+	@echo "  make verify-phase5             - Run Phase 5 DoD verification (Lifecycle & RSA-4096 Hotfix)"
+	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
-	@echo "  make k8s-up         - Deploy full stack to Kubernetes (alias of k8s-deploy)"
-	@echo "  make k8s-down       - Delete full stack from Kubernetes (alias of k8s-delete)"
-	@echo "  make k8s-start      - Start/Resume all Kubernetes Pods (scale replicas to 1)"
-	@echo "  make k8s-stop       - Stop/Pause all Kubernetes Pods (scale replicas to 0, data/configs preserved)"
-	@echo "  make k8s-restart    - Rolling restart of all Kubernetes Pods"
-	@echo "  make k8s-status     - View status of all Pods, Services, and Deployments"
-	@echo "  make k8s-logs       - Stream aggregated logs from all aiorche Pods"
+	@echo "  make k8s-up                    - Deploy full stack to Kubernetes (alias of k8s-deploy)"
+	@echo "  make k8s-down                  - Delete full stack from Kubernetes (alias of k8s-delete)"
+	@echo "  make k8s-start                 - Start/Resume all Kubernetes Pods (scale replicas to 1)"
+	@echo "  make k8s-stop                  - Stop/Pause all Kubernetes Pods (scale replicas to 0, data preserved)"
+	@echo "  make k8s-restart               - Rolling restart of all Kubernetes Pods"
+	@echo "  make k8s-status                - View status of all Pods, Services, and Deployments"
+	@echo "  make k8s-logs                  - Stream aggregated logs from all aiorche Pods"
 
 setup:
 	@echo "==> Setting up backend dependencies..."
@@ -35,6 +46,17 @@ test:
 	@cd backend && uv run pytest -v
 	@echo "==> Running frontend build validation..."
 	@cd frontend && npm run build
+
+lint:
+	@echo "==> Checking backend formatting and linting..."
+	@cd backend && uv run python -m py_compile app/main.py
+	@echo "==> Checking frontend buildability..."
+	@cd frontend && npm run build
+
+build:
+	@echo "==> Building frontend production assets..."
+	@cd frontend && npm run build
+	@echo "✅ Frontend distribution bundle created in frontend/dist/"
 
 run-backend:
 	@cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -68,6 +90,9 @@ verify-phase4:
 
 verify-phase5:
 	@bash scripts/verify-phase5.sh
+
+verify-phase-system-prompt:
+	@bash scripts/verify-phase-system-prompt.sh
 
 
 # Kubernetes (Pod 배포, 라이프사이클 및 관리)

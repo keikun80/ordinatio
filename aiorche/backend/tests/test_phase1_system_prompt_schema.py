@@ -1,6 +1,5 @@
 import pytest
-from app.db.session import SessionLocal
-from app.db.init_db import init_db
+from tests.conftest import TestSessionLocal as SessionLocal, seed_data
 from app.models.system_prompt import SystemPrompt
 from app.schemas.system_prompt import (
     SystemPromptCreate,
@@ -12,7 +11,7 @@ from app.schemas.system_prompt import (
 
 def test_system_prompt_table_creation_and_seed_data():
     """Verify that system_prompts table is created and default seed templates exist."""
-    init_db()
+    seed_data()
     with SessionLocal() as db:
         prompts = db.query(SystemPrompt).all()
         assert len(prompts) >= 3
@@ -30,7 +29,7 @@ def test_system_prompt_table_creation_and_seed_data():
 
 def test_system_prompt_crud_operations():
     """Verify CRUD operations on SystemPrompt ORM model."""
-    init_db()
+    seed_data()
     test_id = "sp-unit-test-crud"
     with SessionLocal() as db:
         # 1. Clean up existing if any

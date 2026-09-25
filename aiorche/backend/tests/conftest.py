@@ -22,6 +22,10 @@ test_engine = create_engine(
 )
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+from app.db import session as db_session
+db_session.SessionLocal = TestSessionLocal
+db_session.engine = test_engine
+
 def override_get_db():
     db = TestSessionLocal()
     try:

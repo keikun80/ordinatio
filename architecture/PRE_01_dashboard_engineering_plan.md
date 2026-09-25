@@ -4,6 +4,11 @@
 본 문서는 Mock 수준으로 검증된 대시보드를 **실제 금융권 및 엔터프라이즈의 폐쇄망/온프레미스 환경에 상용 배포 가능한 프로덕션 레벨 소프트웨어**로 구현하기 위한 엔지니어링 계획서입니다.  
 소프트웨어 공학(Software Engineering) 방법론에 기반하여 요구공학, 도메인 주도 설계(DDD), 클린 아키텍처, 단계별 개발 생명주기(SDLC), 테스팅 피라미드 및 에어갭 릴리즈 파이프라인을 정의합니다.
 
+> [!IMPORTANT]
+> **순차 구현 시 필수 개발 가이드라인 (Reproducibility & ADR First Invariant)**:  
+> 본 마스터 설계서는 프로젝트 초기 청사진을 포함하고 있으므로, 실제 구현 시에는 폐쇄망/에어갭 경량 최적화가 확정된 **[`PRE_12`](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md)의 13대 아키텍처 결정(ADR-01 ~ ADR-13)**을 최우선 기준으로 채택해야 합니다.  
+> 특히 Phase 2 모델 카탈로그 구현 시에는 후속 고도화 사양인 [`PRE_16`](./PRE_16_gateway_browser_test_troubleshooting_report.md)(45s 타임아웃), [`PRE_17`](./PRE_17_model_provider_options_and_url_builder_report.md)(6종 Provider & URL 조합기), [`PRE_18`](./PRE_18_model_health_check_timeout_report.md)(헬스 타임아웃 1.0~30s)을 사전 통합 모델링하고, Phase 5 완료 후 [`PRE_19`](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md) 및 [`PRE_20`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)(시스템 프롬프트 거버넌스)을 순서대로 진행해야 현재 프로덕션 시스템(78 Tests PASS)과 100% 동일하게 개발할 수 있습니다.
+
 ---
 
 ## 목차 (Table of Contents)

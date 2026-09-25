@@ -31,4 +31,85 @@
 | **PRE_19** | [PRE_19_system_prompt_governance_and_dynamic_injection_plan.md](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md) | **시스템 프롬프트 거버넌스 및 동적 주입 구현 계획서 (Engineering Plan)**<br>- 시스템 프롬프트 독립 카탈로그 및 1:1 타겟 바인딩 (라우팅 정책 / 가상 API Key / 테넌트)<br>- L7 Envoy AI Gateway (ext_proc) 기반 인라인 페이로드 변조 및 위계적 우선순위 해석 알고리즘<br>- 프론트엔드 시스템 프롬프트 관리 화면 UI/UX 및 실시간 토큰 계산기 설계 | **구현 완료**<br>(Phase 1~5) |
 | **PRE_20** | [PRE_20_phase_system_prompt_implementation_and_test_results.md](./PRE_20_phase_system_prompt_implementation_and_test_results.md) | **시스템 프롬프트 거버넌스 & 동적 인라인 주입 구현 및 검증 결과서**<br>- DB 스키마/모델, RESTful API, L7 ext_proc 및 AgentRouter 테스트벤치 연동<br>- React 18 Vanilla CSS 관리 포털 대시보드 및 1:1 바인딩 마법사<br>- DoD 자동화 검증 스크립트(`verify-phase-system-prompt.sh`) 및 전체 78개 테스트 무회귀 검증 | **100% PASS**<br>(78/78 Tests) |
 
+---
+
+## 🧭 순차적 구현 가이드라인 (Sequential Implementation & Reproducibility Guide)
+
+본 아키텍처 문서군을 기반으로 현재 프로젝트(`aiorche/`, 78개 테스트 100% PASS)와 **완전히 동일한 프로덕션 시스템을 단 한 번의 재작업 없이 개발하기 위한 공식 실행 순서 및 불변 원칙**입니다.
+
+### 1. 단계별 최적 개발 순서 (9단계 파이프라인)
+
+```
+[Step 1: 청사진 & 기준] PRE_00 (비교) ➔ PRE_01 (마스터 청사진) + PRE_12/13 (ADR-01~13 필수 교차 참조)
+       ▼
+[Step 2: 런타임 기반] PRE_02 (Phase 0: FastAPI, 모노레포, Envoy C++ ext_proc gRPC, AgentRouter)
+       ▼
+[Step 3: 멀티 테넌시] PRE_03 (Phase 1: 테넌트, 가상키 sk-orch-, Argon2id, 외부 연동 REST)
+       ▼
+[Step 4: 서빙 & 라우팅] PRE_04, PRE_05 (Phase 2: 모델 카탈로그, Envoy REST RDS v3 동적 가중치)
+       │ ※ 필수: PRE_16(타임아웃 45s), PRE_17(6종 Provider), PRE_18(헬스 타임아웃 1.0~30s) 동시 모델링
+       ▼
+[Step 5: FinOps & 관제] PRE_06, PRE_07 (Phase 3: 토큰 계량, 1초 WebSocket 관제 허브, Hard Cap 429)
+       ▼
+[Step 6: 컴플라이언스] PRE_08 (Phase 4: 정규식 PII 인라인 마스킹, WORM 불변 감사테이블)
+       ▼
+[Step 7: 어플라이언스] PRE_09 (Phase 5: RSA-4096 서명 패치, 롤링 핫픽스 & 롤백, Preflight, Zero-PII)
+       ▼
+[Step 8: 프롬프트 거버넌스] PRE_19, PRE_20 (시스템 프롬프트 1:1 바인딩 & L7 ext_proc 인라인 주입)
+       ▼
+[Step 9: 종합 검증] PRE_10 (E2E 테스트 스펙), PRE_11 (실데이터 전환), PRE_15 (차세대 마일스톤)
+```
+
+---
+
+### 2. 동일한 구현을 보장하는 3대 불변 원칙 (3 Golden Invariants)
+
+1. **원칙 1: ADR 우선 원칙 (Architecture Decision First)**
+   - `PRE_01`의 초기 구상(Kafka, Go xDS 데몬, 500MB spaCy Presidio)을 그대로 구현하지 말고, [`PRE_12`](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md)의 **ADR-01 ~ ADR-13** 최적화 설계를 최우선 기준으로 채택합니다:
+     - `FastAPI REST RDS v3` (`/api/v1/xds/v3/discovery:routes`)
+     - 단일 DB 트랜잭션 동기식 원자적 계량 API (`POST /api/v1/external/usage/report`)
+     - 자체 고속 정규식 PII 마스킹 엔진 (`<1ms`)
+     - WORM 불변 테이블 (`audit_logs`) INSERT-only & SHA-256 해시 증적
+     - L7 Envoy ext_proc 스트림 페이로드 인라인 주입 엔진
+
+2. **원칙 2: 모델 카탈로그 사전 통합 모델링 (Pre-Integrated Schema Modeling)**
+   - Step 4 (Phase 2 모델 카탈로그) 구현 시, 초기 `PRE_04`/`PRE_05` 명세만으로 DB 테이블을 생성하면 추후 마이그레이션이 발생합니다.
+   - 반드시 [`PRE_16`](./PRE_16_gateway_browser_test_troubleshooting_report.md)(45초 LLM 추론 타임아웃 및 루프백 차단), [`PRE_17`](./PRE_17_model_provider_options_and_url_builder_report.md)(6종 Provider 및 Dynamic URL 조합기), [`PRE_18`](./PRE_18_model_health_check_timeout_report.md)(헬스체크 타임아웃 1.0s~30.0s 개별 제어)의 컬럼 및 파라미터를 **Phase 2 초기 구축 시점에 함께 모델링**해야 합니다.
+
+3. **원칙 3: 시스템 프롬프트 독립 거버넌스 통합 (System Prompt Governance)**
+   - Step 7(Phase 5) 완료 후, 반드시 [`PRE_19`](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md) 및 [`PRE_20`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)을 순서대로 진행하여, 라우팅 정책(ROUTE)/가상키(VIRTUAL_KEY)/테넌트(TENANT) 1:1 바인딩 카탈로그와 Envoy L7 ext_proc 인라인 주입 미들웨어를 구축합니다.
+
+---
+
+### 3. 단계별 자동화 DoD 검증 파이프라인
+
+각 단계가 완료될 때마다 아래 스크립트를 순차 실행하여 100% PASS를 확인하며 진행합니다:
+
+```bash
+# Phase 0 & 0.1: 기반 환경 및 AgentRouter L7 게이트웨이
+make verify-phase0
+make verify-phase0_1
+
+# Phase 1: 멀티 테넌시 & 가상 API Key
+bash scripts/verify-phase1.sh
+
+# Phase 2: Envoy xDS 동적 멀티 라우팅
+bash scripts/verify-phase2.sh
+
+# Phase 3: FinOps 비용 계량 & 1초 관제 스트림
+bash scripts/verify-phase3.sh
+
+# Phase 4: PII 인라인 보안 & WORM 포렌식
+make verify-phase4
+
+# Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진
+bash scripts/verify-phase5.sh
+
+# 시스템 프롬프트: 거버넌스 및 동적 인라인 주입
+bash scripts/verify-phase-system-prompt.sh
+
+# 백엔드 전체 회귀 테스트 (78개 테스트 100% PASS)
+cd backend && uv run pytest -v
+```
+
 

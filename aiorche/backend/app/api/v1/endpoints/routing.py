@@ -1,6 +1,7 @@
 import uuid
 import time
-from typing import List, Optional
+import asyncio
+from typing import List, Optional, Any, Dict
 from datetime import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,7 +19,9 @@ from app.schemas.routing import (
     RoutePolicyUpdate,
     RoutingPolicyResponse,
     RouteTestCallRequest,
-    RouteTestCallResponse
+    RouteTestCallResponse,
+    AllModelsTestCallRequest,
+    AllModelsTestCallResponse
 )
 from app.core.xds_generator import generate_xds_revision
 from app.core.security import SYSTEM_DIAGNOSTICS_KEY, ensure_system_diagnostics_key
@@ -300,16 +303,15 @@ def get_routing_history(db: Session = Depends(get_db)):
     """List historical dynamic routing deployments and revisions"""
     return db.query(RoutingPolicy).order_by(RoutingPolicy.deployed_at.desc()).limit(20).all()
 
-@router.post("/test-call", response_model=RouteTestCallResponse)
-async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_db)):
-    """Test calling a specific route through Envoy Gateway"""
-    policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.route_name).first()
-    if not policy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Route '{req.route_name}' not found."
-        )
-
+async def _execute_single_test_call(
+    route_name: str,
+    method: str,
+    message: str,
+    target_model_id: Optional[str],
+    policy: RoutingPolicy,
+    traffic_weights: Optional[List[Any]],
+    db: Session
+) -> RouteTestCallResponse:
     envoy_ingress = settings.ENVOY_INGRESS_URL.rstrip('/')
     candidate_hosts = ["http://envoy:8080", envoy_ingress]
 
@@ -317,12 +319,12 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
     if policy.match_conditions and policy.match_conditions.get("path_prefix"):
         path_prefix = policy.match_conditions.get("path_prefix")
     else:
-        path_prefix = f"/v1/routes/{req.route_name}"
+        path_prefix = f"/v1/routes/{route_name}"
 
     ensure_system_diagnostics_key(db)
     auth_header_val = f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"
 
-    if req.method == "path":
+    if method == "path":
         target_path = path_prefix
         request_headers = {
             "Content-Type": "application/json",
@@ -334,15 +336,26 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         request_headers = {
             "Content-Type": "application/json",
             "Authorization": auth_header_val,
-            "x-orche-route": req.route_name,
+            "x-orche-route": route_name,
             "x-strict-upstream": "true"
         }
         if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
             request_headers["x-orche-tenant"] = policy.match_conditions["tenant_codes"][0]
 
-    weights = req.traffic_weights if (req.traffic_weights is not None and len(req.traffic_weights) > 0) else (policy.traffic_weights or [])
-    if not weights:
-        chosen_url = f"{envoy_ingress}{path_prefix if req.method == 'path' else '/v1/chat/completions'}"
+    weights = traffic_weights if (traffic_weights is not None and len(traffic_weights) > 0) else (policy.traffic_weights or [])
+    
+    # Target model selection: explicit target_model_id takes priority
+    target_model_name = target_model_id
+    if not target_model_name and weights:
+        first_w = weights[0]
+        if isinstance(first_w, dict):
+            target_model_name = first_w.get("model_id")
+        elif hasattr(first_w, "model_id"):
+            target_model_name = first_w.model_id
+
+    # If no target model found and no weights
+    if not target_model_name and not weights:
+        chosen_url = f"{envoy_ingress}{path_prefix if method == 'path' else '/v1/chat/completions'}"
         return RouteTestCallResponse(
             is_success=False,
             status_code=502,
@@ -351,24 +364,17 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
             request_headers=request_headers,
             response_body={
                 "error": "No Upstream Models Configured (HTTP 502 Bad Gateway)",
-                "message": f"라우트 '{req.route_name}'에 연결된 서빙 모델이 없습니다. 모델 카탈로그에서 모델을 추가하십시오."
+                "message": f"라우트 '{route_name}'에 연결된 서빙 모델이 없습니다."
             },
             error_message="라우트에 연결된 모델이 없습니다. (HTTP 502 Bad Gateway)",
-            dispatched_route=req.route_name
+            dispatched_route=route_name,
+            model_id=target_model_id
         )
 
-    target_model_name = None
-    if weights:
-        first_w = weights[0]
-        if isinstance(first_w, dict):
-            target_model_name = first_w.get("model_id")
-        elif hasattr(first_w, "model_id"):
-            target_model_name = first_w.model_id
-
     payload = {
-        "model": target_model_name or req.route_name,
+        "model": target_model_name or route_name,
         "messages": [
-            {"role": "user", "content": req.message}
+            {"role": "user", "content": message}
         ],
         "temperature": 0.7,
         "max_tokens": 128
@@ -410,7 +416,8 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
                     request_headers=request_headers,
                     response_body=resp_body,
                     error_message=error_msg,
-                    dispatched_route=req.route_name
+                    dispatched_route=route_name,
+                    model_id=target_model_name
                 )
             except httpx.ConnectError:
                 if not err_msg:
@@ -431,7 +438,89 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         request_headers=request_headers,
         response_body=None,
         error_message=err_msg or "연결 실패",
-        dispatched_route=req.route_name
+        dispatched_route=route_name,
+        model_id=target_model_name
+    )
+
+@router.post("/test-call", response_model=RouteTestCallResponse)
+async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_db)):
+    """Test calling a specific route (or specific model) through Envoy Gateway"""
+    policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.route_name).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Route '{req.route_name}' not found."
+        )
+
+    return await _execute_single_test_call(
+        route_name=req.route_name,
+        method=req.method,
+        message=req.message,
+        target_model_id=req.target_model_id,
+        policy=policy,
+        traffic_weights=req.traffic_weights,
+        db=db
+    )
+
+@router.post("/test-call-all", response_model=AllModelsTestCallResponse)
+async def test_all_models_call(req: AllModelsTestCallRequest, db: Session = Depends(get_db)):
+    """Test calling all linked LLM models through Envoy Gateway concurrently"""
+    policy = None
+    if req.route_name:
+        policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.route_name).first()
+    if not policy:
+        policy = db.query(RoutingPolicy).order_by(RoutingPolicy.priority.asc()).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active routing policy configured."
+        )
+
+    # Determine models to test
+    models_to_test = []
+    if req.scope == "route" and policy.traffic_weights:
+        for w in policy.traffic_weights:
+            mid = w.get("model_id") if isinstance(w, dict) else getattr(w, "model_id", None)
+            if mid and mid not in models_to_test:
+                models_to_test.append(mid)
+
+    # If scope == "all" or route had no models, query all registered active models
+    if req.scope == "all" or not models_to_test:
+        all_models = db.query(ModelCatalog).all()
+        models_to_test = [m.model_id for m in all_models]
+
+    if not models_to_test:
+        return AllModelsTestCallResponse(
+            is_success=False,
+            total_count=0,
+            success_count=0,
+            failed_count=0,
+            results=[]
+        )
+
+    tasks = [
+        _execute_single_test_call(
+            route_name=policy.route_name,
+            method=req.method or "header",
+            message=req.message or "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다.",
+            target_model_id=mid,
+            policy=policy,
+            traffic_weights=policy.traffic_weights,
+            db=db
+        )
+        for mid in models_to_test
+    ]
+
+    results = await asyncio.gather(*tasks)
+    success_count = sum(1 for r in results if r.is_success)
+    failed_count = len(results) - success_count
+
+    return AllModelsTestCallResponse(
+        is_success=(failed_count == 0),
+        total_count=len(results),
+        success_count=success_count,
+        failed_count=failed_count,
+        results=list(results)
     )
 
 # -----------------------------------------------------------------------------

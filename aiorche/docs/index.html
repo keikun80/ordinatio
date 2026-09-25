@@ -1167,10 +1167,10 @@ bash scripts/verify-phase5.sh</code></pre>
               <span class="badge badge-primary">Interactive Tester</span>
             </div>
             <ul>
-              <li><strong>대상 모델 선택:</strong> 등록된 LLM 모델 풀 중 테스트를 수행할 대상 모델을 선택합니다.</li>
-              <li><strong>요청 프롬프트 입력:</strong> 실제 모델로 전송할 시스템/사용자 프롬프트를 입력합니다.</li>
-              <li><strong>하이퍼파라미터 튜닝:</strong> <code>max_tokens</code>(최대 생성 토큰), <code>temperature</code>(창의성/결정성)을 실시간으로 지정할 수 있습니다.</li>
-              <li><strong>직접 호출 보장:</strong> 백엔드 라우터(<code>/api/v1/routing/test-call</code>)는 임의의 URL 변형 없이 데이터베이스에 등록된 정확한 <code>target_endpoint</code>로 클라이언트 요청을 그대로 프록시하여 외부 및 내부 엔드포인트(OpenAI 호환, DeepSeek 등)의 실제 응답과 레이턴시를 포맷팅된 JSON 뷰어로 즉각 반환합니다.</li>
+              <li><strong>게이트웨이 연동 전체 LLM 일괄 동시 테스트 (Test All Linked LLMs):</strong> 관리자는 <code>[전체 연동 LLM 일괄 동시 테스트]</code>를 선택하여 게이트웨이 엔드포인트에 연동된 모든 LLM(<code>deepseek-ai/deepseek-v4.1-flash</code>, <code>qwen2.5:0.5b</code>, <code>gemma2:2b</code> 등)으로 동일 프롬프트를 비동기 병렬 전송하고, 각 모델의 응답 상태(HTTP 200 OK / 502), 레이턴시(ms), 생성된 답변 본문(Response Text) 및 원본 JSON을 멀티 카드 비교 뷰어로 한눈에 검증할 수 있습니다.</li>
+              <li><strong>개별 모델 및 라우트 풀 타깃팅:</strong> 특정 단독 모델만 지정하거나 현재 라우트 가중치 풀에 속한 모델들만 선별하여 즉시 게이트웨이 테스트를 수행할 수 있습니다.</li>
+              <li><strong>테스트 프롬프트 인라인 커스텀:</strong> 기본 테스트 문구 외에 실제 업무 질의(Prompt)를 자유롭게 변경하여 즉시 실시간 인그레스 HTTP 검증을 수행합니다.</li>
+              <li><strong>직접 호출 보장:</strong> 백엔드 라우터(<code>/api/v1/routing/test-call</code> 및 <code>/api/v1/routing/test-call-all</code>)는 Envoy Ingress(포트 8080)를 거쳐 정확한 모델 엔드포인트로 클라이언트 요청을 전달하고 실제 응답과 레이턴시를 포맷팅된 뷰어로 반환합니다.</li>
             </ul>
           </div>
         </div>

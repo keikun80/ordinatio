@@ -31,10 +31,23 @@ async def probe_endpoint(
     """
     base_url = endpoint.rstrip('/')
     urls_to_try = [base_url]
+    try:
+        from urllib.parse import urlsplit
+        parsed = urlsplit(base_url)
+        root_url = f"{parsed.scheme}://{parsed.netloc}"
+        if "/chat/completions" in parsed.path:
+            prefix = f"{root_url}{parsed.path.split('/chat/completions')[0]}"
+            if prefix and prefix not in urls_to_try:
+                urls_to_try.append(prefix)
+        if root_url and root_url not in urls_to_try:
+            urls_to_try.append(root_url)
+    except Exception:
+        pass
+
     if "127.0.0.1" in base_url:
-        urls_to_try.append(base_url.replace("127.0.0.1", "host.docker.internal"))
+        urls_to_try.extend([u.replace("127.0.0.1", "host.docker.internal") for u in list(urls_to_try) if "127.0.0.1" in u])
     elif "localhost" in base_url:
-        urls_to_try.append(base_url.replace("localhost", "host.docker.internal"))
+        urls_to_try.extend([u.replace("localhost", "host.docker.internal") for u in list(urls_to_try) if "localhost" in u])
 
     # Provider-specific health probe paths
     prov = (provider or "openai").lower()

@@ -458,6 +458,19 @@ export const apiClient = {
     return await res.json();
   },
 
+  async testAllModelsCall(data) {
+    const res = await fetch(`${API_BASE_URL}/routing/test-call-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '전체 모델 테스트 요청 실패');
+    }
+    return await res.json();
+  },
+
   async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = 'sk-orch-system-diagnostics-appliance-key' }) {
     // Gateway endpoint: fallback to relative /v1/chat/completions or localhost:8000
     const gatewayUrl = window.location.port === '5173'

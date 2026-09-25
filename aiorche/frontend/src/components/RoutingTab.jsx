@@ -170,6 +170,9 @@ export default function RoutingTab({
   const [copiedField, setCopiedField] = useState(null);
   const [isTestingRoute, setIsTestingRoute] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [testTargetScope, setTestTargetScope] = useState('all'); // 'all' (전체 연동 LLM) | 'route' (현재 라우트 모델) | model_id
+  const [testMessage, setTestMessage] = useState('안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다.');
+  const [allModelsTestResult, setAllModelsTestResult] = useState(null);
 
   // Phase 0.1: AgentRouter & Envoy AI Gateway States
   const [agentRouterStatus, setAgentRouterStatus] = useState(null);
@@ -584,46 +587,91 @@ export default function RoutingTab({
     if (onNotify) onNotify('SUCCESS', '클립보드에 복사되었습니다.');
   };
 
-  // Test Route Call via Envoy Gateway
+  // Test Route Call via Envoy Gateway (Single or All Models)
   const handleTestCall = async (methodType) => {
-    if (!currentWeights || currentWeights.length === 0) {
-      if (onNotify) onNotify('ERROR', '현재 라우트에 할당된 서빙 모델이 없습니다. 모델을 먼저 추가하십시오.');
-      setTestResult({
-        is_success: false,
-        status_code: 502,
-        latency_ms: 0,
-        target_url: activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`,
-        request_headers: {},
-        response_body: {
-          error: "No Upstream Models Configured (HTTP 502 Bad Gateway)",
-          message: `라우트 '${currentRoute.route_name}'에 연결된 서빙 모델이 없습니다. 모델 풀에 모델을 추가하고 가중치를 설정하십시오.`
-        },
-        error_message: "라우트에 연결된 모델이 없습니다. (HTTP 502 Bad Gateway)"
-      });
+    setIsTestingRoute(true);
+    setTestResult(null);
+    setAllModelsTestResult(null);
+
+    const mType = methodType || activeEndpointTab;
+    const msg = testMessage || "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다.";
+
+    // 1. 전체 연동 LLM 일괄 동시 테스트
+    if (testTargetScope === 'all') {
+      try {
+        const res = await apiClient.testAllModelsCall({
+          route_name: currentRoute.route_name,
+          method: mType,
+          message: msg,
+          scope: 'all'
+        });
+        setAllModelsTestResult(res);
+        if (onNotify) {
+          if (res.is_success) {
+            onNotify('SUCCESS', `게이트웨이 연동 전체 ${res.total_count}개 LLM 동시 테스트 성공! (모두 정상 응답)`);
+          } else {
+            onNotify('WARNING', `전체 ${res.total_count}개 LLM 테스트 완료: 정상 ${res.success_count}개, 오프라인/오류 ${res.failed_count}개`);
+          }
+        }
+      } catch (err) {
+        if (onNotify) onNotify('ERROR', `전체 LLM 테스트 요청 실패: ${err.message}`);
+      } finally {
+        setIsTestingRoute(false);
+      }
       return;
     }
 
-    setIsTestingRoute(true);
-    setTestResult(null);
+    // 2. 현재 라우트 연동 모델 풀 일괄 테스트
+    if (testTargetScope === 'route') {
+      if (!currentWeights || currentWeights.length === 0) {
+        if (onNotify) onNotify('ERROR', '현재 라우트에 할당된 서빙 모델이 없습니다.');
+        setIsTestingRoute(false);
+        return;
+      }
+      try {
+        const res = await apiClient.testAllModelsCall({
+          route_name: currentRoute.route_name,
+          method: mType,
+          message: msg,
+          scope: 'route'
+        });
+        setAllModelsTestResult(res);
+        if (onNotify) {
+          if (res.is_success) {
+            onNotify('SUCCESS', `라우트 연동 ${res.total_count}개 LLM 동시 테스트 성공!`);
+          } else {
+            onNotify('WARNING', `라우트 ${res.total_count}개 LLM 테스트 완료: 정상 ${res.success_count}개, 오프라인 ${res.failed_count}개`);
+          }
+        }
+      } catch (err) {
+        if (onNotify) onNotify('ERROR', `라우트 LLM 테스트 요청 실패: ${err.message}`);
+      } finally {
+        setIsTestingRoute(false);
+      }
+      return;
+    }
+
+    // 3. 특정 단일 모델 지정 테스트 (예: 'deepseek-ai/deepseek-v4.1-flash')
     try {
       const res = await apiClient.testRouteCall({
         route_name: currentRoute.route_name,
-        method: methodType || activeEndpointTab,
-        message: "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다.",
-        traffic_weights: currentWeights
+        method: mType,
+        message: msg,
+        traffic_weights: currentWeights,
+        target_model_id: testTargetScope
       });
       setTestResult(res);
       if (res.is_success) {
-        if (onNotify) onNotify('SUCCESS', `Envoy 게이트웨이 호출 성공: HTTP ${res.status_code || 200} (${res.latency_ms}ms)`);
+        if (onNotify) onNotify('SUCCESS', `[${testTargetScope}] Envoy 게이트웨이 호출 성공: HTTP ${res.status_code || 200} (${res.latency_ms}ms)`);
       } else {
-        if (onNotify) onNotify('ERROR', `Envoy 게이트웨이 오류: ${res.error_message || `HTTP ${res.status_code || 502}`}`);
+        if (onNotify) onNotify('ERROR', `[${testTargetScope}] Envoy 게이트웨이 오류: ${res.error_message || `HTTP ${res.status_code || 502}`}`);
       }
     } catch (err) {
       setTestResult({
         is_success: false,
         status_code: 502,
         latency_ms: 0,
-        target_url: activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`,
+        target_url: mType === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`,
         request_headers: {},
         response_body: { error: err.message },
         error_message: err.message
@@ -1658,7 +1706,7 @@ print(response.choices[0].message.content)`;
                         </div>
                         {(() => {
                           const hs = healthStatus[m.id];
-                          const effTimeout = m.healthCheckTimeout || healthCheckTimeout;
+                          const effTimeout = healthCheckTimeout || m.healthCheckTimeout || 3.0;
                           if (!hs) {
                             return (
                               <button
@@ -1993,17 +2041,80 @@ print(response.choices[0].message.content)`;
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>테스트 대상:</span>
+                <select
+                  className="form-select"
+                  value={testTargetScope}
+                  onChange={(e) => setTestTargetScope(e.target.value)}
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '4px 8px',
+                    height: '32px',
+                    minWidth: '220px',
+                    background: 'var(--bg-panel)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                  title="게이트웨이로 테스트 요청을 보낼 대상 LLM을 선택합니다."
+                >
+                  <option value="all">🌐 전체 연동 LLM 일괄 동시 테스트 ({modelPool.length}개 모델)</option>
+                  <option value="route">🔀 현재 라우트 모델 풀 ({currentWeights.length}개 가중치)</option>
+                  <optgroup label="── 개별 연동 LLM 단독 테스트 ──">
+                    {modelPool.map(m => (
+                      <option key={m.id} value={m.id}>
+                        🤖 {m.alias || m.id} ({m.engine || 'LLM'})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => handleTestCall(activeEndpointTab)}
                 disabled={isTestingRoute}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', height: '32px' }}
+                title="설정된 대상 LLM으로 게이트웨이 즉시 호출 테스트를 수행합니다."
               >
                 <Play size={13} fill="currentColor" />
-                <span>{isTestingRoute ? '게이트웨이 호출 중...' : '⚡ 게이트웨이 즉시 테스트 호출'}</span>
+                <span>
+                  {isTestingRoute
+                    ? '게이트웨이 호출 중...'
+                    : testTargetScope === 'all'
+                      ? `⚡ 전체 LLM 동시 테스트 (${modelPool.length}개)`
+                      : testTargetScope === 'route'
+                        ? `⚡ 라우트 모델 풀 테스트 (${currentWeights.length}개)`
+                        : `⚡ [${testTargetScope.split('/').pop()}] 즉시 테스트`}
+                </span>
               </button>
             </div>
+          </div>
+
+          {/* Test Prompt Input Bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '14px',
+            background: 'rgba(15, 23, 42, 0.4)',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border-subtle)'
+          }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 600, flexShrink: 0 }}>
+              💬 테스트 프롬프트:
+            </span>
+            <input
+              type="text"
+              className="form-input"
+              value={testMessage}
+              onChange={(e) => setTestMessage(e.target.value)}
+              placeholder="게이트웨이로 전송할 프롬프트를 입력하십시오."
+              style={{ fontSize: '0.78rem', padding: '3px 8px', height: '26px', flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)' }}
+            />
           </div>
 
           {/* Primary Endpoint Box */}
@@ -2390,6 +2501,161 @@ print(response.choices[0].message.content)`;
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* All Linked Models Test Response Box */}
+          {allModelsTestResult && (
+            <div className="panel-nested" style={{
+              marginTop: '16px',
+              padding: '16px',
+              border: `1px solid ${allModelsTestResult.is_success ? 'var(--accent-emerald)' : 'rgba(239, 68, 68, 0.4)'}`,
+              maxWidth: '100%',
+              width: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box'
+            }}>
+              {/* 상단 통계 바 */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '14px',
+                flexWrap: 'wrap',
+                gap: '8px',
+                paddingBottom: '10px',
+                borderBottom: '1px solid var(--border-subtle)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span className={`badge ${allModelsTestResult.is_success ? 'active' : 'warning'}`} style={{ fontSize: '0.72rem' }}>
+                    {allModelsTestResult.is_success ? '전체 정상 서빙 (ALL OK)' : '일부 응답 점검 필요'}
+                  </span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    게이트웨이 연동 LLM 일괄 테스트 결과 (총 {allModelsTestResult.total_count}개 모델)
+                  </span>
+                  <span className="badge active" style={{ fontSize: '0.7rem' }}>
+                    성공 {allModelsTestResult.success_count}개
+                  </span>
+                  {allModelsTestResult.failed_count > 0 && (
+                    <span className="badge danger" style={{ fontSize: '0.7rem' }}>
+                      실패/오프라인 {allModelsTestResult.failed_count}개
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      const summary = allModelsTestResult.results.map(r => ({
+                        model: r.model_id,
+                        status: r.status_code,
+                        latency: `${r.latency_ms}ms`,
+                        success: r.is_success,
+                        response: r.response_body?.choices?.[0]?.message?.content || r.error_message
+                      }));
+                      handleCopy(JSON.stringify(summary, null, 2), 'all-models-summary');
+                    }}
+                    style={{ fontSize: '0.7rem', padding: '2px 8px', height: '22px' }}
+                    title="전체 모델 결과 요약 JSON 복사"
+                  >
+                    {copiedField === 'all-models-summary' ? <Check size={11} color="var(--accent-emerald)" /> : <Copy size={11} />}
+                    <span>{copiedField === 'all-models-summary' ? '요약 복사됨' : '전체 요약 복사'}</span>
+                  </button>
+                  <button
+                    onClick={() => setAllModelsTestResult(null)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    닫기 ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* 모델별 카드 리스트 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {allModelsTestResult.results.map((r, idx) => {
+                  let content = null;
+                  if (r.response_body && typeof r.response_body === 'object') {
+                    content = r.response_body.choices?.[0]?.message?.content ||
+                              r.response_body.choices?.[0]?.text ||
+                              r.response_body.message?.content ||
+                              (typeof r.response_body.response === 'string' ? r.response_body.response : null);
+                  }
+
+                  const rawJson = r.response_body
+                    ? (typeof r.response_body === 'object' ? JSON.stringify(r.response_body, null, 2) : String(r.response_body))
+                    : (r.error_message || '응답 없음');
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.65)',
+                        border: `1px solid ${r.is_success ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        padding: '12px 14px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Cpu size={14} color="var(--accent-cyan)" />
+                            <span>{r.model_id || `모델 #${idx+1}`}</span>
+                          </span>
+                          <span className={`badge ${r.is_success ? 'active' : 'revoked'}`} style={{ fontSize: '0.68rem' }}>
+                            {r.is_success ? `HTTP ${r.status_code || 200} OK` : `HTTP ${r.status_code || '오류'}`}
+                          </span>
+                          <span className="badge info" style={{ fontSize: '0.68rem' }}>
+                            {r.latency_ms}ms
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            URL: {r.target_url}
+                          </span>
+                        </div>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleCopy(rawJson, `all-res-${idx}`)}
+                          style={{ fontSize: '0.7rem', padding: '2px 8px', height: '22px' }}
+                        >
+                          {copiedField === `all-res-${idx}` ? <Check size={11} color="var(--accent-emerald)" /> : <Copy size={11} />}
+                          <span>{copiedField === `all-res-${idx}` ? '복사됨' : 'JSON 복사'}</span>
+                        </button>
+                      </div>
+
+                      {/* 응답 본문 */}
+                      {r.is_success ? (
+                        <div style={{
+                          background: '#040711',
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          color: '#f8fafc',
+                          fontSize: '0.8rem',
+                          lineHeight: '1.6',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all'
+                        }}>
+                          <div style={{ color: 'var(--accent-emerald)', fontSize: '0.72rem', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Zap size={12} />
+                            <span>생성 답변 (Response Text):</span>
+                          </div>
+                          {content || rawJson}
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: 'var(--accent-rose)',
+                          fontSize: '0.78rem'
+                        }}>
+                          <strong>오류 메시지:</strong> {r.error_message || '업스트림 엔드포인트 연결 불가'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

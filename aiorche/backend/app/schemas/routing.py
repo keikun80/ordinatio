@@ -96,6 +96,7 @@ class RouteTestCallRequest(BaseModel):
     method: str = "path"  # "path" or "header"
     message: str = "안녕하세요. 라우팅 테스트 요청입니다."
     traffic_weights: Optional[List[Dict[str, Any]]] = None
+    target_model_id: Optional[str] = None
 
 class RouteTestCallResponse(BaseModel):
     is_success: bool
@@ -106,6 +107,20 @@ class RouteTestCallResponse(BaseModel):
     response_body: Optional[Any] = None
     error_message: Optional[str] = None
     dispatched_route: str
+    model_id: Optional[str] = None
+
+class AllModelsTestCallRequest(BaseModel):
+    route_name: Optional[str] = "financial-advisor-v1"
+    method: str = "header"  # "path" or "header"
+    message: str = "안녕하세요. Envoy 게이트웨이 라우팅 테스트 요청입니다."
+    scope: str = "all"  # "all" | "route"
+
+class AllModelsTestCallResponse(BaseModel):
+    is_success: bool
+    total_count: int
+    success_count: int
+    failed_count: int
+    results: List[RouteTestCallResponse]
 
 class AgentRouterPolicyItem(BaseModel):
     policy_id: str

@@ -48,6 +48,7 @@
 * **예시**:
   * `FNC-VK-ISSUE`: 신규 가상키 발급
   * `FNC-VK-REVOKE`: 가상키 즉시 파기
+  * `FNC-VK-CREATE-TENANT`: 신규 부서(테넌트) 등록
   * `FNC-RT-DEPLOY`: Envoy xDS 동적 라우팅 정책 배포
   * `FNC-RT-AUTOBALANCE`: 모델 가중치 균등 분할
   * `FNC-SP-CREATE`: 시스템 프롬프트 카탈로그 신규 등록
@@ -100,6 +101,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | `SCR-VK-01` | `vk-card-total` | `card` | 전체 발급 키 수 | - | `GET /api/v1/virtual-keys` |
 | `SCR-VK-01` | `vk-card-active` | `card` | 정상 활성 키 수 | - | `GET /api/v1/virtual-keys` |
 | `SCR-VK-01` | `vk-card-revoked` | `card` | 파기 완료 키 수 | - | `GET /api/v1/virtual-keys` |
+| `SCR-VK-01` | `vk-btn-open-create-tenant` | `btn` | 신규 부서 등록 | - | 모달(`SCR-VK-M05`) 오픈 |
 | `SCR-VK-01` | `vk-btn-open-create` | `btn` | 신규 가상키 발급 | - | 모달(`SCR-VK-M01`) 오픈 |
 | `SCR-VK-01` | `vk-input-search` | `input` | 키 이름 / ID 검색 | - | 프론트엔드 목록 필터 |
 | `SCR-VK-01` | `vk-select-tenant-filter`| `select` | 부서(테넌트) 필터 | - | 목록 테넌트 필터링 |
@@ -120,6 +122,13 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | `SCR-VK-M02`| `vk-modal-secret-value`| `input` | 생성된 API Key | - | 읽기 전용 비밀키 값 |
 | `SCR-VK-M02`| `vk-modal-btn-copy-secret`| `btn` | 비밀키 전체 복사 | - | 클립보드 복사 |
 | `SCR-VK-M02`| `vk-modal-btn-close-secret`| `btn` | 복사 완료 및 닫기 | - | 모달 닫기 (영구 마스킹) |
+| `SCR-VK-M05`| `vk-modal-create-tenant` | `modal` | 신규 부서(테넌트) 등록 팝업 | - | 부서 등록 대화상자 |
+| `SCR-VK-M05`| `vk-modal-tenant-input-name` | `input` | 부서 명칭 | - | 폼 필드 (Department Name) |
+| `SCR-VK-M05`| `vk-modal-tenant-input-code` | `input` | 고유 부서 코드 | - | 폼 필드 (Department Code) |
+| `SCR-VK-M05`| `vk-modal-tenant-input-budget` | `input` | 월간 예산 한도(KRW) | - | 폼 필드 (Monthly Budget) |
+| `SCR-VK-M05`| `vk-modal-tenant-toggle-hardcap`| `toggle` | Hard Cap 자동 차단 여부 | - | 폼 필드 (Hard Cap Toggle) |
+| `SCR-VK-M05`| `vk-modal-tenant-btn-submit` | `btn` | 부서 등록 완료 | `FNC-VK-CREATE-TENANT` | `POST /api/v1/tenants` |
+| `SCR-VK-M05`| `vk-modal-tenant-btn-cancel` | `btn` | 취소 | - | 모달 닫기 |
 
 ---
 

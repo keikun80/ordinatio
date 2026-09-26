@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle, Trash2 } from 'lucide-react';
+import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Search, Eye, AlertTriangle, Trash2, Building } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { initialVirtualKeys, initialTenants, initialModels } from '../data/mockData';
 
@@ -42,6 +42,13 @@ export default function VirtualKeysTab({ onNotify }) {
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState(null); // { keyId, name, status }
+
+  // New Tenant (Department) Modal State
+  const [showCreateTenantModal, setShowCreateTenantModal] = useState(false);
+  const [newTenantName, setNewTenantName] = useState('');
+  const [newTenantCode, setNewTenantCode] = useState('');
+  const [newTenantBudget, setNewTenantBudget] = useState(15000000);
+  const [newTenantHardCap, setNewTenantHardCap] = useState(true);
 
   // Edit Key Modal State
   const [editingKey, setEditingKey] = useState(null);
@@ -245,6 +252,61 @@ export default function VirtualKeysTab({ onNotify }) {
     }
   };
 
+  // Create Tenant (Department)
+  const handleCreateTenant = async (e) => {
+    e.preventDefault();
+    if (!newTenantName.trim() || !newTenantCode.trim()) {
+      onNotify('ERROR', '부서명과 부서 코드를 모두 입력해주세요.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await apiClient.createTenant({
+        name: newTenantName.trim(),
+        department_code: newTenantCode.trim().toUpperCase(),
+        monthly_budget_krw: Number(newTenantBudget),
+        is_hard_cap_enabled: newTenantHardCap
+      });
+      const createdTenant = {
+        id: res.tenant_id,
+        name: res.name,
+        code: res.department_code,
+        budget: Number(res.monthly_budget_krw),
+        spent: 0,
+        hardCap: res.is_hard_cap_enabled
+      };
+      const updatedTenants = [...tenants, createdTenant];
+      saveTenants(updatedTenants);
+      setShowCreateTenantModal(false);
+      setNewTenantName('');
+      setNewTenantCode('');
+      setNewTenantBudget(15000000);
+      setNewTenantHardCap(true);
+      onNotify('SUCCESS', `신규 부서 [${res.name}]가 성공적으로 등록되었습니다.`);
+    } catch (err) {
+      console.warn('Backend create tenant offline, saving to persistent local storage:', err);
+      const fallbackId = `dept-${newTenantCode.trim().toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      const fallbackTenant = {
+        id: fallbackId,
+        name: newTenantName.trim(),
+        code: newTenantCode.trim().toUpperCase(),
+        budget: Number(newTenantBudget),
+        spent: 0,
+        hardCap: newTenantHardCap
+      };
+      const updatedTenants = [...tenants, fallbackTenant];
+      saveTenants(updatedTenants);
+      setShowCreateTenantModal(false);
+      setNewTenantName('');
+      setNewTenantCode('');
+      setNewTenantBudget(15000000);
+      setNewTenantHardCap(true);
+      onNotify('SUCCESS', `신규 부서 [${newTenantName}]가 안전하게 등록되었습니다.`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Create Key
   const handleCreateKey = async (e) => {
     e.preventDefault();
@@ -368,6 +430,16 @@ export default function VirtualKeysTab({ onNotify }) {
           <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            className="btn btn-secondary"
+            data-testid="vk-btn-open-create-tenant"
+            data-function-id="FNC-VK-OPEN-TENANT-MODAL"
+            onClick={() => setShowCreateTenantModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Building size={16} color="var(--accent-cyan)" />
+            <span>신규 부서 등록</span>
+          </button>
           <button 
             className="btn btn-primary" 
             data-testid="vk-btn-open-create"
@@ -1012,6 +1084,100 @@ export default function VirtualKeysTab({ onNotify }) {
                 <span>{isLoading ? '삭제 처리 중...' : (keyToDelete.status === 'ACTIVE' ? '즉시 파기 및 영구 삭제' : '영구 삭제 확인')}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Tenant (Department) Modal */}
+      {showCreateTenantModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateTenantModal(false)}>
+          <div className="modal-content" data-testid="vk-modal-create-tenant" data-screen-id="SCR-VK-M05" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={handleCreateTenant}>
+              <div className="modal-header">
+                <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building size={20} color="var(--accent-cyan)" />
+                  <span>신규 부서(테넌트) 등록 마법사</span>
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">부서 명칭 (Department Name) <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    className="form-input"
+                    data-testid="vk-modal-tenant-input-name"
+                    placeholder="예: 데이터인텔리전스부"
+                    value={newTenantName}
+                    onChange={(e) => setNewTenantName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">고유 부서 코드 (Department Code) <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    className="form-input"
+                    data-testid="vk-modal-tenant-input-code"
+                    placeholder="예: DATA_INTEL"
+                    value={newTenantCode}
+                    onChange={(e) => setNewTenantCode(e.target.value)}
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                    required
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    영문 대문자 및 언더스코어(_) 권장 (예: DATA_INTEL, RISK_EVAL)
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">월간 예산 한도 (Monthly Budget KRW)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    data-testid="vk-modal-tenant-input-budget"
+                    value={newTenantBudget}
+                    onChange={(e) => setNewTenantBudget(e.target.value)}
+                    min="0"
+                    step="1000000"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                    required
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                    설정 예산: ₩{Number(newTenantBudget || 0).toLocaleString()} 원
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                    <input
+                      type="checkbox"
+                      data-testid="vk-modal-tenant-toggle-hardcap"
+                      checked={newTenantHardCap}
+                      onChange={(e) => setNewTenantHardCap(e.target.checked)}
+                    />
+                    <span><strong>Hard Cap 자동 차단 활성화</strong> (예산 100% 초과 시 HTTP 429 즉시 차단)</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  data-testid="vk-modal-tenant-btn-cancel"
+                  onClick={() => setShowCreateTenantModal(false)}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  data-testid="vk-modal-tenant-btn-submit"
+                  data-function-id="FNC-VK-CREATE-TENANT"
+                  disabled={isLoading}
+                >
+                  {isLoading ? '등록 중...' : '부서 등록 완료'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 # AI Orchestrator Appliance — 공식 사용자 매뉴얼 & 문서 저장소 (`docs/`)
 
-> **문서 버전**: v2.3 (Phase 0 ~ Phase 5 상용 배포 및 백엔드 66/66개 테스트 100% PASS 현행화)  
-> **최종 갱신일**: 2026-09-25  
+> **문서 버전**: v2.4 (Phase 0 ~ Phase 5 상용 배포, 8대 거버넌스 메뉴 및 고해상도 스크린샷 30종 전면 현행화)  
+> **최종 갱신일**: 2026-09-26  
 > **운영 환경**: 100% 폐쇄망 (Air-Gapped) 온프레미스 자율 운영 어플라이언스  
 
 ---
@@ -20,16 +20,20 @@
 docs/
 ├── README.md               # [본 문서] docs 디렉토리 안내 및 매뉴얼 활용 가이드
 ├── index.html              # 고객사 전달용 독립형 인터랙티브 사용자 매뉴얼 & 설치 가이드 (HTML)
-└── images/                 # 웹 콘솔 7대 핵심 메뉴 및 주요 조작 모달 고해상도 스크린샷 (26종)
+└── images/                 # 웹 콘솔 8대 핵심 메뉴 및 주요 조작 모달 고해상도 스크린샷 (30종)
     ├── 01_overview_main.png                      # 글로벌 관제 홈 & 실시간 WebSocket 메트릭
-    ├── 02_routing_main.png                       # 라우팅 스튜디오 & 4대 자율 라우팅 정책
-    ├── 02_routing_modal_add_model.png            # 신규 모델 등록 & 6종 Provider 규격화 모달
+    ├── 02_routing_main.png                       # 서빙 모델 풀 현황 및 전체 헬스체크(Ping All)
+    ├── 02_routing_modal_add_model.png            # 신규 모델 등록 & Provider 규격화 모달
     ├── 02_routing_compute_target_select.png       # 온프레미스 표준 인프라 규격 드롭다운
-    ├── 02_routing_modal_edit_policy.png          # AgentRouter 정책 실시간 튜닝 모달
-    ├── 02_routing_modal_add_rule.png             # 신규 동적 라우트 생성 모달
-    ├── 03_virtual_keys_main.png                  # 가상 API Key 거버넌스 & 테넌트 쿼터
-    ├── 03_virtual_keys_modal_issue_key.png       # sk-orch- 가상키 발급 마법사
-    ├── 04_finops_main.png                        # FinOps 비용 계량 & 80%/100% 한도 관제
+    ├── 02_routing_modal_edit_policy.png          # AgentRouter 지능형 정책 실시간 튜닝 모달
+    ├── 02_routing_modal_add_rule.png             # 신규 동적 라우트 생성 & 테넌트 멀티셀렉트 모달
+    ├── 03_virtual_keys_main.png                  # 거버넌스 부서 테넌트 & 가상 API Key 목록
+    ├── 03_governance_modal_add_department.png    # 신규 부서(테넌트) 등록 모달
+    ├── 03_virtual_keys_modal_issue_key.png       # sk-orch- 가상 API Key 발급 마법사
+    ├── 08_system_prompts_main.png                # 시스템 프롬프트 거버넌스 카탈로그 & KPI 대시보드
+    ├── 08_system_prompts_modal_add.png           # 신규 시스템 프롬프트 등록 & 다계층 바인딩 모달
+    ├── 08_system_prompts_simulator.png           # 실시간 L7 프롬프트 주입 시뮬레이터 검증 모달
+    ├── 04_finops_main.png                        # FinOps 부서별 토큰 계량 & 비용 예산 관제
     ├── 05_compliance_main.png                    # PII 보안 & 3단계(MASK/HASH/BLOCK) 액션
     ├── 05_compliance_modal_add_rule.png          # 자체 정규식 PII 보안 룰 빌더
     ├── 05_compliance_presidio_presets.png        # 한국 금융/개인정보 표준 프리셋
@@ -82,16 +86,17 @@ python3 -m http.server 8080 --directory docs
    - 시스템 사양 요건 (최소 4 Core, 16GB RAM, 100GB NVMe)
    - Docker / Docker-Compose 및 Kubernetes (k8s) 배포 절차
    - `.env` 설정 가이드 및 시크릿 키 관리
-3. **7대 핵심 거버넌스 메뉴 상세 매뉴얼**:
-   - **글로벌 관제 홈**: 1초 주기 WebSocket 메트릭, GPU 클러스터 히트맵, Grafana 대시보드
-   - **모델 & 라우팅 스튜디오**: 6종 Provider 규격화(OpenAI, DeepSeek, Claude, Gemini, Cohere, 직접지정), Dynamic URL 자동 조합기, 헬스체크 타임아웃(1.0s~30.0s) 수동 조절 & localStorage 영속화, 3단 아코디언 메뉴, 실시간 테스트 호출
-   - **가상 API Key 거버넌스**: `sk-orch-` 접두사, Argon2id 해싱, 1회성 시크릿 노출, 테넌트 쿼터
-   - **FinOps 비용 & 예산**: 원화(₩) 계량, 80% 조기경보, 100% Hard Cap 차단, UTF-8 BOM CSV 청구서
-   - **PII 보안 & 감사 포렌식**: MASK/HASH/BLOCK 정규식 엔진, WORM 불변 감사로그 적재
-   - **긴급 패치 & 자가진단**: RSA-4096 서명 검증, 무중단 롤링 패치, 5대 인프라 Preflight, Zero-PII ZIP
-   - **프롬프트 스튜디오**: 인앱 엔드포인트 직접 추론 및 레이턴시/토큰 계량
+3. **8대 핵심 거버넌스 메뉴 상세 매뉴얼**:
+   - **글로벌 관제 홈**: 1초 주기 WebSocket 메트릭, GPU 클러스터 히트맵, 시스템 상태 지표
+   - **모델 & 라우팅 스튜디오**: 6종 Provider 규격화, 헬스체크 타임아웃 수동 조절, 라우트 정책 인라인 편집, 테넌트 멀티셀렉트 드롭다운, 커스텀 하위 경로(`/v1/tech/chat/completions`), 전체 LLM 일괄 동시 테스트(Test All Linked LLMs)
+   - **거버넌스 (부서 테넌트 & API Key)**: 신규 부서(테넌트) 등록, `sk-orch-` 가상 API Key 발급, Argon2id 해싱, 1회성 시크릿 노출, 테넌트 쿼터, 키 즉시 파기(Revoke) 및 영구 삭제(Purge)
+   - **시스템 프롬프트 거버넌스**: 전사/테넌트/라우트/가상키 4단계 바인딩 우선순위, 3대 주입 모드(PREPEND/APPEND/OVERRIDE), 실시간 L7 주입 시뮬레이터
+   - **FinOps 비용 & 예산**: 부서별 실시간 토큰(Prompt/Completion/Total) 미터링 및 USD 과금 집계, 80% 조기경보, 100% Hard Cap 차단, UTF-8 BOM CSV 청구서 내보내기
+   - **PII 보안 & 감사 포렌식**: MASK/HASH/BLOCK 정규식 엔진, WORM 불변 감사로그 적재 및 검색 필터
+   - **긴급 패치 & 자가진단**: RSA-4096 서명 검증, 무중단 4단계 롤링 패치, 5대 인프라 Preflight 자가진단
+   - **프롬프트 스튜디오**: 인앱 엔드포인트 직접 추론 및 Side-by-Side 마스킹 대조 분석
 4. **문제 해결 및 FAQ (Troubleshooting)**:
-   - 헬스체크 타임아웃 발생 시 대처 방안, Envoy xDS 라우팅 동기화 확인, 감사로그 무결성 검증
+   - 포트 충돌, 429 Too Many Requests, 패치 서명 불일치, 게이트웨이 404/no healthy upstream, 로컬 LLM 컨테이너(gemma2:2b 등) 포트 매핑 엔드포인트 연동, 커스텀 라우트 경로 해석 원리, FinOps 부서 토큰/비용 갱신 문제 해결 가이드 수록
 
 ---
 

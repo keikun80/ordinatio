@@ -190,24 +190,11 @@ async def main():
             await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '취소');"); mid += 1
             await asyncio.sleep(0.5)
 
-            # Open Edit Policy Modal
-            await eval_js(ws, mid, "window.clickByText('button', '정책 튜닝');"); mid += 1
-            await asyncio.sleep(0.8)
-            await capture_screen(ws, mid, "02_routing_modal_edit_policy.png"); mid += 1
-
-            # Close Policy Modal
-            await eval_js(ws, mid, """
-                const closeBtn = document.querySelector('.modal-overlay button.btn-secondary') ||
-                                 Array.from(document.querySelectorAll('.modal-overlay button')).find(b => b.textContent.includes('닫기') || b.textContent.includes('취소'));
-                if (closeBtn) closeBtn.click();
-            """); mid += 1
-            await asyncio.sleep(0.5)
-
-            # Click '라우팅 스튜디오' sub item
-            await eval_js(ws, mid, "window.clickByText('.nav-sub-item', '라우팅 스튜디오');"); mid += 1
+            # Switch to '라우팅 스튜디오' sub item
+            await eval_js(ws, mid, "window.clickByText('button', '라우팅 스튜디오');"); mid += 1
             await asyncio.sleep(0.8)
 
-            # Open Add Route Modal
+            # Open Add Route Modal (showing tenant selector)
             await eval_js(ws, mid, "window.clickByText('button', '신규 라우트');"); mid += 1
             await asyncio.sleep(0.8)
             await capture_screen(ws, mid, "02_routing_modal_add_rule.png"); mid += 1
@@ -216,19 +203,73 @@ async def main():
             await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '취소');"); mid += 1
             await asyncio.sleep(0.5)
 
-            # --- 3. Virtual Keys Tab ---
-            print("[*] 3. Virtual Keys Tab & Modal...")
-            await eval_js(ws, mid, "window.clickByText('.nav-item', '가상 API');"); mid += 1
+            # Switch to 'AgentRouter & 테스트' sub item
+            await eval_js(ws, mid, "window.clickByText('button', 'AgentRouter');"); mid += 1
+            await asyncio.sleep(0.8)
+
+            # Open Edit Policy Modal
+            await eval_js(ws, mid, "window.clickByText('button', '지능형 정책 상세 편집') || window.clickByText('button', '정책');"); mid += 1
+            await asyncio.sleep(0.8)
+            await capture_screen(ws, mid, "02_routing_modal_edit_policy.png"); mid += 1
+
+            # Close Policy Modal
+            await eval_js(ws, mid, """
+                const closeBtn = document.querySelector('.modal-overlay button.btn-secondary') ||
+                                 Array.from(document.querySelectorAll('.modal-overlay button')).find(b => b.textContent.includes('닫기') || b.textContent.includes('취소') || b.textContent.includes('✕'));
+                if (closeBtn) closeBtn.click();
+            """); mid += 1
+            await asyncio.sleep(0.5)
+
+            # --- 3. Governance / Virtual Keys Tab ---
+            print("[*] 3. Governance & Virtual Keys Tab...")
+            await eval_js(ws, mid, "window.clickByText('.nav-item', '거버넌스');"); mid += 1
             await asyncio.sleep(1.0)
             await capture_screen(ws, mid, "03_virtual_keys_main.png"); mid += 1
 
+            # Open New Department Modal
+            print("[*] Opening New Department Modal...")
+            await eval_js(ws, mid, "window.clickByText('button', '신규 부서 등록');"); mid += 1
+            await asyncio.sleep(0.8)
+            await capture_screen(ws, mid, "03_governance_modal_add_department.png"); mid += 1
+
+            # Close New Department Modal
+            await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '취소');"); mid += 1
+            await asyncio.sleep(0.5)
+
             # Open Issue Key Modal
-            await eval_js(ws, mid, "window.clickByText('button', '가상키 발급');"); mid += 1
+            print("[*] Opening Issue API Key Modal...")
+            await eval_js(ws, mid, "window.clickByText('button', '신규 API Key 발급');"); mid += 1
             await asyncio.sleep(0.8)
             await capture_screen(ws, mid, "03_virtual_keys_modal_issue_key.png"); mid += 1
 
             # Close Issue Key Modal
             await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '취소');"); mid += 1
+            await asyncio.sleep(0.5)
+
+            # --- 3.1 System Prompts Governance Tab ---
+            print("[*] 3.1 System Prompts Governance Tab...")
+            await eval_js(ws, mid, "window.clickByText('.nav-item', '시스템 프롬프트');"); mid += 1
+            await asyncio.sleep(1.0)
+            await capture_screen(ws, mid, "08_system_prompts_main.png"); mid += 1
+
+            # Open Add System Prompt Modal
+            print("[*] Opening Add System Prompt Modal...")
+            await eval_js(ws, mid, "window.clickByText('button', '신규 시스템 프롬프트 등록');"); mid += 1
+            await asyncio.sleep(0.8)
+            await capture_screen(ws, mid, "08_system_prompts_modal_add.png"); mid += 1
+
+            # Close Add System Prompt Modal
+            await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '취소');"); mid += 1
+            await asyncio.sleep(0.5)
+
+            # Open System Prompt Simulator Modal
+            print("[*] Opening System Prompt Simulator Modal...")
+            await eval_js(ws, mid, "window.clickByText('button', '주입 시뮬레이터');"); mid += 1
+            await asyncio.sleep(0.8)
+            await capture_screen(ws, mid, "08_system_prompts_simulator.png"); mid += 1
+
+            # Close System Prompt Simulator Modal
+            await eval_js(ws, mid, "window.clickByText('.modal-overlay button', '시뮬레이터 닫기') || window.clickByText('.modal-overlay button', '닫기');"); mid += 1
             await asyncio.sleep(0.5)
 
             # --- 4. FinOps Tab ---

@@ -569,21 +569,29 @@
           <li><a href="#input-compute-target" class="nav-sub-link">인프라 규격 선택</a></li>
           <li><a href="#input-health-check" class="nav-sub-link">실시간 헬스체크 & 타임아웃 조절 (제어)</a></li>
           <li><a href="#input-test-call" class="nav-sub-link">엔드포인트 실시간 테스트 호출 (아코디언)</a></li>
-          <li><a href="#input-add-route" class="nav-sub-link">신규 라우트 생성 (입력)</a></li>
+          <li><a href="#input-add-route" class="nav-sub-link">신규 라우트 생성 & 테넌트 매핑 (입력)</a></li>
           <li><a href="#input-gateway-endpoint" class="nav-sub-link">L7 게이트웨이 엔드포인트 연동</a></li>
         </ul>
       </li>
       <li>
-        <a href="#menu-virtual-keys" class="nav-link">3. 가상 API Key 거버넌스</a>
+        <a href="#menu-virtual-keys" class="nav-link">3. 거버넌스 (부서 테넌트 & API Key)</a>
         <ul class="nav-sub-list">
-          <li><a href="#input-issue-key" class="nav-sub-link">가상 API Key 발급 (입력)</a></li>
+          <li><a href="#input-add-department" class="nav-sub-link">신규 부서(테넌트) 등록 (입력)</a></li>
+          <li><a href="#input-issue-key" class="nav-sub-link">가상 API Key 발급 & 수명주기 (입력)</a></li>
         </ul>
       </li>
       <li>
-        <a href="#menu-finops" class="nav-link">4. FinOps 비용 & 예산</a>
+        <a href="#menu-system-prompts" class="nav-link">4. 시스템 프롬프트 거버넌스</a>
+        <ul class="nav-sub-list">
+          <li><a href="#input-add-system-prompt" class="nav-sub-link">프롬프트 등록 & 다계층 바인딩 (입력)</a></li>
+          <li><a href="#input-system-prompt-sim" class="nav-sub-link">실시간 L7 주입 시뮬레이터 (제어)</a></li>
+        </ul>
       </li>
       <li>
-        <a href="#menu-compliance" class="nav-link">5. PII 보안 & 감사 포렌식</a>
+        <a href="#menu-finops" class="nav-link">5. FinOps 비용 & 예산</a>
+      </li>
+      <li>
+        <a href="#menu-compliance" class="nav-link">6. PII 보안 & 감사 포렌식</a>
         <ul class="nav-sub-list">
           <li><a href="#input-add-pii-rule" class="nav-sub-link">신규 보안 룰 등록 (입력)</a></li>
           <li><a href="#input-presidio-sim" class="nav-sub-link">Presidio 시뮬레이터 (입력)</a></li>
@@ -591,14 +599,14 @@
         </ul>
       </li>
       <li>
-        <a href="#menu-lifecycle" class="nav-link">6. 긴급 패치 & 자가진단</a>
+        <a href="#menu-lifecycle" class="nav-link">7. 긴급 패치 & 자가진단</a>
         <ul class="nav-sub-list">
           <li><a href="#input-patch-deploy" class="nav-sub-link">핫픽스 서명 및 배포 (입력)</a></li>
           <li><a href="#input-diagnostics" class="nav-sub-link">시스템 자가진단 (입력)</a></li>
         </ul>
       </li>
       <li>
-        <a href="#menu-prompt-studio" class="nav-link">7. 프롬프트 스튜디오</a>
+        <a href="#menu-prompt-studio" class="nav-link">8. 프롬프트 스튜디오</a>
         <ul class="nav-sub-list">
           <li><a href="#input-prompt-infer" class="nav-sub-link">추론 파라미터 제어 (입력)</a></li>
         </ul>
@@ -1175,22 +1183,41 @@ bash scripts/verify-phase5.sh</code></pre>
           </div>
         </div>
 
-        <!-- Input 3: Add Route Modal -->
+        <!-- Input 3: Add Route Modal & Tenant Selector -->
         <div id="input-add-route">
-          <h4>[사용자 입력 3] 신규 동적 라우트(규칙) 생성</h4>
-          <p>URL 경로, 테넌트 헤더, 사용자 정의 조건에 따라 트래픽을 모델로 전달하는 라우팅 룰을 생성합니다.</p>
+          <h4>[사용자 입력 3] 신규 동적 라우트 생성, 테넌트 바인딩 및 정책 편집</h4>
+          <p>
+            URL 경로, 테넌트 헤더, 사용자 정의 조건에 따라 트래픽을 모델로 전달하는 라우팅 룰을 생성하고,
+            기존 생성된 라우트의 가중치 분할 및 정책을 실시간으로 편집합니다.
+          </p>
 
           <div class="screenshot-box">
             <div class="screenshot-header">
               <span class="screenshot-tag">📝 User Input Form</span>
-              <span class="screenshot-caption">+ 신규 라우트 생성 모달</span>
+              <span class="screenshot-caption">+ 신규 라우트 생성 및 부서(테넌트) 선택 모달</span>
             </div>
             <div class="screenshot-img-wrapper">
               <img src="images/02_routing_modal_add_rule.png" alt="신규 라우트 생성 모달" class="screenshot-img" onclick="openLightbox(this)">
             </div>
             <div class="screenshot-desc">
-              라우트 이름, 우선순위, 트래픽 매칭 조건, 서빙 모델 가중치 분할(A/B Split), 장애 발생 시 비상 폴백 모델을 설정합니다.
+              라우트 이름, 우선순위, 트래픽 매칭 조건, <strong>소속 부서(테넌트) 드롭다운 선택 및 태그 배지</strong>, 서빙 모델 가중치 분할(A/B Split), 타임아웃(ms) 및 장애 발생 시 비상 폴백 모델을 설정합니다.
             </div>
+          </div>
+
+          <div class="input-grid" style="margin-top: 1.2rem;">
+            <div class="input-card">
+              <div class="input-card-title">🏢 테넌트 선택 드롭다운 & 인터랙티브 태그 배지</div>
+              <div class="input-card-desc">
+                기존 임의 텍스트 입력의 오타 위험을 방지하기 위해, 시스템에 등록된 실제 부서(테넌트) 목록에서 체크/선택할 수 있는 <strong>원클릭 멀티셀렉트 드롭다운</strong>을 제공합니다. 선택된 테넌트는 즉시 대화형 태그 배지로 표시되며 '✕' 클릭으로 손쉽게 제외할 수 있습니다.
+              </div>
+            </div>
+            <div class="input-card">
+              <div class="input-card-title">🔄 라우트 정책 실시간 인라인 편집 (Live Reload)</div>
+              <div class="input-card-desc">
+                이미 생성된 라우트 카드의 <code>[설정 편집]</code> 버튼을 클릭하여 모델 가중치 비율, 페일오버 폴백 체인 순서, 타임아웃, 바인딩 테넌트를 즉시 수정하고 Envoy 게이트웨이에 무중단으로 실시간 배포할 수 있습니다.
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Feature 2: Envoy Gateway Route Endpoints & Live Testing -->
@@ -1198,6 +1225,7 @@ bash scripts/verify-phase5.sh</code></pre>
           <h4>[운영자 제어 2] Envoy L7 게이트웨이 전용 API 엔드포인트 & 실시간 테스트 호출</h4>
           <p>
             생성된 각 동적 라우팅 규칙마다 사내 애플리케이션 및 AI 챗봇이 호출할 수 있는 <strong>Envoy L7 전용 진입점 URL</strong>이 자동으로 부여됩니다.
+            OpenAI 호환 클라이언트 및 커스텀 경로 호출을 완벽하게 지원합니다.
           </p>
 
           <div class="table-container">
@@ -1215,7 +1243,13 @@ bash scripts/verify-phase5.sh</code></pre>
                   <td><span class="badge badge-primary">경로 기반 (Path-based)</span></td>
                   <td><code>POST http://localhost:8080/v1/routes/{route_name}</code></td>
                   <td><code>Authorization: Bearer sk-orch-...</code></td>
-                  <td>Envoy가 <code>prefix_rewrite</code>를 통해 내부 백엔드로 전달하며, 라우트 이름으로 타깃 모델 풀 자동 선택</td>
+                  <td>Envoy가 내부 백엔드로 전달하며, 라우트 이름으로 타깃 모델 풀 자동 선택</td>
+                </tr>
+                <tr>
+                  <td><span class="badge badge-success">커스텀 경로 (Custom Subpath)</span></td>
+                  <td><code>POST http://localhost:8080/v1/{route_path}/chat/completions</code><br>(예: <code>/v1/tech/chat/completions</code>)</td>
+                  <td><code>Authorization: Bearer sk-orch-...</code></td>
+                  <td>OpenAI SDK 규격의 <code>/chat/completions</code> 하위 경로를 자동 해석하여 대상 업스트림 모델로 오류(404) 없이 전달</td>
                 </tr>
                 <tr>
                   <td><span class="badge badge-purple">헤더 기반 (Header-based)</span></td>
@@ -1225,6 +1259,13 @@ bash scripts/verify-phase5.sh</code></pre>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="alert alert-info" style="margin-top: 1.2rem;">
+            <div class="alert-title">🐳 로컬 도커 LLM 컨테이너(Gemma2, Qwen 등) 엔드포인트 구성 가이드</div>
+            로컬에서 구동 중인 Ollama 등 컨테이너 모델을 오케스트레이터에 연동할 경우, 호스트 포트 포워딩 규격을 준수해야 합니다.<br>
+            예를 들어 <code>docker-compose.yml</code>에서 <code>11435:11434</code>로 매핑된 Gemma2 컨테이너의 경우, 
+            모델 등록 엔드포인트는 <code>http://host.docker.internal:11435/v1</code> 또는 동일 도커 브릿지 네트워크의 <code>http://ollama-gemma:11434/v1</code>을 지정해야 헬스체크 핑(Ping) 및 추론이 정상 작동합니다.
           </div>
 
           <h5 style="margin-top: 1.5rem; color: var(--text-main);">⚡ 실시간 콘솔 테스트 호출 (Live Test Call)</h5>
@@ -1250,30 +1291,49 @@ bash scripts/verify-phase5.sh</code></pre>
         </div>
       </div>
 
-      <!-- Menu 3: Virtual Keys -->
+      <!-- Menu 3: Governance & Virtual Keys -->
       <div id="menu-virtual-keys" class="card">
-        <h3>3. 가상 API Key & 테넌트 거버넌스 (Virtual API Keys & Tenant Governance)</h3>
+        <h3>3. 거버넌스 (부서 테넌트 & 가상 API Key 관리)</h3>
         <p>
-          사내 부서 및 조직별로 고유 테넌트를 격리하고, 실제 업스트림 인증 정보를 숨기는 가상 API Key(<code>sk-orch-...</code>)를
+          사내 부서 및 조직별로 고유 테넌트(부서)를 격리 생성하고, 실제 업스트림 인증 정보를 숨기는 가상 API Key(<code>sk-orch-...</code>)를
           발급하여 슬라이딩 윈도우 RPM/TPM 속도 제한과 월간 예산 한도를 강제 집행합니다.
         </p>
 
         <div class="screenshot-box">
           <div class="screenshot-header">
             <span class="screenshot-tag">🔑 Main Console Screen</span>
-            <span class="screenshot-caption">가상 API Key 거버넌스 목록 화면</span>
+            <span class="screenshot-caption">거버넌스 부서 테넌트 & 가상 API Key 목록 화면</span>
           </div>
           <div class="screenshot-img-wrapper">
             <img src="images/03_virtual_keys_main.png" alt="가상 API Key 관리 메인 화면" class="screenshot-img" onclick="openLightbox(this)">
           </div>
           <div class="screenshot-desc">
-            발급된 가상 API Key 목록, 소속 테넌트, 허용 모델, 분당 요청 제한(RPM), 월간 예산 한도 및 실시간 PII 마스킹 강제 여부가 표시됩니다.
+            발급된 가상 API Key 목록, 소속 테넌트, 허용 모델, 분당 요청 제한(RPM), 월간 예산 한도 및 실시간 PII 마스킹 강제 여부가 표시되며, 상단 액션 버튼으로 신규 부서 등록 및 API Key 발급을 수행할 수 있습니다.
           </div>
         </div>
 
-        <!-- Input: Issue Key Modal -->
-        <div id="input-issue-key">
-          <h4>[사용자 입력] 신규 가상 API Key 발급 양식</h4>
+        <!-- Input 1: Add Department Modal -->
+        <div id="input-add-department">
+          <h4>[사용자 입력 1] 신규 부서(테넌트) 등록 양식</h4>
+          <p>사내 조직 체계에 맞춰 새로운 부서(테넌트)를 생성하고 기본 예산 한도를 설정합니다.</p>
+
+          <div class="screenshot-box">
+            <div class="screenshot-header">
+              <span class="screenshot-tag">🏢 Department Registration</span>
+              <span class="screenshot-caption">+ 신규 부서(테넌트) 등록 모달</span>
+            </div>
+            <div class="screenshot-img-wrapper">
+              <img src="images/03_governance_modal_add_department.png" alt="신규 부서 등록 모달" class="screenshot-img" onclick="openLightbox(this)">
+            </div>
+            <div class="screenshot-desc">
+              부서 식별 코드(Department Code, 예: <code>TECH-DEV</code>, <code>FIN-WM</code>), 부서 한글 명칭, 부서 담당자 이메일, 월간 기본 예산 한도(USD)를 입력하여 즉각 등록합니다. 등록된 부서는 FinOps 비용 집계 및 라우팅 권한 바인딩의 기준이 됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- Input 2: Issue Key Modal -->
+        <div id="input-issue-key" style="margin-top: 2rem;">
+          <h4>[사용자 입력 2] 신규 가상 API Key 발급 양식</h4>
           <p>사내 개발팀이나 업무 시스템에 배포할 안전한 가상 API Key를 발급하는 모달입니다.</p>
 
           <div class="screenshot-box">
@@ -1285,7 +1345,7 @@ bash scripts/verify-phase5.sh</code></pre>
               <img src="images/03_virtual_keys_modal_issue_key.png" alt="가상 API Key 발급 모달" class="screenshot-img" onclick="openLightbox(this)">
             </div>
             <div class="screenshot-desc">
-              키 명칭, 소속 부서/테넌트, 월간 예산 한도(USD), 분당 요청 제한(RPM), 분당 토큰 제한(TPM), PII 마스킹 강제 집행 체크박스, 허용 모델 목록 및 허용 IP 대역(CIDR)을 입력합니다.
+              키 명칭, 소속 부서/테넌트(드롭다운), 월간 예산 한도(USD), 분당 요청 제한(RPM), 분당 토큰 제한(TPM), PII 마스킹 강제 집행 체크박스, 허용 모델 목록 및 허용 IP 대역(CIDR)을 입력합니다.
             </div>
           </div>
 
@@ -1305,12 +1365,91 @@ bash scripts/verify-phase5.sh</code></pre>
         </div>
       </div>
 
-      <!-- Menu 4: FinOps -->
-      <div id="menu-finops" class="card">
-        <h3>4. FinOps 비용 통제 & 과금 분석 (FinOps & Budget Controls)</h3>
+      <!-- Menu 4: System Prompts Governance -->
+      <div id="menu-system-prompts" class="card">
+        <h3>4. 시스템 프롬프트 거버넌스 (System Prompt Governance & L7 Injection)</h3>
         <p>
-          사내 부서별 LLM 토큰 소비량을 실시간 집계하여 월간 예산 한도를 초과하지 않도록 통제하고,
-          사내 회계 정산 시스템 연동을 위한 UTF-8 BOM 한글 호환 CSV 청구서를 발행합니다.
+          전사 보안 가드레일, 부서별 전문 상담 페르소나, 라우트별 시큐어 코딩 지침을 통합 등록·관리하고,
+          Envoy L7 프록시 ext_proc 파이프라인을 통해 클라이언트 요청에 실시간으로 프롬프트를 자동 합성·주입(Dynamic Injection)합니다.
+        </p>
+
+        <div class="screenshot-box">
+          <div class="screenshot-header">
+            <span class="screenshot-tag">📜 Main Console Screen</span>
+            <span class="screenshot-caption">시스템 프롬프트 거버넌스 카탈로그 & KPI 대시보드</span>
+          </div>
+          <div class="screenshot-img-wrapper">
+            <img src="images/08_system_prompts_main.png" alt="시스템 프롬프트 거버넌스 메인 화면" class="screenshot-img" onclick="openLightbox(this)">
+          </div>
+          <div class="screenshot-desc">
+            등록된 시스템 프롬프트 목록, 활성화 토글 스위치, 바인딩 대상(가상키, 라우트, 테넌트, 전사), 주입 모드(PREPEND, APPEND, OVERRIDE), 상단 KPI 카드 및 실시간 주입 시뮬레이터 진입 버튼을 제공합니다.
+          </div>
+        </div>
+
+        <!-- Input 1: Add System Prompt Modal -->
+        <div id="input-add-system-prompt">
+          <h4>[사용자 입력 1] 신규 시스템 프롬프트 등록 & 다계층 바인딩</h4>
+          <p>새로운 시스템 프롬프트를 작성하고 우선순위가 적용될 바인딩 대상을 지정합니다.</p>
+
+          <div class="screenshot-box">
+            <div class="screenshot-header">
+              <span class="screenshot-tag">📝 User Input Form</span>
+              <span class="screenshot-caption">+ 신규 시스템 프롬프트 등록 모달</span>
+            </div>
+            <div class="screenshot-img-wrapper">
+              <img src="images/08_system_prompts_modal_add.png" alt="신규 시스템 프롬프트 등록 모달" class="screenshot-img" onclick="openLightbox(this)">
+            </div>
+            <div class="screenshot-desc">
+              프롬프트 명칭, 설명, 주입 모드(PREPEND / APPEND / OVERRIDE), 바인딩 대상(전사 GLOBAL / 테넌트 TENANT / 라우트 ROUTE / 가상키 VIRTUAL_KEY) 및 본문 내용을 작성합니다.
+            </div>
+          </div>
+
+          <div class="input-grid" style="margin-top: 1.2rem;">
+            <div class="input-card">
+              <div class="input-card-title">🎯 4단계 바인딩 우선순위 (Priority Hierarchy)</div>
+              <div class="input-card-desc">
+                동일 요청에 여러 프롬프트가 매칭될 경우 <strong>가상키(1순위) &gt; 라우트(2순위) &gt; 테넌트(3순위) &gt; 전사(4순위)</strong> 순서의 최우선 규칙이 단독 채택되어 일관된 정책 집행을 보장합니다.
+              </div>
+            </div>
+            <div class="input-card">
+              <div class="input-card-title">⚙️ 3대 주입 모드 (Injection Modes)</div>
+              <div class="input-card-desc">
+                <strong>PREPEND:</strong> 클라이언트의 기존 프롬프트 앞에 결합<br>
+                <strong>APPEND:</strong> 클라이언트 프롬프트 뒤에 덧붙임<br>
+                <strong>OVERRIDE:</strong> 클라이언트 프롬프트를 무시하고 등록된 프롬프트로 전면 대체
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input 2: System Prompt Simulator -->
+        <div id="input-system-prompt-sim" style="margin-top: 2rem;">
+          <h4>[운영자 제어 2] 실시간 L7 주입 시뮬레이터 (Prompt Injection Simulator)</h4>
+          <p>
+            호출 컨텍스트(가상키, 라우트, 테넌트)를 조합하여 최종 LLM으로 전달될 합성 페이로드(JSON)를 실시간 사전 검증합니다.
+          </p>
+
+          <div class="screenshot-box">
+            <div class="screenshot-header">
+              <span class="screenshot-tag">🧪 Interactive Simulator</span>
+              <span class="screenshot-caption">L7 게이트웨이 시스템 프롬프트 주입 시뮬레이터 검증 창</span>
+            </div>
+            <div class="screenshot-img-wrapper">
+              <img src="images/08_system_prompts_simulator.png" alt="시스템 프롬프트 시뮬레이터" class="screenshot-img" onclick="openLightbox(this)">
+            </div>
+            <div class="screenshot-desc">
+              가상키, 라우트, 테넌트 드롭다운을 선택하고 <code>[L7 주입 시뮬레이션 실행]</code>을 클릭하면 판정 성공 뱃지 및 최종 LLM에 전송될 <code>final_messages</code> JSON 구조를 즉각 대조할 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menu 5: FinOps -->
+      <div id="menu-finops" class="card">
+        <h3>5. FinOps 비용 통제 & 과금 분석 (FinOps & Budget Controls)</h3>
+        <p>
+          사내 부서별 LLM 토큰 소비량(Prompt / Completion / Total)과 실시간 누적 비용(USD)을 정밀 집계하여
+          월간 예산 한도를 초과하지 않도록 통제하고, 사내 회계 정산 시스템 연동을 위한 UTF-8 BOM 한글 호환 CSV 청구서를 발행합니다.
         </p>
 
         <div class="screenshot-box">
@@ -1322,11 +1461,17 @@ bash scripts/verify-phase5.sh</code></pre>
             <img src="images/04_finops_main.png" alt="FinOps 비용 & 예산 대시보드" class="screenshot-img" onclick="openLightbox(this)">
           </div>
           <div class="screenshot-desc">
-            당월 총 지출액, 예산 잔여율, 테넌트별 비용 소진율 프로그레스 바, 일별 비용 누적 차트, 부서별 상세 청구 테이블 및 CSV 다운로드 버튼을 제공합니다.
+            당월 총 지출액, 예산 잔여율, 부서(테넌트)별 비용 소진율 프로그레스 바, 일별 비용 누적 차트, 부서별 상세 청구 테이블 및 CSV 다운로드 버튼을 제공합니다.
           </div>
         </div>
 
         <div class="input-grid">
+          <div class="input-card">
+            <div class="input-card-title">⚡ 실시간 부서별 토큰 미터링 & 비용 과금</div>
+            <div class="input-card-desc">
+              가상 API Key에 바인딩된 부서(테넌트) 식별자를 기반으로 인그레스 토큰 소비량을 실시간 측정하며, 모델별 입력/출력 단가표에 따라 소수점 단위 비용까지 오차 없이 합산하여 부서별 누적 지출액을 즉각 갱신합니다.
+            </div>
+          </div>
           <div class="input-card">
             <div class="input-card-title">🛑 Hard Cap 예산 차단 메커니즘</div>
             <div class="input-card-desc">테넌트의 월간 토큰 누적 비용이 설정된 예산 한도(100%)에 도달하면 Envoy L7 프록시에서 즉각 HTTP 429 Too Many Requests 코드로 트래픽을 차단합니다.</div>
@@ -1338,9 +1483,9 @@ bash scripts/verify-phase5.sh</code></pre>
         </div>
       </div>
 
-      <!-- Menu 5: Compliance & WORM -->
+      <!-- Menu 6: Compliance & WORM -->
       <div id="menu-compliance" class="card">
-        <h3>5. PII 보안 룰 스튜디오 & 금융 감사 포렌식 (PII Governance & WORM Forensics)</h3>
+        <h3>6. PII 보안 룰 스튜디오 & 금융 감사 포렌식 (PII Governance & WORM Forensics)</h3>
         <p>
           금융위원회 및 전자금융감독규정에 따라 주민등록번호, 계좌번호, 카드번호 등 개인정보(PII)를 실시간 감지하여
           마스킹(MASK), 단방향 가명화(HASH), 전면 차단(BLOCK) 조치를 수행하고, 모든 원문/마스킹 페이로드를 위변조 불가(WORM) 감사 테이블에 기록합니다.
@@ -1430,9 +1575,9 @@ bash scripts/verify-phase5.sh</code></pre>
         </div>
       </div>
 
-      <!-- Menu 6: Lifecycle -->
+      <!-- Menu 7: Lifecycle -->
       <div id="menu-lifecycle" class="card">
-        <h3>6. 에어갭 긴급 패치 & 자가진단 (Lifecycle & Diagnostics Engine)</h3>
+        <h3>7. 에어갭 긴급 패치 & 자가진단 (Lifecycle & Diagnostics Engine)</h3>
         <p>
           외부 인터넷 연결이 불가능한 폐쇄망 환경에서 벤더가 오프라인으로 제공한 서명된 핫픽스 번들(<code>.tar.gz</code>)을 
           RSA-4096 / SHA-256 서명 검증을 거쳐 무중단 4단계 롤링 배포 및 원클릭 롤백할 수 있는 긴급 라이프사이클 엔진입니다.
@@ -1490,9 +1635,9 @@ bash scripts/verify-phase5.sh</code></pre>
         </div>
       </div>
 
-      <!-- Menu 7: Prompt Studio -->
+      <!-- Menu 8: Prompt Studio -->
       <div id="menu-prompt-studio" class="card">
-        <h3>7. 프롬프트 거버넌스 & 엔지니어링 스튜디오 (Prompt Studio)</h3>
+        <h3>8. 프롬프트 거버넌스 & 엔지니어링 스튜디오 (Prompt Studio)</h3>
         <p>
           엔터프라이즈 프롬프트를 작성 및 테스트하고, 백엔드 추론 결과와 PII 실시간 마스킹 치환본을 Side-by-Side로 대조 분석하며
           SHA-256 페이로드 무결성 해시를 확인하는 전문 엔지니어링 도구입니다.
@@ -1571,9 +1716,44 @@ docker compose down && docker compose up -d</code></pre>
         </div>
         <p><strong>원인 및 해결:</strong></p>
         <ul>
-          <li><strong>404 Not Found 발생 시:</strong> 요청 경로가 올바른지 확인하십시오. 라우팅 스튜디오에서 정의된 라우트 명칭에 맞춰 <code>POST http://localhost:8080/v1/routes/{route_name}</code> 또는 <code>POST http://localhost:8080/v1/chat/completions</code> (헤더 <code>x-orche-route: {route_name}</code>) 형식으로 요청해야 합니다.</li>
+          <li><strong>404 Not Found 발생 시:</strong> 요청 경로가 올바른지 확인하십시오. 라우팅 스튜디오에서 정의된 라우트 명칭에 맞춰 <code>POST http://localhost:8080/v1/routes/{route_name}</code>, 커스텀 하위 경로 <code>POST http://localhost:8080/v1/{route_path}/chat/completions</code>(예: <code>/v1/tech/chat/completions</code>) 또는 표준 <code>POST http://localhost:8080/v1/chat/completions</code> (헤더 <code>x-orche-route: {route_name}</code>) 형식으로 요청해야 합니다.</li>
           <li><strong>인증 헤더 누락:</strong> <code>Authorization: Bearer sk-orch-...</code> 형식의 가상 API Key 헤더가 반드시 포함되어야 합니다.</li>
           <li><strong>no healthy upstream 발생 시:</strong> Docker 네트워크 환경에서 IPv4 해석을 위해 <code>envoy.yaml</code>의 <code>backend_service</code> 클러스터에 <code>dns_lookup_family: V4_ONLY</code>가 선언되어 있는지 확인하고 Envoy 컨테이너를 재기동(<code>docker compose restart envoy</code>)하십시오.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Q5. 신규 로컬 LLM 컨테이너(예: gemma2:2b) 추가 후 헬스체크 핑(Ping)이 실패합니다.</span>
+        </div>
+        <p><strong>원인 및 해결:</strong></p>
+        <ul>
+          <li><strong>포트 포워딩 불일치:</strong> <code>docker-compose.yml</code>에서 Gemma 컨테이너가 <code>11435:11434</code>로 매핑되어 있다면, 오케스트레이터 백엔드(호스트 환경)에서는 포트 11434가 아닌 <strong>포트 11435</strong>(<code>http://host.docker.internal:11435/v1</code>)로 접속해야 합니다.</li>
+          <li><strong>도커 내부 네트워크 엔드포인트:</strong> 백엔드가 동일한 도커 브릿지 네트워크에 배포된 경우 서비스 컨테이너명인 <code>http://ollama-gemma:11434/v1</code>으로 엔드포인트를 지정하십시오.</li>
+          <li><strong>타임아웃 설정:</strong> 초기 모델 로딩(VRAM Cold Start) 시 응답이 지연될 수 있으므로, [서빙 모델 풀] 상단의 헬스체크 타임아웃을 5초~10초 이상으로 상향 조절하십시오.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Q6. 커스텀 라우트 경로(/v1/tech 등) 설정 후 OpenAI 클라이언트 호출 시 404가 반환됩니다.</span>
+        </div>
+        <p><strong>원인 및 해결:</strong></p>
+        <ul>
+          <li>OpenAI Python/Node.js SDK는 기본적으로 기본 URL 뒤에 <code>/chat/completions</code>를 자동 접미사로 붙여 요청합니다 (예: <code>http://localhost:8080/v1/tech/chat/completions</code>).</li>
+          <li>오케스트레이터 라우터는 <code>/v1/{route_path}/chat/completions</code> 및 <code>/v1/routes/{route_name}</code> 경로 패턴을 모두 감지하여 업스트림 모델의 <code>/v1/chat/completions</code> 엔드포인트로 투명하게 리라이트(Rewrite)합니다.</li>
+          <li>라우팅 스튜디오에서 라우트 경로가 <code>/v1/tech</code> 또는 <code>tech</code>로 올바르게 영속화되었는지 확인하십시오.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Q7. FinOps 비용 관제 화면에서 특정 부서의 사용 토큰량이나 비용이 실시간 갱신되지 않습니다.</span>
+        </div>
+        <p><strong>원인 및 해결:</strong></p>
+        <ul>
+          <li><strong>가상 API Key 테넌트 바인딩 확인:</strong> 호출 시 사용된 <code>sk-orch-...</code> 가상키가 <strong>[메뉴 3: 거버넌스]</strong>에서 해당 부서(테넌트)에 정상 귀속되어 있는지 확인하십시오. 테넌트가 매핑되지 않은 임의의 키는 전사 공통 또는 미분류로 집계될 수 있습니다.</li>
+          <li><strong>스트리밍 토큰 집계:</strong> SSE 스트리밍(<code>stream: true</code>) 응답의 경우 최종 청크에 포함된 <code>usage</code> 페이로드를 Envoy ext_proc가 파싱하여 비동기 WORM 감사 로그 및 FinOps 버퍼로 전달합니다. 요청 클라이언트에서 <code>stream_options: {"include_usage": true}</code> 옵션이 전달되는지 확인하십시오.</li>
         </ul>
       </div>
     </section>

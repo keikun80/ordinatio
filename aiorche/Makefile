@@ -1,5 +1,5 @@
 .PHONY: help setup test lint build run-backend run-frontend up down \
-	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -25,6 +25,7 @@ help:
 	@echo "  make verify-phase4             - Run Phase 4 DoD verification (PII Masking & WORM Audit)"
 	@echo "  make verify-phase5             - Run Phase 5 DoD verification (Lifecycle & RSA-4096 Hotfix)"
 	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
+	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
 	@echo "  make k8s-up                    - Deploy full stack to Kubernetes (alias of k8s-deploy)"
@@ -93,6 +94,9 @@ verify-phase5:
 
 verify-phase-system-prompt:
 	@bash scripts/verify-phase-system-prompt.sh
+
+verify-all-menus:
+	@bash scripts/verify-all-menus.sh
 
 
 # Kubernetes (Pod 배포, 라이프사이클 및 관리)

@@ -144,3 +144,33 @@ def update_tenant(
         updated_at=tenant.updated_at
     )
 
+
+@router.delete("/{tenant_id}")
+def delete_tenant(tenant_id: str, db: Session = Depends(get_db)):
+    """
+    테넌트(부서) 삭제
+    - 활성 상태(ACTIVE)인 가상키가 남아 있는 경우 400 반환 (먼저 파기/삭제 필요)
+    - 파기된 가상키는 자동 정리 후 테넌트 삭제 처리
+    """
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"테넌트를 찾을 수 없습니다: {tenant_id}")
+
+    active_keys = db.query(VirtualKey).filter(
+        VirtualKey.tenant_id == tenant_id,
+        VirtualKey.is_active == True
+    ).count()
+    if active_keys > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"활성 상태인 가상키({active_keys}개)가 남아있어 부서를 삭제할 수 없습니다. 먼저 키를 파기/삭제하십시오."
+        )
+
+    # Inactive keys cleanup
+    db.query(VirtualKey).filter(VirtualKey.tenant_id == tenant_id).delete(synchronize_session=False)
+    db.delete(tenant)
+    db.commit()
+
+    return {"tenant_id": tenant_id, "message": f"테넌트 [{tenant_id}]가 성공적으로 삭제되었습니다."}
+
+

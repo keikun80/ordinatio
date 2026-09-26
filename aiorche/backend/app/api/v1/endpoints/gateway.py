@@ -5,8 +5,10 @@ import ipaddress
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
+from decimal import Decimal
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import httpx
 
@@ -77,6 +79,71 @@ def is_ip_allowed(client_ip: str, allowed_cidrs: List[str]) -> bool:
         return False
     except ValueError:
         return False
+
+# -----------------------------------------------------------------------------
+# Helper: FinOps Real-time Token & Cost Metering
+# -----------------------------------------------------------------------------
+def record_token_and_cost_metering(
+    db: Session,
+    matched_key: Optional[VirtualKey],
+    model_entry: Optional[ModelCatalog],
+    prompt_tokens: int,
+    completion_tokens: int,
+    target_tenant_hint: Optional[str] = None
+) -> Dict[str, Any]:
+    """가상 API Key 및 부서(Tenant)에 실제 추론 토큰 소비량 및 비용(KRW)을 실시간으로 누적 반영"""
+    total_tokens = prompt_tokens + completion_tokens
+    input_price = float(model_entry.input_price_per_1k) if (model_entry and model_entry.input_price_per_1k) else 0.80
+    output_price = float(model_entry.output_price_per_1k) if (model_entry and model_entry.output_price_per_1k) else 2.40
+    cost_krw = round((prompt_tokens * input_price / 1000.0) + (completion_tokens * output_price / 1000.0), 2)
+    cost_decimal = Decimal(str(cost_krw))
+
+    target_key = matched_key
+    target_tenant = None
+
+    if target_tenant_hint:
+        hint_clean = str(target_tenant_hint).strip()
+        found_tenant = db.query(Tenant).filter(
+            or_(Tenant.department_code == hint_clean, Tenant.tenant_id == hint_clean, Tenant.name == hint_clean)
+        ).first()
+        if found_tenant:
+            target_tenant = found_tenant
+            if not target_key or target_key.tenant_id != found_tenant.tenant_id:
+                t_key = db.query(VirtualKey).filter(
+                    VirtualKey.tenant_id == found_tenant.tenant_id,
+                    VirtualKey.is_active == True
+                ).first()
+                if t_key:
+                    target_key = t_key
+
+    if not target_tenant and target_key:
+        target_tenant = db.query(Tenant).filter(Tenant.tenant_id == target_key.tenant_id).first()
+
+    if target_key:
+        target_key.total_tokens = (target_key.total_tokens or 0) + total_tokens
+        target_key.spent_krw = (target_key.spent_krw or Decimal("0.00")) + cost_decimal
+
+    if target_tenant:
+        target_tenant.spent_budget_krw = (target_tenant.spent_budget_krw or Decimal("0.00")) + cost_decimal
+
+    try:
+        db.commit()
+        if target_key:
+            db.refresh(target_key)
+        if target_tenant:
+            db.refresh(target_tenant)
+    except Exception as e:
+        logger.warning(f"FinOps metering commit failed: {e}")
+        db.rollback()
+
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "cost_krw": cost_krw,
+        "tenant_id": target_tenant.tenant_id if target_tenant else None,
+        "tenant_name": target_tenant.name if target_tenant else None
+    }
 
 # -----------------------------------------------------------------------------
 # Helper: Virtual Key Authenticator with Developer/Test Fallback
@@ -429,8 +496,28 @@ async def dispatch_chat_completion(
     prompt_toks = max(len(user_prompt) // 4 + 10, 5)
     compl_toks = 40
 
+    # Determine tenant attribution hint
+    policy_tenant_code = None
+    if db_policy and db_policy.match_conditions and db_policy.match_conditions.get("tenant_codes"):
+        policy_tenant_code = db_policy.match_conditions["tenant_codes"][0]
+    target_tenant_hint = request.headers.get("x-orche-tenant") or policy_tenant_code
+
     # 5. Format Return Payload
     if upstream_success and upstream_response_data:
+        usage_data = upstream_response_data.get("usage", {}) if isinstance(upstream_response_data, dict) else {}
+        actual_prompt_toks = usage_data.get("prompt_tokens", prompt_toks)
+        actual_compl_toks = usage_data.get("completion_tokens", compl_toks)
+        actual_total_toks = usage_data.get("total_tokens", actual_prompt_toks + actual_compl_toks)
+
+        finops_metering = record_token_and_cost_metering(
+            db=db,
+            matched_key=matched_key,
+            model_entry=model_entry,
+            prompt_tokens=actual_prompt_toks,
+            completion_tokens=actual_compl_toks,
+            target_tenant_hint=target_tenant_hint
+        )
+
         upstream_response_data["orche_metadata"] = {
             "routed_by": "Envoy AI Gateway + AgentRouter",
             "route_name": route_name,
@@ -445,7 +532,8 @@ async def dispatch_chat_completion(
             "policy_applied": routing_decision.policy_applied.value,
             "reasons": routing_decision.reasons,
             "pii_filtered": len(detections) > 0,
-            "status": "LIVE_UPSTREAM"
+            "status": "LIVE_UPSTREAM",
+            "finops": finops_metering
         }
         return upstream_response_data
 
@@ -465,6 +553,16 @@ async def dispatch_chat_completion(
             f"본 요청은 Envoy AI Gateway L7 ext_proc 및 AgentRouter의 실시간 인텐트 분류를 거쳐 안전하게 디스패치되었습니다."
         )
         resp_id = f"chatcmpl-agentrouter-{int(time.time()*1000)}"
+        sim_prompt_tokens = prompt_toks
+        sim_compl_tokens = len(sample_text) // 4 + 10
+        finops_metering = record_token_and_cost_metering(
+            db=db,
+            matched_key=matched_key,
+            model_entry=model_entry,
+            prompt_tokens=sim_prompt_tokens,
+            completion_tokens=sim_compl_tokens,
+            target_tenant_hint=target_tenant_hint
+        )
         return {
             "id": resp_id,
             "object": "chat.completion",
@@ -481,9 +579,9 @@ async def dispatch_chat_completion(
                 }
             ],
             "usage": {
-                "prompt_tokens": prompt_toks,
-                "completion_tokens": len(sample_text) // 4 + 10,
-                "total_tokens": prompt_toks + len(sample_text) // 4 + 10
+                "prompt_tokens": sim_prompt_tokens,
+                "completion_tokens": sim_compl_tokens,
+                "total_tokens": sim_prompt_tokens + sim_compl_tokens
             },
             "orche_metadata": {
                 "routed_by": "Envoy AI Gateway + AgentRouter",
@@ -499,7 +597,8 @@ async def dispatch_chat_completion(
                 "reasons": routing_decision.reasons,
                 "pii_filtered": len(detections) > 0,
                 "status": "SIMULATED_TEST",
-                "note": "개발자 단위 테스트 모드"
+                "note": "개발자 단위 테스트 모드",
+                "finops": finops_metering
             }
         }
 
@@ -630,3 +729,59 @@ def list_available_models(db: Session = Depends(get_db)):
         })
 
     return {"object": "list", "data": data}
+
+@router.post("/{custom_path:path}")
+async def gateway_custom_path_ingress(
+    custom_path: str,
+    req: ChatCompletionRequest,
+    request: Request,
+    response: Response,
+    authorization: Optional[str] = Header(None),
+    x_virtual_key: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """사용자 지정 라우트 경로 수신 엔드포인트: POST /v1/{custom_path}
+    RoutingPolicy의 match_conditions['path_prefix']를 조회하여 일치하는 정책으로 자동 디스패치
+    """
+    matched_key = authenticate_gateway_key(authorization, x_virtual_key, db, request)
+
+    clean_path = custom_path.strip("/")
+    req_full_path = f"/v1/{clean_path}"
+
+    # 1. 활성화된 RoutingPolicy 목록을 우선순위(priority 내림차순)로 검색
+    policies = db.query(RoutingPolicy).filter(RoutingPolicy.is_active == True).order_by(RoutingPolicy.priority.desc()).all()
+
+    matched_policy = None
+    for p in policies:
+        cond = p.match_conditions or {}
+        prefix = cond.get("path_prefix")
+        if prefix:
+            prefix_clean = prefix.strip("/")
+            if not prefix_clean.startswith("v1/"):
+                prefix_clean = f"v1/{prefix_clean}" if not prefix_clean.startswith("v1") else prefix_clean
+            expected_full = f"/{prefix_clean}"
+            if req_full_path == expected_full or req_full_path.startswith(f"{expected_full}/"):
+                matched_policy = p
+                break
+
+        # 라우트 이름 자체가 custom_path와 일치하는 경우도 지원
+        if clean_path == p.route_name:
+            matched_policy = p
+            break
+
+    if not matched_policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"요청 경로 '{req_full_path}'와 매칭되는 활성 라우팅 정책(path_prefix)을 찾을 수 없습니다."
+        )
+
+    return await dispatch_chat_completion(
+        route_name=matched_policy.route_name,
+        req=req,
+        raw_auth=authorization or x_virtual_key,
+        matched_key=matched_key,
+        db=db,
+        request=request,
+        response=response
+    )
+

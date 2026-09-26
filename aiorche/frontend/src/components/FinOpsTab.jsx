@@ -219,11 +219,26 @@ export default function FinOpsTab({ onNotify }) {
                       <span className="badge active">🟢 예산 사용 정상</span>
                     )}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
-                    <strong style={{ color: isBlocked ? '#fb7185' : '#ffffff' }}>₩{Math.round(t.spent).toLocaleString()}</strong> / ₩{Math.round(t.budget).toLocaleString()}
-                    <span style={{ marginLeft: '8px', fontWeight: 700, color: isBlocked ? '#f43f5e' : isWarning ? '#fbbf24' : '#38bdf8' }}>
-                      ({percent}%)
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ 
+                      fontSize: '0.78rem', 
+                      background: 'rgba(56, 189, 248, 0.12)', 
+                      border: '1px solid rgba(56, 189, 248, 0.3)', 
+                      borderRadius: '4px', 
+                      padding: '2px 8px', 
+                      color: '#38bdf8', 
+                      fontFamily: 'var(--font-mono)' 
+                    }}>
+                      ⚡ {(t.totalTokens || 0).toLocaleString()} tokens
                     </span>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+                      <strong style={{ color: isBlocked ? '#fb7185' : '#ffffff' }}>
+                        ₩{t.spent > 0 && t.spent < 100 ? Number(t.spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.spent).toLocaleString()}
+                      </strong> / ₩{Math.round(t.budget).toLocaleString()}
+                      <span style={{ marginLeft: '8px', fontWeight: 700, color: isBlocked ? '#f43f5e' : isWarning ? '#fbbf24' : '#38bdf8' }}>
+                        ({percent}%)
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -241,7 +256,12 @@ export default function FinOpsTab({ onNotify }) {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                  <span>{t.hardCap ? '🛡️ 하드 캡(Hard Cap) 100% 자동 차단 활성' : '⚠️ 초과 사용 허용 (소프트 캡)'}</span>
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <span>{t.hardCap ? '🛡️ 하드 캡(Hard Cap) 100% 자동 차단 활성' : '⚠️ 초과 사용 허용 (소프트 캡)'}</span>
+                    <span style={{ color: '#94a3b8' }}>
+                      누적 소비량: <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{(t.totalTokens || 0).toLocaleString()}</strong> tokens
+                    </span>
+                  </div>
                   {isBlocked && (
                     <button 
                       className="btn btn-secondary btn-sm"

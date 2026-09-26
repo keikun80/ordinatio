@@ -324,6 +324,10 @@ async def _execute_single_test_call(
     ensure_system_diagnostics_key(db)
     auth_header_val = f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"
 
+    primary_tenant_code = None
+    if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
+        primary_tenant_code = policy.match_conditions["tenant_codes"][0]
+
     if method == "path":
         target_path = path_prefix
         request_headers = {
@@ -331,6 +335,8 @@ async def _execute_single_test_call(
             "Authorization": auth_header_val,
             "x-strict-upstream": "true"
         }
+        if primary_tenant_code:
+            request_headers["x-orche-tenant"] = primary_tenant_code
     else:
         target_path = "/v1/chat/completions"
         request_headers = {
@@ -339,8 +345,8 @@ async def _execute_single_test_call(
             "x-orche-route": route_name,
             "x-strict-upstream": "true"
         }
-        if policy.match_conditions and policy.match_conditions.get("tenant_codes"):
-            request_headers["x-orche-tenant"] = policy.match_conditions["tenant_codes"][0]
+        if primary_tenant_code:
+            request_headers["x-orche-tenant"] = primary_tenant_code
 
     weights = traffic_weights if (traffic_weights is not None and len(traffic_weights) > 0) else (policy.traffic_weights or [])
     

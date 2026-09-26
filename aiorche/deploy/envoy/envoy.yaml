@@ -46,6 +46,11 @@ static_resources:
                 route:
                   cluster: backend_service
                   timeout: 10s
+              - match:
+                  prefix: "/v1"
+                route:
+                  cluster: backend_service
+                  timeout: 120s
           http_filters:
           - name: envoy.filters.http.router
             typed_config:

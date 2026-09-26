@@ -63,7 +63,7 @@ export default function Sidebar({
       isAccordion: true,
       subItems: routingSubItems
     },
-    { id: 'virtual-keys', label: '가상 API Key 거버넌스', icon: KeyRound },
+    { id: 'virtual-keys', label: '거버넌스', icon: KeyRound },
     { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText, badge: 'L7 주입' },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
     { id: 'compliance', label: 'PII 보안 & 감사 포렌식', icon: ShieldAlert },

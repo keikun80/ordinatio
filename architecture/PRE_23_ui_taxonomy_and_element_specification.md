@@ -34,7 +34,7 @@
 * **탭 코드(TAB_CODE)**:
   * `COM`: 전역 공통 (Header, Sidebar, Navigation)
   * `OV`: Overview (총괄 관제 대시보드)
-  * `VK`: Virtual Keys (멀티 테넌트 가상 API Key 거버넌스)
+  * `VK`: Virtual Keys (거버넌스)
   * `RT`: Routing (동적 라우팅, 가중치 분할기, 장애 우회, xDS 배포)
   * `SP`: System Prompts (시스템 프롬프트 거버넌스 및 동적 인라인 주입)
   * `FO`: FinOps (비용 계량, 모델 단가, 하드 캡)
@@ -80,7 +80,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | :--- | :--- | :---: | :--- | :--- |
 | `SCR-COM-01` | `com-sidebar-nav` | `nav` | 사이드바 내비게이션 바 | 전체 탭 이동 컨테이너 |
 | `SCR-COM-01` | `com-tab-overview` | `tab` | 관제 홈 (Overview) | Overview 탭 활성화 |
-| `SCR-COM-01` | `com-tab-virtualkeys` | `tab` | 가상 API Key (Virtual Keys) | Virtual Keys 탭 활성화 |
+| `SCR-COM-01` | `com-tab-virtualkeys` | `tab` | 거버넌스 (Governance) | Governance 탭 활성화 |
 | `SCR-COM-01` | `com-tab-routing` | `tab` | 동적 라우팅 (Routing) | Dynamic Routing 탭 활성화 |
 | `SCR-COM-01` | `com-tab-systemprompts` | `tab` | 시스템 프롬프트 (System Prompts) | System Prompts 탭 활성화 |
 | `SCR-COM-01` | `com-tab-finops` | `tab` | 비용 관제 (FinOps) | FinOps 탭 활성화 |
@@ -94,7 +94,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 
 ---
 
-### 3.2 [VK] 가상 API Key 거버넌스 (`SCR-VK-*`)
+### 3.2 [VK] 거버넌스 (`SCR-VK-*`)
 | Screen ID | Element/Test ID (`data-testid`) | 요소 형태 | 공식 명칭 (UI Label) | Function ID | 백엔드 API 연동 |
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | `SCR-VK-01` | `vk-card-total` | `card` | 전체 발급 키 수 | - | `GET /api/v1/virtual-keys` |

@@ -364,7 +364,7 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* Page Header */}
       <div className="page-header" data-testid="vk-header-section">
         <div className="page-title-wrap">
-          <h1>가상 API Key & 테넌트 거버넌스</h1>
+          <h1>거버넌스</h1>
           <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>

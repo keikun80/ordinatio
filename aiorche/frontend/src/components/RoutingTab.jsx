@@ -150,6 +150,9 @@ export default function RoutingTab({
     return localStorage.getItem('aiorche_xds_revision') || 'xds-rev-20260911-1422';
   });
 
+  // Registered Tenants List for Mapping
+  const [availableTenants, setAvailableTenants] = useState([]);
+
   // Health Check States
   const [healthStatus, setHealthStatus] = useState({});
   const [isHealthCheckingAll, setIsHealthCheckingAll] = useState(false);
@@ -415,11 +418,16 @@ export default function RoutingTab({
   useEffect(() => {
     async function loadData() {
       try {
-        const [modelsRes, routesRes, activePolicyRes] = await Promise.all([
+        const [modelsRes, routesRes, activePolicyRes, tenantsRes] = await Promise.all([
           apiClient.getModels(),
           apiClient.getRoutes(),
-          apiClient.getActiveRoutingPolicy()
+          apiClient.getActiveRoutingPolicy(),
+          apiClient.getTenants()
         ]);
+
+        if (Array.isArray(tenantsRes)) {
+          setAvailableTenants(tenantsRes);
+        }
 
         if (Array.isArray(modelsRes)) {
           const mapped = modelsRes.map(m => ({
@@ -1394,20 +1402,99 @@ print(response.choices[0].message.content)`;
               </div>
 
               <div>
-                <label className="form-label" style={{ marginBottom: '4px' }}>적용 대상 부서/테넌트 코드 (쉼표로 구분)</label>
-                <input
-                  className="form-input"
-                  placeholder="예: WM-01, LOAN-01"
-                  value={(currentRoute.match_conditions?.tenant_codes || []).join(', ')}
+                <label className="form-label" style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>적용 대상 테넌트/부서 매핑</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    등록된 테넌트 목록에서 선택
+                  </span>
+                </label>
+                
+                {/* Selected tenant badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', minHeight: '26px' }}>
+                  {(currentRoute.match_conditions?.tenant_codes || []).length === 0 ? (
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '3px 0' }}>
+                      (지정된 테넌트 없음 — 전체 부서 공통 라우트)
+                    </span>
+                  ) : (
+                    (currentRoute.match_conditions?.tenant_codes || []).map(code => {
+                      const matchedT = availableTenants.find(t => t.department_code === code || t.tenant_id === code);
+                      const displayName = matchedT ? `${matchedT.name} (${code})` : code;
+                      return (
+                        <span
+                          key={code}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            color: '#38bdf8',
+                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          <span>{displayName}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = (currentRoute.match_conditions?.tenant_codes || []).filter(c => c !== code);
+                              updateCurrentRoute({
+                                match_conditions: { ...currentRoute.match_conditions, tenant_codes: remaining }
+                              });
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#38bdf8',
+                              cursor: 'pointer',
+                              padding: '0 2px',
+                              fontSize: '0.85rem',
+                              lineHeight: 1
+                            }}
+                            title="매핑 해제"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Dropdown to select existing tenants */}
+                <select
+                  className="form-select"
+                  value=""
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const codes = raw.split(',').map(s => s.trim()).filter(Boolean);
-                    updateCurrentRoute({
-                      match_conditions: { ...currentRoute.match_conditions, tenant_codes: codes }
-                    });
+                    const selectedCode = e.target.value;
+                    if (!selectedCode) return;
+                    const currentCodes = currentRoute.match_conditions?.tenant_codes || [];
+                    if (!currentCodes.includes(selectedCode)) {
+                      updateCurrentRoute({
+                        match_conditions: { ...currentRoute.match_conditions, tenant_codes: [...currentCodes, selectedCode] }
+                      });
+                    }
+                    e.target.value = "";
                   }}
-                />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  style={{ fontSize: '0.82rem' }}
+                >
+                  <option value="">+ 기존 등록된 테넌트(부서) 선택하여 추가 매핑...</option>
+                  {availableTenants.map(t => {
+                    const isAlreadySelected = (currentRoute.match_conditions?.tenant_codes || []).includes(t.department_code);
+                    return (
+                      <option
+                        key={t.department_code}
+                        value={t.department_code}
+                        disabled={isAlreadySelected}
+                      >
+                        {t.name} ({t.department_code}) {isAlreadySelected ? '✓ 매핑됨' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   해당 테넌트의 API Key(헤더 `x-orche-tenant`)로 호출 시 이 라우트가 자동 선택됩니다.
                 </span>
               </div>
@@ -2931,12 +3018,21 @@ print(response.choices[0].message.content)`;
                   </div>
                   <div className="form-group">
                     <label className="form-label">매칭 테넌트 (선택)</label>
-                    <input
-                      className="form-input"
-                      placeholder="예: LOAN-01"
+                    <select
+                      className="form-select"
                       value={newRouteForm.match_tenant}
                       onChange={(e) => setNewRouteForm({ ...newRouteForm, match_tenant: e.target.value })}
-                    />
+                    >
+                      <option value="">-- 전체 공통 (테넌트 제한 없음) --</option>
+                      {availableTenants.map(t => (
+                        <option key={t.department_code} value={t.department_code}>
+                          {t.name} ({t.department_code})
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                      등록된 테넌트 중 이 라우트를 전용으로 사용할 부서를 선택합니다.
+                    </span>
                   </div>
                 </div>
 

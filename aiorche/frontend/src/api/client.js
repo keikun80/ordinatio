@@ -111,7 +111,7 @@ export const apiClient = {
     });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || '가상 API Key 발급 실패');
+      throw new Error(err.detail || 'API Key 발급 실패');
     }
     return await res.json();
   },

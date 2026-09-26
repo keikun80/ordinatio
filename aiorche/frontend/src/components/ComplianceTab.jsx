@@ -702,7 +702,7 @@ export default function ComplianceTab({ onNotify }) {
               <tr>
                 <th>발생 일시 (KST)</th>
                 <th>요청자 식별</th>
-                <th>가상 API Key</th>
+                <th>API Key</th>
                 <th>호출 모델</th>
                 <th>조치 내역</th>
                 <th>원문/페이로드 SHA-256</th>

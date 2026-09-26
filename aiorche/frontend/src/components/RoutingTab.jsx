@@ -1408,7 +1408,7 @@ print(response.choices[0].message.content)`;
                   }}
                 />
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  해당 테넌트의 가상 API Key(헤더 `x-orche-tenant`)로 호출 시 이 라우트가 자동 선택됩니다.
+                  해당 테넌트의 API Key(헤더 `x-orche-tenant`)로 호출 시 이 라우트가 자동 선택됩니다.
                 </span>
               </div>
 

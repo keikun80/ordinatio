@@ -296,7 +296,7 @@ export default function SystemPromptsTab({ onNotify }) {
             <span>시스템 프롬프트 거버넌스</span>
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '4px' }}>
-            사내 표준 페르소나 및 금융 보안 가드레일을 등록하고, <strong>[라우팅 정책 · 가상 API Key · 테넌트]</strong>에 1:1로 연결하여 LLM 호출 시 자동 주입합니다.
+            사내 표준 페르소나 및 금융 보안 가드레일을 등록하고, <strong>[라우팅 정책 · API Key · 테넌트]</strong>에 1:1로 연결하여 LLM 호출 시 자동 주입합니다.
           </p>
         </div>
 
@@ -352,7 +352,7 @@ export default function SystemPromptsTab({ onNotify }) {
         </div>
 
         <div className="card" data-testid="sp-card-vkey" style={{ padding: '16px', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>가상 API Key 바인딩</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>API Key 바인딩</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f59e0b', marginTop: '4px' }}>
             {vkeyBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>개 가상키</span>
           </div>
@@ -380,7 +380,7 @@ export default function SystemPromptsTab({ onNotify }) {
             {[
               { id: 'ALL', label: '전체 보기' },
               { id: 'ROUTE', label: '라우팅 정책' },
-              { id: 'VIRTUAL_KEY', label: '가상 API Key' },
+              { id: 'VIRTUAL_KEY', label: 'API Key' },
               { id: 'TENANT', label: '테넌트 / 부서' },
               { id: 'GLOBAL', label: '전사 공통' }
             ].map((tab) => (
@@ -644,7 +644,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
                     {[
                       { id: 'ROUTE', label: '라우팅 정책 (Route)', icon: GitFork },
-                      { id: 'VIRTUAL_KEY', label: '가상 API Key', icon: KeyRound },
+                      { id: 'VIRTUAL_KEY', label: 'API Key', icon: KeyRound },
                       { id: 'TENANT', label: '테넌트 / 부서', icon: Users },
                       { id: 'GLOBAL', label: '전사 공통 (Global)', icon: Globe }
                     ].map((item) => (
@@ -704,7 +704,7 @@ export default function SystemPromptsTab({ onNotify }) {
 
                   {formTargetType === 'VIRTUAL_KEY' && (
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem' }}>적용할 가상 API Key 선택 (1순위 최고 우선권)</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>적용할 API Key 선택 (1순위 최고 우선권)</label>
                       <select
                         className="form-select"
                         data-testid="sp-select-target-vkey"

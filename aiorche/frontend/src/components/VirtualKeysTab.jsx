@@ -182,7 +182,7 @@ export default function VirtualKeysTab({ onNotify }) {
     saveKeys(updatedKeys);
     setEditingKey(null);
     setIsLoading(false);
-    onNotify('SUCCESS', `가상 API Key [${editingKey.keyId}]의 변경 내용이 성공적으로 저장되었습니다.`);
+    onNotify('SUCCESS', `API Key [${editingKey.keyId}]의 변경 내용이 성공적으로 저장되었습니다.`);
   };
 
   // Toggle Key Status (Revoke / Activate)
@@ -233,12 +233,12 @@ export default function VirtualKeysTab({ onNotify }) {
       await apiClient.deleteVirtualKey(keyId, isForce);
       const updatedKeys = keys.filter((k) => k.keyId !== keyId);
       saveKeys(updatedKeys);
-      onNotify('SUCCESS', `가상 API Key [${name}]가 성공적으로 영구 삭제되었습니다.`);
+      onNotify('SUCCESS', `API Key [${name}]가 성공적으로 영구 삭제되었습니다.`);
     } catch (err) {
       console.warn('Backend delete error, removing from local state:', err);
       const updatedKeys = keys.filter((k) => k.keyId !== keyId);
       saveKeys(updatedKeys);
-      onNotify('SUCCESS', `가상 API Key [${name}]가 삭제되었습니다.`);
+      onNotify('SUCCESS', `API Key [${name}]가 삭제되었습니다.`);
     } finally {
       setIsLoading(false);
       setKeyToDelete(null);
@@ -297,7 +297,7 @@ export default function VirtualKeysTab({ onNotify }) {
       });
       setShowSecretModal(true);
 
-      onNotify('SUCCESS', `가상 API Key [${result.key_id}]가 성공적으로 발급되었습니다. 1회성 토큰을 복사하십시오.`);
+      onNotify('SUCCESS', `API Key [${result.key_id}]가 성공적으로 발급되었습니다. 1회성 토큰을 복사하십시오.`);
     } catch (err) {
       // Fallback for offline mode with persistent localStorage
       console.warn('Backend create offline, creating persistent local key:', err);
@@ -334,7 +334,7 @@ export default function VirtualKeysTab({ onNotify }) {
       });
       setShowSecretModal(true);
 
-      onNotify('SUCCESS', `가상 API Key [${generatedId}]가 성공적으로 발급 및 영구 저장되었습니다.`);
+      onNotify('SUCCESS', `API Key [${generatedId}]가 성공적으로 발급 및 영구 저장되었습니다.`);
     } finally {
       setIsLoading(false);
     }
@@ -345,7 +345,7 @@ export default function VirtualKeysTab({ onNotify }) {
       navigator.clipboard.writeText(createdSecret.rawKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-      onNotify('INFO', '가상 API Key가 클립보드에 안전하게 복사되었습니다.');
+      onNotify('INFO', 'API Key가 클립보드에 안전하게 복사되었습니다.');
     }
   };
 
@@ -375,7 +375,7 @@ export default function VirtualKeysTab({ onNotify }) {
             onClick={() => setShowCreateModal(true)}
           >
             <Plus size={16} />
-            <span>신규 가상 API Key 발급</span>
+            <span>신규 API Key 발급</span>
           </button>
         </div>
       </div>
@@ -437,10 +437,10 @@ export default function VirtualKeysTab({ onNotify }) {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                       <KeyRound size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        발급된 가상 API Key가 없습니다
+                        발급된 API Key가 없습니다
                       </div>
                       <div style={{ fontSize: '0.8rem' }}>
-                        상단의 '+ 신규 가상 API Key 발급' 버튼을 눌러 안전한 가상키를 생성하세요.
+                        상단의 '+ 신규 API Key 발급' 버튼을 눌러 안전한 API Key를 생성하세요.
                       </div>
                     </div>
                   </td>
@@ -545,7 +545,7 @@ export default function VirtualKeysTab({ onNotify }) {
               <div className="modal-header">
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Sliders size={18} style={{ color: '#38bdf8' }} />
-                  <span>가상 API Key 설정 변경 [{editingKey.keyId}]</span>
+                  <span>API Key 설정 변경 [{editingKey.keyId}]</span>
                 </div>
               </div>
               <div className="modal-body">
@@ -710,7 +710,7 @@ export default function VirtualKeysTab({ onNotify }) {
             <form onSubmit={handleCreateKey}>
               <div className="modal-header">
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff' }}>
-                  🔑 신규 가상 API Key 발급 마법사
+                  🔑 신규 API Key 발급 마법사
                 </div>
               </div>
               <div className="modal-body">
@@ -859,7 +859,7 @@ export default function VirtualKeysTab({ onNotify }) {
             <div className="modal-header" style={{ borderColor: 'rgba(245, 158, 11, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f59e0b', fontWeight: 700, fontSize: '1.08rem' }}>
                 <ShieldCheck size={22} />
-                <span>가상 API Key 발급 완료 (단 1회성 시크릿 노출)</span>
+                <span>API Key 발급 완료 (단 1회성 시크릿 노출)</span>
               </div>
             </div>
 
@@ -869,7 +869,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <AlertTriangle size={20} style={{ color: '#fbbf24', flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ fontSize: '0.84rem', color: '#fef3c7', lineHeight: 1.5 }}>
                     <strong>보안 경고 (Security Warning):</strong><br />
-                    이 가상 API Key는 지금 <strong>단 1회만 평문으로 표시</strong>됩니다. 데이터베이스에는 <strong>Argon2id 솔트 해시</strong>로만 안전하게 보관되므로, 본 창을 닫으면 <strong>절대 다시 확인할 수 없습니다</strong>.
+                    이 API Key는 지금 <strong>단 1회만 평문으로 표시</strong>됩니다. 데이터베이스에는 <strong>Argon2id 솔트 해시</strong>로만 안전하게 보관되므로, 본 창을 닫으면 <strong>절대 다시 확인할 수 없습니다</strong>.
                   </div>
                 </div>
               </div>
@@ -882,7 +882,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   Key ID: <code style={{ color: '#38bdf8' }}>{createdSecret.keyId}</code>
                 </div>
 
-                <label className="form-label" style={{ fontWeight: 600, color: '#e2e8f0' }}>생성된 32자리 보안 가상 API Key</label>
+                <label className="form-label" style={{ fontWeight: 600, color: '#e2e8f0' }}>생성된 32자리 보안 API Key</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     readOnly
@@ -951,7 +951,7 @@ export default function VirtualKeysTab({ onNotify }) {
             <div className="modal-header" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', fontWeight: 700, fontSize: '1.05rem' }}>
                 <Trash2 size={20} />
-                <span>가상 API Key 영구 삭제 확인</span>
+                <span>API Key 영구 삭제 확인</span>
               </div>
             </div>
 
@@ -972,7 +972,7 @@ export default function VirtualKeysTab({ onNotify }) {
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <AlertTriangle size={20} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
                     <div style={{ fontSize: '0.84rem', color: '#fde68a', lineHeight: 1.5 }}>
-                      파기된 가상 API Key를 데이터베이스에서 <strong>영구 삭제</strong>합니다.<br />
+                      파기된 API Key를 데이터베이스에서 <strong>영구 삭제</strong>합니다.<br />
                       삭제된 키는 다시 복구할 수 없습니다. 계속하시겠습니까?
                     </div>
                   </div>

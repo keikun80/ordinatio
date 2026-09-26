@@ -117,7 +117,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | `SCR-VK-M01`| `vk-modal-btn-submit` | `btn` | 발급 완료 및 비밀키 생성 | `FNC-VK-ISSUE` | `POST /api/v1/virtual-keys` |
 | `SCR-VK-M01`| `vk-modal-btn-cancel` | `btn` | 취소 | - | 모달 닫기 |
 | `SCR-VK-M02`| `vk-modal-secret` | `modal` | 1회성 비밀키 노출 팝업 | - | `sk-orch-...` 평문 1회 표출 |
-| `SCR-VK-M02`| `vk-modal-secret-value`| `input` | 생성된 가상 API Key | - | 읽기 전용 비밀키 값 |
+| `SCR-VK-M02`| `vk-modal-secret-value`| `input` | 생성된 API Key | - | 읽기 전용 비밀키 값 |
 | `SCR-VK-M02`| `vk-modal-btn-copy-secret`| `btn` | 비밀키 전체 복사 | - | 클립보드 복사 |
 | `SCR-VK-M02`| `vk-modal-btn-close-secret`| `btn` | 복사 완료 및 닫기 | - | 모달 닫기 (영구 마스킹) |
 
@@ -141,7 +141,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | `SCR-RT-03` | `rt-failover-select-${idx}`| `select`| N차 폴백 타겟 모델 선택 | - | 장애 대체 모델 지정 |
 | `SCR-RT-03` | `rt-failover-btn-add` | `btn` | 폴백 단계 추가 | - | 장애 우회 순위 추가 |
 | `SCR-RT-04` | `rt-testbench-card` | `card` | 라우팅 테스트벤치 | - | 라우팅 즉시 시뮬레이션 콘솔 |
-| `SCR-RT-04` | `rt-testbench-select-key` | `select` | 테스트용 가상 API Key | - | Authorization 헤더 주입 |
+| `SCR-RT-04` | `rt-testbench-select-key` | `select` | 테스트용 API Key | - | Authorization 헤더 주입 |
 | `SCR-RT-04` | `rt-testbench-input-prompt`| `textarea` | 테스트 프롬프트 메시지 | - | 테스트 페이로드 |
 | `SCR-RT-04` | `rt-testbench-btn-send` | `btn` | 라우팅 테스트 요청 전송 | `FNC-RT-TEST` | `POST /api/v1/routes/test` (45s 타임아웃) |
 | `SCR-RT-04` | `rt-testbench-output` | `pre` | 게이트웨이 응답 및 라우팅 결과 | - | 실제 응답 모델 및 응답 시간 표출 |

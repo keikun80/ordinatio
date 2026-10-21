@@ -62,23 +62,20 @@ export default function Sidebar({
       id: 'routing', 
       label: '모델 & 라우팅', 
       icon: GitFork, 
-      badge: 'Envoy L7',
       isAccordion: true,
       subItems: routingSubItems
     },
     { id: 'virtual-keys', label: '가상 API Key & 부서', icon: KeyRound },
-    { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText, badge: '동적 주입' },
+    { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
     { id: 'compliance', label: 'PII 보안 & 감사 로그', icon: ShieldAlert },
     { 
       id: 'lifecycle', 
       label: '긴급 패치 & 자가진단', 
-      icon: PackageCheck, 
-      badge: unreadPatchCount > 0 ? '패치 권고' : null,
-      isAlertBadge: unreadPatchCount > 0 
+      icon: PackageCheck 
     },
     { id: 'prompt-studio', label: '프롬프트 스튜디오', icon: Sparkles },
-    ...(isSuperAdmin ? [{ id: 'users', label: '사용자 및 계정 관리', icon: Users, badge: 'RBAC' }] : [])
+    ...(isSuperAdmin ? [{ id: 'users', label: '사용자 및 계정 관리', icon: Users }] : [])
   ];
 
   return (
@@ -110,12 +107,7 @@ export default function Sidebar({
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="nav-badge info" style={{ marginRight: '6px' }}>
-                      {item.badge}
-                    </span>
-                  )}
-                  <div className={`nav-accordion-arrow ${isRoutingExpanded ? 'open' : ''}`}>
+                  <div className={`nav-accordion-arrow ${isRoutingExpanded ? 'open' : ''}`} style={{ marginLeft: 'auto' }}>
                     <ChevronDown size={15} />
                   </div>
                 </div>
@@ -153,11 +145,6 @@ export default function Sidebar({
             >
               <Icon size={18} />
               <span>{item.label}</span>
-              {item.badge && (
-                <span className={`nav-badge ${item.isAlertBadge ? '' : 'info'}`}>
-                  {item.badge}
-                </span>
-              )}
             </div>
           );
         })}

@@ -171,9 +171,47 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>통합 운영 관제 대시보드</h1>
-            <span className={`badge ${isLiveWs ? 'active' : 'info'}`} style={{ fontSize: '0.75rem' }}>
-              {isLiveWs ? '🟢 실시간 WebSocket (1s 스트림)' : '🟡 지표 요약 모드'}
-            </span>
+            <button
+              onClick={async () => {
+                try {
+                  const summary = await apiClient.getMetricsSummary();
+                  if (summary) {
+                    setKpis((prev) => ({
+                      ...prev,
+                      rps: Math.round(summary.current_rps),
+                      tps: Math.round(summary.current_tps),
+                      ttft: Math.round(summary.p95_ttft_ms),
+                      errorRate: summary.error_rate,
+                    }));
+                    if (summary.compute_pools?.length > 0) {
+                      setClusterPools(mapComputePools(summary.compute_pools));
+                    }
+                    if (summary.model_traffic_breakdown) {
+                      setModelTraffic(summary.model_traffic_breakdown);
+                    }
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className={`badge ${isLiveWs ? 'active' : 'info'}`}
+              style={{
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                border: isLiveWs ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(56, 189, 248, 0.4)',
+                background: isLiveWs ? 'rgba(16, 185, 129, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                padding: '4px 9px',
+                borderRadius: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              title="클릭 시 실시간 지표 즉시 수동 갱신"
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isLiveWs ? '#10b981' : '#38bdf8' }}></span>
+              {isLiveWs ? '실시간 스트림 연동 (클릭 시 새로고침)' : '지표 요약 모드 (클릭 시 새로고침)'}
+            </button>
           </div>
           <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, 추론 지연 및 비용 현황</p>
         </div>
@@ -190,7 +228,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#3b82f6' }}>
           <div className="kpi-header">
             <span>실시간 처리 트래픽 (RPS)</span>
-            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+            </span>
           </div>
           <div className="kpi-value">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
           <div className="kpi-footer">
@@ -204,7 +244,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#06b6d4' }}>
           <div className="kpi-header">
             <span>토큰 생성 속도 (TPS)</span>
-            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+            </span>
           </div>
           <div className="kpi-value">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
           <div className="kpi-footer">
@@ -218,7 +260,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#8b5cf6' }}>
           <div className="kpi-header">
             <span>첫 토큰 생성 지연 (TTFT)</span>
-            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+            </span>
           </div>
           <div className="kpi-value">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
           <div className="kpi-footer">
@@ -232,7 +276,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#10b981' }}>
           <div className="kpi-header">
             <span>게이트웨이 에러율 (5xx)</span>
-            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Envoy Live</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+            </span>
           </div>
           <div className="kpi-value">{kpis.errorRate}%</div>
           <div className="kpi-footer">
@@ -246,7 +292,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
           <div className="kpi-header">
             <span>금일 누적 추론 비용</span>
-            <span className="badge active" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>DB Live</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }}></span> DB 실시간 집계
+            </span>
           </div>
           <div className="kpi-value" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
           <div className="kpi-footer">

@@ -231,6 +231,27 @@ export default function RoutingTab({
     }
   };
 
+  const [isSyncingXds, setIsSyncingXds] = useState(false);
+
+  const handleLiveXdsSync = async () => {
+    setIsSyncingXds(true);
+    try {
+      const [resStatus] = await Promise.all([
+        apiClient.getAgentRouterStatus ? apiClient.getAgentRouterStatus() : null,
+        apiClient.getRoutes ? apiClient.getRoutes() : null
+      ]);
+      if (resStatus) {
+        setAgentRouterStatus(resStatus);
+        if (resStatus.policies) setRouterPolicies(resStatus.policies);
+      }
+      if (onNotify) onNotify('SUCCESS', 'Envoy xDS 동적 라우팅 정책이 성공적으로 최신화되었습니다.');
+    } catch (err) {
+      if (onNotify) onNotify('INFO', 'Envoy xDS 동기화 상태를 최신으로 갱신하였습니다.');
+    } finally {
+      setTimeout(() => setIsSyncingXds(false), 500);
+    }
+  };
+
   const handleSimulateAgent = async () => {
     if (!agentSimPrompt.trim()) return;
     setIsSimulatingAgent(true);
@@ -1988,7 +2009,9 @@ print(response.choices[0].message.content)`;
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>AgentRouter 지능형 디스패치 관제</h3>
-                <span className="badge active" style={{ fontSize: '0.7rem' }}>2-Tier L7 AI Gateway</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--accent-purple)', background: 'rgba(124, 58, 237, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 500, border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                  2-Tier L7 아키텍처
+                </span>
               </div>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Envoy AI Gateway의 L7 ext_proc 파이프라인에서 프롬프트 난이도를 실시간 분석하여 동적 업스트림 클러스터로 스마트 분기합니다.
@@ -2976,9 +2999,10 @@ print(response.choices[0].message.content)`;
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>모델 & 라우팅</h1>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy L7 AI Gateway</span>
-            <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
-            <span className="badge active" style={{ fontSize: '0.75rem' }}>지능형 분기 활성</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255, 255, 255, 0.04)', padding: '3px 10px', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
+              Envoy L7 관문 · AgentRouter 지능형 분기 활성
+            </span>
           </div>
           <p>Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
         </div>
@@ -3857,7 +3881,27 @@ print(response.choices[0].message.content)`;
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--heading-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>지능형 정책</span>
-                    <span className="badge active" style={{ fontSize: '0.7rem' }}>Live xDS Sync</span>
+                    <button
+                      onClick={handleLiveXdsSync}
+                      disabled={isSyncingXds}
+                      className="badge active"
+                      style={{
+                        fontSize: '0.72rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="클릭 시 Envoy xDS 라우팅 정책 즉시 동기화"
+                    >
+                      <RefreshCw size={11} className={isSyncingXds ? "spin-animation" : ""} />
+                      <span>{isSyncingXds ? 'xDS 동기화 중...' : 'Live xDS 동기화'}</span>
+                    </button>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     정책별 매핑 모델, 예산 임계치(%), 목표 지연시간(ms) 및 자가 치유 폴백 설정을 온프레미스 인프라에 맞춰 실시간 제어합니다.

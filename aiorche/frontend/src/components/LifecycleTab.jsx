@@ -10,6 +10,7 @@ import {
   Activity, 
   Download, 
   AlertCircle,
+  AlertTriangle,
   FileCode,
   Check,
   ShieldAlert
@@ -325,7 +326,25 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
             <PackageCheck size={20} color="#f43f5e" />
             <span>에어갭(Air-Gapped) 오프라인 긴급 패치 인스톨러</span>
           </div>
-          <span className="badge danger">긴급 보안 핫픽스 권고 대기 중</span>
+          <button 
+            className="badge danger" 
+            style={{ 
+              cursor: 'pointer', 
+              border: '1px solid rgba(244, 63, 94, 0.4)', 
+              background: 'rgba(244, 63, 94, 0.15)', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            onClick={handleLoadSampleBundle}
+            title="클릭 시 검증용 긴급 보안 패치 번들 즉시 로드 및 RSA-4096 서명 검증"
+          >
+            <AlertTriangle size={13} />
+            <span>긴급 패치 번들 로드 및 서명 검증</span>
+          </button>
         </div>
 
         {/* Upload Zone / Load Preset */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Download, TrendingUp, AlertCircle, ShieldAlert, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Coins, Download, TrendingUp, AlertCircle, ShieldAlert, CheckCircle2, RefreshCw, X, FileText } from 'lucide-react';
 import { initialTenants } from '../data/mockData';
 import { apiClient } from '../api/client';
 
@@ -8,6 +8,7 @@ export default function FinOpsTab({ onNotify }) {
   const [finOpsData, setFinOpsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
   const fetchOverview = async () => {
     setLoading(true);
@@ -149,7 +150,25 @@ export default function FinOpsTab({ onNotify }) {
             <Coins size={18} color="#f59e0b" />
             <span>모델 서빙 표준 계량 단가 기준 (Token Pricing Matrix)</span>
           </div>
-          <span className="badge active">사내 원가 산정 기준 v2.1</span>
+          <button 
+            className="badge active"
+            style={{
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              background: 'rgba(16, 185, 129, 0.15)',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            onClick={() => setShowPricingModal(true)}
+            title="클릭 시 사내 AI 원가 산정 기준 및 TCO 정책 상세 확인"
+          >
+            <Coins size={13} />
+            <span>사내 원가 산정 기준 v2.1 (상세보기)</span>
+          </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
@@ -276,6 +295,98 @@ export default function FinOpsTab({ onNotify }) {
           }))}
         </div>
       </div>
+
+      {/* Pricing Standard Details Modal */}
+      {showPricingModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '640px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                  <Coins size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f59e0b', fontWeight: 700 }}>사내 AI 인프라 원가 산정 기준 (v2.1)</h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>On-premise GPU 클러스터 TCO 및 토큰 단위 사내 내부 회계 정산 규정</div>
+                </div>
+              </div>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setShowPricingModal(false)}
+                style={{ padding: '4px 8px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '22px' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '0.85rem', marginBottom: '4px' }}>
+                  TCO 원가 산정 공식
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  사내 H100/A100 GPU 서버 장비 감가상각(3년 균등), IDC 상면비 및 전력 사용량(PUE 1.25)을 종합 반영하여 1,000 토큰 단위로 실비 계량 정산합니다.
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '8px 10px' }}>계량 항목</th>
+                      <th style={{ padding: '8px 10px' }}>단가 기준 (1k 토큰)</th>
+                      <th style={{ padding: '8px 10px' }}>연산 가중치 및 적용 원리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>입력 토큰 (Prompt)</td>
+                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.80</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>Prefill 단계 단일 병렬 GPU 연산</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>출력 토큰 (Completion)</td>
+                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 2.40</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>Continuous Batching 및 디코딩 반복 부하</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>KV-Cache 적중 (Hit)</td>
+                      <td style={{ padding: '10px', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>₩ 0.20</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>PagedAttention 캐시 재사용으로 75% 비용 절감</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ background: 'rgba(56, 189, 248, 0.08)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '0.78rem', color: '#93c5fd' }}>
+                💡 <strong>Hard Cap 정책:</strong> 부서별 월간 예산 100% 도달 시 Envoy L7 AI Gateway에서 즉시 429 Too Many Requests (Quota Exceeded)를 반환하여 사내 예산 초과를 방지합니다.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowPricingModal(false)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

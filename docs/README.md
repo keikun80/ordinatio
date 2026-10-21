@@ -19,6 +19,7 @@
 ```text
 docs/
 ├── README.md               # [본 문서] docs 디렉토리 안내 및 매뉴얼 활용 가이드
+├── proposal.html           # [신규] 고객사 의사결정권자(CIO/CISO/기획팀) 대상 공식 도입 제안서 & 기술 백서 (HTML)
 ├── index.html              # 고객사 전달용 독립형 인터랙티브 사용자 매뉴얼 & 설치 가이드 (HTML)
 └── images/                 # 웹 콘솔 8대 핵심 메뉴 및 주요 조작 모달 고해상도 스크린샷 (30종)
     ├── 01_overview_main.png                      # 글로벌 관제 홈 & 실시간 WebSocket 메트릭
@@ -78,7 +79,30 @@ python3 -m http.server 8080 --directory docs
 
 ---
 
-## 4. 매뉴얼 주요 수록 내용 (`index.html`)
+## 4. 공식 도입 제안서 & 기술 백서 (`proposal.html`)
+
+고객사 의사결정권자(CIO, CISO, CDO, IT 인프라/보안/FinOps 총괄 및 기획 부서)를 위한 **엔터프라이즈 AI 통합 거버넌스 어플라이언스 도입 제안서**입니다.
+
+1. **전사 AI 3대 위기 및 도입 필요성**:
+   - 데이터 유출 및 망분리 규제(전자금융감독규정, 개인정보보호법) 위반 위협
+   - GPU 인프라 및 토큰 비용 폭증 (FinOps 통제 부재)
+   - API Key 평문 노출 및 비인가 모델 무단 호출
+2. **에어갭 어플라이언스 이중 계층(Tiered) 아키텍처**:
+   - Envoy L7 C++ (Zero-Copy SSE) 초저지연 데이터 플레인 + FastAPI REST RDS v3 + AgentRouter 코그너티브 제어 평면
+   - Shared Responsibility Model (고객 100% 자율 제어 vs 벤더 오프라인 패치 공급)
+3. **8대 핵심 거버넌스 역량 및 고해상도 실제 스크린샷 갤러리**:
+   - AgentRouter 4대 자율 라우팅, 멀티 서빙 엔진/6종 Provider 카탈로그, Argon2id 가상 API Key, 동적 시스템 프롬프트 L7 인라인 주입, FinOps 예산 하드캡(Fail-Fast), 인라인 PII 마스킹 & WORM 감사, RSA-4096 오프라인 핫픽스, 1초 WebSocket 관제 홈
+4. **글로벌 솔루션 심층 비교 분석**:
+   - AI Orchestrator vs LiteLLM Proxy vs Kong AI Gateway vs Envoy AI Gateway 다차원 평가 매트릭스
+5. **실시간 인터랙티브 ROI 계산기 (Interactive ROI Calculator Widget)**:
+   - 사내 월간 AI 호출량, 고성능 모델 의존율, 월간 지출을 슬라이더로 조절하여 연간 예상 절감액(최대 60%)과 투자 회수 기간 실시간 산출
+6. **3단계 도입 및 확장 로드맵 (Roadmap)**:
+   - PoC (2주) → 핵심 부서 파일럿 (4주) → 전사 확대 및 정착 가이드
+   - 권장 온프레미스 인프라 사양 및 연동 인터페이스
+
+---
+
+## 5. 매뉴얼 주요 수록 내용 (`index.html`)
 
 1. **아키텍처 및 100% 에어갭 운영 원칙**:
    - 외부 종속성 제로 로컬 번들링 아키텍처 및 폐쇄망 라이선스 자립성

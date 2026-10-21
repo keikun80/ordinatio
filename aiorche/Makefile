@@ -66,7 +66,7 @@ run-frontend:
 	@cd frontend && npm run dev
 
 up:
-	@docker compose up -d --build
+	@docker compose up -d
 
 down:
 	@docker compose down

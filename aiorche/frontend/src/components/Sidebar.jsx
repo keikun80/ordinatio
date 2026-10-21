@@ -69,11 +69,6 @@ export default function Sidebar({
     { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
     { id: 'compliance', label: 'PII 보안 & 감사 로그', icon: ShieldAlert },
-    { 
-      id: 'lifecycle', 
-      label: '긴급 패치 & 자가진단', 
-      icon: PackageCheck 
-    },
     { id: 'prompt-studio', label: '프롬프트 스튜디오', icon: Sparkles },
     ...(isSuperAdmin ? [{ id: 'users', label: '사용자 및 계정 관리', icon: Users }] : [])
   ];

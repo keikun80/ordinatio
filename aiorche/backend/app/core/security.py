@@ -23,6 +23,60 @@ def verify_virtual_key(plain_key: str, hashed_key: str) -> bool:
 get_key_hash = hash_virtual_key
 verify_key = verify_virtual_key
 
+# ------------------------------------------------------------------------------
+# Human User Password & JWT Token Security
+# ------------------------------------------------------------------------------
+import hashlib
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from jose import jwt, JWTError
+from app.core.config import settings
+
+def hash_password(password: str) -> str:
+    """Hash user password with Argon2id."""
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify plaintext password against stored hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+def hash_session_token(token: str) -> str:
+    """Generate SHA-256 hash for database session lookup."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def create_access_token(
+    user_id: str,
+    username: str,
+    role: str,
+    tenant_id: Optional[str],
+    session_id: str,
+    expires_delta: Optional[timedelta] = None
+) -> str:
+    """Generate signed JWT access token for web console & control plane."""
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode: Dict[str, Any] = {
+        "sub": user_id,
+        "username": username,
+        "role": role,
+        "tenant_id": tenant_id,
+        "sid": session_id,
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decode and validate signed JWT access token."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
 # System Diagnostics Virtual Key for appliance loopback testing
 SYSTEM_DIAGNOSTICS_KEY = "sk-orch-system-diagnostics-appliance-key"
 SYSTEM_DIAGNOSTICS_KEY_ID = "vk-system-diagnostics"

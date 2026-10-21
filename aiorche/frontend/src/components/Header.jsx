@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Server, Bell, Download, RefreshCw, ExternalLink, Sun, Moon, Crosshair } from 'lucide-react';
+import { 
+  ShieldCheck, 
+  Server, 
+  Bell, 
+  Download, 
+  RefreshCw, 
+  ExternalLink, 
+  Sun, 
+  Moon, 
+  Crosshair,
+  Clock,
+  LogOut,
+  User
+} from 'lucide-react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header({ 
   onOpenPatchTab, 
@@ -10,6 +24,7 @@ export default function Header({
   isInspectorActive = false,
   onToggleInspector
 }) {
+  const { user, sessionRemaining, resetActivityTimer, logout } = useAuth();
   const [datacenterName, setDatacenterName] = useState(
     import.meta.env.VITE_DATACENTER_NAME || '온프레미스 주전산센터'
   );
@@ -29,6 +44,22 @@ export default function Header({
     }
     loadSystemInfo();
   }, []);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const isLowTime = sessionRemaining <= 300; // Under 5 minutes
+
+  // Get user avatar abbreviation
+  const getAvatarInitials = () => {
+    if (!user) return 'ADM';
+    if (user.role === 'SUPER_ADMIN') return 'SA';
+    if (user.role === 'TENANT_ADMIN') return 'TA';
+    return 'VW';
+  };
 
   return (
     <header className="top-header" data-testid="com-header-bar" data-screen-id="SCR-COM-02">
@@ -62,7 +93,31 @@ export default function Header({
         </div>
       </div>
 
-      <div className="header-right">
+      <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* 30분 금융 보안 세션 타이머 배지 */}
+        <div 
+          data-testid="header-session-timer"
+          title="금융 보안 기준 30분 미활동 자동 로그아웃 (클릭 시 세션 연장)"
+          onClick={resetActivityTimer}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '5px 10px',
+            borderRadius: 'var(--radius-md)',
+            background: isLowTime ? 'rgba(239, 68, 68, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+            border: `1px solid ${isLowTime ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-subtle)'}`,
+            color: isLowTime ? '#f87171' : 'var(--text-secondary)',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          <Clock size={13} color={isLowTime ? '#f87171' : '#38bdf8'} />
+          <span>⏱ {formatTimer(sessionRemaining)}</span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>연장</span>
+        </div>
+
         {/* UI 식별자 인스펙터 토글 버튼 (Ctrl+Shift+D) */}
         <button
           className="theme-toggle-btn"
@@ -113,23 +168,66 @@ export default function Header({
             onClick={onOpenPatchTab}
           >
             <Bell size={14} color="#F54927" />
-            <span style={{ color: '#F54927' }}>벤더 긴급 핫픽스 대기 중</span>
+            <span style={{ color: '#F54927' }}>긴급 패치</span>
             <span style={{ background: '#f43f5e', color: 'white', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '999px', fontWeight: 700 }}>
               1
             </span>
           </button>
         )}
 
-        <div className="user-profile" data-testid="com-header-user-profile">
-          <div className="user-avatar" style={{ color: '#F54927' }}>
-            SRE
+        {/* Dynamic Authenticated User Profile */}
+        <div className="user-profile" data-testid="com-header-user-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div 
+            className="user-avatar" 
+            style={{ 
+              color: user?.role === 'SUPER_ADMIN' ? '#c084fc' : '#38bdf8',
+              background: user?.role === 'SUPER_ADMIN' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+              border: `1px solid ${user?.role === 'SUPER_ADMIN' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(56, 189, 248, 0.3)'}`
+            }}
+          >
+            {getAvatarInitials()}
           </div>
           <div className="user-info">
-            <span className="user-name" style={{ color: '#F54927' }}>홍길동 수석</span>
-            <span className="user-role" style={{ color: '#F54927' }}>인프라운영팀 (Admin)</span>
+            <span className="user-name" style={{ color: 'var(--heading-color)', fontWeight: 600 }}>
+              {user?.full_name || '로그인 사용자'}
+            </span>
+            <span className="user-role" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+              {user?.tenant_name || (user?.role === 'SUPER_ADMIN' ? '전사 최고관리자' : user?.role || '사용자')}
+            </span>
           </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={() => logout()}
+            title="보안 로그아웃"
+            data-testid="header-btn-logout"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              padding: '6px',
+              marginLeft: '4px',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'color 0.2s ease, background 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#f87171';
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.background = 'none';
+            }}
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
     </header>
   );
 }
+

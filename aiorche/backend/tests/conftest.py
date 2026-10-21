@@ -1,5 +1,11 @@
+import sys
 import pytest
 from decimal import Decimal
+
+# Guarantee singleton conftest module across both 'conftest' and 'tests.conftest'
+if __name__ in sys.modules:
+    sys.modules["tests.conftest"] = sys.modules[__name__]
+    sys.modules["conftest"] = sys.modules[__name__]
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -41,6 +47,7 @@ from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.system_prompt import SystemPrompt
+from app.models.user import User, UserSession
 
 # Create all tables and seed data immediately at module load
 Base.metadata.create_all(bind=test_engine)
@@ -48,6 +55,14 @@ Base.metadata.create_all(bind=test_engine)
 @pytest.fixture
 def client():
     return TestClient(app)
+
+@pytest.fixture
+def db_session():
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def seed_data():

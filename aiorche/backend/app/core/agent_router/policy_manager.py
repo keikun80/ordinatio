@@ -69,20 +69,73 @@ class AgentRouterPolicyManager:
         """Fetch all policies from DB or fallback to memory/default seed."""
         if db is not None:
             try:
+                from app.models.model_catalog import ModelCatalog
+                catalog_models = db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()
+                active_catalog_ids = [m.model_id for m in catalog_models]
+
                 db_rows = db.query(AgentRouterPolicyModel).all()
                 if db_rows:
                     result = []
+                    is_dirty = False
                     for row in db_rows:
+                        cfg = dict(row.config or {})
+                        # Dynamically sanitize stale legacy meta-llama seed models
+                        def is_stale_or_empty(val: Optional[str]) -> bool:
+                            return not val or "meta-llama" in str(val)
+
+                        if active_catalog_ids:
+                            default_reasoning = active_catalog_ids[0]
+                            default_fast = active_catalog_ids[-1]
+
+                            if row.policy_id == "QualityFirst":
+                                if is_stale_or_empty(cfg.get("reasoning_model")):
+                                    cfg["reasoning_model"] = default_reasoning
+                                    is_dirty = True
+                                if is_stale_or_empty(cfg.get("fast_model")):
+                                    cfg["fast_model"] = default_fast
+                                    is_dirty = True
+                            elif row.policy_id == "LeastCost":
+                                if is_stale_or_empty(cfg.get("standard_model")):
+                                    cfg["standard_model"] = default_reasoning
+                                    is_dirty = True
+                                if is_stale_or_empty(cfg.get("economic_model")):
+                                    cfg["economic_model"] = default_fast
+                                    is_dirty = True
+                            elif row.policy_id == "LatencyOptimized":
+                                if is_stale_or_empty(cfg.get("reasoning_model")):
+                                    cfg["reasoning_model"] = default_reasoning
+                                    is_dirty = True
+                                if is_stale_or_empty(cfg.get("primary_fast_model")):
+                                    cfg["primary_fast_model"] = default_fast
+                                    is_dirty = True
+                            elif row.policy_id == "SelfHealingFallback":
+                                if is_stale_or_empty(cfg.get("primary_fallback_model")):
+                                    cfg["primary_fallback_model"] = default_fast
+                                    is_dirty = True
+                                if is_stale_or_empty(cfg.get("secondary_fallback_model")):
+                                    cfg["secondary_fallback_model"] = default_reasoning
+                                    is_dirty = True
+
+                            if is_dirty:
+                                row.config = cfg
+
                         item = {
                             "policy_id": row.policy_id,
                             "name": row.name,
                             "description": row.description,
                             "is_active": row.is_active,
-                            "config": row.config or {},
+                            "config": cfg,
                             "updated_at": row.updated_at
                         }
                         result.append(item)
                         cls._cached_policies[row.policy_id] = copy.deepcopy(item)
+
+                    if is_dirty:
+                        try:
+                            db.commit()
+                        except Exception:
+                            db.rollback()
+
                     return result
             except Exception:
                 pass

@@ -1,30 +1,30 @@
 # AI Orchestrator Phase 0 ~ 5 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
-**문서 번호**: AIORCHE-ENG-REP-20260925  
+**문서 번호**: AIORCHE-ENG-REP-20261021  
 **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-09-25 (Phase 0~5 상용화 + 동적 시스템 프롬프트 거버넌스 및 L7 인라인 주입 완성)  
-**검증 상태**: **Phase 0~5 및 시스템 프롬프트 거버넌스 전체 100% PASS (78 / 78 Tests DoD 충족)**  
+**작성 일자**: 2026-10-21 (Phase 0~5 상용화 + 시스템 프롬프트 거버넌스 + 사용자 인증 & RBAC 완성)  
+**검증 상태**: **Phase 0~5, 시스템 프롬프트, 사용자 인증 & RBAC 전체 100% PASS (85 / 85 Tests DoD 충족)**  
 
 ---
 
 ## 1. 종합 요약 및 엔지니어링 개요
 
-본 문서는 `dashboard_arch/dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 5, 그리고 동적 시스템 프롬프트 거버넌스까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
+본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 5, 동적 시스템 프롬프트 거버넌스, 그리고 사용자 인증 & RBAC까지의 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)**를 종합 정리한 총괄 보고서입니다.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                      AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                                                       │
-├─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬───────────────────────┬───────────────────────┤
-│    Phase 0 (기반)   │   Phase 1 (거버넌스)│    Phase 2 (라우팅) │    Phase 3 (FinOps) │  Phase 4 (Compliance│     Phase 5 (Lifecycle)│   시스템 프롬프트     │
-├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────────┤
-│ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 다중 엔진(Ollama등)│ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명  │ • ROUTE/KEY/TENANT 1:1│
-│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 배포│ • L7 ext_proc Body변조│
-│ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 롤백 엔진    │ • PREPEND/OVERRIDE    │
-│ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Dynamic URL 조합기│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 Preflight 진단  │ • 위계적 우선순위 해석│
-│ • Docker & K8s 배포 │ • Prometheus /metric│ • 수동 타임아웃 조절│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII ZIP 번들   │ • 토큰/글자수 실시간계산│
-├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────────┤
-│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PAS│46/46 Tests (100% PASS)│78/78 Tests (100% PASS)│
-└─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────┴───────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                          AI Orchestrator 에어갭 자립형 모노레포 (aiorche/)                                                               │
+├─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬───────────────────────┬───────────────────┬───────────────┤
+│    Phase 0 (기반)   │   Phase 1 (거버넌스)│    Phase 2 (라우팅) │    Phase 3 (FinOps) │  Phase 4 (Compliance│     Phase 5 (Lifecycle)│   시스템 프롬프트 │  Auth & RBAC  │
+├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────┼───────────────┤
+│ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 다중 엔진(Ollama등)│ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명  │ • ROUTE/KEY 1:1   │ • Local DB(Arg│
+│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • K8s 무중단 롤링 배포│ • L7 ext_proc 변조│ • 3-Tier RBAC │
+│ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 롤백 엔진    │ • PREPEND/OVERRIDE│ • 30분 활동만료│
+│ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Dynamic URL 조합기│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 Preflight 진단  │ • 위계적 우선순위 │ • 5회오류15분잠│
+│ • Docker & K8s 배포 │ • Prometheus /metric│ • 수동 타임아웃 조절│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII ZIP 번들   │ • 토큰 실시간계산 │ • make init-ad│
+├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────┼───────────────┤
+│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PASS│46/46 Tests (100% PASS)│78/78 Tests (PASS) │85/85 Tests(PASS│
+└─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────┴───────────────────┴───────────────┘
 ```
 
 ---
@@ -34,13 +34,15 @@
 각 단계별 상세 엔지니어링 설계서 및 개별 테스트 결과 보고서는 아래 파일에 영구 보존되어 있습니다.
 
 | 단계 | 문서 파일 링크 | 세부 범위 | 검증 스크립트 | 단위/통합 테스트 |
-| :--- | :--- | :--- | :---: | :---: |
-| **Phase 0** | [phase0_implementation_plan_and_test_results.md](./phase0_implementation_plan_and_test_results.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
-| **Phase 1** | [phase1_implementation_plan_and_test_results.md](./phase1_implementation_plan_and_test_results.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [phase2_implementation_plan_and_test_results.md](./phase2_implementation_plan_and_test_results.md)<br>• [MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md](./MODEL_CATALOG_AND_GATEWAY_ROUTING_SPEC.md)<br>• [PRE_17_model_provider_options_and_url_builder_report.md](./PRE_17_model_provider_options_and_url_builder_report.md)<br>• [PRE_18_model_health_check_timeout_report.md](./PRE_18_model_health_check_timeout_report.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙 & 타임아웃 수동 조절(1.0s~30.0s), 6종 Provider 규격화, Envoy L7 엔드포인트/RDS, N-Way 분할 | `make verify-phase2` | 23 / 23 PASS |
-| **Phase 3** | [phase3_implementation_plan_and_test_results.md](./phase3_implementation_plan_and_test_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
-| **Phase 4** | [phase4_implementation_plan_and_test_results.md](./phase4_implementation_plan_and_test_results.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
-| **Phase 5** | [phase5_implementation_plan_and_test_results.md](./phase5_implementation_plan_and_test_results.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
+| :--- | :--- | :--- | :--- | :---: |
+| **Phase 0** | [PRE_02_phase0_foundations_and_ai_gateway.md](./PRE_02_phase0_foundations_and_ai_gateway.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
+| **Phase 1** | [PRE_03_phase1_tenant_and_virtual_keys.md](./PRE_03_phase1_tenant_and_virtual_keys.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
+| **Phase 2** | [PRE_05_phase2_dynamic_routing_and_xds.md](./PRE_05_phase2_dynamic_routing_and_xds.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙 & 타임아웃 수동 조절(1.0s~30.0s), 6종 Provider 규격화, Envoy L7 엔드포인트/RDS, N-Way 분할 | `make verify-phase2` | 23 / 23 PASS |
+| **Phase 3** | [PRE_07_phase3_observability_and_finops_results.md](./PRE_07_phase3_observability_and_finops_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV | `make verify-phase3` | 26 / 26 PASS |
+| **Phase 4** | [PRE_08_phase4_pii_governance_and_worm_audit.md](./PRE_08_phase4_pii_governance_and_worm_audit.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
+| **Phase 5** | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./PRE_09_phase5_lifecycle_and_hotfix_engine.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
+| **시스템 프롬프트** | [PRE_20_phase_system_prompt_implementation_and_test_results.md](./PRE_20_phase_system_prompt_implementation_and_test_results.md) | 1:1 타깃 바인딩(ROUTE/KEY/TENANT), L7 ext_proc 인라인 주입, 토큰 계산기, 프롬프트 카탈로그 UI | `make verify-phase-system-prompt` | 78 / 78 PASS |
+| **Auth & RBAC** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 로컬 DB(PostgreSQL) Argon2id 해싱, 3-Tier RBAC, 30분 활동만료, 5회 잠금, 단일 세션, make init-admin | `make verify-auth-rbac` | 85 / 85 PASS |
 
 ---
 
@@ -176,12 +178,13 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-11** | 서빙 모델 엔드포인트 조립 | 백엔드 임의 접미사 슬라이싱/유추 | **동적 URL 조합기(Dynamic URL Builder) & 타깃 경로 직접 호출** | Provider별 고유 접미사를 프론트엔드에서 즉시 조립하고 백엔드의 임의 정규화를 배제하여 Anthropic, Gemini, Cohere 등 비호환 Provider 무결 연동 보장 |
 | **ADR-12** | 헬스체크 타임아웃 제어 | 3.0초 하드코딩 타임아웃 고정 | **계층형 수동 조절(전역 툴바 1.0s~30.0s + 모델별 DB 영속화) & 원인 명시적 예외 처리** | 초고속 온프레미스 LAN(1.0s)부터 분산 클라우드(30.0s)까지 네트워크 지연 환경에 유연하게 대응하고 '응답 대기시간 초과' 원인 상세 안내 |
 | **ADR-13** | 시스템 프롬프트 거버넌스 & L7 인라인 주입 | 클라이언트 개별 프롬프트 전제 및 단일 정적 템플릿 | **위계적 우선순위(`KEY` > `ROUTE` > `TENANT` > `GLOBAL`) 및 L7 ext_proc 페이로드 변조** | 클라이언트 수정 없이 관리자가 라우트/가상키/테넌트별 시스템 프롬프트를 1:1로 유연하게 바인딩하고 게이트웨이 레벨에서 3대 모드(`PREPEND`/`OVERRIDE`/`FALLBACK`)로 자동 합성 |
+| **ADR-14** | 금융권 수준 RBAC & 로컬 자립형 사용자 인증 | 외부 SaaS/IdP 종속 및 단순 단일 역할 체계 | **로컬 DB Argon2id + JWT 세션, 3-Tier 역할(`SUPER_ADMIN`/`TENANT_ADMIN`/`VIEWER`), 30분 미활동 자동 로그아웃, 5회 오류 시 15분 잠금, 단일 세션 보장** | 100% 에어갭 폐쇄망 자립성을 충족하며 금융감독원 망분리 보안 규정 및 비인가 접근 차단을 완벽 보장 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5 및 시스템 프롬프트 거버넌스의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`, `scripts/verify-phase-system-prompt.sh`)와 `make test`를 **100% 통과(78/78 테스트)**하였으며, 실제 브라우저 E2E 기반 1:1 바인딩 마법사 및 L7 ext_proc 인라인 주입까지 최종 확인되었습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5, 시스템 프롬프트 거버넌스 및 사용자 인증/RBAC(PRE_26/27)의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`, `scripts/verify-phase-system-prompt.sh`, `scripts/verify-auth-rbac.sh`)와 `make test`를 **100% 통과(85/85 테스트)**하였으며, 실제 브라우저 E2E 기반 로그인 화면, 슬라이딩 세션 타이머, RBAC 사용자 관리 화면까지 최종 확인되었습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
 - **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)** 및 `PRE_15_Develop_milestone.md`의 **Milestone 6 (P0)** 항목으로 즉시 연계가 가능합니다.
 

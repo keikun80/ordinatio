@@ -10,7 +10,8 @@ from app.core.agent_router.policy_engine import (
     AgentRouter,
     DEFAULT_FAST_MODEL,
     DEFAULT_REASONING_MODEL,
-    DEFAULT_FALLBACK_MODEL
+    DEFAULT_FALLBACK_MODEL,
+    derive_cluster_name
 )
 from app.core.agent_router.affinity import SessionAffinityManager
 
@@ -25,5 +26,6 @@ __all__ = [
     "SessionAffinityManager",
     "DEFAULT_FAST_MODEL",
     "DEFAULT_REASONING_MODEL",
-    "DEFAULT_FALLBACK_MODEL"
+    "DEFAULT_FALLBACK_MODEL",
+    "derive_cluster_name"
 ]

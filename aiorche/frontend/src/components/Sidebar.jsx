@@ -11,8 +11,10 @@ import {
   ChevronDown,
   Cpu,
   Compass,
-  ScrollText
+  ScrollText,
+  Users
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ 
   activeTab, 
@@ -21,6 +23,7 @@ export default function Sidebar({
   setRoutingSubTab, 
   unreadPatchCount = 1 
 }) {
+  const { isSuperAdmin } = useAuth();
   const [isRoutingExpanded, setIsRoutingExpanded] = useState(true);
 
   // Automatically expand accordion when routing tab is activated
@@ -74,7 +77,8 @@ export default function Sidebar({
       badge: unreadPatchCount > 0 ? '패치 권고' : null,
       isAlertBadge: unreadPatchCount > 0 
     },
-    { id: 'prompt-studio', label: '프롬프트 스튜디오', icon: Sparkles }
+    { id: 'prompt-studio', label: '프롬프트 스튜디오', icon: Sparkles },
+    ...(isSuperAdmin ? [{ id: 'users', label: '사용자 및 계정 관리', icon: Users, badge: 'RBAC' }] : [])
   ];
 
   return (

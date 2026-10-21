@@ -828,6 +828,141 @@ export const apiClient = {
       throw new Error(err.detail || '시스템 프롬프트 시뮬레이션 실패');
     }
     return await res.json();
+  },
+
+  // --- Authentication & RBAC (PRE_26) ---
+  async login(username, password) {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '로그인에 실패했습니다.' }));
+      throw new Error(err.detail || '로그인에 실패했습니다.');
+    }
+    return await res.json();
+  },
+
+  async logout() {
+    try {
+      const token = localStorage.getItem('aiorche_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers
+      });
+    } catch (e) {
+      console.warn('Logout API error:', e);
+    }
+  },
+
+  async getMe() {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers
+    });
+    if (!res.ok) {
+      throw new Error(`Session validation failed: HTTP ${res.status}`);
+    }
+    return await res.json();
+  },
+
+  async changePassword(oldPassword, newPassword) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/auth/password`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '비밀번호 변경에 실패했습니다.' }));
+      throw new Error(err.detail || '비밀번호 변경에 실패했습니다.');
+    }
+    return await res.json();
+  },
+
+  // --- User Administration (SUPER_ADMIN only) ---
+  async getUsers(params = {}) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const query = new URLSearchParams(params).toString();
+    const url = query ? `${API_BASE_URL}/users?${query}` : `${API_BASE_URL}/users`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '사용자 목록 조회 실패' }));
+      throw new Error(err.detail || '사용자 목록 조회 실패');
+    }
+    return await res.json();
+  },
+
+  async createUser(userData) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/users`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(userData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '사용자 생성 실패' }));
+      throw new Error(err.detail || '사용자 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async updateUser(userId, userData) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(userData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '사용자 정보 수정 실패' }));
+      throw new Error(err.detail || '사용자 정보 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteUser(userId) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'DELETE',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '사용자 삭제 실패' }));
+      throw new Error(err.detail || '사용자 삭제 실패');
+    }
+    return await res.json();
+  },
+
+  async resetUserPassword(userId, newPassword) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ new_password: newPassword })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '비밀번호 초기화 실패' }));
+      throw new Error(err.detail || '비밀번호 초기화 실패');
+    }
+    return await res.json();
   }
 };
 

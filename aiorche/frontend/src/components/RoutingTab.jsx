@@ -182,6 +182,7 @@ export default function RoutingTab({
   const [agentSimPrompt, setAgentSimPrompt] = useState("파이썬 코드로 비동기 FastAPI 게이트웨이를 구현하고 성능 최적화 방안을 설명해줘.");
   const [agentSimPolicy, setAgentSimPolicy] = useState("QualityFirst");
   const [agentSimResult, setAgentSimResult] = useState(null);
+  const [agentSimInitialResult, setAgentSimInitialResult] = useState(null);
   const [isSimulatingAgent, setIsSimulatingAgent] = useState(false);
 
   // 4대 라우팅 정책 편집 상태
@@ -235,7 +236,9 @@ export default function RoutingTab({
     setIsSimulatingAgent(true);
     try {
       const res = await apiClient.simulateAgentRouter(agentSimPrompt, agentSimPolicy);
-      setAgentSimResult(res);
+      const enrichedRes = { ...res, isOverridden: false };
+      setAgentSimResult(enrichedRes);
+      setAgentSimInitialResult(enrichedRes);
       if (onNotify) onNotify('SUCCESS', `AgentRouter 분석 완료: [${res.complexity}] ➔ ${res.suggested_tier}`);
     } catch (err) {
       if (onNotify) onNotify('ERROR', 'AgentRouter 시뮬레이션 실패');
@@ -492,10 +495,10 @@ export default function RoutingTab({
     route_name: "financial-advisor-v1",
     description: "기본 라우트",
     priority: 10,
-    traffic_weights: [{ model_id: "meta-llama/Llama-3.1-8B-Instruct", weight: 100 }],
+    traffic_weights: models.length > 0 ? [{ model_id: models[0].id, weight: 100 }] : [],
     load_balancing_strategy: "LeastQueueDepth",
-    failover_model_id: "meta-llama/Llama-3.1-70B-Instruct",
-    failover_chain: ["meta-llama/Llama-3.1-70B-Instruct"],
+    failover_model_id: models[0]?.id || "",
+    failover_chain: models[0]?.id ? [models[0].id] : [],
     match_conditions: {},
     is_active: true
   };
@@ -872,10 +875,10 @@ export default function RoutingTab({
       route_name: routeName,
       description: newRouteForm.description || "사용자 정의 멀티 라우트",
       priority: Number(newRouteForm.priority || 10),
-      traffic_weights: defaultWeights.length > 0 ? defaultWeights : [{ model_id: "meta-llama/Llama-3.1-8B-Instruct", weight: 100 }],
+      traffic_weights: defaultWeights.length > 0 ? defaultWeights : (models.length > 0 ? [{ model_id: models[0].id, weight: 100 }] : []),
       load_balancing_strategy: "LeastQueueDepth",
-      failover_model_id: models[0]?.id || "meta-llama/Llama-3.1-70B-Instruct",
-      failover_chain: [models[0]?.id || "meta-llama/Llama-3.1-70B-Instruct"],
+      failover_model_id: models[0]?.id || "",
+      failover_chain: models[0]?.id ? [models[0].id] : [],
       match_conditions: matchConditions,
       is_active: true
     };
@@ -1988,14 +1991,20 @@ print(response.choices[0].message.content)`;
                 <span className="badge active" style={{ fontSize: '0.7rem' }}>2-Tier L7 AI Gateway</span>
               </div>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Envoy AI Gateway의 L7 ext_proc 파이프라인에서 프롬프트 난이도를 실시간 분석하여 Fast 8B와 Reasoning 72B로 스마트 분기합니다.
+                Envoy AI Gateway의 L7 ext_proc 파이프라인에서 프롬프트 난이도를 실시간 분석하여 동적 업스트림 클러스터로 스마트 분기합니다.
               </p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Fast 8B Tier</span>
-            <span className="badge purple" style={{ fontSize: '0.75rem' }}>Reasoning 72B Tier</span>
-            <span className="badge active" style={{ fontSize: '0.75rem' }}>Self-Healing Fallback</span>
+            <span className="badge info" style={{ fontSize: '0.75rem' }} title={`엔보이 클러스터: ${agentRouterStatus?.default_tiers?.fast_8b?.cluster || 'cluster_vllm_fast_8b'}`}>
+              ⚡ 고속 클러스터: {agentRouterStatus?.default_tiers?.fast_8b?.cluster || 'Fast Tier'}
+            </span>
+            <span className="badge purple" style={{ fontSize: '0.75rem' }} title={`엔보이 클러스터: ${agentRouterStatus?.default_tiers?.reasoning_72b?.cluster || 'cluster_vllm_reasoning_72b'}`}>
+              🧠 추론 클러스터: {agentRouterStatus?.default_tiers?.reasoning_72b?.cluster || 'Reasoning Tier'}
+            </span>
+            <span className="badge active" style={{ fontSize: '0.75rem' }} title={`엔보이 클러스터: ${agentRouterStatus?.default_tiers?.fallback?.cluster || 'cluster_vllm_inference_pool'}`}>
+              🛡️ 폴백: {agentRouterStatus?.default_tiers?.fallback?.cluster || 'Self-Healing'}
+            </span>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => setShowPolicyModal(true)}
@@ -2061,35 +2070,210 @@ print(response.choices[0].message.content)`;
             </div>
           </div>
 
-          {/* Simulation Output Card */}
+          {/* Simulation Output Card (Fully Editable) */}
           {agentSimResult && (
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-              <div className="panel-kpi-sub">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>판정된 복잡도 (Complexity)</span>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: agentSimResult.complexity === 'REASONING_HEAVY' ? 'var(--accent-purple)' : (agentSimResult.complexity === 'LIGHT' ? 'var(--accent-cyan)' : 'var(--accent-emerald)'), marginTop: '2px' }}>
-                  {agentSimResult.complexity}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+              {/* Card Sub-Header with Status & Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    📊 인텐트 분석 및 라우팅 판정 결과
+                  </span>
+                  {agentSimResult.isOverridden ? (
+                    <span className="badge warning" style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-amber)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                      ✏️ 수동 에디트 모드 활성 (Manual Override)
+                    </span>
+                  ) : (
+                    <span className="badge active" style={{ fontSize: '0.7rem' }}>
+                      ⚡ AI 자동 분류 완료
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {agentSimResult.isOverridden && agentSimInitialResult && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setAgentSimResult({ ...agentSimInitialResult, isOverridden: false });
+                        if (onNotify) onNotify('INFO', 'AI 초기 분석 결과로 복원되었습니다.');
+                      }}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <RefreshCw size={12} />
+                      <span>초기 분석값 복원</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      if (agentSimResult?.selected_model) {
+                        setTestTargetScope(agentSimResult.selected_model);
+                      }
+                      if (agentSimPrompt) {
+                        setTestMessage(agentSimPrompt);
+                      }
+                      if (onNotify) onNotify('SUCCESS', `타깃 모델 [${agentSimResult.selected_model}] 및 프롬프트가 테스트벤치에 동기화되었습니다.`);
+                    }}
+                    style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                  >
+                    <Play size={12} fill="currentColor" />
+                    <span>테스트벤치에 적용</span>
+                  </button>
                 </div>
               </div>
-              <div className="panel-kpi-sub">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>디스패치 모델 티어</span>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-amber)', marginTop: '2px' }}>
-                  {agentSimResult.suggested_tier.toUpperCase()}
+
+              {/* 4 Editable Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                {/* 1. 판정된 복잡도 (Complexity) - Editable */}
+                <div className="panel-kpi-sub" style={{ padding: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>판정된 복잡도 (Complexity)</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-purple)' }}>✏️ 편집 가능</span>
+                  </div>
+                  <select
+                    className="form-input"
+                    value={agentSimResult.complexity}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAgentSimResult(prev => ({
+                        ...prev,
+                        complexity: val,
+                        isOverridden: true
+                      }));
+                    }}
+                    style={{
+                      height: '34px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      color: agentSimResult.complexity === 'REASONING_HEAVY' ? 'var(--accent-purple)' : (agentSimResult.complexity === 'LIGHT' ? 'var(--accent-cyan)' : 'var(--accent-emerald)'),
+                      background: 'var(--bg-panel)',
+                      borderColor: 'var(--border-subtle)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="LIGHT">LIGHT (단순 대화 / 경량)</option>
+                    <option value="STANDARD">STANDARD (표준 질의)</option>
+                    <option value="REASONING_HEAVY">REASONING_HEAVY (심층 추론 / 코딩)</option>
+                  </select>
                 </div>
-              </div>
-              <div className="panel-kpi-sub">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선택된 타깃 모델</span>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {agentSimResult.selected_model}
+
+                {/* 2. 디스패치 모델 티어 - Editable */}
+                <div className="panel-kpi-sub" style={{ padding: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>디스패치 모델 티어</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-amber)' }}>✏️ 편집 가능</span>
+                  </div>
+                  <select
+                    className="form-input"
+                    value={agentSimResult.suggested_tier}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAgentSimResult(prev => ({
+                        ...prev,
+                        suggested_tier: val,
+                        isOverridden: true
+                      }));
+                    }}
+                    style={{
+                      height: '34px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      color: 'var(--accent-amber)',
+                      background: 'var(--bg-panel)',
+                      borderColor: 'var(--border-subtle)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="fast_8b">FAST_8B (고속 경량 티어)</option>
+                    <option value="reasoning_72b">REASONING_72B (심층 추론 티어)</option>
+                    <option value="fallback">FALLBACK (자가 치유 폴백)</option>
+                    <option value="agent_worker">AGENT_WORKER (자율 에이전트)</option>
+                  </select>
                 </div>
-              </div>
-              <div className="panel-kpi-sub">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Envoy 업스트림 클러스터</span>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-cyan)', marginTop: '4px' }}>
-                  {agentSimResult.target_cluster}
+
+                {/* 3. 선택된 타깃 모델 - Editable */}
+                <div className="panel-kpi-sub" style={{ padding: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>선택된 타깃 모델</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-cyan)' }}>✏️ 편집 가능</span>
+                  </div>
+                  <select
+                    className="form-input"
+                    value={agentSimResult.selected_model}
+                    onChange={(e) => {
+                      const selectedModelId = e.target.value;
+                      const derivedCluster = `cluster_${selectedModelId.split('/').pop().replace(/[:.-]/g, '_').toLowerCase()}`;
+                      setAgentSimResult(prev => ({
+                        ...prev,
+                        selected_model: selectedModelId,
+                        target_cluster: derivedCluster,
+                        isOverridden: true
+                      }));
+                    }}
+                    style={{
+                      height: '34px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      background: 'var(--bg-panel)',
+                      borderColor: 'var(--border-subtle)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {!models.some(m => m.id === agentSimResult.selected_model) && (
+                      <option value={agentSimResult.selected_model}>{agentSimResult.selected_model} (커스텀 지정)</option>
+                    )}
+                    {models.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.alias ? `${m.alias} (${m.id})` : m.id}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-              <div style={{ gridColumn: '1 / -1', padding: '10px 14px', background: 'var(--bg-panel)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
+
+                {/* 4. Envoy 업스트림 클러스터 - Editable */}
+                <div className="panel-kpi-sub" style={{ padding: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Envoy 업스트림 클러스터</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-cyan)' }}>✏️ 편집 가능</span>
+                  </div>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={agentSimResult.target_cluster || ''}
+                    placeholder="예: cluster_vllm_fast_8b"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAgentSimResult(prev => ({
+                        ...prev,
+                        target_cluster: val,
+                        isOverridden: true
+                      }));
+                    }}
+                    style={{
+                      height: '34px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: 'var(--accent-cyan)',
+                      background: 'var(--bg-panel)',
+                      borderColor: 'var(--border-subtle)'
+                    }}
+                  />
+                </div>
+
+                {/* 5. 판정 사유 및 오버라이드 안내 바 */}
+                <div style={{ gridColumn: '1 / -1', padding: '10px 14px', background: 'var(--bg-panel)', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <strong style={{ color: 'var(--text-primary)' }}>판정 사유:</strong> {agentSimResult.reasons?.join(' | ') || '기본 휴리스틱 인텐트 분류'}
+                  </div>
+                  {agentSimResult.isOverridden && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', fontWeight: 600 }}>
+                      ℹ️ 복잡도, 디스패치 티어 및 타깃 모델이 사용자 설정값으로 실시간 수동 재지정되었습니다.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -3735,36 +3919,70 @@ print(response.choices[0].message.content)`;
                       💡 <strong>QualityFirst 정책:</strong> 복잡한 알고리즘, 파이썬/SQL 코딩 및 심층 논리 추론 질문 감지 시 최고 성능 모델로 우선 분기하고 단순 일상 대화는 경량 고속 모델로 디스패치합니다.
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>심층 추론·코딩 전용 고성능 모델 (Reasoning 72B Tier)</span>
-                        <span style={{ color: 'var(--accent-purple)', fontSize: '0.75rem' }}>클러스터: cluster_vllm_reasoning_72b</span>
-                      </label>
-                      <select
-                        className="form-input"
-                        value={cfg.reasoning_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'reasoning_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">
+                          심층 추론·코딩 전용 고성능 모델 (Reasoning Tier)
+                        </label>
+                        <select
+                          className="form-input"
+                          value={cfg.reasoning_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'reasoning_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.reasoning_model) && cfg.reasoning_model && (
+                            <option value={cfg.reasoning_model}>⚠️ {cfg.reasoning_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Envoy 업스트림 클러스터 식별자</span>
+                          <span style={{ color: 'var(--accent-purple)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_reasoning_72b"
+                          value={cfg.reasoning_cluster !== undefined ? cfg.reasoning_cluster : 'cluster_vllm_reasoning_72b'}
+                          onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'reasoning_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>일반 대화 및 단순 질의 모델 (Fast 8B Tier)</span>
-                        <span style={{ color: 'var(--accent-cyan)', fontSize: '0.75rem' }}>클러스터: cluster_vllm_fast_8b</span>
-                      </label>
-                      <select
-                        className="form-input"
-                        value={cfg.fast_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'fast_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">
+                          일반 대화 및 단순 질의 모델 (Fast Tier)
+                        </label>
+                        <select
+                          className="form-input"
+                          value={cfg.fast_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'fast_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.fast_model) && cfg.fast_model && (
+                            <option value={cfg.fast_model}>⚠️ {cfg.fast_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias}) - {m.backend || m.serving_engine}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Envoy 업스트림 클러스터 식별자</span>
+                          <span style={{ color: 'var(--accent-cyan)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_fast_8b"
+                          value={cfg.fast_cluster !== undefined ? cfg.fast_cluster : 'cluster_vllm_fast_8b'}
+                          onChange={(e) => handleUpdatePolicyConfig('QualityFirst', 'fast_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
                     <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
@@ -3815,30 +4033,66 @@ print(response.choices[0].message.content)`;
                       </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">예산 초과 시 다운티어링할 경제형 모델 (Economic Model)</label>
-                      <select
-                        className="form-input"
-                        value={cfg.economic_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'economic_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias}) - 입력 ₩{m.input_price || m.input_price_per_1k}/1k</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">예산 초과 시 다운티어링할 경제형 모델 (Economic Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.economic_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'economic_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.economic_model) && cfg.economic_model && (
+                            <option value={cfg.economic_model}>⚠️ {cfg.economic_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias}) - 입력 ₩{m.input_price || m.input_price_per_1k}/1k</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>경제형 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-emerald)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_fast_8b"
+                          value={cfg.economic_cluster !== undefined ? cfg.economic_cluster : 'cluster_vllm_fast_8b'}
+                          onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'economic_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">일반 상태(예산 여유) 시 표준 고성능 모델 (Standard Model)</label>
-                      <select
-                        className="form-input"
-                        value={cfg.standard_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'standard_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">일반 상태(예산 여유) 시 표준 고성능 모델 (Standard Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.standard_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'standard_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.standard_model) && cfg.standard_model && (
+                            <option value={cfg.standard_model}>⚠️ {cfg.standard_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>표준형 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-purple)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_reasoning_72b"
+                          value={cfg.standard_cluster !== undefined ? cfg.standard_cluster : 'cluster_vllm_reasoning_72b'}
+                          onChange={(e) => handleUpdatePolicyConfig('LeastCost', 'standard_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
                 );
@@ -3870,17 +4124,66 @@ print(response.choices[0].message.content)`;
                       />
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">초저지연 최우선 처리 모델 (Primary Fast Model)</label>
-                      <select
-                        className="form-input"
-                        value={cfg.primary_fast_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'primary_fast_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">초저지연 최우선 처리 모델 (Primary Fast Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.primary_fast_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'primary_fast_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.primary_fast_model) && cfg.primary_fast_model && (
+                            <option value={cfg.primary_fast_model}>⚠️ {cfg.primary_fast_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>초저지연 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-cyan)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_fast_8b"
+                          value={cfg.fast_cluster !== undefined ? cfg.fast_cluster : 'cluster_vllm_fast_8b'}
+                          onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'fast_cluster', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">심층 추론 허용 시 모델 (Reasoning Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.reasoning_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'reasoning_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.reasoning_model) && cfg.reasoning_model && (
+                            <option value={cfg.reasoning_model}>⚠️ {cfg.reasoning_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>심층 추론 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-purple)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_reasoning_72b"
+                          value={cfg.reasoning_cluster !== undefined ? cfg.reasoning_cluster : 'cluster_vllm_reasoning_72b'}
+                          onChange={(e) => handleUpdatePolicyConfig('LatencyOptimized', 'reasoning_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
                     <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
@@ -3909,30 +4212,66 @@ print(response.choices[0].message.content)`;
                       💡 <strong>SelfHealingFallback 정책:</strong> 업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시, 무중단으로 지정된 예비 모델로 자동 절체(Failover)합니다.
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">1차 장애 발생 시 자동 절체 모델 (Primary Fallback Model)</label>
-                      <select
-                        className="form-input"
-                        value={cfg.primary_fallback_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'primary_fallback_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">1차 장애 발생 시 자동 절체 모델 (Primary Fallback Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.primary_fallback_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'primary_fallback_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.primary_fallback_model) && cfg.primary_fallback_model && (
+                            <option value={cfg.primary_fallback_model}>⚠️ {cfg.primary_fallback_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>1차 폴백 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-amber)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_vllm_inference_pool"
+                          value={cfg.fallback_cluster !== undefined ? cfg.fallback_cluster : 'cluster_vllm_inference_pool'}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'fallback_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">2차 예비 모델 (Secondary Fallback Model)</label>
-                      <select
-                        className="form-input"
-                        value={cfg.secondary_fallback_model || ''}
-                        onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'secondary_fallback_model', e.target.value)}
-                      >
-                        {models.map(m => (
-                          <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">2차 예비 모델 (Secondary Fallback Model)</label>
+                        <select
+                          className="form-input"
+                          value={cfg.secondary_fallback_model || ''}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'secondary_fallback_model', e.target.value)}
+                        >
+                          {!models.some(m => m.id === cfg.secondary_fallback_model) && cfg.secondary_fallback_model && (
+                            <option value={cfg.secondary_fallback_model}>⚠️ {cfg.secondary_fallback_model} (미등록 모델)</option>
+                          )}
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.id} ({m.alias})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>2차 폴백 업스트림 클러스터</span>
+                          <span style={{ color: 'var(--accent-amber)', fontSize: '0.72rem' }}>xDS Cluster</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="예: cluster_solar_backup"
+                          value={cfg.secondary_fallback_cluster !== undefined ? cfg.secondary_fallback_cluster : 'cluster_solar_backup'}
+                          onChange={(e) => handleUpdatePolicyConfig('SelfHealingFallback', 'secondary_fallback_cluster', e.target.value)}
+                        />
+                      </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

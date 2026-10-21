@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.agent_router_policy import AgentRouterPolicyModel
 from app.models.system_prompt import SystemPrompt
+from app.models.user import User, UserSession
 
 logger = logging.getLogger(__name__)
 

@@ -560,7 +560,8 @@ from app.core.agent_router import (
     RoutingPolicyType,
     DEFAULT_FAST_MODEL,
     DEFAULT_REASONING_MODEL,
-    DEFAULT_FALLBACK_MODEL
+    DEFAULT_FALLBACK_MODEL,
+    derive_cluster_name
 )
 from app.core.agent_router.policy_manager import AgentRouterPolicyManager
 from app.schemas.routing import (
@@ -577,8 +578,21 @@ class AgentRouterSimulateRequest(BaseModel):
 
 @router.get("/agent-router/status")
 def get_agent_router_status(db: Session = Depends(get_db)):
-    """AgentRouter 현재 활성 정책 및 모델 풀 상태 조회"""
+    """AgentRouter 현재 활성 정책 및 모델 풀 상태 조회 (동적 클러스터/모델 매핑)"""
     policies = AgentRouterPolicyManager.get_all_policies(db=db)
+    policy_dict = {p.get("policy_id"): p.get("config", {}) for p in policies}
+    qf_cfg = policy_dict.get("QualityFirst", {})
+    sh_cfg = policy_dict.get("SelfHealingFallback", {})
+
+    fast_model = qf_cfg.get("fast_model") or DEFAULT_FAST_MODEL
+    fast_cluster = qf_cfg.get("fast_cluster") or derive_cluster_name(fast_model, "cluster_vllm_fast_8b")
+
+    reasoning_model = qf_cfg.get("reasoning_model") or DEFAULT_REASONING_MODEL
+    reasoning_cluster = qf_cfg.get("reasoning_cluster") or derive_cluster_name(reasoning_model, "cluster_vllm_reasoning_72b")
+
+    fallback_model = sh_cfg.get("primary_fallback_model") or DEFAULT_FALLBACK_MODEL
+    fallback_cluster = sh_cfg.get("fallback_cluster") or derive_cluster_name(fallback_model, "cluster_vllm_inference_pool")
+
     return {
         "status": "ACTIVE",
         "engine": "AgentRouter Cognitive Dispatcher v0.1",
@@ -586,18 +600,18 @@ def get_agent_router_status(db: Session = Depends(get_db)):
         "policies": policies,
         "default_tiers": {
             "fast_8b": {
-                "model": DEFAULT_FAST_MODEL,
-                "cluster": "cluster_vllm_fast_8b",
+                "model": fast_model,
+                "cluster": fast_cluster,
                 "description": "단순 질의 및 대화형 Q&A를 위한 초저지연 경량 모델"
             },
             "reasoning_72b": {
-                "model": DEFAULT_REASONING_MODEL,
-                "cluster": "cluster_vllm_reasoning_72b",
+                "model": reasoning_model,
+                "cluster": reasoning_cluster,
                 "description": "코딩, 수학, 알고리즘 및 심층 추론 전용 대형 모델"
             },
             "fallback": {
-                "model": DEFAULT_FALLBACK_MODEL,
-                "cluster": "cluster_vllm_inference_pool",
+                "model": fallback_model,
+                "cluster": fallback_cluster,
                 "description": "장애 발생 시 자가 치유(Self-healing) 페일오버 모델"
             }
         }
@@ -623,7 +637,7 @@ def update_agent_router_policies(payload: AgentRouterPoliciesUpdate, db: Session
     )
 
 @router.post("/agent-router/simulate")
-def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest):
+def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest, db: Session = Depends(get_db)):
     """프롬프트 인텐트 및 복잡도 분석 실시간 시뮬레이션"""
     messages = [{"role": "user", "content": req.prompt}]
     classification = classify_prompt(messages=messages, tools=req.tools)
@@ -634,10 +648,15 @@ def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest):
             policy_enum = p
             break
 
+    # Fetch active policy configuration dynamically from DB/cache
+    policy_data = AgentRouterPolicyManager.get_policy(policy_enum.value, db=db)
+    policy_config = policy_data.get("config", {}) if policy_data else {}
+
     router_inst = AgentRouter(default_policy=policy_enum)
     decision = router_inst.evaluate_route(
         classification=classification,
         policy=policy_enum,
+        policy_config=policy_config,
         tenant_budget_spent_ratio=req.budget_spent_ratio or 0.0
     )
 

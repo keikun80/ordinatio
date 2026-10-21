@@ -1,5 +1,5 @@
-.PHONY: help setup test lint build run-backend run-frontend up down \
-	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus \
+.PHONY: help setup test lint build run-backend run-frontend up down init-admin \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -97,6 +97,12 @@ verify-phase-system-prompt:
 
 verify-all-menus:
 	@bash scripts/verify-all-menus.sh
+
+verify-auth-rbac:
+	@bash scripts/verify-auth-rbac.sh
+
+init-admin:
+	@cd backend && uv run python -m app.scripts.init_admin $(ARGS)
 
 
 # Kubernetes (Pod 배포, 라이프사이클 및 관리)

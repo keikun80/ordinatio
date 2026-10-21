@@ -9,10 +9,14 @@ import ComplianceTab from './components/ComplianceTab';
 import LifecycleTab from './components/LifecycleTab';
 import PromptStudioTab from './components/PromptStudioTab';
 import SystemPromptsTab from './components/SystemPromptsTab';
+import UsersTab from './components/UsersTab';
+import LoginPage from './components/LoginPage';
 import DevInspector from './components/DevInspector';
-import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { CheckCircle2, AlertTriangle, Info, X, Loader2 } from 'lucide-react';
 
-export default function App() {
+function Dashboard() {
+  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [routingSubTab, setRoutingSubTab] = useState('routing');
   const [unreadPatchCount, setUnreadPatchCount] = useState(1);
@@ -34,7 +38,8 @@ export default function App() {
   // Trigger Toast Notification
   const addToast = (type, message) => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, type, message }]);
+    const normalizedType = type.toUpperCase();
+    setToasts((prev) => [...prev, { id, type: normalizedType, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
@@ -44,6 +49,36 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // 1. Loading splash screen while session token is verified
+  if (isLoading) {
+    return (
+      <div 
+        style={{
+          minHeight: '100vh',
+          width: '100vw',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)',
+          gap: '16px'
+        }}
+      >
+        <Loader2 size={36} color="#38bdf8" className="spin" />
+        <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+          폐쇄망 어플라이언스 보안 세션 초기화 중...
+        </span>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated state -> render LoginPage
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  // 3. Authenticated dashboard view
   return (
     <div className="app-container">
       {/* Sidebar Navigation */}
@@ -107,6 +142,10 @@ export default function App() {
           {activeTab === 'prompt-studio' && (
             <PromptStudioTab onNotify={addToast} />
           )}
+
+          {activeTab === 'users' && isSuperAdmin && (
+            <UsersTab onNotify={addToast} />
+          )}
         </main>
       </div>
 
@@ -123,6 +162,7 @@ export default function App() {
             {toast.type === 'SUCCESS' && <CheckCircle2 size={18} color="#34d399" />}
             {toast.type === 'ERROR' && <AlertTriangle size={18} color="#f43f5e" />}
             {toast.type === 'INFO' && <Info size={18} color="#38bdf8" />}
+            {toast.type === 'WARNING' && <AlertTriangle size={18} color="#fbbf24" />}
             <span style={{ fontSize: '0.85rem', flex: 1 }}>{toast.message}</span>
             <button 
               onClick={() => removeToast(toast.id)}
@@ -134,5 +174,13 @@ export default function App() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Dashboard />
+    </AuthProvider>
   );
 }

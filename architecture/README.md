@@ -35,7 +35,10 @@
 | **PRE_23** | [PRE_23_ui_taxonomy_and_element_specification.md](./PRE_23_ui_taxonomy_and_element_specification.md) | **UI 택소노미 체계 및 화면/기능 식별자 명세서 (UI Element Taxonomy & Spec)**<br>- 4대 식별자 계층(`Screen ID`, `Function ID`, `data-testid`, `Element Class`) 표준화<br>- 주요 관리 탭 컴포넌트 locator 주입 및 DevInspector(`Ctrl+Shift+D`) 실시간 오버레이 탑재<br>- E2E 테스트 및 원격 커뮤니케이션용 UI 요소 전수 인벤토리 매핑표 수립 | **구현 완료**<br>(Vite Build PASS) |
 | **PRE_24** | [PRE_24_route_custom_path_finops_metering_and_tenant_mapping_report.md](./PRE_24_route_custom_path_finops_metering_and_tenant_mapping_report.md) | **라우트 커스텀 경로 디스패치, FinOps 실시간 계량 누적 및 테넌트 매핑 선택 UI 구현 보고서**<br>- Envoy L7 와일드카드 및 백엔드 동적 경로 디스패처(`/v1/{custom_path}`) 구현 (404 해소)<br>- `gemma2:2b` 오프라인 포트 정정(HTTP 11434) 및 헬스 200 OK 확보<br>- 추론 시 가상 API Key 및 부서(Tenant) 실시간 토큰/비용 원자적 누적 엔진 탑재<br>- 라우팅 스튜디오 내 기존 등록 테넌트 드롭다운 및 인터랙티브 뱃지 칩 매핑 UI 구현 | **100% PASS**<br>(78/78 Tests) |
 | **PRE_25** | [PRE_25_all_menus_integrated_test_scenario_and_monitoring_plan.md](./PRE_25_all_menus_integrated_test_scenario_and_monitoring_plan.md) | **8대 전 메뉴 활용 및 모니터링 통합 테스트 시나리오 & 자동화 검증 계획서**<br>- 8대 전 메뉴(관제홈, 라우팅, 가상키/테넌트, 시스템프롬프트, FinOps, PII보안, 긴급패치, 프롬프트스튜디오) E2E 10단계 시나리오<br>- 자가진단, 테넌트/가상키 발급, 동적 라우팅, L7 프롬프트 주입, Presidio 마스킹, WORM 감사, 원자적 토큰 계량, Hotfix 무결성 전수 검증<br>- 원클릭 자동화 검증 러너(`verify-all-menus.sh`, `make verify-all-menus`) 10단계 100% PASS 검증 완료 | **100% PASS**<br>(10/10 Steps) |
-| **PRE_26** | [PRE_26_user_authentication_and_rbac_specification.md](./PRE_26_user_authentication_and_rbac_specification.md) | **사용자 인증 및 역할 기반 권한 관리(RBAC) 아키텍처 및 구현 사양서**<br>- 100% 에어갭 로컬 DB(PostgreSQL) 기반 계정/세션 관리 및 Argon2id 해싱<br>- 3단계 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`), 1:1 테넌트 소속 스코프 통제<br>- 금융 3대 보안 제약(30분 미활동 만료, 5회 실패 시 15분 잠금, 단일 세션 중복 로그인 방지)<br>- 초기 슈퍼관리자 생성용 대화형 CLI(`make init-admin`) 부트스트랩 사양 정의 | **설계 확정**<br>(구현 준비) |
+| **PRE_26** | [PRE_26_user_authentication_and_rbac_specification.md](./PRE_26_user_authentication_and_rbac_specification.md) | **사용자 인증 및 역할 기반 권한 관리(RBAC) 아키텍처 및 구현 사양서**<br>- 100% 에어갭 로컬 DB(PostgreSQL) 기반 계정/세션 관리 및 Argon2id 해싱<br>- 3단계 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`), 1:1 테넌트 소속 스코프 통제<br>- 금융 3대 보안 제약(30분 미활동 만료, 5회 실패 시 15분 잠금, 단일 세션 중복 로그인 방지)<br>- 초기 슈퍼관리자 생성용 대화형 CLI(`make init-admin`) 부트스트랩 사양 정의 | **설계 완료** |
+| **PRE_27** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | **사용자 인증 & RBAC 권한 통제 구현 및 검증 결과서**<br>- 100% 에어갭 로컬 DB(PostgreSQL), Argon2id 해싱, JWT 단일 활성 세션<br>- 30분 슬라이딩 활동 타이머, 5회 실패 시 15분 잠금, 3-Tier RBAC 통제<br>- React 18 Glassmorphism 로그인/사용자관리 UI, `make init-admin` CLI, `make verify-auth-rbac` 검증 | **100% PASS**<br>(85/85 Tests) |
+| **PRE_28** | [PRE_28_commercial_packaging_and_enterprise_expansion_plan.md](./PRE_28_commercial_packaging_and_enterprise_expansion_plan.md) | **상용화 패키징 및 엔터프라이즈 확장 구축·테스트 계획서**<br>- Stage 1: 오프라인 라이선스(RSA-4096/HW바인딩), Helm 차트, 단일 tar.gz 인스톨러, 셋업 마법사<br>- Stage 2: 사내 디렉토리 연동(AD/LDAP, SAML/OIDC), TOTP MFA, 1-Click 암호화 백업/DR, 사내 알림 웹훅<br>- Stage 3: 시맨틱 캐싱(비용 40~60% 절감), L7 프롬프트 탈옥 방어 가드레일, 화이트라벨링, 엔터프라이즈 SDK<br>- 단계별 구축 계획, 세부 테스트 매트릭스, 자동화 검증 스크립트 규격 및 라이선스 티어링 정의 | **설계 완료** |
+| **PRE_29** | [PRE_29_agent_router_dynamic_cluster_configuration_report.md](./PRE_29_agent_router_dynamic_cluster_configuration_report.md) | **AgentRouter 동적 Envoy 업스트림 클러스터 사용자 구성 및 시스템 하드코딩 제거 구현 보고서**<br>- 클러스터 고정 시스템 상수 및 `meta-llama` 하드코딩 모델 완전 제거<br>- 4대 지능형 라우팅 정책 내 동적 클러스터 `<input>` 편집 UI 및 모델 카탈로그 실시간 동적 바인딩<br>- 인텐트 분석 카드 메뉴 4종(복잡도, 티어, 타깃모델, 클러스터) 대화형 실시간 수동 에디트(Manual Override) 구현 | **100% PASS**<br>(85/85 Tests) |
 
 ---
 
@@ -114,7 +117,10 @@ bash scripts/verify-phase5.sh
 # 시스템 프롬프트: 거버넌스 및 동적 인라인 주입
 bash scripts/verify-phase-system-prompt.sh
 
-# 백엔드 전체 회귀 테스트 (78개 테스트 100% PASS)
+# 사용자 인증 및 RBAC 권한 통제 (DoD)
+make verify-auth-rbac
+
+# 백엔드 전체 회귀 테스트 (85개 테스트 100% PASS)
 cd backend && uv run pytest -v
 ```
 

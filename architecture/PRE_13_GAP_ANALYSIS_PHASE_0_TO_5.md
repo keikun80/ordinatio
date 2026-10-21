@@ -13,11 +13,11 @@
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 5 + 시스템 프롬프트 거버넌스)**
   - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱), 동적 모델 카탈로그, **6종 LLM Provider 규격화 및 동적 엔드포인트 URL 조합기(Dynamic URL Builder)**, **헬스체크 타임아웃 수동 조절(1.0s~30.0s) 및 모달별 개별 설정/DB 영속화**, Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, PII 규칙 인앱 안전 삭제 모달, **에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단**, **동적 시스템 프롬프트 거버넌스 포털 및 L7 Envoy ext_proc 스트림 인라인 주입 엔진 (1:1 라우팅/가상키/테넌트 바인딩, PREPEND/OVERRIDE/FALLBACK_ONLY)**.
-- **자동화 테스트 검증율**: **85 / 85 테스트 100% PASS** (`uv run pytest -v`)
+- **자동화 테스트 검증율**: **86 / 86 테스트 100% PASS** (`uv run pytest -v`)
   - Phase 0: Health & Readiness (5종)
   - Phase 1: Virtual Keys & Tenants (6종)
   - Phase 2: Dynamic Routing & xDS (9종)
-  - Phase 3: Observability & FinOps (6종)
+  - Phase 3: Observability & FinOps (7종 - 원격 엔드포인트 텔레메트리 & N/A Fallback 테스트 포함)
   - Phase 4: Compliance & PII Governance (8종)
   - Phase 5: Lifecycle & Hotfix Engine (8종)
   - 시스템 프롬프트 거버넌스 & L7 ext_proc 주입: (12종)
@@ -27,8 +27,8 @@
   - External API: (4종)
   - Models & Routing: (3종)
 - **DoD 자동화 감사**: Phase 0, 1, 2, 3, 4, 5, 시스템 프롬프트 및 사용자 인증/RBAC 스크립트(`bash scripts/verify-auth-rbac.sh`) 100% 통과
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **14건** (ADR-01 ~ ADR-14 공식 반영 완료)
-- **미구현 항목**: 총 **1건** (예산 임계치 외부 웹훅 알림 - Keycloak OIDC는 에어갭 자립형 로컬 Argon2id+JWT 인증(ADR-14)으로 완전 대체 구현 완료)
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **15건** (ADR-01 ~ ADR-15 공식 반영 완료)
+- **미구현 항목**: 총 **1건** (예산 임계치 외부 웹훅 알림 - Keycloak OIDC는 에어갭 자립형 로컬 Argon2id+JWT 인증(ADR-15)으로 완전 대체 구현 완료)
 
 ---
 
@@ -207,7 +207,15 @@
   - 라우팅 스튜디오 내 즉시 호출 테스트벤치 및 프론트엔드 전용 거버넌스 대시보드(`SystemPromptsTab.jsx`)에 실시간 토큰/글자수 카운터와 1:1 바인딩 마법사 연동 완료 (`PRE_19`, `PRE_20`).
 - **영향도**: 긍정적 (클라이언트 코드 수정 없이 전사 보안 가드레일 및 부서별 페르소나를 L7 레벨에서 100% 강제 적용 가능).
 
-### 3.17 [신규 구현 - 인증/보안] 금융권 수준 RBAC & 로컬 자립형 사용자 인증 [ADR-14]
+### 3.17 [신규 구현 - 관제] 원격 엔드포인트 텔레메트리 스크래핑 & 토폴로지 자동 식별 [ADR-14]
+- **설계서 명세**: 모든 컴퓨팅 풀에 대해 일괄적으로 `On-Prem K8s` / `k8s` 인프라를 표기하고 호스트 OS RAM(`psutil`)을 측정치로 매핑.
+- **현재 구현 상태**:
+  - 모델의 `endpoint_url`을 기반으로 인프라 유형(`External Cloud API`, `Docker Container`, `On-Prem K8s`, `Remote On-Prem GPU Node`)과 오토스케일링 기술(`external-api`, `docker-compose`, `k8s-hpa`, `fixed-capacity`)을 동적 판별.
+  - vLLM 원격 인스턴스의 Prometheus `/metrics` 엔드포인트를 4초 주기로 비동기 스크래핑하여 `gpu_cache_usage_factor`를 `gpu_memory_pct`로 실시간 파싱.
+  - 시스템/GPU 메트릭 수집이 불가한 외부 SaaS/클라우드 API는 `N/A (Remote Endpoint)`로 명확히 분기하여 프론트엔드에서 비활성 점선 게이지와 안내 뱃지를 렌더링하고, Envoy L7 프록시 정보(`Envoy L7 (Active Upstream: N rq)`)를 제공 (`PRE_30_remote_endpoint_telemetry_and_topology_resolution_report.md`).
+- **영향도**: 긍정적 (오해의 소지가 있는 허위 RAM 점유율 및 중복 표기를 제거하고 실질적인 인프라 토폴로지 정보 제공).
+
+### 3.18 [신규 구현 - 인증/보안] 금융권 수준 RBAC & 로컬 자립형 사용자 인증 [ADR-15]
 - **설계서 명세**: 외부 Keycloak 서버 및 단순 단일 관리자 모델 전제.
 - **현재 구현 상태**:
   - 외부 네트워크 및 복잡한 컨테이너 종속성이 없는 로컬 자립형 사용자 인증 시스템 구축 (`PRE_26`, `PRE_27`).
@@ -218,7 +226,7 @@
   - 프론트엔드: Dark Slate Glassmorphism 로그인 화면, 30분 실시간 카운트다운 타이머 헤더 배지, 사용자 및 계정 관리 전용 탭(`UsersTab.jsx`).
 - **영향도**: 긍정적 (에어갭 금융/공공 기관의 컴플라이언스를 100% 충족하며 비인가 접근을 원천 차단).
 
-### 3.18 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
+### 3.19 [미구현 - Phase 6] E2E 통합 검증, Helm 차트 & 오프라인 패키징
 - **설계서 명세**: Playwright 관리자 E2E 테스트 스위트, Helm Chart/KOTS 단일 배포 번들, 오프라인 컨테이너 이미지 아카이브(`save-images.sh`).
 - **현재 구현 상태**: 현재 Docker Compose 기반 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 정식 단일 Helm 패키지 및 Playwright E2E 스위트는 미구현.
 - **영향도**: 높음 (Phase 6 정규 작업 범위).
@@ -227,7 +235,7 @@
 
 ## 4. 미테스트 시나리오 목록 (Untested Scenarios)
 
-현재 백엔드 단위/통합 테스트 78개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
+현재 백엔드 단위/통합 테스트 86개와 DoD 스크립트는 100% PASS 상태이나, 향후 추가 E2E/부하 테스트가 권장되는 항목은 다음과 같습니다.
 
 1. **대규모 정규식 처리량 부하 테스트 (High-Throughput PII Matching)**:
    - 초당 10,000건 이상의 동시 프롬프트 인입 시 정규식 컴파일 캐시 및 CPU 점유율 측정.

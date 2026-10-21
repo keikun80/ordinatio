@@ -27,13 +27,14 @@ export default function OverviewTab({ onNavigateTab }) {
     if (!pools || pools.length === 0) return [];
     return pools.map((p, idx) => ({
       id: `pool-${(p.infra || 'infra').toLowerCase().replace(/[^a-z0-9]/g, '')}-${idx}`,
-      name: p.model_id || p.pool_name,
+      name: p.pool_name || p.model_id,
       model: p.model_id || p.pool_name,
       engine: p.engine || 'vLLM',
       workload: p.workload || `${p.engine || 'vLLM'} 온프레미스 인스턴스`,
       pods: p.pod_count,
       queueDepth: p.waiting_queue,
-      gpuMemoryPercent: Math.round(p.gpu_memory_pct),
+      gpuMemoryPercent: p.gpu_memory_pct != null ? Math.round(p.gpu_memory_pct) : null,
+      gpuMetricSource: p.gpu_metric_source || (p.gpu_memory_pct != null ? '시스템 측정' : '원격 블랙박스 엔드포인트'),
       scalingTech: p.scaling_tech || `${p.infra} 인프라`,
       status: p.status || 'HEALTHY',
       endpointUrl: p.endpoint_url || ''
@@ -338,9 +339,9 @@ export default function OverviewTab({ onNavigateTab }) {
                       whiteSpace: 'nowrap',
                       marginRight: '8px'
                     }}
-                    title={pool.model || pool.name}
+                    title={pool.name || pool.model}
                   >
-                    {pool.model || pool.name}
+                    {pool.name || pool.model}
                   </div>
                   <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`} style={{ flexShrink: 0 }}>
                     {pool.status === 'HEALTHY' ? '정상 가동' : '점검 필요'}
@@ -368,23 +369,38 @@ export default function OverviewTab({ onNavigateTab }) {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>시스템/GPU 점유율:</span>
-                    <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>{pool.gpuMemoryPercent}%</span>
+                    {pool.gpuMemoryPercent !== null && pool.gpuMemoryPercent !== undefined ? (
+                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
+                        {pool.gpuMemoryPercent}%
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>
+                        N/A (원격 엔드포인트)
+                      </span>
+                    )}
                   </div>
 
-                  {/* Progress bar */}
-                  <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                    <div 
-                      style={{ 
-                        width: `${Math.min(100, Math.max(2, pool.gpuMemoryPercent))}%`, 
-                        height: '100%', 
-                        background: 'linear-gradient(90deg, #38bdf8, #06b6d4)',
-                        borderRadius: '999px'
-                      }}
-                    />
-                  </div>
+                  {/* Progress bar or Remote indicator */}
+                  {pool.gpuMemoryPercent !== null && pool.gpuMemoryPercent !== undefined ? (
+                    <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div 
+                        style={{ 
+                          width: `${Math.min(100, Math.max(2, pool.gpuMemoryPercent))}%`, 
+                          height: '100%', 
+                          background: 'linear-gradient(90deg, #38bdf8, #06b6d4)',
+                          borderRadius: '999px'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '999px', border: '1px dashed rgba(255, 255, 255, 0.15)' }} />
+                  )}
 
-                  <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    🔧 {pool.scalingTech}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <span>🔧 {pool.scalingTech}</span>
+                    <span style={{ fontSize: '0.68rem', color: pool.gpuMemoryPercent != null ? '#38bdf8' : '#64748b' }}>
+                      {pool.gpuMetricSource}
+                    </span>
                   </div>
                 </div>
               </div>

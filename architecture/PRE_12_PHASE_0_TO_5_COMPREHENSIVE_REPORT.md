@@ -161,12 +161,12 @@ kubectl get pods,svc -n aiorche -o wide
 
 ## 6. 아키텍처 결정 기록 (ADR) 및 설계 문서 현행화 완료 내역
 
-에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 13대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
+에어갭 폐쇄망 자립형 어플라이언스의 운영 신뢰성과 단순성을 극대화하기 위해 적용된 15대 아키텍처 최적화 사항을 마스터 설계서(`dashboard_engineering_plan.md`)에 공식 현행화 반영하였습니다.
 
 | 결정 번호 | 최적화 영역 | 기존 초기 구상 | 현행화된 프로덕션 아키텍처 | 채택 배경 및 엔지니어링 효과 |
 | :---: | :---: | :--- | :--- | :--- |
 | **ADR-01** | xDS 제어 평면 | `go-control-plane` gRPC ADS 서버 | **FastAPI Envoy REST RDS v3** (`/api/v1/xds/v3/discovery:routes`) | 별도 무거운 Go 데몬 의존성을 제거하고 Envoy 공식 `rest_api_provider`를 단일 백엔드에 통합하여 무중단 카나리 라우팅 구현 |
-| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 실시간 DB 및 시스템 메모리 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 `model_catalogs` DB + host OS 메모리 + Envoy 실시간 큐 결합 스트림 구축 |
+| **ADR-02** | 컴퓨팅 풀 관제 | K8s `InferencePool` 실시간 CRD Watcher | **Multi-Compute Pools 실시간 vLLM Prometheus 스크래핑 & 로컬 노드 RAM 모델링** | 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고 원격 vLLM `/metrics`의 GPU KV-Cache 점유율 비동기 스크래핑 및 Envoy 실시간 큐 결합 스트림 구축 |
 | **ADR-03** | FinOps 과금 계량 | Apache Kafka 비동기 이벤트 컨슈머 | **Envoy L7 직접 보고 동기식 원자적 계량 API** (`POST /api/v1/external/usage/report`) | 무거운 Kafka 클러스터 설치/운영 오버헤드 없이 단일 DB 트랜잭션으로 토큰/비용의 100% 원자적 일관성 및 초저지연 보장 |
 | **ADR-04** | 전문 관제 대시보드 | Grafana Kiosk 모드 iFrame 직접 임베딩 | **전문 3종 내장 관제 패널 및 외부 Grafana 연동 링크** | Grafana 컨테이너 미구동 상태에서도 L7, GPU, FinOps 3대 화면을 자체 독립적으로 완벽 관제 가능 |
 | **ADR-05** | PII 마스킹 엔진 | 대용량 외부 Presidio spaCy NER 모델 (~500MB) | **자체 정규식 기반 고속 PII 엔진 (`pii_engine.py`)** | 외부 인터넷 불가 에어갭 환경에서 즉시 구동 가능하며, 2ms 미만의 초저지연 처리 보장 |
@@ -178,13 +178,14 @@ kubectl get pods,svc -n aiorche -o wide
 | **ADR-11** | 서빙 모델 엔드포인트 조립 | 백엔드 임의 접미사 슬라이싱/유추 | **동적 URL 조합기(Dynamic URL Builder) & 타깃 경로 직접 호출** | Provider별 고유 접미사를 프론트엔드에서 즉시 조립하고 백엔드의 임의 정규화를 배제하여 Anthropic, Gemini, Cohere 등 비호환 Provider 무결 연동 보장 |
 | **ADR-12** | 헬스체크 타임아웃 제어 | 3.0초 하드코딩 타임아웃 고정 | **계층형 수동 조절(전역 툴바 1.0s~30.0s + 모델별 DB 영속화) & 원인 명시적 예외 처리** | 초고속 온프레미스 LAN(1.0s)부터 분산 클라우드(30.0s)까지 네트워크 지연 환경에 유연하게 대응하고 '응답 대기시간 초과' 원인 상세 안내 |
 | **ADR-13** | 시스템 프롬프트 거버넌스 & L7 인라인 주입 | 클라이언트 개별 프롬프트 전제 및 단일 정적 템플릿 | **위계적 우선순위(`KEY` > `ROUTE` > `TENANT` > `GLOBAL`) 및 L7 ext_proc 페이로드 변조** | 클라이언트 수정 없이 관리자가 라우트/가상키/테넌트별 시스템 프롬프트를 1:1로 유연하게 바인딩하고 게이트웨이 레벨에서 3대 모드(`PREPEND`/`OVERRIDE`/`FALLBACK`)로 자동 합성 |
-| **ADR-14** | 금융권 수준 RBAC & 로컬 자립형 사용자 인증 | 외부 SaaS/IdP 종속 및 단순 단일 역할 체계 | **로컬 DB Argon2id + JWT 세션, 3-Tier 역할(`SUPER_ADMIN`/`TENANT_ADMIN`/`VIEWER`), 30분 미활동 자동 로그아웃, 5회 오류 시 15분 잠금, 단일 세션 보장** | 100% 에어갭 폐쇄망 자립성을 충족하며 금융감독원 망분리 보안 규정 및 비인가 접근 차단을 완벽 보장 |
+| **ADR-14** | 원격 엔드포인트 텔레메트리 & 토폴로지 식별 | 호스트 OS RAM 일괄 대입 및 `On-Prem K8s / k8s` 고정 | **URL 토폴로지 기반 스마트 식별 & vLLM Prometheus 스크래핑/N/A 분기** | 로컬 OS RAM 강제 바인딩 맹점을 해소하고, 외부 SaaS/클라우드 API, Docker 컨테이너, K8s 클러스터 토폴로지를 자동 판별하여 Envoy L7 Reverse-Proxy 등 실질적인 인프라 정보 제공 |
+| **ADR-15** | 금융권 수준 RBAC & 로컬 자립형 사용자 인증 | 외부 SaaS/IdP 종속 및 단순 단일 역할 체계 | **로컬 DB Argon2id + JWT 세션, 3-Tier 역할(`SUPER_ADMIN`/`TENANT_ADMIN`/`VIEWER`), 30분 미활동 자동 로그아웃, 5회 오류 시 15분 잠금, 단일 세션 보장** | 100% 에어갭 폐쇄망 자립성을 충족하며 금융감독원 망분리 보안 규정 및 비인가 접근 차단을 완벽 보장 |
 
 ---
 
 ## 7. 결론 및 향후 계획 (Next Steps)
 
-- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5, 시스템 프롬프트 거버넌스 및 사용자 인증/RBAC(PRE_26/27)의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`, `scripts/verify-phase-system-prompt.sh`, `scripts/verify-auth-rbac.sh`)와 `make test`를 **100% 통과(85/85 테스트)**하였으며, 실제 브라우저 E2E 기반 로그인 화면, 슬라이딩 세션 타이머, RBAC 사용자 관리 화면까지 최종 확인되었습니다.
+- **DoD 완료 상태**: Phase 0, 1, 2, 3, 4, 5, 시스템 프롬프트 거버넌스 및 사용자 인증/RBAC(PRE_26/27)의 모든 Definition of Done 검증 스크립트(`scripts/verify-phase*.sh`, `scripts/verify-phase-system-prompt.sh`, `scripts/verify-auth-rbac.sh`)와 `make test`를 **100% 통과(86/86 테스트)**하였으며, 실제 브라우저 E2E 기반 로그인 화면, 슬라이딩 세션 타이머, RBAC 사용자 관리 화면까지 최종 확인되었습니다.
 - **설계 문서 일치도**: 마스터 엔지니어링 설계서(`dashboard_engineering_plan.md`), 단계별 구현 계획서, 테스트 결과 보고서 및 갭 분석서 간 **100% 정합성 유지**.
 - **향후 단계**: `dashboard_engineering_plan.md`의 최종 단계인 **Phase 6: E2E 통합 검증, 보안 감사 및 에어갭 패키징 (Release Engineering)** 및 `PRE_15_Develop_milestone.md`의 **Milestone 6 (P0)** 항목으로 즉시 연계가 가능합니다.
 

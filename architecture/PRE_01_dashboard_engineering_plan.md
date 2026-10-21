@@ -308,6 +308,7 @@ CREATE TABLE patch_histories (
 - **프로덕션 아키텍처 및 상세 작업**:
   1. **Backend**:
      - ✅ **1초 주기 실시간 텔레메트리 스트림 허브 (`app/core/telemetry_hub.py`)**: `ws://localhost:8000/api/v1/observability/ws`, 실시간 RPS, TPS, TTFT, 5xx 에러율, 누적 비용, Multi-Compute Pool 부하 브로드캐스트
+       > **[ADR-02 / ADR-14] Multi-Compute Pools 실시간 vLLM Prometheus 스크래핑 & 원격 토폴로지 자동 식별 채택 배경**: 폐쇄망에서 K8s cluster-admin API 권한 종속성을 배제하고, 모델 엔드포인트 URL 토폴로지(External Cloud API, Docker Container, On-Prem K8s, Remote GPU Node)를 스마트 판별하며, vLLM `/metrics` 비동기 스크래핑 및 외부 SaaS API의 `N/A (Remote Endpoint)` graceful fallback을 구축하여 실질적인 인프라 관제를 실현함.
      - ✅ **실시간 관제 요약 및 PromQL 프록시**: `GET /api/v1/observability/metrics/summary`, `POST /api/v1/observability/promql`
      - ✅ **Envoy L7 직접 보고 기반 원자적 토큰 계량 및 실시간 정산 API (`POST /api/v1/external/usage/report`)**:
        > **[ADR-03] Envoy L7 직접 보고 동기식 원자적 계량 API 채택 배경**: 분산 Kafka 클러스터 설치/운영 오버헤드를 배제하고, Envoy ext_proc 및 클라이언트가 추론 완료 즉시 단일 DB 트랜잭션으로 토큰과 비용을 원자적으로 증가시키도록 하여 초저지연과 완벽한 데이터 일관성을 달성함.

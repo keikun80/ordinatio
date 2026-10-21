@@ -137,3 +137,58 @@ def test_hard_cap_enforcement_blocks_traffic():
     )
     assert soft_res.status_code == 200
     assert soft_res.json()["valid"] is True
+
+def test_remote_endpoint_metrics_and_na_fallback():
+    """Verify that remote LLM endpoints parse real vLLM Prometheus metrics or gracefully fallback to N/A."""
+    from app.core.telemetry_hub import _is_local_endpoint, _parse_vllm_gpu_cache_pct, telemetry_hub
+    from app.models.model_catalog import ModelCatalog
+
+    # 1. Test local endpoint detection
+    assert _is_local_endpoint("http://127.0.0.1:8000") is True
+    assert _is_local_endpoint("http://localhost:11434") is True
+    assert _is_local_endpoint("http://10.200.1.50:8000") is False
+    assert _is_local_endpoint("http://remote-vllm.ai-serving.internal:8000/v1") is False
+
+    # 2. Test Prometheus metrics parsing for vLLM KV-Cache
+    sample_prometheus = (
+        "# HELP vllm:gpu_cache_usage_factor GPU KV-cache usage. 1 means 100 percent usage.\n"
+        "# TYPE vllm:gpu_cache_usage_factor gauge\n"
+        'vllm:gpu_cache_usage_factor{model_name="meta-llama/Llama-3.1-8B-Instruct"} 0.684\n'
+    )
+    parsed_pct = _parse_vllm_gpu_cache_pct(sample_prometheus)
+    assert parsed_pct == 68.4
+
+    # 3. Test compute pools with remote endpoint model in DB
+    db = TestSessionLocal()
+    remote_model = ModelCatalog(
+        model_id="remote-org/vllm-cloud-model",
+        alias="remote-vllm-cloud",
+        backend_infra="Remote EKS",
+        serving_engine="vLLM",
+        execution_method="remote-api",
+        target_endpoint="http://10.250.0.12:8000/v1",
+        input_price_per_1k=Decimal("2.0"),
+        output_price_per_1k=Decimal("5.0"),
+        cache_discount_ratio=Decimal("0.2"),
+        is_active=True
+    )
+    db.merge(remote_model)
+    db.commit()
+    db.close()
+
+    # Query summary API
+    res = client.get("/api/v1/observability/metrics/summary")
+    assert res.status_code == 200
+    pools = res.json()["compute_pools"]
+    target_pool = next((p for p in pools if p.get("model_id") == "remote-org/vllm-cloud-model"), None)
+    assert target_pool is not None
+    # Since 10.250.0.12 is unreachable in test mock, it should gracefully fall back to None/Remote Endpoint Blackbox
+    assert target_pool["gpu_memory_pct"] is None
+    assert "Remote Endpoint" in target_pool["gpu_metric_source"]
+
+    # Clean up test model
+    db = TestSessionLocal()
+    db.query(ModelCatalog).filter(ModelCatalog.model_id == "remote-org/vllm-cloud-model").delete()
+    db.commit()
+    db.close()
+

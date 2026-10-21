@@ -1,14 +1,15 @@
 import asyncio
 import time
 import logging
-from typing import Set, Dict, Any, List, Optional
+import re
+from typing import Set, Dict, Any, List, Optional, Tuple
 import httpx
 from fastapi import WebSocket
 from sqlalchemy import func
 
 from app.core.config import settings
 from app.schemas.observability import TelemetryPacket, ComputePoolStatus, ModelTrafficShare
-from app.db.session import SessionLocal
+from app.db import session as db_session
 # Import models to ensure SQLAlchemy relations resolve correctly
 import app.models.virtual_key
 import app.models.tenant
@@ -17,6 +18,85 @@ from app.models.model_catalog import ModelCatalog
 from app.models.audit_log import AuditLog
 
 logger = logging.getLogger("telemetry_hub")
+
+def _is_local_endpoint(url: Optional[str]) -> bool:
+    """Check if the target endpoint is hosted locally on the appliance node."""
+    if not url:
+        return True
+    u = url.lower()
+    return any(host in u for host in ["127.0.0.1", "localhost", "0.0.0.0", "host.docker.internal"])
+
+def _parse_vllm_gpu_cache_pct(metrics_text: str) -> Optional[float]:
+    """Parse Prometheus metrics text to extract GPU cache usage factor (0.0 to 1.0) and convert to percentage."""
+    try:
+        # Match vllm:gpu_cache_usage_factor or vllm_gpu_cache_usage_factor
+        pattern = r"(?:vllm:gpu_cache_usage_factor|vllm_gpu_cache_usage_factor)(?:\{[^}]*\})?\s+([0-9\.]+)"
+        matches = re.findall(pattern, metrics_text)
+        if matches:
+            val = float(matches[-1])
+            if 0.0 <= val <= 1.0:
+                return round(val * 100.0, 1)
+            return round(val, 1)
+
+        # Fallback to TGI or other GPU memory percent metrics if available
+        tgi_pattern = r"(?:tgi_gpu_memory_used_ratio|gpu_memory_utilization)(?:\{[^}]*\})?\s+([0-9\.]+)"
+        tgi_matches = re.findall(tgi_pattern, metrics_text)
+        if tgi_matches:
+            val = float(tgi_matches[-1])
+            if 0.0 <= val <= 1.0:
+                return round(val * 100.0, 1)
+            return round(val, 1)
+    except Exception:
+        pass
+def _resolve_infra_and_scaling(
+    endpoint_url: Optional[str],
+    raw_infra: Optional[str],
+    raw_engine: Optional[str],
+    raw_exec: Optional[str]
+) -> Tuple[str, str, str]:
+    """Dynamically resolve infrastructure type, workload description, and routing/scaling tech based on endpoint topology."""
+    url = (endpoint_url or "").strip().lower()
+    engine = raw_engine or "LLM"
+
+    # 1. External Cloud API (HTTPS or well-known cloud AI providers)
+    if url.startswith("https://") or any(dom in url for dom in ["api.nvidia.com", "openai.com", "anthropic.com", "together.xyz", "groq.com"]):
+        infra = "External Cloud API"
+        workload = f"{engine} 클라우드 모델 엔드포인트"
+        scaling = "Envoy L7 Dynamic Reverse-Proxy"
+        return infra, workload, scaling
+
+    # 2. Docker container (local docker service names or local endpoints with container runtime)
+    if any(h in url for h in ["ollama-", "vllm-", "tgi-", "docker", "compose"]) or (
+        any(h in url for h in ["127.0.0.1", "localhost"]) and raw_exec in ["direct", "docker", "docker-compose"]
+    ):
+        infra = "Docker Container"
+        workload = f"{engine} 온프레미스 컨테이너"
+        scaling = "Docker Engine / Local Ingress"
+        return infra, workload, scaling
+
+    # 3. Kubernetes in-cluster service
+    if any(k in url for k in [".svc", "cluster.local"]) or (raw_exec == "k8s" and not url.startswith("https://")):
+        infra = raw_infra if (raw_infra and "k8s" in raw_infra.lower()) else "On-Prem K8s"
+        workload = f"{engine} K8s 파드 워크로드"
+        scaling = "KEDA Autoscaling / HPA"
+        return infra, workload, scaling
+
+    # 4. Remote On-Premises GPU Server/Node (Private IP e.g. 10.x, 192.168.x, 172.x)
+    if any(url.startswith(prefix) for prefix in ["http://10.", "http://192.168.", "http://172."]):
+        infra = "Remote On-Prem GPU Node"
+        workload = f"{engine} 원격 GPU 서빙 인스턴스"
+        scaling = "Remote HTTP Endpoint / L7 Route"
+        return infra, workload, scaling
+
+    # 5. Fallback with clean deduplication
+    infra = raw_infra or "On-Premises"
+    exec_method = raw_exec or "direct"
+    if exec_method.lower() in infra.lower():
+        scaling = f"{infra} Engine"
+    else:
+        scaling = f"{infra} / {exec_method}"
+    workload = f"{engine} 서빙 인스턴스 ({exec_method})"
+    return infra, workload, scaling
 
 def _get_system_memory_pct() -> float:
     """Read memory usage without external dependencies (cross-platform)."""
@@ -57,6 +137,9 @@ class TelemetryHub:
         self._has_baseline: bool = False
         self._last_raw_stats: Dict[str, Any] = {}
 
+        # Cache for remote endpoint metrics: endpoint -> (cached_at, Optional[float], source_label)
+        self._remote_metrics_cache: Dict[str, Tuple[float, Optional[float], str]] = {}
+
         # Latest cached live telemetry
         self._latest_telemetry: Optional[TelemetryPacket] = None
 
@@ -87,7 +170,7 @@ class TelemetryHub:
     def _get_db_cumulative_cost(self) -> float:
         """Fetch real cumulative inference cost from PostgreSQL tenants table."""
         try:
-            with SessionLocal() as db:
+            with db_session.SessionLocal() as db:
                 total_cost = db.query(func.sum(Tenant.spent_budget_krw)).scalar()
                 return float(total_cost) if total_cost is not None else 0.0
         except Exception as e:
@@ -179,17 +262,57 @@ class TelemetryHub:
             "rq_total": rq_total,
         }
 
+    async def _fetch_remote_metrics(self, endpoint_url: str) -> Tuple[Optional[float], str]:
+        """Attempt to scrape /metrics from a remote LLM serving endpoint (e.g., vLLM /metrics)."""
+        now = time.time()
+        # Return cached entry if less than 4 seconds old
+        if endpoint_url in self._remote_metrics_cache:
+            cached_at, cached_pct, cached_source = self._remote_metrics_cache[endpoint_url]
+            if now - cached_at < 4.0:
+                return cached_pct, cached_source
+
+        # Try to request metrics with short timeout
+        clean_url = endpoint_url.rstrip("/")
+        # If endpoint already has path like /v1, strip it to find root /metrics
+        base_url = clean_url
+        if "/v1" in base_url:
+            base_url = base_url.split("/v1")[0]
+        metrics_url = f"{base_url}/metrics"
+
+        try:
+            async with httpx.AsyncClient(timeout=0.8) as client:
+                resp = await client.get(metrics_url)
+                if resp.status_code == 200:
+                    gpu_pct = _parse_vllm_gpu_cache_pct(resp.text)
+                    if gpu_pct is not None:
+                        source = "vLLM KV-Cache"
+                        self._remote_metrics_cache[endpoint_url] = (now, gpu_pct, source)
+                        return gpu_pct, source
+        except Exception:
+            pass
+
+        # If metrics scrape failed or unavailable, record as remote blackbox
+        source = "Remote Endpoint (Blackbox)"
+        self._remote_metrics_cache[endpoint_url] = (now, None, source)
+        return None, source
+
     def _get_real_compute_pools(self, raw_envoy_stats: Optional[Dict[str, Any]] = None) -> List[ComputePoolStatus]:
-        """Fetch actual compute pools from PostgreSQL model_catalogs and combine with Envoy stats and system memory."""
+        """Fetch actual compute pools from PostgreSQL model_catalogs and combine with Envoy stats, remote metrics, and local node RAM."""
         pools: List[ComputePoolStatus] = []
         try:
-            mem_pct = _get_system_memory_pct()
+            local_mem_pct = _get_system_memory_pct()
 
-            with SessionLocal() as db:
+            with db_session.SessionLocal() as db:
                 models = db.query(ModelCatalog).all()
 
                 for m in models:
-                    infra_name = m.backend_infra or "On-Premises"
+                    target_ep = m.target_endpoint or ""
+                    infra_name, workload_desc, scaling_tech = _resolve_infra_and_scaling(
+                        target_ep,
+                        m.backend_infra,
+                        m.serving_engine,
+                        m.execution_method
+                    )
                     engine = m.serving_engine or "vLLM"
                     pool_name = f"{infra_name} ({engine} - {m.alias})"
 
@@ -207,8 +330,20 @@ class TelemetryHub:
                                 elif "membership_healthy" in clean_k:
                                     pod_count = max(1, int(v))
 
-                    workload_desc = f"{engine} 서빙 인스턴스 ({m.execution_method})"
-                    scaling_tech = f"{infra_name} / {m.execution_method}"
+                    # Determine real GPU / memory utilization based on endpoint topology
+                    target_ep = m.target_endpoint or ""
+                    if _is_local_endpoint(target_ep):
+                        gpu_pct = local_mem_pct
+                        gpu_source = "Local Node RAM"
+                    else:
+                        # Check cache for scraped remote metrics
+                        if target_ep in self._remote_metrics_cache:
+                            _, cached_pct, cached_source = self._remote_metrics_cache[target_ep]
+                            gpu_pct = cached_pct
+                            gpu_source = cached_source
+                        else:
+                            gpu_pct = None
+                            gpu_source = "Remote Endpoint (Blackbox)"
 
                     pools.append(
                         ComputePoolStatus(
@@ -216,7 +351,8 @@ class TelemetryHub:
                             infra=infra_name,
                             pod_count=pod_count,
                             waiting_queue=waiting_queue,
-                            gpu_memory_pct=mem_pct,
+                            gpu_memory_pct=gpu_pct,
+                            gpu_metric_source=gpu_source,
                             status=status,
                             model_id=m.model_id,
                             engine=engine,
@@ -237,6 +373,7 @@ class TelemetryHub:
                     pod_count=1,
                     waiting_queue=0,
                     gpu_memory_pct=65.0,
+                    gpu_metric_source="Local Node RAM",
                     status="HEALTHY",
                     model_id="meta-llama/Llama-3.1-8B-Instruct",
                     engine="vLLM",
@@ -251,7 +388,7 @@ class TelemetryHub:
         """Calculate real model traffic breakdown from PostgreSQL audit_logs and distribute live RPS."""
         shares: List[ModelTrafficShare] = []
         try:
-            with SessionLocal() as db:
+            with db_session.SessionLocal() as db:
                 models = db.query(ModelCatalog).all()
                 model_map = {m.model_id: m.alias for m in models}
 
@@ -291,6 +428,23 @@ class TelemetryHub:
         """Aggregate Envoy metrics, DB cumulative cost, real compute pool status, and real traffic breakdown."""
         envoy_kpis = await self.fetch_envoy_kpis()
         cumulative_cost = self._get_db_cumulative_cost()
+
+        # Concurrently poll remote metrics for registered non-local endpoints
+        try:
+            with db_session.SessionLocal() as db:
+                models = db.query(ModelCatalog).all()
+                remote_endpoints = [
+                    m.target_endpoint for m in models
+                    if m.target_endpoint and not _is_local_endpoint(m.target_endpoint)
+                ]
+            if remote_endpoints:
+                await asyncio.gather(
+                    *[self._fetch_remote_metrics(ep) for ep in set(remote_endpoints)],
+                    return_exceptions=True
+                )
+        except Exception as e:
+            logger.debug(f"Error refreshing remote endpoint metrics: {e}")
+
         pools = self._get_real_compute_pools(self._last_raw_stats)
         traffic_breakdown = self._get_real_model_traffic(envoy_kpis["rps"])
 
@@ -310,23 +464,27 @@ class TelemetryHub:
         return packet
 
     def generate_current_telemetry(self) -> TelemetryPacket:
-        """Synchronous getter for current telemetry (uses latest collected or initial state with real DB)."""
-        if self._latest_telemetry:
-            return self._latest_telemetry
-
+        """Synchronous getter for current telemetry (reflects real DB model catalogs dynamically)."""
         cost = self._get_db_cumulative_cost()
         pools = self._get_real_compute_pools(self._last_raw_stats)
-        traffic_breakdown = self._get_real_model_traffic(0.0)
+        
+        rps = self._latest_telemetry.rps if self._latest_telemetry else 0.0
+        tps = self._latest_telemetry.tps if self._latest_telemetry else 0.0
+        ttft = self._latest_telemetry.ttft_ms if self._latest_telemetry else 3.1
+        err_rate = self._latest_telemetry.error_rate_5xx if self._latest_telemetry else 0.0
+        active_conn = len(self.active_connections)
+
+        traffic_breakdown = self._get_real_model_traffic(rps)
 
         return TelemetryPacket(
             timestamp=time.time(),
-            rps=0.0,
-            tps=0.0,
-            ttft_ms=3.1,
-            error_rate_5xx=0.0,
+            rps=rps,
+            tps=tps,
+            ttft_ms=ttft,
+            error_rate_5xx=err_rate,
             cache_hit_rate=42.0,
             cumulative_cost_krw=round(cost, 0),
-            active_connections=len(self.active_connections),
+            active_connections=active_conn,
             compute_pools=pools,
             model_traffic_breakdown=traffic_breakdown
         )

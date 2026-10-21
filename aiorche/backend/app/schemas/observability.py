@@ -7,7 +7,8 @@ class ComputePoolStatus(BaseModel):
     infra: str  # On-Prem K8s, Docker-Compose, Bare-Metal, EKS, ECS, EC2
     pod_count: int
     waiting_queue: int
-    gpu_memory_pct: float
+    gpu_memory_pct: Optional[float] = None
+    gpu_metric_source: Optional[str] = None
     status: str = "HEALTHY"
     model_id: Optional[str] = None
     engine: Optional[str] = None  # vLLM, Ollama, TGI, SGLang, Triton

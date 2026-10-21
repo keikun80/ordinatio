@@ -315,12 +315,12 @@ export default function ComplianceTab({ onNotify }) {
       {/* Page Header */}
       <div className="page-header">
         <div className="page-title-wrap">
-          <h1>PII 보안 룰 스튜디오 & 금융 감사 포렌식</h1>
-          <p>Microsoft Presidio 기반 금융 개인정보 실시간 마스킹 치환 및 전자금융감독규정 준수 WORM 불변 감사 증적</p>
+          <h1>개인정보(PII) 보안 및 감사 로그</h1>
+          <p>개인정보 및 중요 금융 데이터 실시간 마스킹 치환 및 위·변조 방지 WORM 불변 감사 증적 관리</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span className="badge active" style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
-            <Lock size={14} /> WORM S3 Object Lock 불변 보관 연동됨
+            <Lock size={14} /> WORM 위·변조 방지 감사 증적 활성
           </span>
           <button className="btn btn-secondary btn-sm" onClick={() => { loadRules(); loadLogs(); loadStats(); }}>
             <RefreshCw size={14} />
@@ -363,9 +363,9 @@ export default function ComplianceTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <ShieldAlert size={20} color="#38bdf8" />
-            <span>실시간 PII 탐지 & 마스킹 시뮬레이터 (Presidio Live Inspector)</span>
+            <span>실시간 PII 탐지 & 마스킹 시뮬레이터</span>
           </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Envoy ext_proc gRPC 인라인 검사 엔진</span>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>실시간 인라인 검사 엔진</span>
         </div>
 
         <div style={{ marginBottom: '14px' }}>

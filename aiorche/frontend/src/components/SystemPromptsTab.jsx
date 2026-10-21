@@ -337,7 +337,7 @@ export default function SystemPromptsTab({ onNotify }) {
             {totalCount} <span style={{ fontSize: '0.88rem', fontWeight: 400, color: '#10b981' }}>({activeCount}개 활성)</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            전사 가드레일 & 페르소나 카탈로그
+            전사 가드레일 & 표준 페르소나 목록
           </div>
         </div>
 

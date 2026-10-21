@@ -170,12 +170,12 @@ export default function OverviewTab({ onNavigateTab }) {
       <div className="page-header">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1>글로벌 관제 대시보드</h1>
+            <h1>통합 운영 관제 대시보드</h1>
             <span className={`badge ${isLiveWs ? 'active' : 'info'}`} style={{ fontSize: '0.75rem' }}>
               {isLiveWs ? '🟢 실시간 WebSocket (1s 스트림)' : '🟡 지표 요약 모드'}
             </span>
           </div>
-          <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, vLLM 추론 지연 및 비용 현황</p>
+          <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, 추론 지연 및 비용 현황</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')}>
@@ -185,7 +185,7 @@ export default function OverviewTab({ onNavigateTab }) {
         </div>
       </div>
 
-      {/* 5대 글로벌 관제 KPI - Envoy L7 Gateway 실시간 통계 연동 (Real Data) */}
+      {/* 5대 운영 관제 KPI - Envoy L7 Gateway 실시간 통계 연동 (Real Data) */}
       <div className="kpi-grid">
         <div className="kpi-card" style={{ '--card-accent': '#3b82f6' }}>
           <div className="kpi-header">
@@ -195,9 +195,9 @@ export default function OverviewTab({ onNavigateTab }) {
           <div className="kpi-value">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
-              <Activity size={13} color="#3b82f6" /> downstream_rq
+              <Activity size={13} color="#3b82f6" /> 인바운드 호출 수
             </span>
-            <span className="kpi-badge-neutral">실시간 Envoy 측정</span>
+            <span className="kpi-badge-neutral">실시간 측정</span>
           </div>
         </div>
 
@@ -209,7 +209,7 @@ export default function OverviewTab({ onNavigateTab }) {
           <div className="kpi-value">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
-              <Zap size={13} color="#06b6d4" /> tx_bytes/4
+              <Zap size={13} color="#06b6d4" /> 생성 토큰 환산치
             </span>
             <span className="kpi-badge-neutral">초당 토큰 출력량</span>
           </div>
@@ -239,7 +239,7 @@ export default function OverviewTab({ onNavigateTab }) {
             <span className="badge active">
               <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> 정상 가동
             </span>
-            <span className="kpi-badge-neutral">downstream_rq_5xx</span>
+            <span className="kpi-badge-neutral">5xx 에러 제로</span>
           </div>
         </div>
 
@@ -358,7 +358,7 @@ export default function OverviewTab({ onNavigateTab }) {
               <Activity size={18} color="#38bdf8" />
               <span>모델별 실시간 트래픽 점유율</span>
             </div>
-            <span className="badge active" style={{ fontSize: '0.68rem' }}>WORM 감사로그 & Envoy 연동</span>
+            <span className="badge active" style={{ fontSize: '0.68rem' }}>실시간 감사로그 연동</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

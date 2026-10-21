@@ -73,7 +73,7 @@ export default function PromptStudioTab({ onNotify }) {
             totalLatencyMs: simRes.latency_ms
           }
         });
-        onNotify('ERROR', '컴플라이언스 차단: 사내 사번/행번 또는 보안 정책 위반 항목이 감지되어 모델 호출이 즉시 차단되었습니다.');
+        onNotify('ERROR', '컴플라이언스 차단: 사내 임직원 식별 정보 또는 보안 정책 위반 항목이 감지되어 모델 호출이 즉시 차단되었습니다.');
         setIsRunning(false);
         return;
       }
@@ -209,7 +209,7 @@ export default function PromptStudioTab({ onNotify }) {
           <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(56, 189, 248, 0.05)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '0.82rem', fontWeight: 600 }}>
               <Shield size={14} />
-              <span>Phase 4 PII 거버넌스 활성</span>
+              <span>개인정보(PII) 실시간 보호 활성</span>
             </div>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
               프롬프트 전송 전 Presidio/정규식 인라인 마스킹 및 SHA-256 불변 감사 로그가 자동 기록됩니다.

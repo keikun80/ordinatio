@@ -75,22 +75,6 @@ export default function Header({
           <span className="status-dot"></span>
           <span>오케스트레이터 데이터 플레인 정상 가동 중</span>
         </div>
-
-        {/* 통신 상태 컬러 범례 배지 */}
-        <div 
-          data-testid="com-header-badge-comm-legend"
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '16px', padding: '4px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.72rem' }}
-        >
-          <span style={{ color: 'var(--text-muted)' }}>UI 통신 진단:</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#F54927', fontWeight: 600 }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#F54927' }}></span>
-            #F54927 (백엔드 미통신)
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#5EF527', fontWeight: 600 }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#5EF527' }}></span>
-            #5EF527 (백엔드 Mock/시뮬레이션)
-          </span>
-        </div>
       </div>
 
       <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

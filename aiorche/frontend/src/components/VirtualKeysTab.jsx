@@ -152,7 +152,7 @@ export default function VirtualKeysTab({ onNotify }) {
     setEditTpm(keyItem.tpm);
     setEditIp(keyItem.ipWhitelist || '10.100.0.0/16');
     setEditStatus(keyItem.status);
-    setEditModels(keyItem.allowedModels || ['meta-llama/Llama-3.1-8B-Instruct']);
+    setEditModels(keyItem.allowedModels || (registeredModels.length > 0 ? [registeredModels[0].id] : []));
   };
 
   // Save Edited Key
@@ -371,7 +371,7 @@ export default function VirtualKeysTab({ onNotify }) {
         name: newKeyName,
         tenantName: deptObj.name,
         tenantId: deptObj.id,
-        allowedModels: ['meta-llama/Llama-3.1-8B-Instruct'],
+        allowedModels: registeredModels.length > 0 ? [registeredModels[0].id] : [],
         rpm: Number(newKeyRpm),
         tpm: Number(newKeyTpm),
         spent: 0,
@@ -426,8 +426,8 @@ export default function VirtualKeysTab({ onNotify }) {
       {/* Page Header */}
       <div className="page-header" data-testid="vk-header-section">
         <div className="page-title-wrap">
-          <h1>거버넌스</h1>
-          <p>백엔드 GPU 주소 노출 없이 사내 부서별 안전한 가상키 발급, 허용 모델, 속도 제한(RPM/TPM) 및 비상 즉시 파기 제어</p>
+          <h1>가상 API Key & 부서 관리</h1>
+          <p>사내 부서(테넌트)별 가상 API Key 발급, 모델 접근 권한 및 속도 제한(RPM/TPM) 관리</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 

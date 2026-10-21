@@ -2289,7 +2289,7 @@ print(response.choices[0].message.content)`;
                 <Globe size={20} color="var(--accent-cyan)" />
                 <span>Envoy Gateway API 엔드포인트 & 실시간 테스트 벤치</span>
               </div>
-              <span className="badge active">포트 8080 Ingress</span>
+              <span className="badge active">게이트웨이 엔드포인트</span>
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               현재 선택된 라우트 프로필(<strong>"{currentRoute.route_name}"</strong>)로 실제 인그레스 HTTP 요청을 전송하고 L7 xDS 라우팅 응답을 실시간 검증합니다.
@@ -2976,11 +2976,11 @@ print(response.choices[0].message.content)`;
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>모델 & 라우팅</h1>
-            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy AI Gateway (ext_proc)</span>
+            <span className="badge info" style={{ fontSize: '0.75rem' }}>Envoy L7 AI Gateway</span>
             <span className="badge purple" style={{ fontSize: '0.75rem' }}>AgentRouter 탑재</span>
-            <span className="badge active" style={{ fontSize: '0.75rem' }}>Phase 0.1 활성</span>
+            <span className="badge active" style={{ fontSize: '0.75rem' }}>지능형 분기 활성</span>
           </div>
-          <p>CNCF Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
+          <p>Envoy AI Gateway L7 관문과 AgentRouter 인지 지능 엔진을 통해 프롬프트 인텐트/복잡도별 최적 모델 자동 분기 및 무중단 카나리 트래픽을 제어합니다.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
@@ -3007,21 +3007,21 @@ print(response.choices[0].message.content)`;
           {[
             {
               id: 'routing',
-              label: '라우팅 스튜디오 (Routing Studio)',
+              label: '라우팅 스튜디오',
               icon: GitFork,
               badge: `${routes.length}개 프로필`,
               badgeColor: 'info'
             },
             {
               id: 'catalog',
-              label: '서빙 모델 풀 (Model Catalog)',
+              label: '서빙 모델 풀',
               icon: Cpu,
               badge: `${models.length}개 모델`,
               badgeColor: 'active'
             },
             {
               id: 'dispatch',
-              label: 'AgentRouter & 테스트 (Dispatch & Testbench)',
+              label: 'AgentRouter 지능형 디스패치',
               icon: Compass,
               badge: 'Live Ingress',
               badgeColor: 'purple'

@@ -57,7 +57,7 @@ export default function Sidebar({
   };
 
   const navItems = [
-    { id: 'overview', label: '글로벌 관제 홈', icon: LayoutDashboard },
+    { id: 'overview', label: '통합 관제 홈', icon: LayoutDashboard },
     { 
       id: 'routing', 
       label: '모델 & 라우팅', 
@@ -66,10 +66,10 @@ export default function Sidebar({
       isAccordion: true,
       subItems: routingSubItems
     },
-    { id: 'virtual-keys', label: '거버넌스', icon: KeyRound },
-    { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText, badge: 'L7 주입' },
+    { id: 'virtual-keys', label: '가상 API Key & 부서', icon: KeyRound },
+    { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText, badge: '동적 주입' },
     { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
-    { id: 'compliance', label: 'PII 보안 & 감사 포렌식', icon: ShieldAlert },
+    { id: 'compliance', label: 'PII 보안 & 감사 로그', icon: ShieldAlert },
     { 
       id: 'lifecycle', 
       label: '긴급 패치 & 자가진단', 

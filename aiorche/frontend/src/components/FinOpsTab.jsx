@@ -42,7 +42,7 @@ export default function FinOpsTab({ onNotify }) {
     setDownloading(true);
     try {
       await apiClient.exportFinOpsInvoiceCsv();
-      onNotify('SUCCESS', '사내 회계 결산용 부서별 정산 청구서(CSV - UTF-8 BOM)가 성공적으로 다운로드되었습니다.');
+      onNotify('SUCCESS', '사내 회계 결산용 부서별 정산 청구서(CSV)가 성공적으로 다운로드되었습니다.');
     } catch (err) {
       console.error(err);
       onNotify('ERROR', '청구서 CSV 다운로드 중 오류가 발생했습니다.');
@@ -77,7 +77,7 @@ export default function FinOpsTab({ onNotify }) {
               </span>
             )}
           </div>
-          <p>부서별 실시간 토큰 사용량 계량, 예산 하드 캡(Hard Cap) 제어 및 회계 결산용 쇼백(Showback) 리포트</p>
+          <p>부서별 실시간 토큰 사용량 계량, 예산 하드 캡(Hard Cap) 제어 및 부서별 회계 결산 정산서 생성</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn btn-secondary" onClick={fetchOverview} disabled={loading}>

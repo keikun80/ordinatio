@@ -311,9 +311,9 @@ export default function LifecycleTab({ onNotify, onPatchApplied }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '0.8rem' }}>
             <div>PostgreSQL DB: <strong style={{ color: '#34d399' }}>{diagResults.postgres?.status} ({diagResults.postgres?.latency})</strong></div>
             <div>Redis 쿼터: <strong style={{ color: '#34d399' }}>{diagResults.redis?.status} ({diagResults.redis?.latency})</strong></div>
-            <div>Kafka 버스: <strong style={{ color: '#34d399' }}>{diagResults.kafka?.status} ({diagResults.kafka?.latency})</strong></div>
-            <div>EKS vLLM Pods: <strong style={{ color: '#34d399' }}>{diagResults.vllmEks?.status} ({diagResults.vllmEks?.latency})</strong></div>
-            <div>NVIDIA DCGM: <strong style={{ color: '#34d399' }}>{diagResults.dcgm?.status} ({diagResults.dcgm?.latency})</strong></div>
+            <div>내부 이벤트 큐: <strong style={{ color: '#34d399' }}>{diagResults.kafka?.status} ({diagResults.kafka?.latency})</strong></div>
+            <div>LLM 서빙 노드: <strong style={{ color: '#34d399' }}>{diagResults.vllmEks?.status} ({diagResults.vllmEks?.latency})</strong></div>
+            <div>GPU 인프라 (DCGM): <strong style={{ color: '#34d399' }}>{diagResults.dcgm?.status} ({diagResults.dcgm?.latency})</strong></div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Vagrant Provisioner: Standalone Appliance Offline Bundle Test
-# Supports: Ubuntu 24.04 LTS (Debian) & Rocky Linux 9 / RHEL 9 (Enterprise Linux)
+# Supports: Amazon Linux 2023, Ubuntu 24.04 LTS (Debian) & Rocky Linux 9 / RHEL 9 (Enterprise Linux)
 # Installs and validates the appliance directly from dist/aiorche-appliance-*.tar.gz
 # ==============================================================================
 
@@ -47,6 +47,28 @@ if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
         apt-get update -y
         apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         systemctl enable --now docker
+    fi
+elif [[ "$OS_ID" == "amzn" ]]; then
+    echo "==> Amazon Linux 2023 계열 감지: $PRETTY_NAME"
+    dnf install -y --allowerasing tar gzip jq procps-ng git openssl make docker
+    systemctl enable --now docker
+
+    if systemctl is-active firewalld &>/dev/null; then
+        firewall-cmd --permanent --add-port=80/tcp || true
+        firewall-cmd --permanent --add-port=5173/tcp || true
+        firewall-cmd --permanent --add-port=8000/tcp || true
+        firewall-cmd --permanent --add-port=8080/tcp || true
+        firewall-cmd --permanent --add-port=9901/tcp || true
+        firewall-cmd --reload || true
+    fi
+
+    if ! docker compose version &>/dev/null; then
+        echo "==> Docker Compose Plugin 설치..."
+        mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
+        curl -fsSL https://github.com/docker/compose/releases/download/v2.33.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+        chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+        ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+        ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
     fi
 else
     echo "==> RHEL/CentOS/Rocky Linux 계열 감지: $PRETTY_NAME"

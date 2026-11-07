@@ -106,3 +106,4 @@ Loaded image: envoyproxy/envoy:v1.31.2
 1. **Ubuntu 24.04 LTS (Noble Numbat)** 환경에서도 단일 오프라인 압축 번들(`aiorche-appliance-v1.0.0.tar.gz`)이 외부 인터넷 의존성 없이 `make up`만으로 100% 정상 기동되었습니다.
 2. 백엔드 외부 포트 바인딩 및 프론트엔드 동일 오리진 프록시 패치로 인해, 가상머신 외부(호스트 브라우저)에서 `http://localhost:5173` 접속 시 로그인 오류 없이 즉시 대시보드로 진입 가능함을 입증하였습니다.
 3. 이로써 AI Orchestrator Standalone 어플라이언스는 **Enterprise Linux 계열(Rocky Linux 9, RHEL 9)**과 **Debian 계열(Ubuntu 24.04 LTS)** 모두에서 100% 호환성 및 무결성을 입증하였습니다.
+

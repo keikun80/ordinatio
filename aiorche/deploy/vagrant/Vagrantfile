@@ -7,9 +7,9 @@
 # ==============================================================================
 
 Vagrant.configure("2") do |config|
-  # 가상머신 기본 베이스 박스 (Ubuntu 24.04 LTS 기본값, 환경변수 OS_DISTRO로 변경 가능)
-  # 예: OS_DISTRO=bento/rockylinux-9 vagrant up
-  config.vm.box = ENV['OS_DISTRO'] || ENV['EL_DISTRO'] || "bento/ubuntu-24.04"
+  # 가상머신 기본 베이스 박스 (Amazon Linux 2023 기본값, 환경변수 OS_DISTRO로 변경 가능)
+  # 예: OS_DISTRO=bento/ubuntu-24.04 vagrant up
+  config.vm.box = ENV['OS_DISTRO'] || ENV['EL_DISTRO'] || "bento/amazonlinux-2023"
   config.vm.hostname = "aiorche-standalone"
 
   # 호스트 전용 고정 IP 네트워크

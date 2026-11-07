@@ -170,7 +170,7 @@ echo "ℹ️ Envoy Gateway 응답 코드: HTTP $HTTP_CODE_GW (L7 리스너 활�
 echo "==> [Test 5] Initial Admin Creation Test (make init-admin)..."
 docker exec aiorche-backend python -m app.scripts.init_admin \
     --email "admin@aiorche.local" \
-    --password "Admin123!Secure" \
+    --password "${ADMIN_PASSWORD:-admin1234!}" \
     --full-name "시스템 최고관리자" || true
 echo "✅ 슈퍼관리자 부트스트랩 명령 완료"
 

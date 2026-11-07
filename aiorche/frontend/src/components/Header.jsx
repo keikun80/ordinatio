@@ -1,24 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ShieldCheck, 
   Server, 
-  Bell, 
-  Download, 
-  RefreshCw, 
-  ExternalLink, 
   Sun, 
   Moon, 
   Crosshair,
   Clock,
-  LogOut,
-  User
+  LogOut
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { strings } from '../constants/strings';
 
 export default function Header({ 
-  onOpenPatchTab, 
-  unreadPatchCount = 1, 
   theme = 'dark', 
   onToggleTheme,
   isInspectorActive = false,
@@ -26,20 +19,22 @@ export default function Header({
 }) {
   const { user, sessionRemaining, resetActivityTimer, logout } = useAuth();
   const [datacenterName, setDatacenterName] = useState(
-    import.meta.env.VITE_DATACENTER_NAME || '온프레미스 주전산센터'
+    import.meta.env.VITE_DATACENTER_NAME || strings.nav.defaultDatacenter
   );
   const [clusterRegion, setClusterRegion] = useState(
-    import.meta.env.VITE_CLUSTER_REGION || 'DC-1 서울'
+    import.meta.env.VITE_CLUSTER_REGION || strings.nav.defaultRegion
   );
+  const [dataPlaneHealthy, setDataPlaneHealthy] = useState(true);
 
   useEffect(() => {
     async function loadSystemInfo() {
       const info = await apiClient.getSystemInfo();
-      if (info && info.datacenter_name) {
-        setDatacenterName(info.datacenter_name);
-      }
-      if (info && info.cluster_region) {
-        setClusterRegion(info.cluster_region);
+      if (info) {
+        if (info.datacenter_name) setDatacenterName(info.datacenter_name);
+        if (info.cluster_region) setClusterRegion(info.cluster_region);
+        if (typeof info.data_plane_healthy === 'boolean') {
+          setDataPlaneHealthy(info.data_plane_healthy);
+        }
       }
     }
     loadSystemInfo();
@@ -53,12 +48,20 @@ export default function Header({
 
   const isLowTime = sessionRemaining <= 300; // Under 5 minutes
 
-  // Get user avatar abbreviation
+  // Dynamically derive user avatar abbreviation for any system or custom role
   const getAvatarInitials = () => {
-    if (!user) return 'ADM';
+    if (!user) return 'USR';
     if (user.role === 'SUPER_ADMIN') return 'SA';
     if (user.role === 'TENANT_ADMIN') return 'TA';
-    return 'VW';
+    if (user.role === 'VIEWER') return 'VW';
+    if (user.role) {
+      const parts = user.role.split('_').filter(Boolean);
+      if (parts.length >= 2) {
+        return parts.map((p) => p[0]).join('').slice(0, 3).toUpperCase();
+      }
+      return user.role.slice(0, 2).toUpperCase();
+    }
+    return (user.username || 'US').slice(0, 2).toUpperCase();
   };
 
   return (
@@ -72,8 +75,8 @@ export default function Header({
           data-testid="com-header-badge-status"
           style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}
         >
-          <span className="status-dot"></span>
-          <span>오케스트레이터 데이터 플레인 정상 가동 중</span>
+          <span className={`status-dot ${dataPlaneHealthy ? '' : 'warning'}`}></span>
+          <span>{dataPlaneHealthy ? strings.nav.dataPlaneHealthy : strings.nav.dataPlaneUnhealthy}</span>
         </div>
       </div>
 
@@ -81,7 +84,7 @@ export default function Header({
         {/* 30분 금융 보안 세션 타이머 배지 */}
         <div 
           data-testid="header-session-timer"
-          title="금융 보안 기준 30분 미활동 자동 로그아웃 (클릭 시 세션 연장)"
+          title={strings.auth.sessionTimerTooltip}
           onClick={resetActivityTimer}
           style={{
             display: 'flex',
@@ -99,7 +102,7 @@ export default function Header({
         >
           <Clock size={13} color={isLowTime ? '#f87171' : '#38bdf8'} />
           <span>⏱ {formatTimer(sessionRemaining)}</span>
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>연장</span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>{strings.common.extend}</span>
         </div>
 
         {/* UI 식별자 인스펙터 토글 버튼 (Ctrl+Shift+D) */}
@@ -108,8 +111,8 @@ export default function Header({
           data-testid="com-header-btn-inspector"
           data-function-id="FNC-COM-INSPECTOR"
           onClick={onToggleInspector}
-          title={isInspectorActive ? 'UI 인스펙터 끄기 (Ctrl+Shift+D)' : 'UI 식별자 인스펙터 켜기 (Ctrl+Shift+D)'}
-          aria-label="UI 식별자 인스펙터 토글"
+          title={isInspectorActive ? strings.nav.inspectorTooltipOn : strings.nav.inspectorTooltipOff}
+          aria-label={strings.nav.inspectorToggle}
           style={{
             borderColor: isInspectorActive ? '#a855f7' : 'var(--border-subtle)',
             background: isInspectorActive ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
@@ -118,7 +121,7 @@ export default function Header({
         >
           <Crosshair size={15} color={isInspectorActive ? '#c084fc' : '#94a3b8'} />
           <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-            {isInspectorActive ? '인스펙터 ON' : 'UI Inspector'}
+            {isInspectorActive ? strings.nav.inspectorOn : strings.nav.inspectorOff}
           </span>
         </button>
 
@@ -128,8 +131,8 @@ export default function Header({
           data-testid="com-header-btn-theme"
           data-function-id="FNC-COM-THEME"
           onClick={onToggleTheme}
-          title={theme === 'dark' ? '라이트 테마로 전환' : '다크 테마로 전환'}
-          aria-label="컬러 테마 토글"
+          title={theme === 'dark' ? strings.nav.themeLightTooltip : strings.nav.themeDarkTooltip}
+          aria-label={strings.nav.themeToggle}
         >
           <span className="theme-toggle-icon">
             {theme === 'dark' ? (
@@ -142,22 +145,6 @@ export default function Header({
             {theme === 'dark' ? 'Dark' : 'Light'}
           </span>
         </button>
-
-        {unreadPatchCount > 0 && (
-          <button 
-            className="header-action-btn"
-            data-testid="com-header-btn-patch-alert"
-            data-function-id="FNC-COM-OPEN-PATCH"
-            style={{ borderColor: 'rgba(244, 63, 94, 0.4)', background: 'rgba(244, 63, 94, 0.1)', color: '#F54927' }}
-            onClick={onOpenPatchTab}
-          >
-            <Bell size={14} color="#F54927" />
-            <span style={{ color: '#F54927' }}>긴급 패치</span>
-            <span style={{ background: '#f43f5e', color: 'white', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '999px', fontWeight: 700 }}>
-              1
-            </span>
-          </button>
-        )}
 
         {/* Dynamic Authenticated User Profile */}
         <div className="user-profile" data-testid="com-header-user-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -173,17 +160,17 @@ export default function Header({
           </div>
           <div className="user-info">
             <span className="user-name" style={{ color: 'var(--heading-color)', fontWeight: 600 }}>
-              {user?.full_name || '로그인 사용자'}
+              {user?.full_name || strings.nav.defaultUser}
             </span>
             <span className="user-role" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-              {user?.tenant_name || (user?.role === 'SUPER_ADMIN' ? '전사 최고관리자' : user?.role || '사용자')}
+              {user?.tenant_name || (user?.role === 'SUPER_ADMIN' ? strings.nav.superAdminRole : user?.role || strings.nav.defaultUser)}
             </span>
           </div>
 
           {/* Logout Button */}
           <button
             onClick={() => logout()}
-            title="보안 로그아웃"
+            title={strings.auth.logoutTooltip}
             data-testid="header-btn-logout"
             style={{
               background: 'none',

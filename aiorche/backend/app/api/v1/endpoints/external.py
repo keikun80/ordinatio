@@ -16,6 +16,7 @@ from app.schemas.external import (
     TenantBudgetUpdate,
     TenantSummaryResponse
 )
+from app.api.deps import require_permission
 
 router = APIRouter(prefix="/external", tags=["External Application Integration"])
 
@@ -213,7 +214,7 @@ def report_gateway_usage(
 # -----------------------------------------------------------------------------
 # 3. 사내 ERP / FinOps / 결재 시스템 연동 API
 # -----------------------------------------------------------------------------
-@router.get("/tenants/{tenant_id}/summary", response_model=TenantSummaryResponse)
+@router.get("/tenants/{tenant_id}/summary", response_model=TenantSummaryResponse, dependencies=[Depends(require_permission("finops:read"))])
 def get_tenant_summary(
     tenant_id: str,
     db: Session = Depends(get_db)
@@ -250,7 +251,7 @@ def get_tenant_summary(
         total_tokens=int(total_tokens_sum)
     )
 
-@router.patch("/tenants/{tenant_id}/budget", response_model=TenantSummaryResponse)
+@router.patch("/tenants/{tenant_id}/budget", response_model=TenantSummaryResponse, dependencies=[Depends(require_permission("finops:write"))])
 def update_tenant_budget(
     tenant_id: str,
     payload: TenantBudgetUpdate,

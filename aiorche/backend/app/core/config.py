@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     CLUSTER_REGION: str = "DC-1 서울"
     DEPLOY_MODE: str = "air-gap"
     ALLOW_DEV_MOCK_KEYS: bool = False
+    SEED_DEMO_DATA: bool = False
     
     # Server
     HOST: str = "0.0.0.0"
@@ -28,6 +29,9 @@ class Settings(BaseSettings):
     SESSION_INACTIVITY_TIMEOUT_MINUTES: int = 30
     MAX_LOGIN_ATTEMPTS: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15
+    INITIAL_ADMIN_USERNAME: str = "admin"
+    INITIAL_ADMIN_EMAIL: str = "admin@aiorche.local"
+    INITIAL_ADMIN_PASSWORD: str = "admin1234!"
 
     # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/aiorche_db"

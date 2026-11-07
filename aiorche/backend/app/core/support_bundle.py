@@ -4,7 +4,7 @@ import zipfile
 import tempfile
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -26,15 +26,16 @@ class SupportBundleGenerator:
         include_system_metrics: bool = True,
         include_routing_dump: bool = True
     ) -> Dict[str, Any]:
-        timestamp_str = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        now_utc = datetime.now(timezone.utc)
+        timestamp_str = now_utc.strftime("%Y%m%d-%H%M%S")
         bundle_id = f"bundle-{timestamp_str}-{os.urandom(4).hex()}"
-        bundle_filename = f"zero-pii-support-bundle-{datetime.utcnow().strftime('%Y%m%d')}.zip"
+        bundle_filename = f"zero-pii-support-bundle-{now_utc.strftime('%Y%m%d')}.zip"
         zip_path = os.path.join(BUNDLE_STORAGE_DIR, f"{bundle_id}.zip")
 
         # 1. Metadata
         metadata = {
             "bundle_id": bundle_id,
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "generated_at": now_utc.isoformat(),
             "requester": requester_id,
             "solution": "Enterprise AI Orchestrator Appliance",
             "version": settings.VERSION,
@@ -80,12 +81,13 @@ class SupportBundleGenerator:
         }
 
         # 5. Sanitized Log Sample
+        log_now = now_utc.isoformat()
         sanitized_logs = (
-            f"[{datetime.utcnow().isoformat()}] INFO  aiorche.system: System preflight completed. All probes UP.\n"
-            f"[{datetime.utcnow().isoformat()}] INFO  aiorche.xds: RouteConfiguration revision 4 pushed to Envoy.\n"
-            f"[{datetime.utcnow().isoformat()}] WARN  aiorche.ext_proc: Memory spike detected in ext_proc (CVE-2026-0812 warning).\n"
-            f"[{datetime.utcnow().isoformat()}] INFO  aiorche.compliance: PII detection executed on session [ID: MASKED_SESSION]. Actions: MASK(1).\n"
-            f"[{datetime.utcnow().isoformat()}] INFO  aiorche.finops: Aggregated hourly usage. Zero over-budget events.\n"
+            f"[{log_now}] INFO  aiorche.system: System preflight completed. All probes UP.\n"
+            f"[{log_now}] INFO  aiorche.xds: RouteConfiguration revision 4 pushed to Envoy.\n"
+            f"[{log_now}] WARN  aiorche.ext_proc: Memory spike detected in ext_proc (CVE-2026-0812 warning).\n"
+            f"[{log_now}] INFO  aiorche.compliance: PII detection executed on session [ID: MASKED_SESSION]. Actions: MASK(1).\n"
+            f"[{log_now}] INFO  aiorche.finops: Aggregated hourly usage. Zero over-budget events.\n"
         )
 
         # ZIP 아카이브 작성

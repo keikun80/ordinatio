@@ -1,9 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 from app.models.tenant import Tenant
+
+def get_utc_now():
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
@@ -17,10 +20,10 @@ class User(Base):
     tenant_id = Column(String(64), ForeignKey("tenants.tenant_id", ondelete="SET NULL"), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True)
     failed_login_count = Column(Integer, nullable=False, default=0)
-    locked_until = Column(DateTime, nullable=True)
-    last_login_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
     tenant = relationship("Tenant", foreign_keys=[tenant_id], lazy="joined")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
@@ -34,9 +37,9 @@ class UserSession(Base):
     session_token_hash = Column(String(64), nullable=False, index=True)  # SHA-256 hash of session token
     ip_address = Column(String(64), nullable=False, default="127.0.0.1")
     user_agent = Column(String(512), nullable=True)
-    last_activity_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=False)
+    last_activity_at = Column(DateTime(timezone=True), nullable=False, default=get_utc_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
     is_revoked = Column(Boolean, nullable=False, default=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
 
     user = relationship("User", back_populates="sessions")

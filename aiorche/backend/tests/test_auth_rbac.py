@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -24,9 +24,9 @@ def auth_client(client: TestClient, db_session: Session):
         db_session.add(tenant)
         db_session.commit()
 
-    # Clear test users
-    db_session.query(UserSession).delete()
-    db_session.query(User).filter(User.username.like("test-%")).delete()
+    # Clear test users (preserve test-super-admin session)
+    db_session.query(UserSession).filter(UserSession.id != "sess-test-super-admin").delete()
+    db_session.query(User).filter(User.username.like("test-%"), User.username != "test-super-admin").delete()
     db_session.query(User).filter(User.username == "admin-test").delete()
     db_session.commit()
     yield client
@@ -82,6 +82,14 @@ def test_login_success_and_me(auth_client: TestClient, db_session: Session):
     me_data = me_res.json()
     assert me_data["username"] == "test-user-01"
     assert me_data["role"] == "TENANT_ADMIN"
+
+    # 3. Login using email address instead of username
+    email_res = auth_client.post("/api/v1/auth/login", json={
+        "username": "hong@aiorche.local",
+        "password": "ValidPassword123!"
+    })
+    assert email_res.status_code == 200
+    assert email_res.json()["user"]["username"] == "test-user-01"
 
 def test_login_invalid_password_and_failed_count(auth_client: TestClient, db_session: Session):
     """Test failed password increments failure count."""
@@ -211,7 +219,7 @@ def test_inactivity_timeout_30m(auth_client: TestClient, db_session: Session):
 
     # Simulate 31 minutes of inactivity
     session = db_session.query(UserSession).filter(UserSession.user_id == u.id).first()
-    session.last_activity_at = datetime.utcnow() - timedelta(minutes=31)
+    session.last_activity_at = datetime.now(timezone.utc) - timedelta(minutes=31)
     db_session.commit()
 
     # Request after timeout -> 401
@@ -271,3 +279,13 @@ def test_rbac_super_admin_vs_tenant_admin(auth_client: TestClient, db_session: S
     }, headers={"Authorization": f"Bearer {token_super}"})
     assert create_res.status_code == 201
     assert create_res.json()["username"] == "test-new-operator"
+
+
+def test_unauthenticated_request_strictly_blocked():
+    """Verify that requests without Authorization header strictly return 401 Unauthorized (A-1)."""
+    raw_client = TestClient(app)
+    raw_client.headers.pop("Authorization", None)
+    res = raw_client.get("/api/v1/models")
+    assert res.status_code == 401
+    assert "인증" in res.json()["detail"]
+

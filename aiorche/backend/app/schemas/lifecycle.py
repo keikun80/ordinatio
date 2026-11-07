@@ -1,6 +1,9 @@
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 # --- Component Schemas ---
 class ComponentVersionInfo(BaseModel):
@@ -30,7 +33,7 @@ class SignatureVerificationInfo(BaseModel):
     signer: str
     algorithm: str = "RSA-4096 / SHA-256"
     fingerprint: str
-    verified_at: datetime = Field(default_factory=datetime.utcnow)
+    verified_at: datetime = Field(default_factory=get_utc_now)
 
 class PatchVerifyResponse(BaseModel):
     status: str = "VERIFIED"  # VERIFIED, UNVERIFIED, INVALID_SIGNATURE
@@ -71,7 +74,7 @@ class PatchApplyResponse(BaseModel):
     applied_version: str
     strategy: str = "Kubernetes RollingUpdate (PDB minAvailable: 2)"
     logs: List[str]
-    applied_at: datetime = Field(default_factory=datetime.utcnow)
+    applied_at: datetime = Field(default_factory=get_utc_now)
 
 class PatchRollbackRequest(BaseModel):
     patch_id: Optional[str] = None
@@ -85,7 +88,7 @@ class PatchRollbackResponse(BaseModel):
     target_component: str
     restored_version: str
     logs: List[str]
-    rolled_back_at: datetime = Field(default_factory=datetime.utcnow)
+    rolled_back_at: datetime = Field(default_factory=get_utc_now)
 
 class PatchHistoryRead(BaseModel):
     patch_id: str
@@ -110,7 +113,7 @@ class DiagnosticCheckItem(BaseModel):
 
 class PreflightResponse(BaseModel):
     status: str = "HEALTHY"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_utc_now)
     overall_health: str = "100% 정상 (All 5 components operational)"
     checks: Dict[str, DiagnosticCheckItem]
 
@@ -125,7 +128,7 @@ class SupportBundleResponse(BaseModel):
     status: str = "READY"
     bundle_id: str
     bundle_filename: str
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=get_utc_now)
     sanitization_report: Dict[str, Any]
     download_url: str
     file_size_bytes: int

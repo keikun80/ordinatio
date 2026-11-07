@@ -55,6 +55,13 @@ def test_tenant_lifecycle():
     assert float(patched["monthly_budget_krw"]) == 30000000.00
     assert patched["is_hard_cap_enabled"] is False
 
+    # 6. Delete tenant (DELETE)
+    del_res = client.delete("/api/v1/tenants/dept-loan-02")
+    assert del_res.status_code == 200
+    assert del_res.json()["tenant_id"] == "dept-loan-02"
+    get_after_del = client.get("/api/v1/tenants/dept-loan-02")
+    assert get_after_del.status_code == 404
+
 def test_virtual_key_creation_one_time_exposure_and_argon2_hashing():
     # 1. Create a virtual key
     payload = {

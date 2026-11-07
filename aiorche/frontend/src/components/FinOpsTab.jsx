@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Coins, Download, TrendingUp, AlertCircle, ShieldAlert, CheckCircle2, RefreshCw, X, FileText } from 'lucide-react';
-import { initialTenants } from '../data/mockData';
 import { apiClient } from '../api/client';
+import { strings } from '../constants/strings';
+import { useAuth } from '../context/AuthContext';
 
 export default function FinOpsTab({ onNotify }) {
+  const { isSuperAdmin, hasPermission } = useAuth();
+  const canWriteFinops = isSuperAdmin || hasPermission('finops:write');
   const [tenants, setTenants] = useState([]);
   const [finOpsData, setFinOpsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+
+  const pricing = finOpsData?.pricing_matrix;
+  const modelPricings = pricing?.models || [];
+  const stdInputPrice = modelPricings.length > 0
+    ? Number(modelPricings[0].input_price_per_1k)
+    : Number(pricing?.standard_input_per_1k ?? 0.80);
+  const stdOutputPrice = modelPricings.length > 0
+    ? Number(modelPricings[0].output_price_per_1k)
+    : Number(pricing?.standard_output_per_1k ?? 2.40);
+  const stdDiscountRatio = modelPricings.length > 0
+    ? Number(modelPricings[0].cache_discount_ratio)
+    : Number(pricing?.standard_cache_discount ?? 0.25);
+  const stdCachePrice = Number((stdInputPrice * stdDiscountRatio).toFixed(2));
+  const savingsPct = Math.round((1 - stdDiscountRatio) * 100);
 
   const fetchOverview = async () => {
     setLoading(true);
@@ -43,25 +60,27 @@ export default function FinOpsTab({ onNotify }) {
     setDownloading(true);
     try {
       await apiClient.exportFinOpsInvoiceCsv();
-      onNotify('SUCCESS', '사내 회계 결산용 부서별 정산 청구서(CSV)가 성공적으로 다운로드되었습니다.');
+      onNotify('SUCCESS', strings.finops.alertExportSuccess);
     } catch (err) {
       console.error(err);
-      onNotify('ERROR', '청구서 CSV 다운로드 중 오류가 발생했습니다.');
+      onNotify('ERROR', strings.finops.alertExportFailed);
     } finally {
       setDownloading(false);
     }
   };
 
+  const getEmergencyIncreaseAmt = (budget) => Math.max(1000000, Math.round((Number(budget) || 10000000) * 0.2));
+
   const handleEmergencyIncrease = async (tenant) => {
+    if (!canWriteFinops) return;
     try {
-      const newBudget = tenant.budget + 2000000;
+      const increaseAmt = getEmergencyIncreaseAmt(tenant.budget);
+      const newBudget = tenant.budget + increaseAmt;
       await apiClient.updateTenantBudget(tenant.id, { monthly_budget_krw: newBudget });
-      onNotify('SUCCESS', `${tenant.name}의 월간 예산이 ₩2,000,000 긴급 증액되어 차단이 즉시 해제되었습니다.`);
+      onNotify('SUCCESS', strings.finops.alertEmergencySuccessUnblockDynamic(tenant.name, increaseAmt));
       await fetchOverview();
     } catch (err) {
-      // Fallback local update
-      setTenants(tenants.map(item => item.id === tenant.id ? { ...item, budget: item.budget + 2000000, isBlocked: false } : item));
-      onNotify('SUCCESS', `${tenant.name}의 월간 예산이 ₩2,000,000 긴급 증액되었습니다.`);
+      onNotify('ERROR', err.message || strings.finops.alertExportFailed);
     }
   };
 
@@ -71,23 +90,33 @@ export default function FinOpsTab({ onNotify }) {
       <div className="page-header">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1>FinOps 비용 거버넌스 & 예산 관제</h1>
+            <h1>{strings.finops.headerTitle}</h1>
             {finOpsData && (
               <span className="badge active" style={{ fontSize: '0.75rem' }}>
-                실시간 DB 연동 완료 ({finOpsData.active_tenants_count}개 부서)
+                {strings.finops.dbConnected(finOpsData.active_tenants_count)}
               </span>
             )}
           </div>
-          <p>부서별 실시간 토큰 사용량 계량, 예산 하드 캡(Hard Cap) 제어 및 부서별 회계 결산 정산서 생성</p>
+          <p>{strings.finops.headerSubtitle}</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!canWriteFinops && (
+            <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+              {strings.virtualKeys.readOnlyBadge}
+            </span>
+          )}
           <button className="btn btn-secondary" onClick={fetchOverview} disabled={loading}>
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            <span>새로고침</span>
+            <span>{strings.common.refresh}</span>
           </button>
-          <button className="btn btn-primary" onClick={handleDownloadInvoice} disabled={downloading}>
+          <button
+            className="btn btn-primary"
+            onClick={() => canWriteFinops && handleDownloadInvoice()}
+            disabled={downloading || !canWriteFinops}
+            style={{ opacity: canWriteFinops ? 1 : 0.45, cursor: canWriteFinops ? 'pointer' : 'not-allowed' }}
+          >
             <Download size={16} />
-            <span>{downloading ? 'CSV 생성 중...' : '사내 결산 청구서 다운로드 (CSV)'}</span>
+            <span>{downloading ? strings.finops.exportingCsv : strings.finops.btnExportCsv}</span>
           </button>
         </div>
       </div>
@@ -97,47 +126,47 @@ export default function FinOpsTab({ onNotify }) {
         <div className="kpi-grid" style={{ marginBottom: '22px' }}>
           <div className="kpi-card" style={{ '--card-accent': '#38bdf8' }}>
             <div className="kpi-header">
-              <span>전사 AI 월간 총 예산</span>
+              <span>{strings.finops.kpi.totalBudget}</span>
               <Coins size={18} color="#38bdf8" />
             </div>
             <div className="kpi-value">₩ {Math.round(finOpsData.total_budget_krw).toLocaleString()}</div>
             <div className="kpi-footer">
-              <span className="kpi-badge-neutral">{finOpsData.active_tenants_count}개 승인 부서 합산</span>
+              <span className="kpi-badge-neutral">{strings.finops.kpi.tenantsSum(finOpsData.active_tenants_count)}</span>
             </div>
           </div>
 
           <div className="kpi-card" style={{ '--card-accent': '#a855f7' }}>
             <div className="kpi-header">
-              <span>현재 누적 총 집행액</span>
+              <span>{strings.finops.kpi.totalSpent}</span>
               <TrendingUp size={18} color="#a855f7" />
             </div>
             <div className="kpi-value" style={{ color: '#c084fc' }}>₩ {Math.round(finOpsData.total_spent_krw).toLocaleString()}</div>
             <div className="kpi-footer">
-              <span className="kpi-badge-neutral">잔여: ₩ {Math.round(finOpsData.total_remaining_krw).toLocaleString()}</span>
+              <span className="kpi-badge-neutral">{strings.finops.kpi.remaining(Math.round(finOpsData.total_remaining_krw).toLocaleString())}</span>
             </div>
           </div>
 
           <div className="kpi-card" style={{ '--card-accent': finOpsData.overall_burn_rate_pct > 80 ? '#f59e0b' : '#10b981' }}>
             <div className="kpi-header">
-              <span>전사 예산 소진율</span>
+              <span>{strings.finops.kpi.burnRate}</span>
               <ActivityIcon size={18} color={finOpsData.overall_burn_rate_pct > 80 ? '#f59e0b' : '#10b981'} />
             </div>
             <div className="kpi-value">{finOpsData.overall_burn_rate_pct}%</div>
             <div className="kpi-footer">
               <span className={finOpsData.overall_burn_rate_pct > 80 ? 'badge warning' : 'badge active'}>
-                {finOpsData.overall_burn_rate_pct > 80 ? '주의 필요' : '예산 정상'}
+                {finOpsData.overall_burn_rate_pct > 80 ? strings.finops.kpi.attentionNeeded : strings.finops.kpi.budgetNormal}
               </span>
             </div>
           </div>
 
           <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
             <div className="kpi-header">
-              <span>월말 예상 지출액 (Run Rate)</span>
+              <span>{strings.finops.kpi.runRate}</span>
               <TrendingUp size={18} color="#f59e0b" />
             </div>
             <div className="kpi-value">₩ {Math.round(finOpsData.projected_month_end_krw).toLocaleString()}</div>
             <div className="kpi-footer">
-              <span className="kpi-badge-neutral">현재 추세 기반 예측</span>
+              <span className="kpi-badge-neutral">{strings.finops.kpi.trendForecast}</span>
             </div>
           </div>
         </div>
@@ -148,7 +177,7 @@ export default function FinOpsTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <Coins size={18} color="#f59e0b" />
-            <span>모델 서빙 표준 계량 단가 기준 (Token Pricing Matrix)</span>
+            <span>{strings.finops.pricingBanner.title}</span>
           </div>
           <button 
             className="badge active"
@@ -164,27 +193,27 @@ export default function FinOpsTab({ onNotify }) {
               transition: 'all 0.15s ease'
             }}
             onClick={() => setShowPricingModal(true)}
-            title="클릭 시 사내 AI 원가 산정 기준 및 TCO 정책 상세 확인"
+            title={strings.finops.pricingBanner.btnDetailTooltip}
           >
             <Coins size={13} />
-            <span>사내 원가 산정 기준 v2.1 (상세보기)</span>
+            <span>{strings.finops.pricingBanner.btnDetail}</span>
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>입력 토큰 (Prompt Tokens)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.80 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>사내 GPU 전력 및 감가상각 반영</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.promptToken}</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdInputPrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.promptDesc}</div>
           </div>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>출력 토큰 (Completion Tokens)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 2.40 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Continuous Batching 가중 연산</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.completionToken}</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdOutputPrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.completionDesc}</div>
           </div>
           <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>KV-Cache 적중 토큰 (Prefix Hit)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.20 <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>(75% 절감)</span></div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>PagedAttention 캐싱 재사용 유도</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.kvCacheToken}</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdCachePrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>{strings.finops.pricingBanner.savingsDynamic(savingsPct)}</span></div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.kvCacheDesc}</div>
           </div>
         </div>
       </div>
@@ -194,10 +223,10 @@ export default function FinOpsTab({ onNotify }) {
         <div className="card-header">
           <div className="card-title">
             <TrendingUp size={18} color="#38bdf8" />
-            <span>부서별 월간 예산 대비 소진율 현황 (Hard Cap 감시)</span>
+            <span>{strings.finops.tenants.title}</span>
           </div>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            회계 결산월: {new Date().getFullYear()}년 {new Date().getMonth() + 1}월
+            {strings.finops.tenants.billingMonth(new Date().getFullYear(), new Date().getMonth() + 1)}
           </span>
         </div>
 
@@ -205,10 +234,10 @@ export default function FinOpsTab({ onNotify }) {
           {tenants.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                등록된 부서(테넌트) 및 예산 데이터가 없습니다
+                {strings.finops.tenants.emptyTitle}
               </div>
               <div style={{ fontSize: '0.78rem' }}>
-                부서가 등록되면 실시간 예산 소진율과 토큰 사용량이 표시됩니다.
+                {strings.finops.tenants.emptyDesc}
               </div>
             </div>
           ) : (
@@ -231,11 +260,11 @@ export default function FinOpsTab({ onNotify }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff' }}>{t.name}</span>
                     {isBlocked ? (
-                      <span className="badge danger">🔴 예산 100% 한도 초과 (추론 자동 차단됨 - HTTP 429)</span>
+                      <span className="badge danger">{strings.finops.tenants.statusBlocked}</span>
                     ) : isWarning ? (
-                      <span className="badge warning">🟡 소프트캡 도달 (경고 알림 발송됨)</span>
+                      <span className="badge warning">{strings.finops.tenants.statusWarning}</span>
                     ) : (
-                      <span className="badge active">🟢 예산 사용 정상</span>
+                      <span className="badge active">{strings.finops.tenants.statusNormal}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -248,7 +277,7 @@ export default function FinOpsTab({ onNotify }) {
                       color: '#38bdf8', 
                       fontFamily: 'var(--font-mono)' 
                     }}>
-                      ⚡ {(t.totalTokens || 0).toLocaleString()} tokens
+                      ⚡ {(t.totalTokens || 0).toLocaleString()} {strings.common.units.tokens}
                     </span>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
                       <strong style={{ color: isBlocked ? '#fb7185' : '#ffffff' }}>
@@ -276,17 +305,19 @@ export default function FinOpsTab({ onNotify }) {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px' }}>
                   <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <span>{t.hardCap ? '🛡️ 하드 캡(Hard Cap) 100% 자동 차단 활성' : '⚠️ 초과 사용 허용 (소프트 캡)'}</span>
+                    <span>{t.hardCap ? strings.finops.tenants.hardCapActive : strings.finops.tenants.softCapActive}</span>
                     <span style={{ color: '#94a3b8' }}>
-                      누적 소비량: <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{(t.totalTokens || 0).toLocaleString()}</strong> tokens
+                      {strings.finops.tenants.totalTokens} <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{(t.totalTokens || 0).toLocaleString()}</strong> {strings.common.units.tokens}
                     </span>
                   </div>
                   {isBlocked && (
                     <button 
                       className="btn btn-secondary btn-sm"
-                      onClick={() => handleEmergencyIncrease(t)}
+                      disabled={!canWriteFinops}
+                      onClick={() => canWriteFinops && handleEmergencyIncrease(t)}
+                      style={{ opacity: canWriteFinops ? 1 : 0.45, cursor: canWriteFinops ? 'pointer' : 'not-allowed' }}
                     >
-                      월간 예산 ₩200만 긴급 증액 및 차단 해제
+                      {strings.finops.tenants.btnEmergencyUnblockDynamic(Math.round(getEmergencyIncreaseAmt(t.budget) / 10000).toLocaleString())}
                     </button>
                   )}
                 </div>
@@ -318,8 +349,8 @@ export default function FinOpsTab({ onNotify }) {
                   <Coins size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f59e0b', fontWeight: 700 }}>사내 AI 인프라 원가 산정 기준 (v2.1)</h3>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>On-premise GPU 클러스터 TCO 및 토큰 단위 사내 내부 회계 정산 규정</div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f59e0b', fontWeight: 700 }}>{strings.finops.modal.title}</h3>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.finops.modal.subtitle}</div>
                 </div>
               </div>
               <button 
@@ -334,10 +365,10 @@ export default function FinOpsTab({ onNotify }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '22px' }}>
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                 <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '0.85rem', marginBottom: '4px' }}>
-                  TCO 원가 산정 공식
+                  {strings.finops.modal.tcoFormulaTitle}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  사내 H100/A100 GPU 서버 장비 감가상각(3년 균등), IDC 상면비 및 전력 사용량(PUE 1.25)을 종합 반영하여 1,000 토큰 단위로 실비 계량 정산합니다.
+                  {strings.finops.modal.tcoFormulaDesc}
                 </div>
               </div>
 
@@ -345,33 +376,46 @@ export default function FinOpsTab({ onNotify }) {
                 <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '8px 10px' }}>계량 항목</th>
-                      <th style={{ padding: '8px 10px' }}>단가 기준 (1k 토큰)</th>
-                      <th style={{ padding: '8px 10px' }}>연산 가중치 및 적용 원리</th>
+                      <th style={{ padding: '8px 10px' }}>{strings.finops.modal.colItem}</th>
+                      <th style={{ padding: '8px 10px' }}>{strings.finops.modal.colPrice}</th>
+                      <th style={{ padding: '8px 10px' }}>{strings.finops.modal.colReason}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>입력 토큰 (Prompt)</td>
-                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 0.80</td>
-                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>Prefill 단계 단일 병렬 GPU 연산</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>{strings.finops.modal.itemPrompt}</td>
+                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdInputPrice.toFixed(2)}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{strings.finops.modal.reasonPrompt}</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>출력 토큰 (Completion)</td>
-                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ 2.40</td>
-                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>Continuous Batching 및 디코딩 반복 부하</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>{strings.finops.modal.itemCompletion}</td>
+                      <td style={{ padding: '10px', color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdOutputPrice.toFixed(2)}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{strings.finops.modal.reasonCompletion}</td>
                     </tr>
-                    <tr>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>KV-Cache 적중 (Hit)</td>
-                      <td style={{ padding: '10px', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>₩ 0.20</td>
-                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>PagedAttention 캐시 재사용으로 75% 비용 절감</td>
+                    <tr style={{ borderBottom: modelPricings.length > 0 ? '1px solid rgba(255,255,255,0.1)' : 'none' }}>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#e2e8f0' }}>{strings.finops.modal.itemKvCache}</td>
+                      <td style={{ padding: '10px', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>₩ {stdCachePrice.toFixed(2)}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{strings.finops.modal.reasonKvCacheDynamic(savingsPct)}</td>
                     </tr>
+                    {modelPricings.map((mp) => (
+                      <tr key={mp.model_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#93c5fd' }}>
+                          {mp.alias || mp.model_id}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#34d399' }}>
+                          ₩{Number(mp.input_price_per_1k).toFixed(2)} / ₩{Number(mp.output_price_per_1k).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '8px 10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {mp.backend_infra || mp.model_id}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
 
               <div style={{ background: 'rgba(56, 189, 248, 0.08)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.2)', fontSize: '0.78rem', color: '#93c5fd' }}>
-                💡 <strong>Hard Cap 정책:</strong> 부서별 월간 예산 100% 도달 시 Envoy L7 AI Gateway에서 즉시 429 Too Many Requests (Quota Exceeded)를 반환하여 사내 예산 초과를 방지합니다.
+                💡 <strong>{strings.finops.modal.hardCapPolicyPrefix}</strong> {strings.finops.modal.hardCapNotice}
               </div>
             </div>
 
@@ -381,7 +425,7 @@ export default function FinOpsTab({ onNotify }) {
                 className="btn btn-secondary" 
                 onClick={() => setShowPricingModal(false)}
               >
-                닫기
+                {strings.common.close}
               </button>
             </div>
           </div>

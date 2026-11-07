@@ -25,10 +25,11 @@ from app.schemas.routing import (
 )
 from app.core.xds_generator import generate_xds_revision
 from app.core.security import SYSTEM_DIAGNOSTICS_KEY, ensure_system_diagnostics_key
+from app.api.deps import require_permission
 
 router = APIRouter()
 
-@router.get("", response_model=RoutingPolicyResponse)
+@router.get("", response_model=RoutingPolicyResponse, dependencies=[Depends(require_permission("routing:read"))])
 def get_active_routing(
     route_name: Optional[str] = Query(None, description="Optional specific route name to query"),
     db: Session = Depends(get_db)
@@ -47,12 +48,12 @@ def get_active_routing(
         )
     return policy
 
-@router.get("/routes", response_model=List[RoutingPolicyResponse])
+@router.get("/routes", response_model=List[RoutingPolicyResponse], dependencies=[Depends(require_permission("routing:read"))])
 def list_all_routes(db: Session = Depends(get_db)):
     """List all configured routing profiles in order of priority"""
     return db.query(RoutingPolicy).order_by(RoutingPolicy.priority.asc(), RoutingPolicy.deployed_at.desc()).all()
 
-@router.get("/routes/{route_name}", response_model=RoutingPolicyResponse)
+@router.get("/routes/{route_name}", response_model=RoutingPolicyResponse, dependencies=[Depends(require_permission("routing:read"))])
 def get_route_by_name(route_name: str, db: Session = Depends(get_db)):
     """Get specific route policy by route_name"""
     policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == route_name).first()
@@ -63,7 +64,7 @@ def get_route_by_name(route_name: str, db: Session = Depends(get_db)):
         )
     return policy
 
-@router.post("/routes", response_model=RoutingPolicyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/routes", response_model=RoutingPolicyResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("routing:write"))])
 def create_route(request: RoutePolicyCreate, db: Session = Depends(get_db)):
     """Create a new multi-route profile"""
     existing = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == request.route_name).first()
@@ -113,7 +114,7 @@ def create_route(request: RoutePolicyCreate, db: Session = Depends(get_db)):
     db.refresh(new_route)
     return new_route
 
-@router.put("/routes/{route_name}", response_model=RoutingPolicyResponse)
+@router.put("/routes/{route_name}", response_model=RoutingPolicyResponse, dependencies=[Depends(require_permission("routing:write"))])
 def update_route(route_name: str, request: RoutePolicyUpdate, db: Session = Depends(get_db)):
     """Update an existing multi-route profile"""
     route = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == route_name).first()
@@ -153,7 +154,7 @@ def update_route(route_name: str, request: RoutePolicyUpdate, db: Session = Depe
     db.refresh(route)
     return route
 
-@router.delete("/routes/{route_name}", status_code=status.HTTP_200_OK)
+@router.delete("/routes/{route_name}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("routing:write"))])
 def delete_route(route_name: str, db: Session = Depends(get_db)):
     """Delete a route profile (at least one route must remain)"""
     total_routes = db.query(RoutingPolicy).count()
@@ -174,7 +175,7 @@ def delete_route(route_name: str, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": f"Route '{route_name}' deleted successfully."}
 
-@router.post("/dry-run", response_model=DryRunResponse)
+@router.post("/dry-run", response_model=DryRunResponse, dependencies=[Depends(require_permission("routing:write"))])
 def dry_run_routing(request: DryRunRequest, db: Session = Depends(get_db)):
     """Pre-flight dry run validation for traffic weights, models, and match rules"""
     errors = []
@@ -213,7 +214,7 @@ def dry_run_routing(request: DryRunRequest, db: Session = Depends(get_db)):
         active_endpoints_count=active_count
     )
 
-@router.post("/deploy", response_model=CanaryDeployResponse)
+@router.post("/deploy", response_model=CanaryDeployResponse, dependencies=[Depends(require_permission("routing:write"))])
 def deploy_canary_routing(request: CanaryDeployRequest, db: Session = Depends(get_db)):
     """Deploy new routing policy or canary weights to Envoy xDS without downtime"""
     # 1. Validation
@@ -298,7 +299,7 @@ def deploy_canary_routing(request: CanaryDeployRequest, db: Session = Depends(ge
         message=f"Envoy AI Gateway에 xDS 라우팅 정책이 무중단 실시간 배포되었습니다. (리비전: {new_revision})"
     )
 
-@router.get("/history", response_model=List[RoutingPolicyResponse])
+@router.get("/history", response_model=List[RoutingPolicyResponse], dependencies=[Depends(require_permission("routing:read"))])
 def get_routing_history(db: Session = Depends(get_db)):
     """List historical dynamic routing deployments and revisions"""
     return db.query(RoutingPolicy).order_by(RoutingPolicy.deployed_at.desc()).limit(20).all()
@@ -468,7 +469,7 @@ async def _execute_single_test_call(
         model_id=target_model_name
     )
 
-@router.post("/test-call", response_model=RouteTestCallResponse)
+@router.post("/test-call", response_model=RouteTestCallResponse, dependencies=[Depends(require_permission("routing:read"))])
 async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_db)):
     """Test calling a specific route (or specific model) through Envoy Gateway"""
     policy = db.query(RoutingPolicy).filter(RoutingPolicy.route_name == req.route_name).first()
@@ -488,7 +489,7 @@ async def test_route_call(req: RouteTestCallRequest, db: Session = Depends(get_d
         db=db
     )
 
-@router.post("/test-call-all", response_model=AllModelsTestCallResponse)
+@router.post("/test-call-all", response_model=AllModelsTestCallResponse, dependencies=[Depends(require_permission("routing:read"))])
 async def test_all_models_call(req: AllModelsTestCallRequest, db: Session = Depends(get_db)):
     """Test calling all linked LLM models through Envoy Gateway concurrently"""
     policy = None
@@ -576,7 +577,7 @@ class AgentRouterSimulateRequest(BaseModel):
     tools: Optional[List[Dict[str, Any]]] = Field(default=None, description="도구/함수 호출 스키마")
     budget_spent_ratio: Optional[float] = Field(default=0.0, ge=0.0, le=1.0)
 
-@router.get("/agent-router/status")
+@router.get("/agent-router/status", dependencies=[Depends(require_permission("routing:read"))])
 def get_agent_router_status(db: Session = Depends(get_db)):
     """AgentRouter 현재 활성 정책 및 모델 풀 상태 조회 (동적 클러스터/모델 매핑)"""
     policies = AgentRouterPolicyManager.get_all_policies(db=db)
@@ -617,7 +618,7 @@ def get_agent_router_status(db: Session = Depends(get_db)):
         }
     }
 
-@router.get("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+@router.get("/agent-router/policies", response_model=AgentRouterPoliciesResponse, dependencies=[Depends(require_permission("routing:read"))])
 def get_agent_router_policies(db: Session = Depends(get_db)):
     """AgentRouter 4대 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback) 상세 설정 조회"""
     policies = AgentRouterPolicyManager.get_all_policies(db=db)
@@ -626,7 +627,7 @@ def get_agent_router_policies(db: Session = Depends(get_db)):
         active_policy="QualityFirst"
     )
 
-@router.put("/agent-router/policies", response_model=AgentRouterPoliciesResponse)
+@router.put("/agent-router/policies", response_model=AgentRouterPoliciesResponse, dependencies=[Depends(require_permission("routing:write"))])
 def update_agent_router_policies(payload: AgentRouterPoliciesUpdate, db: Session = Depends(get_db)):
     """AgentRouter 4대 라우팅 정책 파라미터 및 모델 매핑 업데이트"""
     raw_list = [p.model_dump() for p in payload.policies]
@@ -636,7 +637,7 @@ def update_agent_router_policies(payload: AgentRouterPoliciesUpdate, db: Session
         active_policy="QualityFirst"
     )
 
-@router.post("/agent-router/simulate")
+@router.post("/agent-router/simulate", dependencies=[Depends(require_permission("routing:read"))])
 def simulate_agent_router_dispatch(req: AgentRouterSimulateRequest, db: Session = Depends(get_db)):
     """프롬프트 인텐트 및 복잡도 분석 실시간 시뮬레이션"""
     messages = [{"role": "user", "content": req.prompt}]

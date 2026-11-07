@@ -14,9 +14,17 @@ COPY pyproject.toml README.md ./
 RUN pip install --no-cache-dir pip -U && \
     pip install --no-cache-dir .
 
-# 소스 코드 복사
+# 소스 코드 복사 및 non-root 사용자 생성
 COPY . .
 
+RUN useradd -u 1000 -m appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

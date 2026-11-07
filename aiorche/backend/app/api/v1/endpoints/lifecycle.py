@@ -25,6 +25,7 @@ from app.schemas.lifecycle import (
     SupportBundleRequest,
     SupportBundleResponse
 )
+from app.api.deps import require_permission
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ router = APIRouter()
 # 1. Component Version Management
 # ==========================================
 
-@router.get("/components", response_model=ComponentListResponse)
+@router.get("/components", response_model=ComponentListResponse, dependencies=[Depends(require_permission("lifecycle:read"))])
 def get_components():
     """어플라이언스 내 핵심 모듈(ext_proc, Envoy, Control Plane, Presidio)의 버전 및 패치 상태를 반환합니다."""
     comps = PatchEngine.get_components()
@@ -57,7 +58,7 @@ def get_components():
 # 2. Patch Verification, Dry-Run & Rolling Deploy
 # ==========================================
 
-@router.post("/patches/verify", response_model=PatchVerifyResponse)
+@router.post("/patches/verify", response_model=PatchVerifyResponse, dependencies=[Depends(require_permission("lifecycle:write"))])
 def verify_patch(payload: PatchVerifyRequest):
     """업로드된 오프라인 패치 번들의 RSA-4096 서명 및 SHA-256 무결성을 검증합니다."""
     verif = PatchEngine.verify_signature(
@@ -92,7 +93,7 @@ def verify_patch(payload: PatchVerifyRequest):
     )
 
 
-@router.post("/patches/dry-run", response_model=PatchDryRunResponse)
+@router.post("/patches/dry-run", response_model=PatchDryRunResponse, dependencies=[Depends(require_permission("lifecycle:write"))])
 def dry_run_patch(payload: PatchDryRunRequest):
     """K8s PDB, readinessProbe 및 vLLM GPU 워크로드 무영향성 드라이런 검증을 수행합니다."""
     res = PatchEngine.run_dry_run(
@@ -104,7 +105,7 @@ def dry_run_patch(payload: PatchDryRunRequest):
     return PatchDryRunResponse(**res)
 
 
-@router.post("/patches/apply", response_model=PatchApplyResponse)
+@router.post("/patches/apply", response_model=PatchApplyResponse, dependencies=[Depends(require_permission("lifecycle:write"))])
 def apply_patch(payload: PatchApplyRequest, db: Session = Depends(get_db)):
     """무중단 롤링 핫픽스 배포를 실행하고, 패치 이력을 데이터베이스에 영속화합니다."""
     target_comp = payload.target_component or "ext_proc"
@@ -136,7 +137,7 @@ def apply_patch(payload: PatchApplyRequest, db: Session = Depends(get_db)):
     return PatchApplyResponse(**res)
 
 
-@router.post("/patches/rollback", response_model=PatchRollbackResponse)
+@router.post("/patches/rollback", response_model=PatchRollbackResponse, dependencies=[Depends(require_permission("lifecycle:write"))])
 def rollback_patch(payload: PatchRollbackRequest, db: Session = Depends(get_db)):
     """이전 안정 버전으로 롤백을 수행하고 이력을 갱신합니다."""
     target_comp = payload.target_component
@@ -166,7 +167,7 @@ def rollback_patch(payload: PatchRollbackRequest, db: Session = Depends(get_db))
     return PatchRollbackResponse(**res)
 
 
-@router.get("/patches/history", response_model=List[PatchHistoryRead])
+@router.get("/patches/history", response_model=List[PatchHistoryRead], dependencies=[Depends(require_permission("lifecycle:read"))])
 def get_patch_history(limit: int = 50, db: Session = Depends(get_db)):
     """패치 적용 및 롤백 이력 목록을 조회합니다."""
     records = db.query(PatchHistory).order_by(PatchHistory.applied_at.desc()).limit(limit).all()
@@ -177,7 +178,7 @@ def get_patch_history(limit: int = 50, db: Session = Depends(get_db)):
 # 3. Pre-flight Diagnostics
 # ==========================================
 
-@router.get("/preflight", response_model=PreflightResponse)
+@router.get("/preflight", response_model=PreflightResponse, dependencies=[Depends(require_permission("lifecycle:read"))])
 def run_preflight():
     """5대 핵심 컴포넌트(PostgreSQL, Redis, Kafka, vLLM, DCGM) 실시간 자가진단을 수행합니다."""
     diag = PatchEngine.run_preflight()
@@ -188,7 +189,7 @@ def run_preflight():
 # 4. Zero-PII Support Bundle
 # ==========================================
 
-@router.post("/support-bundle", response_model=SupportBundleResponse)
+@router.post("/support-bundle", response_model=SupportBundleResponse, dependencies=[Depends(require_permission("lifecycle:write"))])
 def generate_support_bundle(payload: SupportBundleRequest = SupportBundleRequest()):
     """고객 개인정보(PII)를 100% 배제한 암호화 기술지원 번들 ZIP 아카이브를 생성합니다."""
     bundle_res = SupportBundleGenerator.generate_bundle(
@@ -207,7 +208,7 @@ def generate_support_bundle(payload: SupportBundleRequest = SupportBundleRequest
     )
 
 
-@router.get("/support-bundle/download/{bundle_id}")
+@router.get("/support-bundle/download/{bundle_id}", dependencies=[Depends(require_permission("lifecycle:write"))])
 def download_support_bundle(bundle_id: str):
     """생성된 Zero-PII 서포트 번들 ZIP 파일을 다운로드합니다."""
     zip_path = SupportBundleGenerator.get_bundle_path(bundle_id)

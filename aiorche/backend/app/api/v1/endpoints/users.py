@@ -1,5 +1,13 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -7,28 +15,41 @@ from app.db.session import get_db
 from app.core.security import hash_password
 from app.models.user import User, UserSession
 from app.models.tenant import Tenant
+from app.models.role import Role
+from app.core.permissions import ALL_PERMISSION_CODES
 from app.schemas.user import (
     UserCreateRequest,
     UserUpdateRequest,
     UserResponse
 )
-from app.api.deps import require_roles, get_current_user
+from app.api.deps import require_roles, require_permission, get_current_user
 
 router = APIRouter(prefix="/users", tags=["User & RBAC Account Administration"])
 
-# Enforce SUPER_ADMIN role across all user management endpoints
-super_admin_guard = require_roles(["SUPER_ADMIN"])
+users_read_guard = require_permission("users:read")
+users_write_guard = require_permission("users:write")
 
-def _to_user_response(user: User) -> UserResponse:
-    now = datetime.utcnow()
-    is_locked = bool(user.locked_until and user.locked_until > now)
+def _to_user_response(user: User, db: Optional[Session] = None) -> UserResponse:
+    now = datetime.now(timezone.utc)
+    locked_until = _to_utc(user.locked_until)
+    is_locked = bool(locked_until and locked_until > now)
     tenant_name = user.tenant.name if user.tenant else None
+
+    permissions = []
+    if user.role == "SUPER_ADMIN":
+        permissions = ["*"] + ALL_PERMISSION_CODES
+    elif db:
+        role_obj = db.query(Role).filter(Role.name == user.role).first()
+        if role_obj and role_obj.permissions:
+            permissions = role_obj.permissions
+
     return UserResponse(
         id=user.id,
         username=user.username,
         full_name=user.full_name,
         email=user.email,
         role=user.role,
+        permissions=permissions,
         tenant_id=user.tenant_id,
         tenant_name=tenant_name,
         is_active=user.is_active,
@@ -39,7 +60,7 @@ def _to_user_response(user: User) -> UserResponse:
         created_at=user.created_at
     )
 
-@router.get("", response_model=List[UserResponse], dependencies=[Depends(super_admin_guard)])
+@router.get("", response_model=List[UserResponse], dependencies=[Depends(users_read_guard)])
 def list_users(
     tenant_id: Optional[str] = Query(None, description="부서별 필터링"),
     role: Optional[str] = Query(None, description="역할 필터링"),
@@ -52,9 +73,9 @@ def list_users(
     if role:
         query = query.filter(User.role == role)
     users = query.order_by(User.created_at.desc()).all()
-    return [_to_user_response(u) for u in users]
+    return [_to_user_response(u, db) for u in users]
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(super_admin_guard)])
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(users_write_guard)])
 def create_user(
     req: UserCreateRequest,
     db: Session = Depends(get_db)
@@ -74,9 +95,10 @@ def create_user(
             detail=f"이미 등록된 이메일 주소입니다: '{req.email}'"
         )
 
-    # Validate role
-    valid_roles = ["SUPER_ADMIN", "TENANT_ADMIN", "VIEWER"]
-    if req.role not in valid_roles:
+    # Validate role dynamically against roles table or fallback
+    role_obj = db.query(Role).filter(Role.name == req.role).first()
+    if not role_obj and req.role not in ["SUPER_ADMIN", "TENANT_ADMIN", "VIEWER"]:
+        valid_roles = [r.name for r in db.query(Role.name).all()] or ["SUPER_ADMIN", "TENANT_ADMIN", "VIEWER"]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"유효하지 않은 역할입니다. (허용 역할: {', '.join(valid_roles)})"
@@ -103,9 +125,9 @@ def create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return _to_user_response(new_user)
+    return _to_user_response(new_user, db)
 
-@router.patch("/{user_id}", response_model=UserResponse, dependencies=[Depends(super_admin_guard)])
+@router.patch("/{user_id}", response_model=UserResponse, dependencies=[Depends(users_write_guard)])
 def update_user(
     user_id: str,
     req: UserUpdateRequest,
@@ -128,7 +150,8 @@ def update_user(
             raise HTTPException(status_code=400, detail="이미 다른 사용자가 사용 중인 이메일입니다.")
         user.email = req.email
     if req.role is not None:
-        if req.role not in ["SUPER_ADMIN", "TENANT_ADMIN", "VIEWER"]:
+        role_obj = db.query(Role).filter(Role.name == req.role).first()
+        if not role_obj and req.role not in ["SUPER_ADMIN", "TENANT_ADMIN", "VIEWER"]:
             raise HTTPException(status_code=400, detail="유효하지 않은 역할입니다.")
         user.role = req.role
     if req.tenant_id is not None:
@@ -149,9 +172,9 @@ def update_user(
 
     db.commit()
     db.refresh(user)
-    return _to_user_response(user)
+    return _to_user_response(user, db)
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_guard)])
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(users_write_guard)])
 def delete_user(
     user_id: str,
     current_user: User = Depends(get_current_user),

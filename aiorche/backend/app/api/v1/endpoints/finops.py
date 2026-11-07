@@ -1,6 +1,6 @@
 import io
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -15,10 +15,11 @@ from app.schemas.finops import (
     FinOpsPricingMatrix,
     ModelPricingInfo
 )
+from app.api.deps import require_permission
 
 router = APIRouter()
 
-@router.get("/overview", response_model=FinOpsOverviewResponse)
+@router.get("/overview", response_model=FinOpsOverviewResponse, dependencies=[Depends(require_permission("finops:read"))])
 def get_finops_overview(db: Session = Depends(get_db)):
     """Returns department-level budget consumption, burn rate, and pricing matrix."""
     tenants = db.query(Tenant).all()
@@ -79,7 +80,7 @@ def get_finops_overview(db: Session = Depends(get_db)):
     total_remaining = max(0.0, total_budget - total_spent)
 
     # Projected month-end run rate
-    day_of_month = datetime.utcnow().day
+    day_of_month = datetime.now(timezone.utc).day
     projected = round((total_spent / max(1, day_of_month)) * 30.0, 0)
 
     return FinOpsOverviewResponse(
@@ -93,13 +94,13 @@ def get_finops_overview(db: Session = Depends(get_db)):
         tenants=tenant_summaries
     )
 
-@router.get("/invoices/export")
+@router.get("/invoices/export", dependencies=[Depends(require_permission("finops:write"))])
 def export_finops_invoices_csv(
     month: Optional[str] = Query(None, description="Billing month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
     """Streams enterprise accounting CSV invoice with UTF-8 BOM encoding for Korean Excel compatibility."""
-    target_month = month or datetime.utcnow().strftime("%Y-%m")
+    target_month = month or datetime.now(timezone.utc).strftime("%Y-%m")
     tenants = db.query(Tenant).all()
 
     output = io.StringIO()
@@ -156,5 +157,5 @@ def export_finops_invoices_csv(
         media_type="text/csv; charset=utf-8"
     )
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    response.headers["X-Export-Timestamp"] = datetime.utcnow().isoformat()
+    response.headers["X-Export-Timestamp"] = datetime.now(timezone.utc).isoformat()
     return response

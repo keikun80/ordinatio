@@ -1,20 +1,27 @@
-.PHONY: help setup test lint build run-backend run-frontend up down init-admin \
-	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac \
+.PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down init-admin \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-standalone-install \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
 help:
 	@echo "AI Orchestrator (aiorche) Build & Management Commands"
 	@echo ""
-	@echo "  [Local & Development]"
+	@echo "  [Local Development Mode (Default)]"
 	@echo "  make setup                     - Initialize Python backend (uv) and Frontend dependencies"
-	@echo "  make test                      - Run backend pytest (78 tests) and frontend build verification"
-	@echo "  make lint                      - Run backend and frontend code linting"
-	@echo "  make build                     - Build frontend production distribution bundle"
-	@echo "  make run-backend               - Run FastAPI backend locally (http://localhost:8000)"
-	@echo "  make run-frontend              - Run React Vite frontend locally (http://localhost:5173)"
-	@echo "  make up                        - Run local Docker Compose air-gapped stack"
+	@echo "  make up                        - Run local Development Docker Compose stack (Vite HMR + FastAPI --reload with live source mounts)"
 	@echo "  make down                      - Stop local Docker Compose stack"
+	@echo "  make test                      - Run backend pytest (93 tests) and frontend build verification"
+	@echo "  make lint                      - Run backend and frontend code linting"
+	@echo "  make migrate                   - Run Alembic DB schema migrations (upgrade head)"
+	@echo "  make migrate-rollback          - Rollback last Alembic migration (downgrade -1)"
+	@echo "  make run-backend               - Run FastAPI backend directly on host (http://localhost:8000)"
+	@echo "  make run-frontend              - Run React Vite frontend directly on host (http://localhost:5173)"
+	@echo ""
+	@echo "  [Production / Appliance Release Mode (On-Demand Only)]"
+	@echo "  make build                     - Build frontend production distribution bundle (frontend/dist)"
+	@echo "  make prod-build                - Build immutable Production Docker images (Nginx static + FastAPI)"
+	@echo "  make prod-up                   - Build & run immutable Production Docker Compose stack"
+	@echo "  make prod-down                 - Stop Production Docker Compose stack"
 	@echo ""
 	@echo "  [DoD Automated Verification]"
 	@echo "  make verify-phase0             - Run Phase 0 DoD verification (Foundations & Envoy AI Gateway)"
@@ -26,6 +33,7 @@ help:
 	@echo "  make verify-phase5             - Run Phase 5 DoD verification (Lifecycle & RSA-4096 Hotfix)"
 	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
 	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD"
+	@echo "  make verify-standalone-install - Run Standalone Installer & Vagrant Deployment DoD"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
 	@echo "  make k8s-up                    - Deploy full stack to Kubernetes (alias of k8s-deploy)"
@@ -38,7 +46,7 @@ help:
 
 setup:
 	@echo "==> Setting up backend dependencies..."
-	@cd backend && uv sync
+	@cd backend && uv sync --extra dev
 	@echo "==> Setting up frontend dependencies..."
 	@cd frontend && npm install
 
@@ -54,6 +62,14 @@ lint:
 	@echo "==> Checking frontend buildability..."
 	@cd frontend && npm run build
 
+migrate:
+	@echo "==> Running Alembic DB migrations..."
+	@cd backend && uv run alembic upgrade head
+
+migrate-rollback:
+	@echo "==> Rolling back last Alembic migration..."
+	@cd backend && uv run alembic downgrade -1
+
 build:
 	@echo "==> Building frontend production assets..."
 	@cd frontend && npm run build
@@ -66,10 +82,27 @@ run-frontend:
 	@cd frontend && npm run dev
 
 up:
+	@echo "==> Starting Development Stack (Live Source Mounts: Vite HMR + FastAPI --reload)..."
+	@docker build -t aiorche-backend ./backend
+	@docker build --target dev -t aiorche-frontend ./frontend
 	@docker compose up -d
 
 down:
 	@docker compose down
+
+prod-build:
+	@echo "==> Building Production Frontend Bundle & Immutable Docker Images..."
+	@cd frontend && npm run build
+	@docker build -t aiorche-backend:prod ./backend
+	@docker build --target prod -t aiorche-frontend:prod ./frontend
+	@echo "✅ Production images (aiorche-backend:prod, aiorche-frontend:prod) built successfully."
+
+prod-up: prod-build
+	@echo "==> Starting Immutable Production Stack (Nginx Static + FastAPI Production)..."
+	@docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+
+prod-down:
+	@docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 verify-phase0:
 	@bash scripts/verify-phase0.sh
@@ -101,8 +134,22 @@ verify-all-menus:
 verify-auth-rbac:
 	@bash scripts/verify-auth-rbac.sh
 
+verify-rbac-scenarios:
+	@bash scripts/verify-rbac-scenarios.sh
+
+verify-standalone-install:
+	@bash scripts/verify-standalone-install.sh
+
 init-admin:
-	@cd backend && uv run python -m app.scripts.init_admin $(ARGS)
+	@if docker ps --format '{{.Names}}' | grep -q '^aiorche-backend$$'; then \
+		if [ -t 0 ]; then \
+			docker exec -it aiorche-backend python -m app.scripts.init_admin $(ARGS); \
+		else \
+			docker exec -i aiorche-backend python -m app.scripts.init_admin $(ARGS); \
+		fi; \
+	else \
+		cd backend && DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/aiorche_db" uv run python -m app.scripts.init_admin $(ARGS); \
+	fi
 
 
 # Kubernetes (Pod 배포, 라이프사이클 및 관리)

@@ -12,13 +12,26 @@ import {
   ShieldCheck,
   CheckCircle2
 } from 'lucide-react';
-import { initialKPIs } from '../data/mockData';
 import { apiClient } from '../api/client';
+import { strings } from '../constants/strings';
+import { useAuth } from '../context/AuthContext';
 
 export default function OverviewTab({ onNavigateTab }) {
-  const [kpis, setKpis] = useState(initialKPIs);
+  const { isSuperAdmin, hasPermission } = useAuth();
+  const canAccessRouting = isSuperAdmin || hasPermission('routing:read');
+  const canAccessCompliance = isSuperAdmin || hasPermission('compliance:read');
+  const canAccessFinops = isSuperAdmin || hasPermission('finops:read');
+  const [kpis, setKpis] = useState({
+    rps: 0,
+    tps: 0,
+    ttft: 0,
+    errorRate: 0,
+    dailyCost: 0
+  });
   const [clusterPools, setClusterPools] = useState([]);
   const [modelTraffic, setModelTraffic] = useState([]);
+  const [latestAuditLog, setLatestAuditLog] = useState(null);
+  const [finOpsSummary, setFinOpsSummary] = useState(null);
   const [isLiveWs, setIsLiveWs] = useState(false);
   const isLiveWsRef = useRef(false);
 
@@ -30,12 +43,12 @@ export default function OverviewTab({ onNavigateTab }) {
       name: p.pool_name || p.model_id,
       model: p.model_id || p.pool_name,
       engine: p.engine || 'vLLM',
-      workload: p.workload || `${p.engine || 'vLLM'} 온프레미스 인스턴스`,
+      workload: p.workload || strings.overview.onPremInstance(p.engine),
       pods: p.pod_count,
       queueDepth: p.waiting_queue,
       gpuMemoryPercent: p.gpu_memory_pct != null ? Math.round(p.gpu_memory_pct) : null,
-      gpuMetricSource: p.gpu_metric_source || (p.gpu_memory_pct != null ? '시스템 측정' : '원격 블랙박스 엔드포인트'),
-      scalingTech: p.scaling_tech || `${p.infra} 인프라`,
+      gpuMetricSource: p.gpu_metric_source || (p.gpu_memory_pct != null ? strings.overview.sysMeasure : strings.overview.remoteEndpoint),
+      scalingTech: p.scaling_tech || strings.overview.infraSuffix(p.infra),
       status: p.status || 'HEALTHY',
       endpointUrl: p.endpoint_url || ''
     }));
@@ -47,7 +60,7 @@ export default function OverviewTab({ onNavigateTab }) {
     let reconnectTimeout = null;
     let isUnmounted = false;
 
-    // 1. Initial immediate load from summary API
+    // 1. Initial immediate load from summary API + live Audit/FinOps context
     const loadInitialSummary = async () => {
       const summary = await apiClient.getMetricsSummary();
       if (summary && !isUnmounted) {
@@ -63,6 +76,22 @@ export default function OverviewTab({ onNavigateTab }) {
         }
         if (summary.model_traffic_breakdown && summary.model_traffic_breakdown.length > 0) {
           setModelTraffic(summary.model_traffic_breakdown);
+        }
+      }
+      if (canAccessCompliance) {
+        const logs = await apiClient.getAuditLogs({ limit: 1 });
+        if (Array.isArray(logs) && logs.length > 0 && !isUnmounted) {
+          setLatestAuditLog(logs[0]);
+        }
+      }
+      if (canAccessFinops) {
+        const finops = await apiClient.getFinOpsOverview();
+        if (finops && !isUnmounted) {
+          setFinOpsSummary(finops);
+          setKpis((prev) => ({
+            ...prev,
+            dailyCost: Math.round(finops.total_spent_krw || prev.dailyCost),
+          }));
         }
       }
     };
@@ -171,7 +200,7 @@ export default function OverviewTab({ onNavigateTab }) {
       <div className="page-header">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1>통합 운영 관제 대시보드</h1>
+            <h1>{strings.overview.title}</h1>
             <button
               onClick={async () => {
                 try {
@@ -208,19 +237,21 @@ export default function OverviewTab({ onNavigateTab }) {
                 borderRadius: '6px',
                 transition: 'all 0.15s ease'
               }}
-              title="클릭 시 실시간 지표 즉시 수동 갱신"
+              title={strings.overview.refreshManualTooltip}
             >
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isLiveWs ? '#10b981' : '#38bdf8' }}></span>
-              {isLiveWs ? '실시간 스트림 연동 (클릭 시 새로고침)' : '지표 요약 모드 (클릭 시 새로고침)'}
+              {isLiveWs ? strings.overview.streamModeOn : strings.overview.streamModeOff}
             </button>
           </div>
-          <p>고객사 폐쇄망 클러스터의 실시간 인프라 부하, 추론 지연 및 비용 현황</p>
+          <p>{strings.overview.subtitle}</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')}>
-            <Cpu size={16} />
-            <span>모델 라우팅 설정</span>
-          </button>
+          {canAccessRouting && (
+            <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')}>
+              <Cpu size={16} />
+              <span>{strings.overview.btnRoutingConfig}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -228,41 +259,41 @@ export default function OverviewTab({ onNavigateTab }) {
       <div className="kpi-grid">
         <div className="kpi-card" style={{ '--card-accent': '#3b82f6' }}>
           <div className="kpi-header">
-            <span>실시간 처리 트래픽 (RPS)</span>
+            <span>{strings.overview.kpi.rpsTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
           <div className="kpi-value">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
-              <Activity size={13} color="#3b82f6" /> 인바운드 호출 수
+              <Activity size={13} color="#3b82f6" /> {strings.overview.kpi.rpsSub}
             </span>
-            <span className="kpi-badge-neutral">실시간 측정</span>
+            <span className="kpi-badge-neutral">{strings.overview.kpi.liveMeasure}</span>
           </div>
         </div>
 
         <div className="kpi-card" style={{ '--card-accent': '#06b6d4' }}>
           <div className="kpi-header">
-            <span>토큰 생성 속도 (TPS)</span>
+            <span>{strings.overview.kpi.tpsTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
           <div className="kpi-value">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
-              <Zap size={13} color="#06b6d4" /> 생성 토큰 환산치
+              <Zap size={13} color="#06b6d4" /> {strings.overview.kpi.tpsSub}
             </span>
-            <span className="kpi-badge-neutral">초당 토큰 출력량</span>
+            <span className="kpi-badge-neutral">{strings.overview.kpi.tpsSub}</span>
           </div>
         </div>
 
         <div className="kpi-card" style={{ '--card-accent': '#8b5cf6' }}>
           <div className="kpi-header">
-            <span>첫 토큰 생성 지연 (TTFT)</span>
+            <span>{strings.overview.kpi.ttftTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
           <div className="kpi-value">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
@@ -270,37 +301,37 @@ export default function OverviewTab({ onNavigateTab }) {
             <span className="kpi-badge-positive">
               <Clock size={13} color="#8b5cf6" /> P95 Latency
             </span>
-            <span className="kpi-badge-neutral">SLA (500ms) 충족</span>
+            <span className="kpi-badge-neutral">{strings.overview.kpi.slaSatisfied}</span>
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--card-accent': '#10b981' }}>
+        <div className="kpi-card" style={{ '--card-accent': Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981' }}>
           <div className="kpi-header">
-            <span>게이트웨이 에러율 (5xx)</span>
+            <span>{strings.overview.kpi.errorTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> Envoy 연동
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
           <div className="kpi-value">{kpis.errorRate}%</div>
           <div className="kpi-footer">
-            <span className="badge active">
-              <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> 정상 가동
+            <span className={`badge ${Number(kpis.errorRate) > 0 ? 'warning' : 'active'}`}>
+              <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> {Number(kpis.errorRate) > 0 ? strings.overview.kpi.errorStatusWarn(kpis.errorRate) : strings.overview.kpi.normalStatus}
             </span>
-            <span className="kpi-badge-neutral">5xx 에러 제로</span>
+            <span className="kpi-badge-neutral">{strings.overview.kpi.errorSubDynamic(kpis.errorRate)}</span>
           </div>
         </div>
 
         <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
           <div className="kpi-header">
-            <span>금일 누적 추론 비용</span>
+            <span>{strings.overview.kpi.costTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }}></span> DB 실시간 집계
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }}></span> {strings.overview.kpi.dbBadge}
             </span>
           </div>
           <div className="kpi-value" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
           <div className="kpi-footer">
-            <span style={{ color: '#f59e0b', fontWeight: 600 }}>테넌트 실시간 집계</span>
-            <span className="kpi-badge-neutral">원화(KRW) 기준</span>
+            <span style={{ color: '#f59e0b', fontWeight: 600 }}>{strings.overview.kpi.tenantRealtime}</span>
+            <span className="kpi-badge-neutral">{strings.overview.kpi.krwCurrency}</span>
           </div>
         </div>
       </div>
@@ -310,9 +341,9 @@ export default function OverviewTab({ onNavigateTab }) {
         <div className="card-header">
           <div className="card-title">
             <Server size={20} color="#38bdf8" />
-            <span>LLM 서빙 인프라 풀 상태 (Multi-Compute Pools)</span>
+            <span>{strings.overview.infraPool.title}</span>
           </div>
-          <span className="badge active">실시간 DB 모델 카탈로그 & Envoy 연동</span>
+          <span className="badge active">{strings.overview.infraPool.badge}</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: '16px' }}>
@@ -344,7 +375,7 @@ export default function OverviewTab({ onNavigateTab }) {
                     {pool.name || pool.model}
                   </div>
                   <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`} style={{ flexShrink: 0 }}>
-                    {pool.status === 'HEALTHY' ? '정상 가동' : '점검 필요'}
+                    {pool.status === 'HEALTHY' ? strings.common.status.active : strings.common.status.needsAttention}
                   </span>
                 </div>
                 
@@ -354,28 +385,28 @@ export default function OverviewTab({ onNavigateTab }) {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>할당 모델:</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.assignedModel}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontSize: '0.76rem' }}>{pool.model}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>가동 인스턴스:</span>
-                    <span style={{ fontWeight: 600, color: '#38bdf8' }}>{pool.pods} 개</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.activeInstances}</span>
+                    <span style={{ fontWeight: 600, color: '#38bdf8' }}>{pool.pods} {strings.common.units.items}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>대기열 큐 (Queue Depth):</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.queueDepth}</span>
                     <span style={{ fontWeight: 700, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
                       {pool.queueDepth} reqs
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>시스템/GPU 점유율:</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.gpuOccupancy}</span>
                     {pool.gpuMemoryPercent !== null && pool.gpuMemoryPercent !== undefined ? (
                       <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
                         {pool.gpuMemoryPercent}%
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>
-                        N/A (원격 엔드포인트)
+                        {strings.overview.infraPool.remoteEndpointNA}
                       </span>
                     )}
                   </div>
@@ -407,7 +438,7 @@ export default function OverviewTab({ onNavigateTab }) {
             ))
           ) : (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
-              등록된 서빙 인프라 풀을 불러오는 중...
+              {strings.overview.infraPool.loadingPools}
             </div>
           )}
         </div>
@@ -420,9 +451,9 @@ export default function OverviewTab({ onNavigateTab }) {
           <div className="card-header">
             <div className="card-title">
               <Activity size={18} color="#38bdf8" />
-              <span>모델별 실시간 트래픽 점유율</span>
+              <span>{strings.overview.trafficShare.title}</span>
             </div>
-            <span className="badge active" style={{ fontSize: '0.68rem' }}>실시간 감사로그 연동</span>
+            <span className="badge active" style={{ fontSize: '0.68rem' }}>{strings.overview.trafficShare.badge}</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -436,7 +467,7 @@ export default function OverviewTab({ onNavigateTab }) {
                     <div key={item.model_id}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
                         <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                          {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}건)</span>
+                          {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}{strings.common.units.count})</span>
                         </span>
                         <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }}>
                           {item.share_pct}% ({item.rps} RPS)
@@ -457,7 +488,7 @@ export default function OverviewTab({ onNavigateTab }) {
                 })
             ) : (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                기록된 모델 트래픽 데이터가 없습니다 (0건)
+                {strings.overview.trafficShare.noData}
               </div>
             )}
           </div>
@@ -468,41 +499,77 @@ export default function OverviewTab({ onNavigateTab }) {
           <div className="card-header">
             <div className="card-title">
               <AlertTriangle size={18} color="#f59e0b" />
-              <span>최근 시스템 이상 징후 및 알림</span>
+              <span>{strings.overview.systemAlerts.title}</span>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => onNavigateTab('compliance')}>
-              <span>로그 전체보기</span>
-            </button>
+            {canAccessCompliance && (
+              <button className="btn btn-secondary btn-sm" onClick={() => onNavigateTab('compliance')}>
+                <span>{strings.overview.systemAlerts.viewAll}</span>
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ padding: '10px 12px', background: 'rgba(239, 68, 68, 0.08)', borderLeft: '3px solid #ef4444', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#ef4444' }}>
-                <span>[보안] 비정상 카드번호 대량 탐지 및 차단</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
+            <div style={{ padding: '10px 12px', background: latestAuditLog?.action_taken === 'BLOCK' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', borderLeft: `3px solid ${latestAuditLog?.action_taken === 'BLOCK' ? '#ef4444' : '#10b981'}`, borderRadius: '4px', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: latestAuditLog?.action_taken === 'BLOCK' ? '#ef4444' : '#34d399' }}>
+                <span>
+                  {latestAuditLog
+                    ? strings.overview.systemAlerts.auditEventTitle(latestAuditLog.action_taken, latestAuditLog.model_id)
+                    : strings.overview.systemAlerts.securityTitle}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {latestAuditLog?.created_at
+                    ? new Date(latestAuditLog.created_at).toLocaleTimeString('ko-KR', { hour12: false })
+                    : strings.overview.systemAlerts.realTime}
+                </span>
               </div>
               <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                IP 10.100.42.19에서 카드번호 페이로드 감지 ➔ Presidio L7 엔진 차단 완료
+                {latestAuditLog
+                  ? strings.overview.systemAlerts.auditEventDesc(latestAuditLog.requester_id, latestAuditLog.worm_storage_id, latestAuditLog.pii_detected_count)
+                  : strings.overview.systemAlerts.securityDesc}
               </div>
             </div>
 
             <div style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#38bdf8' }}>
-                <span>[인프라] LLM 서빙 모델 풀 헬스체크 통과</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
+                <span>
+                  {clusterPools.length > 0
+                    ? strings.overview.systemAlerts.infraDynamicTitle(
+                        clusterPools.filter((p) => p.status === 'HEALTHY').length,
+                        clusterPools.length
+                      )
+                    : strings.overview.systemAlerts.infraTitle}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
               </div>
               <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                등록된 온프레미스 인스턴스 정상 가동 확인 (Envoy Ingress 클러스터 연동 완료)
+                {clusterPools.length > 0
+                  ? strings.overview.systemAlerts.infraDynamicDesc(
+                      clusterPools.map((p) => p.name || p.model).slice(0, 3).join(', ')
+                    )
+                  : strings.overview.systemAlerts.infraDesc}
               </div>
             </div>
 
             <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f59e0b' }}>
-                <span>[FinOps] 테넌트 예산 한도 정상 관리 중</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>실시간</span>
+                <span>
+                  {finOpsSummary
+                    ? strings.overview.systemAlerts.finopsDynamicTitle(
+                        finOpsSummary.overall_burn_rate_pct,
+                        (finOpsSummary.tenants || []).filter((t) => t.is_blocked).length
+                      )
+                    : strings.overview.systemAlerts.finopsTitle}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
               </div>
               <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                PostgreSQL WORM 감사로그 기준 누적 추론 비용 집계 정상 유지 중
+                {finOpsSummary
+                  ? strings.overview.systemAlerts.finopsDynamicDesc(
+                      finOpsSummary.total_spent_krw,
+                      finOpsSummary.total_budget_krw,
+                      finOpsSummary.active_tenants_count
+                    )
+                  : strings.overview.systemAlerts.finopsDesc}
               </div>
             </div>
           </div>

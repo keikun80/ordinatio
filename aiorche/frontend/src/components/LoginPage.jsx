@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { strings } from '../constants/strings';
 import { 
   ShieldCheck, 
   Lock, 
@@ -26,7 +27,7 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password) {
-      setErrorMessage('사용자명과 비밀번호를 모두 입력해 주십시오.');
+      setErrorMessage(strings.auth.loginErrorEmpty);
       return;
     }
 
@@ -36,7 +37,7 @@ export default function LoginPage() {
     try {
       await login(username.trim(), password);
     } catch (err) {
-      setErrorMessage(err.message || '로그인 인증에 실패했습니다.');
+      setErrorMessage(err.message || strings.auth.loginErrorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -123,15 +124,15 @@ export default function LoginPage() {
             <Layers size={28} />
           </div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--heading-color)', margin: 0 }}>
-            AI Orchestrator
+            {strings.auth.appTitle}
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            고객 자율 운영형 폐쇄망 어플라이언스 콘솔
+            {strings.auth.loginSubtitle}
           </p>
         </div>
 
         {/* Auto-logout alert banner */}
-        {logoutReason === 'inactivity' && (
+        {(logoutReason === 'inactivity' || logoutReason === 'session_expired') && (
           <div 
             style={{
               display: 'flex',
@@ -147,7 +148,7 @@ export default function LoginPage() {
             }}
           >
             <Clock size={16} />
-            <span>30분간 활동이 없어 세션이 안전하게 자동 종료되었습니다.</span>
+            <span>{strings.auth.sessionExpiredNotice}</span>
           </div>
         )}
 
@@ -181,7 +182,7 @@ export default function LoginPage() {
               htmlFor="login-username"
               style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}
             >
-              사용자 아이디 (Username)
+              {strings.auth.usernameLabel}
             </label>
             <div style={{ position: 'relative' }}>
               <div 
@@ -203,7 +204,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="관리자 계정명 (예: admin)"
+                placeholder={strings.auth.usernamePlaceholder}
                 autoComplete="username"
                 disabled={isLoading}
                 style={{
@@ -229,7 +230,7 @@ export default function LoginPage() {
               htmlFor="login-password"
               style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}
             >
-              비밀번호 (Password)
+              {strings.auth.passwordLabel}
             </label>
             <div style={{ position: 'relative' }}>
               <div 
@@ -251,7 +252,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호 입력"
+                placeholder={strings.auth.passwordPlaceholder}
                 autoComplete="current-password"
                 disabled={isLoading}
                 style={{
@@ -284,7 +285,7 @@ export default function LoginPage() {
                   alignItems: 'center',
                   padding: '2px'
                 }}
-                title={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                title={showPassword ? strings.auth.hidePassword : strings.auth.showPassword}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -317,12 +318,12 @@ export default function LoginPage() {
             {isLoading ? (
               <>
                 <Loader2 size={18} className="spin" />
-                <span>보안 인증 진행 중...</span>
+                <span>{strings.auth.authenticating}</span>
               </>
             ) : (
               <>
                 <KeyRound size={18} />
-                <span>안전 로그인</span>
+                <span>{strings.auth.loginButton}</span>
               </>
             )}
           </button>
@@ -341,12 +342,12 @@ export default function LoginPage() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
             <ShieldCheck size={14} color="#38bdf8" />
-            <span>금융권 컴플라이언스 및 세션 보안 표준</span>
+            <span>{strings.auth.complianceTitle}</span>
           </div>
           <ul style={{ paddingLeft: '18px', margin: 0 }}>
-            <li>30분 미활동 시 자동 로그아웃 (슬라이딩 세션 만료)</li>
-            <li>5회 연속 비밀번호 오류 시 15분간 계정 자동 잠금</li>
-            <li>Argon2id 솔트 해싱 및 단일 활성 세션 제어</li>
+            {strings.auth.complianceRules.map((rule, idx) => (
+              <li key={idx}>{rule}</li>
+            ))}
           </ul>
         </div>
 
@@ -367,7 +368,7 @@ export default function LoginPage() {
         >
           <Terminal size={14} color="#a855f7" />
           <span>
-            초기 관리자 계정 설정: <code>make init-admin</code>
+            {strings.auth.initAdminGuide}
           </span>
         </div>
       </div>

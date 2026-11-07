@@ -1,5 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Callable
+
+def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 from fastapi import Depends, HTTPException, status, Header, Cookie, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -8,6 +15,7 @@ from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import decode_access_token
 from app.models.user import User, UserSession
+from app.models.role import Role
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login",
@@ -72,9 +80,10 @@ def get_current_user(
         )
 
     # 2. Account lockout check
-    now = datetime.utcnow()
-    if user.locked_until and user.locked_until > now:
-        remaining_seconds = int((user.locked_until - now).total_seconds())
+    now = datetime.now(timezone.utc)
+    locked_until = _to_utc(user.locked_until)
+    if locked_until and locked_until > now:
+        remaining_seconds = int((locked_until - now).total_seconds())
         remaining_minutes = max(1, (remaining_seconds + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -95,7 +104,8 @@ def get_current_user(
 
     # 4. 30-minute inactivity check (sliding window)
     inactivity_limit = timedelta(minutes=settings.SESSION_INACTIVITY_TIMEOUT_MINUTES)
-    if now - session.last_activity_at > inactivity_limit:
+    last_act = _to_utc(session.last_activity_at)
+    if last_act and (now - last_act > inactivity_limit):
         session.is_revoked = True
         db.commit()
         raise HTTPException(
@@ -122,6 +132,48 @@ def require_roles(allowed_roles: List[str]) -> Callable[[User], User]:
             )
         return current_user
     return role_checker
+
+def require_permission(permission_code: str) -> Callable:
+    """
+    Enforce fine-grained PBAC based on dynamic Role permissions in DB.
+    - SUPER_ADMIN: unrestricted access to all permissions.
+    - Custom / standard roles: check if '*' or permission_code exists in role.permissions.
+    - Unauthenticated requests strictly return 401 Unauthorized across all environments.
+    """
+    def permission_checker(
+        token: Optional[str] = Depends(extract_token_from_request),
+        db: Session = Depends(get_db)
+    ) -> User:
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="인증되지 않은 요청입니다. 로그인이 필요합니다.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        current_user = get_current_user(token=token, db=db)
+        if current_user.role == "SUPER_ADMIN":
+            return current_user
+
+        role = db.query(Role).filter(Role.name == current_user.role).first()
+        perms = role.permissions if role and role.permissions else []
+
+        if "*" in perms or permission_code in perms:
+            return current_user
+
+        if permission_code.endswith(":read"):
+            write_equiv = permission_code.replace(":read", ":write")
+            if write_equiv in perms:
+                return current_user
+            if permission_code == "users:read" and "roles:manage" in perms:
+                return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"접근 권한이 없습니다. (필요 권한: '{permission_code}', 현재 역할: '{current_user.role}')"
+        )
+
+    return permission_checker
 
 def get_tenant_scope(current_user: User = Depends(get_current_user)) -> Optional[str]:
     """

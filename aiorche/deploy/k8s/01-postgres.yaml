@@ -22,7 +22,7 @@ data:
         key_id VARCHAR(64) PRIMARY KEY,
         key_hash VARCHAR(128) NOT NULL UNIQUE,
         key_prefix VARCHAR(16) NOT NULL,
-        tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(tenant_id) ON DELETE RESTRICT,
+        tenant_id VARCHAR(64) REFERENCES tenants(tenant_id) ON DELETE RESTRICT,
         name VARCHAR(128) NOT NULL,
         allowed_models JSONB NOT NULL DEFAULT '[]'::jsonb,
         allowed_ip_cidrs JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -75,32 +75,6 @@ data:
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-
-    -- 초기 테넌트 시드 데이터
-    INSERT INTO tenants (tenant_id, name, department_code, monthly_budget_krw, spent_budget_krw, is_hard_cap_enabled)
-    VALUES
-        ('dept-wm', '자산관리부', 'WM-01', 15000000.00, 2840000.00, TRUE),
-        ('dept-ai-lab', 'AI 혁신 랩', 'AILAB-01', 30000000.00, 5420000.00, FALSE),
-        ('dept-01', '자산관리본부 (WM)', 'WM-100', 10000000.00, 1200000.00, TRUE),
-        ('dept-02', '여신심사부', 'LOAN-200', 5000000.00, 450000.00, TRUE),
-        ('dept-03', '리스크관리부', 'RISK-300', 10000000.00, 950000.00, TRUE)
-    ON CONFLICT (tenant_id) DO NOTHING;
-
-    INSERT INTO model_catalogs (model_id, alias, backend_infra, target_endpoint, input_price_per_1k, output_price_per_1k)
-    VALUES
-        ('meta-llama/Llama-3.1-8B-Instruct', 'financial-advisor-v1', 'EKS', 'http://vllm-llama8b.ai-serving:8000', 0.8000, 2.4000),
-        ('meta-llama/Llama-3.1-8B-FineTuned-v2', 'financial-advisor-canary', 'EKS', 'http://vllm-llama8b-canary.ai-serving:8000', 0.8000, 2.4000),
-        ('meta-llama/Llama-3.1-70B-Instruct', 'deep-risk-evaluator', 'EC2', 'http://10.20.4.12:8000', 3.5000, 10.5000),
-        ('Solar-10.7B-Financial', 'compliance-auditor', 'ECS', 'http://vllm-solar.ai-serving:8000', 1.2000, 3.6000)
-    ON CONFLICT (model_id) DO NOTHING;
-
-    INSERT INTO pii_rules (rule_id, name, entity_type, regex_pattern, confidence_threshold, action)
-    VALUES
-        ('pii-rrn', '주민등록번호', 'RRN', '\d{2}([0]\d|[1][0-2])\d{2}-[1-4]\d{6}', 0.95, 'MASK'),
-        ('pii-account', '은행 계좌번호', 'BANK_ACCOUNT', '(\d{3,6}-\d{2,6}-\d{3,6})', 0.85, 'HASH'),
-        ('pii-card', '신용카드 번호', 'CREDIT_CARD', '\d{4}-\d{4}-\d{4}-\d{4}', 0.90, 'MASK'),
-        ('pii-employee', '사내 행번/사번', 'EMPLOYEE_ID', 'EMP-[A-Z]{2}\d{5}', 0.80, 'BLOCK')
-    ON CONFLICT (rule_id) DO NOTHING;
 ---
 apiVersion: apps/v1
 kind: Deployment

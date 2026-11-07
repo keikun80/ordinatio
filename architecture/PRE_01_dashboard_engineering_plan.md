@@ -6,8 +6,8 @@
 
 > [!IMPORTANT]
 > **순차 구현 시 필수 개발 가이드라인 (Reproducibility & ADR First Invariant)**:  
-> 본 마스터 설계서는 프로젝트 초기 청사진을 포함하고 있으므로, 실제 구현 시에는 폐쇄망/에어갭 경량 최적화가 확정된 **[`PRE_12`](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md)의 13대 아키텍처 결정(ADR-01 ~ ADR-13)**을 최우선 기준으로 채택해야 합니다.  
-> 특히 Phase 2 모델 카탈로그 구현 시에는 후속 고도화 사양인 [`PRE_16`](./PRE_16_gateway_browser_test_troubleshooting_report.md)(45s 타임아웃), [`PRE_17`](./PRE_17_model_provider_options_and_url_builder_report.md)(6종 Provider & URL 조합기), [`PRE_18`](./PRE_18_model_health_check_timeout_report.md)(헬스 타임아웃 1.0~30s)을 사전 통합 모델링하고, Phase 5 완료 후 [`PRE_19`](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md) 및 [`PRE_20`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)(시스템 프롬프트 거버넌스)을 순서대로 진행해야 현재 프로덕션 시스템(78 Tests PASS)과 100% 동일하게 개발할 수 있습니다.
+> 본 마스터 설계서는 프로젝트 초기 청사진을 포함하고 있으므로, 실제 구현 시에는 폐쇄망/에어갭 경량 최적화가 확정된 **[`PRE_12`](./PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)의 17대 아키텍처 결정(ADR-01 ~ ADR-17)**을 최우선 기준으로 채택해야 합니다.  
+> 특히 Phase 2 모델 카탈로그 구현 시에는 후속 고도화 사양인 [`PRE_16`](./PRE_16_gateway_browser_test_troubleshooting_report.md)(45s 타임아웃), [`PRE_17`](./PRE_17_model_provider_options_and_url_builder_report.md)(6종 Provider & URL 조합기), [`PRE_18`](./PRE_18_model_health_check_timeout_report.md)(헬스 타임아웃 1.0~30s)을 사전 통합 모델링하고, Phase 5 완료 후 [`PRE_19`](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md)/[`PRE_20`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)(시스템 프롬프트 거버넌스), [`PRE_26`](./PRE_26_user_authentication_and_rbac_specification.md)/[`PRE_27`](./PRE_27_auth_rbac_implementation_plan_and_test_results.md)(금융권 RBAC), [`PRE_31`](./PRE_31_rhel_compatible_vagrant_installer_plan.md)/[`PRE_32`](./PRE_32_standalone_installer_implementation_and_test_results.md)(Standalone 무인 설치기), [`PRE_34`](./PRE_34_frontend_ui_strings_localization_plan.md)/[`PRE_35`](./PRE_35_frontend_ui_strings_implementation_and_test_results.md)(strings.js 현지화)를 순서대로 진행해야 현재 프로덕션 시스템(86 Tests PASS, Standalone 7/7 PASS)과 100% 동일하게 개발할 수 있습니다.
 
 ---
 
@@ -209,7 +209,7 @@ CREATE TABLE patch_histories (
 
 소프트웨어 공학의 애자일(Iterative & Incremental) 개발 방식을 적용하여 7개 단계로 분할 구현합니다.
 
-> **현재 진행 상태**: Phase 0, Phase 0.1, Phase 1 ~ Phase 5 구현 완료 ✅ | Phase 6 미구현 🚧
+> **현재 진행 상태**: Phase 0 ~ Phase 6 (Standalone 무인 배포, 종합 보안 하드닝, strings.js 현지화) 구현 완료 ✅ | 상용화 엔터프라이즈 확장(PRE_28) 계획 수립 🚧
 
 ```
 ✅ [Phase 0: 기반 환경 구축] ──► ✅ [Phase 0.1: Envoy AI Gateway & AgentRouter]
@@ -220,7 +220,7 @@ CREATE TABLE patch_histories (
                                                                                 │
 ┌─────────────────────────────────────────────────────────────────────────────┘
 ▼
-✅ [Phase 4: PII & 감사 연동]   ──► ✅ [Phase 5: 에어갭 패치 엔진] ──► 🚧 [Phase 6: E2E 통합 릴리즈]
+✅ [Phase 4: PII & 감사 연동]   ──► ✅ [Phase 5: 에어갭 패치 엔진] ──► ✅ [Phase 6: Standalone & 보안 패키징]
 ```
 
 ---
@@ -447,7 +447,7 @@ ai-orchestrator-admin-v1.2.0-offline.tar.gz
 | **Phase 3** | 관제, FinOps 과금 및 Prometheus/Grafana 통합 | ✅ 완료 | `verify-phase3.sh` 통과 |
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `verify-phase4.sh` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `verify-phase5.sh` 100% 통과 |
-| **Phase 6** | E2E 통합 검증, 보안 감사 및 에어갭 패키징 | 🚧 미구현 | — |
+| **Phase 6** | Standalone 무인 패키징, 종합 보안 감사, UI strings.js 현지화 | ✅ 완료 | `make verify-standalone-install` (7/7 PASS), 86개 테스트 통과 |
 
 - **산출물 위치**: `./PRE_01_dashboard_engineering_plan.md`
-- **다음 추천 액션**: **Phase 6 (E2E 통합 검증, 보안 감사 및 에어갭 패키징)** 구현 진행.
+- **다음 추천 액션**: **차세대 엔터프라이즈 상용화 확장 (PRE_28: 오프라인 DRM 라이선스, Helm Chart, 시맨틱 캐싱)** 구현 진행.

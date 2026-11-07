@@ -17,20 +17,38 @@ import {
   RefreshCw,
   Building2,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Pencil,
+  Shield,
+  Plus,
+  CheckSquare,
+  Square
 } from 'lucide-react';
+import { strings } from '../constants/strings';
 
-export default function UsersTab({ onNotify }) {
-  const { user: currentUser } = useAuth();
+export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
+  const { user: currentUser, isSuperAdmin, hasPermission } = useAuth();
+  const canWriteUsers = isSuperAdmin || hasPermission('users:write');
+  const canManageRoles = isSuperAdmin || hasPermission('roles:manage');
+  const [subTab, setSubTab] = useState(defaultSubTab); // 'users' | 'roles'
+
+  useEffect(() => {
+    if (defaultSubTab) {
+      setSubTab(defaultSubTab);
+    }
+  }, [defaultSubTab]);
   const [users, setUsers] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [availablePermissions, setAvailablePermissions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
-  // Modals state
+  // Modals state (Users)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [targetUser, setTargetUser] = useState(null);
 
   // Form states for Create User
@@ -43,24 +61,50 @@ export default function UsersTab({ onNotify }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [modalError, setModalError] = useState('');
 
+  // Form states for Edit User & Role
+  const [editUserId, setEditUserId] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editFullName, setEditFullName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState('TENANT_ADMIN');
+  const [editTenantId, setEditTenantId] = useState('');
+
   // Form state for Reset Password
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
 
+  // Role Management State
+  const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false);
+  const [isEditRoleModalOpen, setIsEditRoleModalOpen] = useState(false);
+  const [roleFormName, setRoleFormName] = useState('');
+  const [roleFormDisplayName, setRoleFormDisplayName] = useState('');
+  const [roleFormDesc, setRoleFormDesc] = useState('');
+  const [roleFormPermissions, setRoleFormPermissions] = useState([]);
+  const [roleModalError, setRoleModalError] = useState('');
+  const [editRoleId, setEditRoleId] = useState('');
+  const [isSystemRole, setIsSystemRole] = useState(false);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [userList, tenantList] = await Promise.all([
+      const [userList, tenantList, roleList, permList] = await Promise.all([
         apiClient.getUsers(),
-        apiClient.getTenants()
+        apiClient.getTenants(),
+        apiClient.getRoles(),
+        apiClient.getRolePermissions()
       ]);
       setUsers(userList || []);
       setTenants(tenantList || []);
+      setRoles(roleList || []);
+      setAvailablePermissions(permList || []);
       if (tenantList && tenantList.length > 0 && !newTenantId) {
         setNewTenantId(tenantList[0].tenant_id);
       }
+      if (roleList && roleList.length > 0 && !newRole) {
+        setNewRole(roleList[0].name);
+      }
     } catch (err) {
-      if (onNotify) onNotify('error', err.message || '사용자 목록 로드 실패');
+      if (onNotify) onNotify('error', strings.users.alerts.loadFailed(err.message));
     } finally {
       setIsLoading(false);
     }
@@ -75,15 +119,15 @@ export default function UsersTab({ onNotify }) {
     setModalError('');
 
     if (!newUsername.trim() || !newFullName.trim() || !newEmail.trim() || !newPassword) {
-      setModalError('모든 필수 항목을 입력해 주십시오.');
+      setModalError(strings.users.modal.errRequiredFields);
       return;
     }
     if (newPassword.length < 8) {
-      setModalError('비밀번호는 최소 8자 이상이어야 합니다.');
+      setModalError(strings.users.modal.errPasswordMinLength);
       return;
     }
     if (newPassword !== confirmPassword) {
-      setModalError('비밀번호가 일치하지 않습니다.');
+      setModalError(strings.users.modal.errPasswordMismatch);
       return;
     }
 
@@ -97,7 +141,7 @@ export default function UsersTab({ onNotify }) {
         password: newPassword
       });
 
-      if (onNotify) onNotify('success', `신규 사용자 '${newUsername}' 계정이 생성되었습니다.`);
+      if (onNotify) onNotify('success', strings.users.alerts.created(newUsername));
       setIsCreateModalOpen(false);
       setNewUsername('');
       setNewFullName('');
@@ -106,7 +150,7 @@ export default function UsersTab({ onNotify }) {
       setConfirmPassword('');
       loadData();
     } catch (err) {
-      setModalError(err.message || '사용자 생성에 실패했습니다.');
+      setModalError(strings.users.alerts.createFailed(err.message));
     }
   };
 
@@ -115,23 +159,67 @@ export default function UsersTab({ onNotify }) {
     setModalError('');
 
     if (!resetNewPassword || resetNewPassword.length < 8) {
-      setModalError('신규 비밀번호는 최소 8자 이상이어야 합니다.');
+      setModalError(strings.users.modal.errNewPasswordMinLength);
       return;
     }
     if (resetNewPassword !== resetConfirmPassword) {
-      setModalError('비밀번호가 일치하지 않습니다.');
+      setModalError(strings.users.modal.errPasswordMismatch);
       return;
     }
 
     try {
       await apiClient.resetUserPassword(targetUser.id, resetNewPassword);
-      if (onNotify) onNotify('success', `'${targetUser.username}' 계정 비밀번호가 성공적으로 초기화되었습니다.`);
+      if (onNotify) onNotify('success', strings.users.alerts.pwResetSuccess(targetUser.username));
       setIsResetPasswordModalOpen(false);
       setTargetUser(null);
       setResetNewPassword('');
       setResetConfirmPassword('');
     } catch (err) {
-      setModalError(err.message || '비밀번호 초기화 실패');
+      setModalError(strings.users.alerts.pwResetFailed(err.message));
+    }
+  };
+
+  const openEditModal = (u) => {
+    setTargetUser(u);
+    setEditUserId(u.id);
+    setEditUsername(u.username);
+    setEditFullName(u.full_name || '');
+    setEditEmail(u.email || '');
+    setEditRole(u.role || 'TENANT_ADMIN');
+    setEditTenantId(u.tenant_id || (tenants[0]?.tenant_id || ''));
+    setModalError('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    setModalError('');
+
+    if (!editFullName.trim() || !editEmail.trim()) {
+      setModalError(strings.users.modal.errRequiredFields);
+      return;
+    }
+
+    // Safety guard: prevent demoting current super admin self
+    if (currentUser?.id === editUserId && currentUser?.role === 'SUPER_ADMIN' && editRole !== 'SUPER_ADMIN') {
+      setModalError(strings.users.alerts.cannotDemoteSelf);
+      return;
+    }
+
+    try {
+      await apiClient.updateUser(editUserId, {
+        full_name: editFullName.trim(),
+        email: editEmail.trim(),
+        role: editRole,
+        tenant_id: editRole === 'SUPER_ADMIN' ? '' : editTenantId
+      });
+
+      if (onNotify) onNotify('success', strings.users.alerts.updatedSuccess(editUsername));
+      setIsEditModalOpen(false);
+      setTargetUser(null);
+      loadData();
+    } catch (err) {
+      setModalError(strings.users.alerts.updateFailed(err.message));
     }
   };
 
@@ -141,10 +229,10 @@ export default function UsersTab({ onNotify }) {
         is_active: true,
         unlock_account: true
       });
-      if (onNotify) onNotify('success', `'${u.username}' 계정 잠금이 성공적으로 해제되었습니다.`);
+      if (onNotify) onNotify('success', strings.users.alerts.unlockedSuccess(u.username));
       loadData();
     } catch (err) {
-      if (onNotify) onNotify('error', err.message || '계정 잠금 해제 실패');
+      if (onNotify) onNotify('error', strings.users.alerts.unlockedFailed(err.message));
     }
   };
 
@@ -152,30 +240,154 @@ export default function UsersTab({ onNotify }) {
     try {
       const nextActive = !u.is_active;
       await apiClient.updateUser(u.id, { is_active: nextActive });
-      if (onNotify) onNotify('success', `'${u.username}' 계정 상태가 ${nextActive ? '활성화' : '비활성화'}되었습니다.`);
+      if (onNotify) onNotify('success', strings.users.alerts.statusChanged(u.username, nextActive));
       loadData();
     } catch (err) {
-      if (onNotify) onNotify('error', err.message || '계정 상태 변경 실패');
+      if (onNotify) onNotify('error', strings.users.alerts.statusChangeFailed(err.message));
     }
   };
 
   const handleDeleteUser = async (u) => {
     if (u.id === currentUser?.id) {
-      if (onNotify) onNotify('warning', '현재 로그인 중인 본인 계정은 삭제할 수 없습니다.');
+      if (onNotify) onNotify('warning', strings.users.alerts.cannotDeleteSelf);
       return;
     }
-    if (!window.confirm(`정말로 사용자 '${u.username}' (${u.full_name}) 계정을 삭제하시겠습니까?`)) {
+    if (!window.confirm(strings.users.alerts.deleteConfirm(u.username, u.full_name))) {
       return;
     }
 
     try {
       await apiClient.deleteUser(u.id);
-      if (onNotify) onNotify('success', `'${u.username}' 계정이 삭제되었습니다.`);
+      if (onNotify) onNotify('success', strings.users.alerts.deletedSuccess(u.username));
       loadData();
     } catch (err) {
-      if (onNotify) onNotify('error', err.message || '사용자 삭제 실패');
+      if (onNotify) onNotify('error', strings.users.alerts.deleteFailed(err.message));
     }
   };
+
+  // --- Role Management Handlers ---
+  const openCreateRoleModal = () => {
+    setRoleFormName('');
+    setRoleFormDisplayName('');
+    setRoleFormDesc('');
+    setRoleFormPermissions([]);
+    setRoleModalError('');
+    setIsCreateRoleModalOpen(true);
+  };
+
+  const openEditRoleModal = (r) => {
+    setEditRoleId(r.id || r.name);
+    setRoleFormName(r.name);
+    setRoleFormDisplayName(r.display_name || '');
+    setRoleFormDesc(r.description || '');
+    setRoleFormPermissions(r.permissions || []);
+    setIsSystemRole(r.is_system || false);
+    setRoleModalError('');
+    setIsEditRoleModalOpen(true);
+  };
+
+  const togglePermission = (code) => {
+    setRoleFormPermissions((prev) => 
+      prev.includes(code) ? prev.filter((p) => p !== code) : [...prev, code]
+    );
+  };
+
+  const selectAllPermissions = () => {
+    setRoleFormPermissions(availablePermissions.map((p) => p.code));
+  };
+
+  const deselectAllPermissions = () => {
+    setRoleFormPermissions([]);
+  };
+
+  const handleCreateRole = async (e) => {
+    e.preventDefault();
+    setRoleModalError('');
+
+    const normName = roleFormName.trim().toUpperCase();
+    if (!normName) {
+      setRoleModalError(strings.roles.modal.errNameRequired);
+      return;
+    }
+    if (!/^[A-Z0-9_]{2,64}$/.test(normName)) {
+      setRoleModalError(strings.roles.modal.errNameFormat);
+      return;
+    }
+    if (!roleFormDisplayName.trim()) {
+      setRoleModalError(strings.roles.modal.errDisplayNameRequired);
+      return;
+    }
+    if (roleFormPermissions.length === 0) {
+      setRoleModalError(strings.roles.modal.errPermRequired);
+      return;
+    }
+
+    try {
+      await apiClient.createRole({
+        name: normName,
+        display_name: roleFormDisplayName.trim(),
+        description: roleFormDesc.trim() || null,
+        permissions: roleFormPermissions
+      });
+      if (onNotify) onNotify('success', strings.roles.alerts.created(normName));
+      setIsCreateRoleModalOpen(false);
+      loadData();
+    } catch (err) {
+      setRoleModalError(strings.roles.alerts.createFailed(err.message));
+    }
+  };
+
+  const handleUpdateRole = async (e) => {
+    e.preventDefault();
+    setRoleModalError('');
+
+    if (!roleFormDisplayName.trim()) {
+      setRoleModalError(strings.roles.modal.errDisplayNameRequired);
+      return;
+    }
+
+    try {
+      await apiClient.updateRole(editRoleId, {
+        display_name: roleFormDisplayName.trim(),
+        description: roleFormDesc.trim() || null,
+        permissions: roleFormPermissions
+      });
+      if (onNotify) onNotify('success', strings.roles.alerts.updated(roleFormName));
+      setIsEditRoleModalOpen(false);
+      loadData();
+    } catch (err) {
+      setRoleModalError(strings.roles.alerts.updateFailed(err.message));
+    }
+  };
+
+  const handleDeleteRole = async (r) => {
+    if (r.is_system) {
+      if (onNotify) onNotify('warning', strings.roles.table.systemRoleNoDelete);
+      return;
+    }
+    if ((r.user_count || 0) > 0) {
+      if (onNotify) onNotify('warning', strings.roles.table.inUseNoDelete(r.user_count));
+      return;
+    }
+    if (!window.confirm(strings.roles.alerts.deleteConfirm(r.name, r.display_name))) {
+      return;
+    }
+
+    try {
+      await apiClient.deleteRole(r.id || r.name);
+      if (onNotify) onNotify('success', strings.roles.alerts.deleted(r.name));
+      loadData();
+    } catch (err) {
+      if (onNotify) onNotify('error', strings.roles.alerts.deleteFailed(err.message));
+    }
+  };
+
+  const permissionsByCategory = availablePermissions.reduce((acc, p) => {
+    const cat = p.category || strings.roles.table.categoryEtc;
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(p);
+    return acc;
+  }, {});
 
   // Filter users
   const filteredUsers = users.filter((u) => {
@@ -190,78 +402,160 @@ export default function UsersTab({ onNotify }) {
   const superAdminCount = users.filter((u) => u.role === 'SUPER_ADMIN').length;
   const tenantAdminCount = users.filter((u) => u.role === 'TENANT_ADMIN').length;
   const viewerCount = users.filter((u) => u.role === 'VIEWER').length;
+  const customRoleCount = users.filter((u) => !['SUPER_ADMIN', 'TENANT_ADMIN', 'VIEWER'].includes(u.role)).length;
   const lockedCount = users.filter((u) => u.is_locked).length;
 
   return (
     <div className="tab-pane active" data-screen-id="SCR-ADM-01">
       {/* Page Header */}
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Users size={24} color="#38bdf8" />
+            {subTab === 'users' ? <Users size={24} color="#38bdf8" /> : <ShieldCheck size={24} color="#c084fc" />}
             <h2 style={{ fontSize: '1.45rem', fontWeight: 700, margin: 0, color: 'var(--heading-color)' }}>
-              사용자 및 권한 관리 (RBAC)
+              {subTab === 'users' ? strings.users.headerTitle : strings.roles.headerTitle}
             </h2>
           </div>
           <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            폐쇄망 제어 평면 역할 기반 접근 통제(SUPER_ADMIN, TENANT_ADMIN, VIEWER) 및 세션 보안 관리
+            {subTab === 'users' ? strings.users.headerSubtitle : strings.roles.headerSubtitle}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {((subTab === 'users' && !canWriteUsers) || (subTab === 'roles' && !canManageRoles)) && (
+            <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+              {strings.virtualKeys.readOnlyBadge}
+            </span>
+          )}
           <button 
             className="btn-secondary"
             onClick={loadData}
-            title="새로고침"
+            title={strings.common.refresh}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <RefreshCw size={14} />
-            <span>새로고침</span>
+            <span>{strings.common.refresh}</span>
           </button>
-          <button
-            className="btn-primary"
-            data-testid="users-btn-create-modal"
-            onClick={() => {
-              setModalError('');
-              setIsCreateModalOpen(true);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <UserPlus size={16} />
-            <span>신규 사용자 등록</span>
-          </button>
+          {subTab === 'users' ? (
+            <button
+              className="btn-primary"
+              data-testid="users-btn-create-modal"
+              disabled={!canWriteUsers}
+              onClick={() => {
+                if (!canWriteUsers) return;
+                setModalError('');
+                setIsCreateModalOpen(true);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: canWriteUsers ? 1 : 0.45, cursor: canWriteUsers ? 'pointer' : 'not-allowed' }}
+            >
+              <UserPlus size={16} />
+              <span>{strings.users.btnCreateUser}</span>
+            </button>
+          ) : (
+            <button
+              className="btn-primary"
+              data-testid="roles-btn-create-modal"
+              disabled={!canManageRoles}
+              onClick={() => canManageRoles && openCreateRoleModal()}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)', opacity: canManageRoles ? 1 : 0.45, cursor: canManageRoles ? 'pointer' : 'not-allowed' }}
+            >
+              <Plus size={16} />
+              <span>{strings.roles.btnAddRole}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KPI Stats Row */}
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', marginBottom: '24px' }}>
+      {/* Sub-Tab Navigation (Users vs Roles) */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '22px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+        <button
+          type="button"
+          data-testid="users-subtab-users"
+          onClick={() => setSubTab('users')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: subTab === 'users' ? '1px solid #38bdf8' : '1px solid transparent',
+            background: subTab === 'users' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+            color: subTab === 'users' ? '#38bdf8' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Users size={16} />
+          <span>{strings.roles.subTabUsers}</span>
+          <span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '10px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}>
+            {users.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="users-subtab-roles"
+          onClick={() => setSubTab('roles')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: subTab === 'roles' ? '1px solid #c084fc' : '1px solid transparent',
+            background: subTab === 'roles' ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
+            color: subTab === 'roles' ? '#c084fc' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <ShieldCheck size={16} />
+          <span>{strings.roles.subTabRoles}</span>
+          <span style={{ fontSize: '0.72rem', padding: '2px 7px', borderRadius: '10px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-primary)' }}>
+            {roles.length}
+          </span>
+        </button>
+      </div>
+
+      {subTab === 'users' ? (
+        <>
+          {/* KPI Stats Row */}
+          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
         <div className="kpi-card card">
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>총 등록 계정</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.users.kpi.totalAccounts}</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--heading-color)', marginTop: '4px' }}>
             {users.length}
           </div>
         </div>
         <div className="kpi-card card">
-          <div style={{ fontSize: '0.75rem', color: '#c084fc' }}>전사 최고 관리자 (Super)</div>
+          <div style={{ fontSize: '0.75rem', color: '#c084fc' }}>{strings.users.kpi.superAdmin}</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#c084fc', marginTop: '4px' }}>
             {superAdminCount}
           </div>
         </div>
         <div className="kpi-card card">
-          <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>테넌트 관리자 (Tenant Admin)</div>
+          <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{strings.users.kpi.tenantAdmin}</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#38bdf8', marginTop: '4px' }}>
             {tenantAdminCount}
           </div>
         </div>
         <div className="kpi-card card">
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>일반 뷰어 (Viewer)</div>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{strings.users.kpi.viewer}</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#94a3b8', marginTop: '4px' }}>
             {viewerCount}
           </div>
         </div>
         <div className="kpi-card card">
+          <div style={{ fontSize: '0.75rem', color: '#34d399' }}>{strings.users.kpi.customRoles}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#34d399', marginTop: '4px' }}>
+            {customRoleCount}
+          </div>
+        </div>
+        <div className="kpi-card card">
           <div style={{ fontSize: '0.75rem', color: lockedCount > 0 ? '#f43f5e' : '#10b981' }}>
-            보안 잠금 계정 (Lockout)
+            {strings.users.kpi.lockout}
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, color: lockedCount > 0 ? '#f43f5e' : '#10b981', marginTop: '4px' }}>
             {lockedCount}
@@ -276,7 +570,7 @@ export default function UsersTab({ onNotify }) {
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="사용자명, 성명, 이메일 검색..."
+              placeholder={strings.users.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -305,10 +599,12 @@ export default function UsersTab({ onNotify }) {
                 fontSize: '0.85rem'
               }}
             >
-              <option value="ALL">모든 권한 역할</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN (전사 최고관리자)</option>
-              <option value="TENANT_ADMIN">TENANT_ADMIN (부서 관리자)</option>
-              <option value="VIEWER">VIEWER (조회 전용)</option>
+              <option value="ALL">{strings.users.filterAllRoles}</option>
+              {roles.map((r) => (
+                <option key={r.name} value={r.name}>
+                  {r.display_name} ({r.name})
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -320,27 +616,27 @@ export default function UsersTab({ onNotify }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '14px 18px' }}>사용자명 / 성명</th>
-                <th style={{ padding: '14px 18px' }}>이메일</th>
-                <th style={{ padding: '14px 18px' }}>권한 역할</th>
-                <th style={{ padding: '14px 18px' }}>소속 테넌트</th>
-                <th style={{ padding: '14px 18px' }}>계정 상태</th>
-                <th style={{ padding: '14px 18px' }}>보안 잠금</th>
-                <th style={{ padding: '14px 18px' }}>최종 로그인</th>
-                <th style={{ padding: '14px 18px', textAlign: 'right' }}>관리 액션</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colUsername}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colEmail}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colRole}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colTenant}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colStatus}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colLocked}</th>
+                <th style={{ padding: '14px 18px' }}>{strings.users.table.colLastLogin}</th>
+                <th style={{ padding: '14px 18px', textAlign: 'right' }}>{strings.users.table.colActions}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
                   <td colSpan="8" style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    사용자 계정 목록을 불러오는 중...
+                    {strings.users.table.loading}
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    조건에 일치하는 사용자가 없습니다.
+                    {strings.users.table.empty}
                   </td>
                 </tr>
               ) : (
@@ -356,7 +652,7 @@ export default function UsersTab({ onNotify }) {
                           <span>{u.username}</span>
                           {isCurrent && (
                             <span style={{ fontSize: '0.65rem', padding: '1px 6px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', borderRadius: '4px' }}>
-                              본인
+                              {strings.users.table.currentUserBadge}
                             </span>
                           )}
                         </div>
@@ -368,21 +664,41 @@ export default function UsersTab({ onNotify }) {
                         {u.email}
                       </td>
                       <td style={{ padding: '14px 18px' }}>
-                        {u.role === 'SUPER_ADMIN' && (
-                          <span style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.18)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', fontWeight: 600, fontSize: '0.75rem' }}>
-                            SUPER_ADMIN
-                          </span>
-                        )}
-                        {u.role === 'TENANT_ADMIN' && (
-                          <span style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.18)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 600, fontSize: '0.75rem' }}>
-                            TENANT_ADMIN
-                          </span>
-                        )}
-                        {u.role === 'VIEWER' && (
-                          <span style={{ padding: '3px 8px', borderRadius: '4px', background: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.25)', fontSize: '0.75rem' }}>
-                            VIEWER
-                          </span>
-                        )}
+                        {(() => {
+                          const roleMeta = roles.find((r) => r.name === u.role);
+                          const isSuper = u.role === 'SUPER_ADMIN';
+                          const isTenant = u.role === 'TENANT_ADMIN';
+                          const isViewer = u.role === 'VIEWER';
+                          const bg = isSuper
+                            ? 'rgba(168, 85, 247, 0.18)'
+                            : isTenant
+                            ? 'rgba(56, 189, 248, 0.18)'
+                            : isViewer
+                            ? 'rgba(148, 163, 184, 0.15)'
+                            : 'rgba(16, 185, 129, 0.16)';
+                          const color = isSuper
+                            ? '#c084fc'
+                            : isTenant
+                            ? '#38bdf8'
+                            : isViewer
+                            ? '#94a3b8'
+                            : '#34d399';
+                          const border = isSuper
+                            ? '1px solid rgba(168, 85, 247, 0.3)'
+                            : isTenant
+                            ? '1px solid rgba(56, 189, 248, 0.3)'
+                            : isViewer
+                            ? '1px solid rgba(148, 163, 184, 0.25)'
+                            : '1px solid rgba(16, 185, 129, 0.3)';
+                          return (
+                            <span
+                              title={roleMeta?.display_name || u.role}
+                              style={{ padding: '3px 8px', borderRadius: '4px', background: bg, color, border, fontWeight: 600, fontSize: '0.75rem' }}
+                            >
+                              {roleMeta ? `${roleMeta.display_name} (${u.role})` : u.role}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>
                         {u.tenant_name ? (
@@ -391,19 +707,19 @@ export default function UsersTab({ onNotify }) {
                             <span>{u.tenant_name}</span>
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>전사 공통 (Global)</span>
+                          <span style={{ color: 'var(--text-muted)' }}>{strings.users.table.globalTenant}</span>
                         )}
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         {u.is_active ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.78rem' }}>
                             <CheckCircle2 size={13} />
-                            <span>정상 활성</span>
+                            <span>{strings.users.table.statusActive}</span>
                           </span>
                         ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontSize: '0.78rem' }}>
                             <XCircle size={13} />
-                            <span>비활성</span>
+                            <span>{strings.users.table.statusInactive}</span>
                           </span>
                         )}
                       </td>
@@ -411,30 +727,32 @@ export default function UsersTab({ onNotify }) {
                         {u.is_locked ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f43f5e', fontWeight: 600, fontSize: '0.78rem' }}>
                             <Lock size={13} />
-                            <span>15분 잠금 ({u.failed_login_attempts}회 오류)</span>
+                            <span>{strings.users.table.lockedNotice(u.failed_login_attempts)}</span>
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                            정상 ({u.failed_login_attempts || 0}/5)
+                            {strings.users.table.normalAttempts(u.failed_login_attempts || 0)}
                           </span>
                         )}
                       </td>
                       <td style={{ padding: '14px 18px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                        {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '미접속'}
+                        {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : strings.users.table.neverLoggedIn}
                       </td>
                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '8px' }}>
                           {u.is_locked && (
                             <button
-                              onClick={() => handleUnlockAccount(u)}
-                              title="계정 잠금 해제"
+                              disabled={!canWriteUsers}
+                              onClick={() => canWriteUsers && handleUnlockAccount(u)}
+                              title={strings.users.table.btnUnlockTitle}
                               style={{
                                 padding: '6px 10px',
                                 background: 'rgba(244, 63, 94, 0.15)',
                                 border: '1px solid rgba(244, 63, 94, 0.3)',
                                 borderRadius: 'var(--radius-sm)',
                                 color: '#f43f5e',
-                                cursor: 'pointer',
+                                cursor: canWriteUsers ? 'pointer' : 'not-allowed',
+                                opacity: canWriteUsers ? 1 : 0.4,
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
@@ -442,24 +760,45 @@ export default function UsersTab({ onNotify }) {
                               }}
                             >
                               <Unlock size={13} />
-                              <span>잠금 해제</span>
+                              <span>{strings.users.table.btnUnlock}</span>
                             </button>
                           )}
 
                           <button
+                            disabled={!canWriteUsers}
+                            onClick={() => canWriteUsers && openEditModal(u)}
+                            data-testid={`users-btn-edit-${u.id}`}
+                            title={strings.users.table.btnEditTitle}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(168, 85, 247, 0.12)',
+                              border: '1px solid rgba(168, 85, 247, 0.25)',
+                              borderRadius: 'var(--radius-sm)',
+                              color: '#c084fc',
+                              cursor: canWriteUsers ? 'pointer' : 'not-allowed',
+                              opacity: canWriteUsers ? 1 : 0.4
+                            }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+
+                          <button
+                            disabled={!canWriteUsers}
                             onClick={() => {
+                              if (!canWriteUsers) return;
                               setModalError('');
                               setTargetUser(u);
                               setIsResetPasswordModalOpen(true);
                             }}
-                            title="비밀번호 초기화"
+                            title={strings.users.table.btnResetPwTitle}
                             style={{
                               padding: '6px 8px',
                               background: 'rgba(56, 189, 248, 0.12)',
                               border: '1px solid rgba(56, 189, 248, 0.25)',
                               borderRadius: 'var(--radius-sm)',
                               color: '#38bdf8',
-                              cursor: 'pointer'
+                              cursor: canWriteUsers ? 'pointer' : 'not-allowed',
+                              opacity: canWriteUsers ? 1 : 0.4
                             }}
                           >
                             <KeyRound size={14} />
@@ -468,30 +807,34 @@ export default function UsersTab({ onNotify }) {
                           {!isCurrent && (
                             <>
                               <button
-                                onClick={() => handleToggleActive(u)}
-                                title={u.is_active ? '계정 비활성화' : '계정 활성화'}
+                                disabled={!canWriteUsers}
+                                onClick={() => canWriteUsers && handleToggleActive(u)}
+                                title={u.is_active ? strings.users.table.btnDeactivateTitle : strings.users.table.btnActivateTitle}
                                 style={{
                                   padding: '6px 8px',
                                   background: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid var(--border-subtle)',
                                   borderRadius: 'var(--radius-sm)',
                                   color: u.is_active ? '#fbbf24' : '#10b981',
-                                  cursor: 'pointer'
+                                  cursor: canWriteUsers ? 'pointer' : 'not-allowed',
+                                  opacity: canWriteUsers ? 1 : 0.4
                                 }}
                               >
                                 {u.is_active ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
                               </button>
 
                               <button
-                                onClick={() => handleDeleteUser(u)}
-                                title="사용자 삭제"
+                                disabled={!canWriteUsers}
+                                onClick={() => canWriteUsers && handleDeleteUser(u)}
+                                title={strings.users.table.btnDeleteTitle}
                                 style={{
                                   padding: '6px 8px',
                                   background: 'rgba(239, 68, 68, 0.12)',
                                   border: '1px solid rgba(239, 68, 68, 0.25)',
                                   borderRadius: 'var(--radius-sm)',
                                   color: '#f87171',
-                                  cursor: 'pointer'
+                                  cursor: canWriteUsers ? 'pointer' : 'not-allowed',
+                                  opacity: canWriteUsers ? 1 : 0.4
                                 }}
                               >
                                 <Trash2 size={14} />
@@ -508,6 +851,155 @@ export default function UsersTab({ onNotify }) {
           </table>
         </div>
       </div>
+    </>
+  ) : (
+    <>
+      {/* KPI Stats Row for Roles */}
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+        <div className="kpi-card card">
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.roles.stats.totalRoles}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--heading-color)', marginTop: '4px' }}>
+            {roles.length}
+          </div>
+        </div>
+        <div className="kpi-card card">
+          <div style={{ fontSize: '0.75rem', color: '#c084fc' }}>{strings.roles.stats.systemRoles}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#c084fc', marginTop: '4px' }}>
+            {roles.filter((r) => r.is_system).length}
+          </div>
+        </div>
+        <div className="kpi-card card">
+          <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{strings.roles.stats.customRoles}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#38bdf8', marginTop: '4px' }}>
+            {roles.filter((r) => !r.is_system).length}
+          </div>
+        </div>
+        <div className="kpi-card card">
+          <div style={{ fontSize: '0.75rem', color: '#10b981' }}>{strings.roles.stats.totalPerms}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>
+            {availablePermissions.length}
+          </div>
+        </div>
+      </div>
+
+      {/* Roles Table Card */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={18} color="#c084fc" />
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--heading-color)' }}>
+              {strings.roles.headerTitle}
+            </h3>
+          </div>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            {strings.roles.headerSubtitle}
+          </span>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table" data-testid="roles-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(15, 23, 42, 0.4)', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colName}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colDisplayName}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colDesc}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colType}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colPermCount}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colUserCount}</th>
+                <th style={{ padding: '12px 18px' }}>{strings.roles.table.colCreatedAt}</th>
+                <th style={{ padding: '12px 18px', textAlign: 'right' }}>{strings.roles.table.colActions}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roles.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {strings.common.noData}
+                  </td>
+                </tr>
+              ) : (
+                roles.map((r) => (
+                  <tr 
+                    key={r.id || r.name} 
+                    data-testid={`role-row-${r.name}`}
+                    style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                  >
+                    <td style={{ padding: '14px 18px', fontWeight: 700, color: 'var(--heading-color)' }}>
+                      <code>{r.name}</code>
+                    </td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {r.display_name}
+                    </td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)', fontSize: '0.82rem', maxWidth: '300px' }}>
+                      {r.description || '-'}
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      {r.is_system ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', fontWeight: 600 }}>
+                          <Shield size={11} />
+                          {strings.roles.table.typeSystem}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 600 }}>
+                          {strings.roles.table.typeCustom}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', fontWeight: 600 }}>
+                        {r.permissions?.includes('*') ? strings.roles.modal.selectAll : strings.roles.table.permCountUnit(r.permissions?.length || 0)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', borderRadius: '10px', background: (r.user_count || 0) > 0 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.05)', color: (r.user_count || 0) > 0 ? '#38bdf8' : 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
+                        <Users size={12} />
+                        {strings.roles.table.userCountUnit(r.user_count || 0)}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 18px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      {r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}
+                    </td>
+                    <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        <button
+                          className="btn-icon"
+                          data-testid={`role-btn-edit-${r.name}`}
+                          disabled={!canManageRoles}
+                          title={strings.roles.table.btnEdit}
+                          onClick={() => canManageRoles && openEditRoleModal(r)}
+                          style={{ color: '#38bdf8', padding: '6px 8px', borderRadius: 'var(--radius-sm)', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', cursor: canManageRoles ? 'pointer' : 'not-allowed', opacity: canManageRoles ? 1 : 0.35 }}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          className="btn-icon"
+                          data-testid={`role-btn-delete-${r.name}`}
+                          title={r.is_system ? strings.roles.table.systemRoleNoDelete : (r.user_count || 0) > 0 ? strings.roles.table.inUseNoDelete(r.user_count) : strings.roles.table.btnDelete}
+                          disabled={!canManageRoles || r.is_system || (r.user_count || 0) > 0}
+                          onClick={() => canManageRoles && handleDeleteRole(r)}
+                          style={{
+                            color: !canManageRoles || r.is_system || (r.user_count || 0) > 0 ? 'var(--text-muted)' : '#f43f5e',
+                            padding: '6px 8px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: !canManageRoles || r.is_system || (r.user_count || 0) > 0 ? 'transparent' : 'rgba(244, 63, 94, 0.1)',
+                            border: !canManageRoles || r.is_system || (r.user_count || 0) > 0 ? '1px solid transparent' : '1px solid rgba(244, 63, 94, 0.25)',
+                            cursor: !canManageRoles || r.is_system || (r.user_count || 0) > 0 ? 'not-allowed' : 'pointer',
+                            opacity: !canManageRoles || r.is_system || (r.user_count || 0) > 0 ? 0.35 : 1
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )}
 
       {/* Modal 1: Create New User */}
       {isCreateModalOpen && (
@@ -540,7 +1032,7 @@ export default function UsersTab({ onNotify }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UserPlus size={20} color="#38bdf8" />
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--heading-color)' }}>
-                  신규 사용자 등록
+                  {strings.users.modal.createTitle}
                 </h3>
               </div>
               <button 
@@ -562,12 +1054,12 @@ export default function UsersTab({ onNotify }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    사용자 ID (Username)*
+                    {strings.users.modal.usernameLabel}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="예: kim-pb"
+                    placeholder={strings.users.modal.usernamePlaceholder}
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -575,12 +1067,12 @@ export default function UsersTab({ onNotify }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    성명 (Full Name)*
+                    {strings.users.modal.fullNameLabel}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="예: 김철수 수석"
+                    placeholder={strings.users.modal.fullNamePlaceholder}
                     value={newFullName}
                     onChange={(e) => setNewFullName(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -590,12 +1082,12 @@ export default function UsersTab({ onNotify }) {
 
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  사내 이메일 (Email)*
+                  {strings.users.modal.emailLabel}
                 </label>
                 <input
                   type="email"
                   required
-                  placeholder="예: chulsoo.kim@bank.corp"
+                  placeholder={strings.users.modal.emailPlaceholder}
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -605,22 +1097,24 @@ export default function UsersTab({ onNotify }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    권한 역할 (Role)*
+                    {strings.users.modal.roleLabel}
                   </label>
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
                   >
-                    <option value="TENANT_ADMIN">TENANT_ADMIN (부서 관리자)</option>
-                    <option value="VIEWER">VIEWER (조회 전용)</option>
-                    <option value="SUPER_ADMIN">SUPER_ADMIN (전사 최고관리자)</option>
+                    {roles.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.display_name} ({r.name})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    소속 테넌트 (부서)*
+                    {strings.users.modal.tenantLabel}
                   </label>
                   <select
                     disabled={newRole === 'SUPER_ADMIN'}
@@ -640,12 +1134,12 @@ export default function UsersTab({ onNotify }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    초기 비밀번호 (최소 8자)*
+                    {strings.users.modal.initPasswordLabel}
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="비밀번호 입력"
+                    placeholder={strings.users.modal.initPasswordPlaceholder}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -653,12 +1147,12 @@ export default function UsersTab({ onNotify }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    비밀번호 확인*
+                    {strings.users.modal.confirmPasswordLabel}
                   </label>
                   <input
                     type="password"
                     required
-                    placeholder="비밀번호 재입력"
+                    placeholder={strings.users.modal.confirmPasswordPlaceholder}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -672,13 +1166,13 @@ export default function UsersTab({ onNotify }) {
                   className="btn-secondary"
                   onClick={() => setIsCreateModalOpen(false)}
                 >
-                  취소
+                  {strings.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary"
                 >
-                  사용자 등록 완료
+                  {strings.users.modal.btnSubmitCreate}
                 </button>
               </div>
             </form>
@@ -717,7 +1211,7 @@ export default function UsersTab({ onNotify }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <KeyRound size={20} color="#38bdf8" />
                 <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--heading-color)' }}>
-                  비밀번호 초기화
+                  {strings.users.modal.resetPwTitle}
                 </h3>
               </div>
               <button 
@@ -729,7 +1223,7 @@ export default function UsersTab({ onNotify }) {
             </div>
 
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '18px' }}>
-              대상 사용자: <strong>{targetUser.username}</strong> ({targetUser.full_name})
+              {strings.users.modal.targetUserLabel(targetUser.username, targetUser.full_name)}
             </p>
 
             {modalError && (
@@ -741,12 +1235,12 @@ export default function UsersTab({ onNotify }) {
             <form onSubmit={handleResetPassword}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  신규 임시 비밀번호 (최소 8자)*
+                  {strings.users.modal.newTempPasswordLabel}
                 </label>
                 <input
                   type="password"
                   required
-                  placeholder="새로운 비밀번호"
+                  placeholder={strings.users.modal.newTempPasswordPlaceholder}
                   value={resetNewPassword}
                   onChange={(e) => setResetNewPassword(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -755,12 +1249,12 @@ export default function UsersTab({ onNotify }) {
 
               <div style={{ marginBottom: '22px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  비밀번호 확인*
+                  {strings.users.modal.confirmPasswordLabel}
                 </label>
                 <input
                   type="password"
                   required
-                  placeholder="비밀번호 재입력"
+                  placeholder={strings.users.modal.confirmPasswordPlaceholder}
                   value={resetConfirmPassword}
                   onChange={(e) => setResetConfirmPassword(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
@@ -773,13 +1267,553 @@ export default function UsersTab({ onNotify }) {
                   className="btn-secondary"
                   onClick={() => setIsResetPasswordModalOpen(false)}
                 >
-                  취소
+                  {strings.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary"
                 >
-                  비밀번호 변경
+                  {strings.users.modal.btnSubmitReset}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Edit User & Role / Tenant */}
+      {isEditModalOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              padding: '28px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-card)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Pencil size={20} color="#c084fc" />
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--heading-color)' }}>
+                  {strings.users.modal.editTitle}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {modalError && (
+              <div style={{ padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.8rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={15} />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateUser}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {strings.users.modal.usernameLabel}
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUsername}
+                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.3)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'not-allowed' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  {strings.users.modal.readOnlyUsernameDesc}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.users.modal.fullNameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFullName}
+                    onChange={(e) => setEditFullName(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.users.modal.emailLabel}
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.users.modal.roleLabel}
+                  </label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    disabled={currentUser?.id === editUserId && currentUser?.role === 'SUPER_ADMIN'}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  >
+                    {roles.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.display_name} ({r.name})
+                      </option>
+                    ))}
+                  </select>
+                  {currentUser?.id === editUserId && currentUser?.role === 'SUPER_ADMIN' && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', marginTop: '4px', display: 'block' }}>
+                      {strings.users.modal.selfRoleNotice}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.users.modal.tenantLabel}
+                  </label>
+                  <select
+                    disabled={editRole === 'SUPER_ADMIN'}
+                    value={editTenantId}
+                    onChange={(e) => setEditTenantId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', opacity: editRole === 'SUPER_ADMIN' ? 0.5 : 1 }}
+                  >
+                    {tenants.map((t) => (
+                      <option key={t.tenant_id} value={t.tenant_id}>
+                        {t.name} ({t.department_code || t.tenant_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  {strings.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  data-testid="users-btn-submit-edit"
+                  style={{ background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)' }}
+                >
+                  {strings.users.modal.btnSubmitEdit}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Create New Role */}
+      {isCreateRoleModalOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '28px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-card)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={20} color="#c084fc" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, color: 'var(--heading-color)' }}>
+                  {strings.roles.modal.createTitle}
+                </h3>
+              </div>
+              <button 
+                className="btn-icon"
+                onClick={() => setIsCreateRoleModalOpen(false)}
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {roleModalError && (
+              <div 
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(244, 63, 94, 0.15)',
+                  border: '1px solid rgba(244, 63, 94, 0.3)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f43f5e',
+                  fontSize: '0.82rem',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <AlertTriangle size={15} />
+                <span>{roleModalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateRole}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.roles.modal.nameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    data-testid="role-input-name"
+                    placeholder={strings.roles.modal.namePlaceholder}
+                    value={roleFormName}
+                    onChange={(e) => setRoleFormName(e.target.value.toUpperCase())}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    {strings.roles.modal.nameDesc}
+                  </span>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.roles.modal.displayNameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    data-testid="role-input-display-name"
+                    placeholder={strings.roles.modal.displayNamePlaceholder}
+                    value={roleFormDisplayName}
+                    onChange={(e) => setRoleFormDisplayName(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {strings.roles.modal.descLabel}
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder={strings.roles.modal.descPlaceholder}
+                  value={roleFormDesc}
+                  onChange={(e) => setRoleFormDesc(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Permissions Matrix */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--heading-color)' }}>
+                    {strings.roles.modal.permissionsLabel} ({roleFormPermissions.length}/{availablePermissions.length})
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={selectAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-sm)', color: '#38bdf8', cursor: 'pointer' }}
+                    >
+                      {strings.roles.modal.selectAll}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deselectAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    >
+                      {strings.roles.modal.deselectAll}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '280px', overflowY: 'auto', padding: '12px', background: 'rgba(15, 23, 42, 0.5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {Object.entries(permissionsByCategory).map(([category, perms]) => (
+                      <div key={category} style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#38bdf8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Shield size={12} />
+                          <span>{category}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {perms.map((p) => {
+                            const isChecked = roleFormPermissions.includes(p.code) || roleFormPermissions.includes('*');
+                            return (
+                              <label key={p.code} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '0.78rem' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePermission(p.code)}
+                                  style={{ marginTop: '2px' }}
+                                />
+                                <div>
+                                  <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{p.name}</div>
+                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{p.description}</div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsCreateRoleModalOpen(false)}
+                >
+                  {strings.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  data-testid="roles-btn-submit-create"
+                  style={{ background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)' }}
+                >
+                  {strings.roles.modal.btnSubmitCreate}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Edit Role & Permissions */}
+      {isEditRoleModalOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div 
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '28px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-card)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Pencil size={20} color="#38bdf8" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, color: 'var(--heading-color)' }}>
+                  {strings.roles.modal.editTitle}
+                </h3>
+              </div>
+              <button 
+                className="btn-icon"
+                onClick={() => setIsEditRoleModalOpen(false)}
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {roleModalError && (
+              <div 
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(244, 63, 94, 0.15)',
+                  border: '1px solid rgba(244, 63, 94, 0.3)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#f43f5e',
+                  fontSize: '0.82rem',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <AlertTriangle size={15} />
+                <span>{roleModalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateRole}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.roles.modal.nameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={roleFormName}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.3)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '0.85rem', fontFamily: 'monospace', cursor: 'not-allowed' }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    {strings.roles.modal.nameDesc}
+                  </span>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    {strings.roles.modal.displayNameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    data-testid="role-input-edit-display-name"
+                    placeholder={strings.roles.modal.displayNamePlaceholder}
+                    value={roleFormDisplayName}
+                    onChange={(e) => setRoleFormDisplayName(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {strings.roles.modal.descLabel}
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder={strings.roles.modal.descPlaceholder}
+                  value={roleFormDesc}
+                  onChange={(e) => setRoleFormDesc(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Permissions Matrix */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--heading-color)' }}>
+                    {strings.roles.modal.permissionsLabel} ({roleFormPermissions.length}/{availablePermissions.length})
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={selectAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-sm)', color: '#38bdf8', cursor: 'pointer' }}
+                    >
+                      {strings.roles.modal.selectAll}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deselectAllPermissions}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    >
+                      {strings.roles.modal.deselectAll}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '280px', overflowY: 'auto', padding: '12px', background: 'rgba(15, 23, 42, 0.5)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {Object.entries(permissionsByCategory).map(([category, perms]) => (
+                      <div key={category} style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#38bdf8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Shield size={12} />
+                          <span>{category}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {perms.map((p) => {
+                            const isChecked = roleFormPermissions.includes(p.code) || roleFormPermissions.includes('*');
+                            return (
+                              <label key={p.code} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '0.78rem' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePermission(p.code)}
+                                  style={{ marginTop: '2px' }}
+                                />
+                                <div>
+                                  <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{p.name}</div>
+                                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{p.description}</div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsEditRoleModalOpen(false)}
+                >
+                  {strings.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  data-testid="roles-btn-submit-edit"
+                  style={{ background: 'var(--accent-purple)', borderColor: 'var(--accent-purple)' }}
+                >
+                  {strings.roles.modal.btnSubmitEdit}
                 </button>
               </div>
             </form>

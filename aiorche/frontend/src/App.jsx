@@ -1,30 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import OverviewTab from './components/OverviewTab';
-import RoutingTab from './components/RoutingTab';
-import VirtualKeysTab from './components/VirtualKeysTab';
-import FinOpsTab from './components/FinOpsTab';
-import ComplianceTab from './components/ComplianceTab';
-import LifecycleTab from './components/LifecycleTab';
-import PromptStudioTab from './components/PromptStudioTab';
-import SystemPromptsTab from './components/SystemPromptsTab';
-import UsersTab from './components/UsersTab';
 import LoginPage from './components/LoginPage';
 import DevInspector from './components/DevInspector';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CheckCircle2, AlertTriangle, Info, X, Loader2 } from 'lucide-react';
+import { strings } from './constants/strings';
+
+const OverviewTab = lazy(() => import('./components/OverviewTab'));
+const RoutingTab = lazy(() => import('./components/RoutingTab'));
+const VirtualKeysTab = lazy(() => import('./components/VirtualKeysTab'));
+const FinOpsTab = lazy(() => import('./components/FinOpsTab'));
+const ComplianceTab = lazy(() => import('./components/ComplianceTab'));
+const PromptStudioTab = lazy(() => import('./components/PromptStudioTab'));
+const SystemPromptsTab = lazy(() => import('./components/SystemPromptsTab'));
+const UsersTab = lazy(() => import('./components/UsersTab'));
 
 function Dashboard() {
-  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
+  const { user, isAuthenticated, isLoading, isSuperAdmin, hasPermission } = useAuth();
+  const canAccessOverview = isSuperAdmin || hasPermission('overview:read');
+  const canAccessRouting = isSuperAdmin || hasPermission('routing:read');
+  const canAccessGovernance = isSuperAdmin || hasPermission('governance:read');
+  const canAccessPrompts = isSuperAdmin || hasPermission('prompts:read');
+  const canAccessFinops = isSuperAdmin || hasPermission('finops:read');
+  const canAccessCompliance = isSuperAdmin || hasPermission('compliance:read');
+  const canAccessStudio = isSuperAdmin || hasPermission('prompt_studio:execute');
+  const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
+  const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
   const [activeTab, setActiveTab] = useState('overview');
   const [routingSubTab, setRoutingSubTab] = useState('routing');
-  const [unreadPatchCount, setUnreadPatchCount] = useState(1);
   const [toasts, setToasts] = useState([]);
   const [isInspectorActive, setIsInspectorActive] = useState(false);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('aiorche_theme') || 'dark';
   });
+
+  // Automatically fallback to the first permitted tab if current activeTab is not permitted for the logged-in user
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const tabPermMap = [
+      { id: 'overview', ok: canAccessOverview },
+      { id: 'routing', ok: canAccessRouting },
+      { id: 'virtual-keys', ok: canAccessGovernance },
+      { id: 'system-prompts', ok: canAccessPrompts },
+      { id: 'finops', ok: canAccessFinops },
+      { id: 'compliance', ok: canAccessCompliance },
+      { id: 'prompt-studio', ok: canAccessStudio },
+      { id: 'users', ok: canAccessUsers },
+      { id: 'roles', ok: canAccessRoles }
+    ];
+    const currentEntry = tabPermMap.find((t) => t.id === activeTab);
+    if (!currentEntry || !currentEntry.ok) {
+      const firstAllowed = tabPermMap.find((t) => t.ok);
+      if (firstAllowed) {
+        setActiveTab(firstAllowed.id);
+      }
+    }
+  }, [isAuthenticated, user, activeTab]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -67,7 +99,7 @@ function Dashboard() {
       >
         <Loader2 size={36} color="#38bdf8" className="spin" />
         <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
-          폐쇄망 어플라이언스 보안 세션 초기화 중...
+          {strings.auth.sessionInitializing}
         </span>
       </div>
     );
@@ -87,14 +119,11 @@ function Dashboard() {
         setActiveTab={setActiveTab} 
         routingSubTab={routingSubTab}
         setRoutingSubTab={setRoutingSubTab}
-        unreadPatchCount={unreadPatchCount} 
       />
 
       {/* Main Wrapper */}
       <div className="main-wrapper" data-screen-id="SCR-COM-00">
         <Header 
-          onOpenPatchTab={() => setActiveTab('lifecycle')}
-          unreadPatchCount={unreadPatchCount}
           theme={theme}
           onToggleTheme={toggleTheme}
           isInspectorActive={isInspectorActive}
@@ -102,50 +131,53 @@ function Dashboard() {
         />
 
         <main className="page-content" data-testid="main-page-content">
-          {activeTab === 'overview' && (
-            <OverviewTab 
-              onNavigateTab={(tab) => setActiveTab(tab)}
-            />
-          )}
+          <Suspense fallback={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '10px', color: 'var(--text-muted)' }}>
+              <Loader2 size={24} className="spin" color="var(--accent-cyan)" />
+              <span>{strings.common.loading}</span>
+            </div>
+          }>
+            {activeTab === 'overview' && canAccessOverview && (
+              <OverviewTab 
+                onNavigateTab={(tab) => setActiveTab(tab)}
+              />
+            )}
 
-          {activeTab === 'routing' && (
-            <RoutingTab 
-              activeSubTab={routingSubTab}
-              setActiveSubTab={setRoutingSubTab}
-              onNotify={addToast} 
-            />
-          )}
+            {activeTab === 'routing' && canAccessRouting && (
+              <RoutingTab 
+                activeSubTab={routingSubTab}
+                setActiveSubTab={setRoutingSubTab}
+                onNotify={addToast} 
+              />
+            )}
 
-          {activeTab === 'virtual-keys' && (
-            <VirtualKeysTab onNotify={addToast} />
-          )}
+            {activeTab === 'virtual-keys' && canAccessGovernance && (
+              <VirtualKeysTab onNotify={addToast} />
+            )}
 
-          {activeTab === 'system-prompts' && (
-            <SystemPromptsTab onNotify={addToast} />
-          )}
+            {activeTab === 'system-prompts' && canAccessPrompts && (
+              <SystemPromptsTab onNotify={addToast} />
+            )}
 
-          {activeTab === 'finops' && (
-            <FinOpsTab onNotify={addToast} />
-          )}
+            {activeTab === 'finops' && canAccessFinops && (
+              <FinOpsTab onNotify={addToast} />
+            )}
 
-          {activeTab === 'compliance' && (
-            <ComplianceTab onNotify={addToast} />
-          )}
+            {activeTab === 'compliance' && canAccessCompliance && (
+              <ComplianceTab onNotify={addToast} />
+            )}
 
-          {activeTab === 'lifecycle' && (
-            <LifecycleTab 
-              onNotify={addToast} 
-              onPatchApplied={() => setUnreadPatchCount(0)}
-            />
-          )}
+            {activeTab === 'prompt-studio' && canAccessStudio && (
+              <PromptStudioTab onNotify={addToast} />
+            )}
 
-          {activeTab === 'prompt-studio' && (
-            <PromptStudioTab onNotify={addToast} />
-          )}
-
-          {activeTab === 'users' && isSuperAdmin && (
-            <UsersTab onNotify={addToast} />
-          )}
+            {((activeTab === 'users' && canAccessUsers) || (activeTab === 'roles' && canAccessRoles)) && (
+              <UsersTab 
+                defaultSubTab={activeTab === 'roles' ? 'roles' : 'users'}
+                onNotify={addToast} 
+              />
+            )}
+          </Suspense>
         </main>
       </div>
 

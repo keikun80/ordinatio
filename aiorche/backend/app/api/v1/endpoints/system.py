@@ -7,12 +7,15 @@ router = APIRouter()
 def get_system_info():
     """Return core orchestrator version and component status."""
     return {
-        "solution": "Enterprise AI Orchestrator Appliance",
+        "solution": settings.PROJECT_NAME,
         "version": settings.VERSION,
+        "license": "Apache 2.0",
         "datacenter_name": settings.DATACENTER_NAME,
         "cluster_region": settings.CLUSTER_REGION,
         "deploy_mode": settings.DEPLOY_MODE,
         "mode": "Air-Gapped Customer-Managed",
+        "data_plane_healthy": True,
+        "envoy_ingress_url": settings.ENVOY_INGRESS_URL,
         "components": {
             "envoy": "v1.31.2",
             "ext_proc": "v1.2.0",

@@ -19,7 +19,16 @@ from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
 from app.models.model_catalog import ModelCatalog
 from app.models.routing_policy import RoutingPolicy
-from app.core.security import verify_virtual_key
+from app.models.user import User, UserSession
+from app.models.role import Role
+from app.core.security import (
+    verify_virtual_key,
+    decrypt_upstream_key,
+    decode_access_token,
+    validate_upstream_endpoint_url,
+    SYSTEM_DIAGNOSTICS_KEY_ID,
+    INTERNAL_DIAGNOSTICS_CIDRS,
+)
 from app.core.pii_engine import PiiEngine
 from app.models.audit_log import AuditLog
 from app.core.telemetry_hub import telemetry_hub
@@ -61,14 +70,18 @@ class ChatCompletionRequest(BaseModel):
 # Helper: IP Address / CIDR Matcher
 # -----------------------------------------------------------------------------
 def is_ip_allowed(client_ip: str, allowed_cidrs: List[str]) -> bool:
-    if not allowed_cidrs:
+    valid_cidrs = [
+        part.strip()
+        for raw in (allowed_cidrs or [])
+        if raw
+        for part in str(raw).split(",")
+        if part.strip()
+    ]
+    if not valid_cidrs or "0.0.0.0/0" in valid_cidrs or "*" in valid_cidrs:
         return True
     try:
         ip_obj = ipaddress.ip_address(client_ip)
-        for cidr in allowed_cidrs:
-            if not cidr or not str(cidr).strip():
-                continue
-            cidr_str = str(cidr).strip()
+        for cidr_str in valid_cidrs:
             if "/" in cidr_str:
                 network = ipaddress.ip_network(cidr_str, strict=False)
                 if ip_obj in network:
@@ -145,6 +158,60 @@ def record_token_and_cost_metering(
         "tenant_name": target_tenant.name if target_tenant else None
     }
 
+def _extract_client_ip(request: Optional[Request]) -> str:
+    """
+    Extract client IP safely (H-1):
+    Only trust X-Forwarded-For when the immediate TCP peer is a trusted proxy
+    (loopback / container network / testclient), and take the rightmost hop
+    appended by Envoy (use_remote_address: true) to prevent XFF header spoofing.
+    """
+    if not request:
+        return "127.0.0.1"
+    peer_host = request.client.host if (request.client and request.client.host) else "127.0.0.1"
+    is_trusted_proxy = (peer_host == "testclient") or is_ip_allowed(peer_host, INTERNAL_DIAGNOSTICS_CIDRS)
+    if is_trusted_proxy:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+            if hops:
+                return hops[-1]
+    return "127.0.0.1" if peer_host == "testclient" else peer_host
+
+
+def _try_authenticate_console_jwt(token: str, db: Session) -> bool:
+    """
+    Allow authenticated Web Console users (Prompt Studio / Admin Diagnostics)
+    to call the gateway using their session JWT without needing a static virtual key.
+    """
+    payload = decode_access_token(token)
+    if not payload:
+        return False
+    user_id = payload.get("sub")
+    session_id = payload.get("sid")
+    if not user_id or not session_id:
+        return False
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        return False
+    session = db.query(UserSession).filter(
+        UserSession.id == session_id,
+        UserSession.user_id == user.id,
+        UserSession.is_revoked == False
+    ).first()
+    if not session:
+        return False
+    if user.role == "SUPER_ADMIN":
+        return True
+    role = db.query(Role).filter(Role.name == user.role).first()
+    perms = role.permissions if (role and role.permissions) else []
+    if "*" in perms or "prompt_studio:execute" in perms or "routing:write" in perms:
+        return True
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"접근 권한이 없습니다. (필요 권한: 'prompt_studio:execute', 현재 역할: '{user.role}')"
+    )
+
+
 # -----------------------------------------------------------------------------
 # Helper: Virtual Key Authenticator with Developer/Test Fallback
 # -----------------------------------------------------------------------------
@@ -167,19 +234,15 @@ def authenticate_gateway_key(
         )
 
     if not raw_key.startswith("sk-orch-"):
+        if request and request.headers.get("x-console-prompt-studio") == "true" and _try_authenticate_console_jwt(raw_key, db):
+            return None
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="잘못된 가상 API Key 형식입니다. 'sk-orch-' 접두사가 필요합니다."
         )
 
-    # Extract client IP for IP CIDR validation
-    client_ip = "127.0.0.1"
-    if request:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
-        elif request.client and request.client.host:
-            client_ip = request.client.host
+    # Extract client IP for IP CIDR validation (resistant to X-Forwarded-For spoofing)
+    client_ip = _extract_client_ip(request)
 
     # 1. First check against database
     prefix = raw_key[:16]
@@ -203,8 +266,10 @@ def authenticate_gateway_key(
                         detail="유효기간이 만료된 가상 API Key입니다."
                     )
 
-            # Check IP CIDR whitelist
-            allowed_cidrs = candidate.allowed_ip_cidrs or []
+            # Check IP CIDR whitelist (System Diagnostics Key is strictly bound to internal CIDRs)
+            allowed_cidrs = candidate.allowed_ip_cidrs or (
+                INTERNAL_DIAGNOSTICS_CIDRS if candidate.key_id == SYSTEM_DIAGNOSTICS_KEY_ID else []
+            )
             if allowed_cidrs and len(allowed_cidrs) > 0:
                 if not is_ip_allowed(client_ip, allowed_cidrs):
                     raise HTTPException(
@@ -395,6 +460,14 @@ async def dispatch_chat_completion(
     target_endpoint = model_entry.target_endpoint if model_entry else "http://127.0.0.1:11434"
     serving_engine = model_entry.serving_engine if model_entry else "vLLM"
 
+    try:
+        validate_upstream_endpoint_url(target_endpoint)
+    except ValueError as ssrf_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"비인가 업스트림 엔드포인트 차단 (SSRF 보호): {ssrf_err}"
+        )
+
     # 3. Session Affinity
     session_id = request.headers.get("x-session-id")
     affinity_mgr = SessionAffinityManager()
@@ -443,17 +516,18 @@ async def dispatch_chat_completion(
     # Build upstream request headers including API key auth if configured
     upstream_headers = {"Content-Type": "application/json"}
     model_provider = getattr(model_entry, 'provider', 'openai') or 'openai'
+    raw_api_key = decrypt_upstream_key(model_entry.api_key) if model_entry and model_entry.api_key else None
     if model_provider.lower() == 'anthropic':
         upstream_headers["anthropic-version"] = "2023-06-01"
-        if model_entry and model_entry.api_key:
-            upstream_headers["x-api-key"] = model_entry.api_key
+        if raw_api_key:
+            upstream_headers["x-api-key"] = raw_api_key
 
-    if model_entry and model_entry.api_key:
+    if raw_api_key:
         auth_type_norm = (model_entry.auth_type or "none").lower()
         if auth_type_norm == "bearer":
-            upstream_headers["Authorization"] = f"Bearer {model_entry.api_key}"
+            upstream_headers["Authorization"] = f"Bearer {raw_api_key}"
         elif auth_type_norm == "apikey":
-            upstream_headers["apikey"] = model_entry.api_key
+            upstream_headers["apikey"] = raw_api_key
 
     client_timeout = httpx.Timeout(90.0, connect=5.0)
     async with httpx.AsyncClient(timeout=client_timeout) as client:

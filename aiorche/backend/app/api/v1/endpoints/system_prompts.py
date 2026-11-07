@@ -15,6 +15,7 @@ from app.schemas.system_prompt import (
     PromptResolveRequest,
     PromptResolveResponse
 )
+from app.api.deps import require_permission
 
 router = APIRouter(prefix="/system-prompts", tags=["System Prompt Governance"])
 
@@ -56,7 +57,7 @@ def _validate_and_enrich_target(
 
     return target_id
 
-@router.get("", response_model=List[SystemPromptResponse])
+@router.get("", response_model=List[SystemPromptResponse], dependencies=[Depends(require_permission("prompts:read"))])
 def list_system_prompts(
     target_type: Optional[str] = Query(None, description="타겟 유형 필터링 (ROUTE, VIRTUAL_KEY, TENANT, GLOBAL)"),
     is_active: Optional[bool] = Query(None, description="활성화 여부 필터링"),
@@ -76,7 +77,7 @@ def list_system_prompts(
 
     return query.order_by(SystemPrompt.created_at.desc()).all()
 
-@router.post("", response_model=SystemPromptResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SystemPromptResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("prompts:write"))])
 def create_system_prompt(
     payload: SystemPromptCreate,
     db: Session = Depends(get_db)
@@ -116,7 +117,7 @@ def create_system_prompt(
     db.refresh(new_prompt)
     return new_prompt
 
-@router.get("/{prompt_id}", response_model=SystemPromptResponse)
+@router.get("/{prompt_id}", response_model=SystemPromptResponse, dependencies=[Depends(require_permission("prompts:read"))])
 def get_system_prompt(
     prompt_id: str,
     db: Session = Depends(get_db)
@@ -132,7 +133,7 @@ def get_system_prompt(
         )
     return prompt
 
-@router.put("/{prompt_id}", response_model=SystemPromptResponse)
+@router.put("/{prompt_id}", response_model=SystemPromptResponse, dependencies=[Depends(require_permission("prompts:write"))])
 def update_system_prompt(
     prompt_id: str,
     payload: SystemPromptUpdate,
@@ -178,7 +179,7 @@ def update_system_prompt(
     db.refresh(prompt)
     return prompt
 
-@router.delete("/{prompt_id}", status_code=status.HTTP_200_OK)
+@router.delete("/{prompt_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("prompts:write"))])
 def delete_system_prompt(
     prompt_id: str,
     db: Session = Depends(get_db)
@@ -197,7 +198,7 @@ def delete_system_prompt(
     db.commit()
     return {"message": f"시스템 프롬프트 [{prompt_id}]가 성공적으로 삭제되었습니다.", "prompt_id": prompt_id}
 
-@router.post("/resolve", response_model=PromptResolveResponse)
+@router.post("/resolve", response_model=PromptResolveResponse, dependencies=[Depends(require_permission("prompts:read"))])
 def resolve_system_prompt(
     req: PromptResolveRequest,
     db: Session = Depends(get_db)

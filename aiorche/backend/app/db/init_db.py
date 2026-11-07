@@ -11,6 +11,9 @@ from app.models.patch_history import PatchHistory
 from app.models.agent_router_policy import AgentRouterPolicyModel
 from app.models.system_prompt import SystemPrompt
 from app.models.user import User, UserSession
+from app.models.role import Role
+from app.core.permissions import ALL_PERMISSION_CODES
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,7 @@ def init_db():
         # 0. Safe DDL Column Migrations (Execute before opening ORM session)
         try:
             with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE virtual_keys ALTER COLUMN tenant_id DROP NOT NULL;"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS serving_engine VARCHAR(32) DEFAULT 'vLLM';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS execution_method VARCHAR(32) DEFAULT 'k8s';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS api_key TEXT;"))
@@ -37,8 +41,101 @@ def init_db():
             logger.debug(f"Column migration check: {mig_err}")
 
         db = SessionLocal()
-        
-        # 1. Tenants
+
+        # 1. Default System Roles Seed (Required for RBAC / Initial Admin Bootstrap)
+        if db.query(Role).count() == 0:
+            super_admin_role = Role(
+                name="SUPER_ADMIN",
+                display_name="전사 최고관리자",
+                description="전사 플랫폼, 전 부서 테넌트, 모델 라우팅 및 보안 정책 총괄 최고 관리자",
+                is_system=True,
+                permissions=ALL_PERMISSION_CODES
+            )
+            tenant_admin_role = Role(
+                name="TENANT_ADMIN",
+                display_name="부서 관리자",
+                description="소속 부서(테넌트) 한정 가상키 발급/파기, 시스템 프롬프트, FinOps 모니터링 관리자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read", "governance:write",
+                    "prompts:read", "prompts:write", "finops:read", "prompt_studio:execute"
+                ]
+            )
+            viewer_role = Role(
+                name="VIEWER",
+                display_name="일반 조회자",
+                description="전사 또는 소속 부서 운영 지표 및 감사 로그 열람 전용 읽기 사용자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read",
+                    "prompts:read", "finops:read", "compliance:read", "lifecycle:read"
+                ]
+            )
+            db.add_all([super_admin_role, tenant_admin_role, viewer_role])
+            db.commit()
+            logger.info("Initialized database with default system roles (SUPER_ADMIN, TENANT_ADMIN, VIEWER)")
+
+        # 1.1 Initial Super Admin Account Bootstrap (Ensures admin can log in after make up)
+        from app.core.security import hash_password
+        existing_admin = db.query(User).filter(User.username == settings.INITIAL_ADMIN_USERNAME).first()
+        if not existing_admin and db.query(User).filter(User.role == "SUPER_ADMIN").count() == 0:
+            if settings.INITIAL_ADMIN_PASSWORD:
+                initial_admin = User(
+                    username=settings.INITIAL_ADMIN_USERNAME,
+                    full_name="시스템 최고관리자",
+                    email=settings.INITIAL_ADMIN_EMAIL,
+                    password_hash=hash_password(settings.INITIAL_ADMIN_PASSWORD),
+                    role="SUPER_ADMIN",
+                    tenant_id=None,
+                    is_active=True,
+                    failed_login_count=0,
+                    locked_until=None
+                )
+                db.add(initial_admin)
+                db.commit()
+                logger.info(f"Bootstrapped initial SUPER_ADMIN account: '{settings.INITIAL_ADMIN_USERNAME}'")
+        elif existing_admin and settings.ENV == "development":
+            # In local development mode (make down && make up), recover locked initial admin account automatically
+            if existing_admin.failed_login_count > 0 or existing_admin.locked_until is not None or not existing_admin.is_active:
+                existing_admin.failed_login_count = 0
+                existing_admin.locked_until = None
+                existing_admin.is_active = True
+                db.commit()
+                logger.info(f"Cleared login lockout for initial admin '{existing_admin.username}' on development startup")
+
+        # 2. System Diagnostics Key Provisioning (Internal gateway diagnostics only)
+        from app.core.security import ensure_system_diagnostics_key
+        ensure_system_diagnostics_key(db)
+        logger.info("Initialized database with official system diagnostics virtual key")
+
+        # 3. AgentRouter 4-Tier Strategy Slots
+        if db.query(AgentRouterPolicyModel).count() == 0:
+            import copy
+            from app.core.agent_router.policy_manager import DEFAULT_POLICIES_CONFIG
+            for p_data in DEFAULT_POLICIES_CONFIG:
+                cfg = copy.deepcopy(p_data["config"])
+                if not settings.SEED_DEMO_DATA:
+                    # Leave model bindings empty until user registers models via Web UI
+                    for k in ("reasoning_model", "fast_model", "economic_model", "standard_model", "primary_fast_model", "primary_fallback_model", "secondary_fallback_model"):
+                        if k in cfg:
+                            cfg[k] = ""
+                row = AgentRouterPolicyModel(
+                    policy_id=p_data["policy_id"],
+                    name=p_data["name"],
+                    description=p_data["description"],
+                    is_active=p_data["is_active"],
+                    config=cfg
+                )
+                db.add(row)
+            db.commit()
+            logger.info("Initialized database with AgentRouter 4-tier policy slots")
+
+        # 4. Demo / Sample Data Seeding (ONLY when explicitly enabled via SEED_DEMO_DATA=True)
+        if not settings.SEED_DEMO_DATA:
+            db.close()
+            return
+
+        # Demo Tenants
         if db.query(Tenant).count() == 0:
             wm = Tenant(
                 tenant_id="dept-wm",
@@ -347,6 +444,39 @@ def init_db():
             db.add_all([sp1, sp2, sp3])
             db.commit()
             logger.info("Initialized database with default system prompts catalog")
+
+        # 10. Default System Roles Seed (Phase 6 Dynamic RBAC)
+        if db.query(Role).count() == 0:
+            super_admin_role = Role(
+                name="SUPER_ADMIN",
+                display_name="전사 최고관리자",
+                description="전사 플랫폼, 전 부서 테넌트, 모델 라우팅 및 보안 정책 총괄 최고 관리자",
+                is_system=True,
+                permissions=ALL_PERMISSION_CODES
+            )
+            tenant_admin_role = Role(
+                name="TENANT_ADMIN",
+                display_name="부서 관리자",
+                description="소속 부서(테넌트) 한정 가상키 발급/파기, 시스템 프롬프트, FinOps 모니터링 관리자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read", "governance:write",
+                    "prompts:read", "prompts:write", "finops:read", "prompt_studio:execute"
+                ]
+            )
+            viewer_role = Role(
+                name="VIEWER",
+                display_name="일반 조회자",
+                description="전사 또는 소속 부서 운영 지표 및 감사 로그 열람 전용 읽기 사용자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read",
+                    "prompts:read", "finops:read", "compliance:read", "lifecycle:read"
+                ]
+            )
+            db.add_all([super_admin_role, tenant_admin_role, viewer_role])
+            db.commit()
+            logger.info("Initialized database with default system roles (SUPER_ADMIN, TENANT_ADMIN, VIEWER)")
 
         db.close()
     except Exception as e:

@@ -1,5 +1,5 @@
 import uuid
-from typing import List
+from typing import List, Optional
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -8,15 +8,31 @@ from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
 from app.schemas.tenant import TenantCreate, TenantResponse, TenantUpdate
+from app.api.deps import require_permission, get_tenant_scope
 
 router = APIRouter(prefix="/tenants", tags=["Multi-Tenant Governance"])
 
-@router.get("", response_model=List[TenantResponse])
-def list_tenants(db: Session = Depends(get_db)):
+
+def _require_global_scope(tenant_scope: Optional[str]) -> None:
+    """부서(테넌트) 생성/수정/삭제는 전사 범위(SUPER_ADMIN 등 tenant_scope=None) 사용자만 허용."""
+    if tenant_scope:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="부서(테넌트) 생성·수정·삭제는 전사 관리자만 수행할 수 있습니다. (소속 부서 한정 권한)"
+        )
+
+@router.get("", response_model=List[TenantResponse], dependencies=[Depends(require_permission("governance:read"))])
+def list_tenants(
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    db: Session = Depends(get_db)
+):
     """
-    모든 테넌트(부서) 목록 및 상태 조회
+    모든 테넌트(부서) 목록 및 상태 조회 (부서 한정 사용자는 소속 부서만)
     """
-    tenants = db.query(Tenant).order_by(Tenant.created_at.asc()).all()
+    query = db.query(Tenant)
+    if tenant_scope:
+        query = query.filter(Tenant.tenant_id == tenant_scope)
+    tenants = query.order_by(Tenant.created_at.asc()).all()
     results = []
     for t in tenants:
         active_count = db.query(VirtualKey).filter(
@@ -38,11 +54,16 @@ def list_tenants(db: Session = Depends(get_db)):
         )
     return results
 
-@router.post("", response_model=TenantResponse, status_code=status.HTTP_201_CREATED)
-def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
+@router.post("", response_model=TenantResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("governance:write"))])
+def create_tenant(
+    payload: TenantCreate,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    db: Session = Depends(get_db)
+):
     """
     신규 테넌트(부서) 등록
     """
+    _require_global_scope(tenant_scope)
     existing_dept = db.query(Tenant).filter(Tenant.department_code == payload.department_code).first()
     if existing_dept:
         raise HTTPException(
@@ -78,11 +99,17 @@ def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
         updated_at=tenant.updated_at
     )
 
-@router.get("/{tenant_id}", response_model=TenantResponse)
-def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
+@router.get("/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(require_permission("governance:read"))])
+def get_tenant(
+    tenant_id: str,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    db: Session = Depends(get_db)
+):
     """
     단일 테넌트 상세 조회
     """
+    if tenant_scope and tenant_id != tenant_scope:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="타 부서(테넌트) 정보를 조회할 권한이 없습니다.")
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
@@ -104,15 +131,18 @@ def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
         updated_at=tenant.updated_at
     )
 
-@router.patch("/{tenant_id}", response_model=TenantResponse)
+@router.patch("/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(require_permission("governance:write"))])
 def update_tenant(
     tenant_id: str,
     payload: TenantUpdate,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
-    테넌트(부서) 정보 수정 (예산, 부서명, 하드캡 여부)
+    테넌트(부서) 정보 수정 (예산, 부서명, 하드캡 여부) - 전사 관리자 전용
+    (부서 관리자가 자기 부서 예산/Hard Cap 을 직접 올려 통제를 우회하는 것을 방지)
     """
+    _require_global_scope(tenant_scope)
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
@@ -145,13 +175,18 @@ def update_tenant(
     )
 
 
-@router.delete("/{tenant_id}")
-def delete_tenant(tenant_id: str, db: Session = Depends(get_db)):
+@router.delete("/{tenant_id}", dependencies=[Depends(require_permission("governance:write"))])
+def delete_tenant(
+    tenant_id: str,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    db: Session = Depends(get_db)
+):
     """
     테넌트(부서) 삭제
     - 활성 상태(ACTIVE)인 가상키가 남아 있는 경우 400 반환 (먼저 파기/삭제 필요)
     - 파기된 가상키는 자동 정리 후 테넌트 삭제 처리
     """
+    _require_global_scope(tenant_scope)
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"테넌트를 찾을 수 없습니다: {tenant_id}")

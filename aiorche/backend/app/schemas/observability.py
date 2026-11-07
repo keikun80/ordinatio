@@ -1,6 +1,9 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class ComputePoolStatus(BaseModel):
     pool_name: str
@@ -45,7 +48,7 @@ class ObservabilitySummaryResponse(BaseModel):
     compute_pools: List[ComputePoolStatus]
     model_traffic_breakdown: List[ModelTrafficShare] = []
     uptime_seconds: float
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=get_utc_now)
 
 class PromQLQueryRequest(BaseModel):
     query: str = Field(..., json_schema_extra={"example": "sum(rate(ai_inference_requests_total[5m]))"})

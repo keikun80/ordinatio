@@ -29,6 +29,7 @@ from app.schemas.compliance import (
     AuditLogRead,
     ComplianceStats,
 )
+from app.api.deps import require_permission
 
 router = APIRouter(prefix="/compliance", tags=["PII Compliance & Audit Forensics"])
 
@@ -44,7 +45,7 @@ def _load_engine(db: Session) -> PiiEngine:
 # 1. PII Rules Management
 # ==========================================
 
-@router.get("/rules", response_model=List[PiiRuleRead])
+@router.get("/rules", response_model=List[PiiRuleRead], dependencies=[Depends(require_permission("compliance:read"))])
 def list_pii_rules(
     active_only: bool = Query(False, description="활성화된 룰만 조회"),
     db: Session = Depends(get_db)
@@ -57,7 +58,7 @@ def list_pii_rules(
     return rules
 
 
-@router.post("/rules", response_model=PiiRuleRead, status_code=status.HTTP_201_CREATED)
+@router.post("/rules", response_model=PiiRuleRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("compliance:write"))])
 def create_pii_rule(payload: PiiRuleCreate, db: Session = Depends(get_db)):
     """신규 PII 마스킹 규칙을 등록합니다."""
     # 1. 중복 ID 검사
@@ -93,7 +94,7 @@ def create_pii_rule(payload: PiiRuleCreate, db: Session = Depends(get_db)):
     return rule
 
 
-@router.put("/rules/{rule_id}", response_model=PiiRuleRead)
+@router.put("/rules/{rule_id}", response_model=PiiRuleRead, dependencies=[Depends(require_permission("compliance:write"))])
 def update_pii_rule(rule_id: str, payload: PiiRuleUpdate, db: Session = Depends(get_db)):
     """기존 PII 규칙을 수정합니다."""
     rule = db.query(PiiRule).filter(PiiRule.rule_id == rule_id).first()
@@ -128,7 +129,7 @@ def update_pii_rule(rule_id: str, payload: PiiRuleUpdate, db: Session = Depends(
     return rule
 
 
-@router.delete("/rules/{rule_id}", status_code=status.HTTP_200_OK)
+@router.delete("/rules/{rule_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("compliance:write"))])
 def delete_pii_rule(rule_id: str, db: Session = Depends(get_db)):
     """PII 규칙을 삭제합니다."""
     rule = db.query(PiiRule).filter(PiiRule.rule_id == rule_id).first()
@@ -147,7 +148,7 @@ def delete_pii_rule(rule_id: str, db: Session = Depends(get_db)):
 # 2. PII Simulation & Masking
 # ==========================================
 
-@router.post("/simulate", response_model=SimulateResponse)
+@router.post("/simulate", response_model=SimulateResponse, dependencies=[Depends(require_permission("compliance:read"))])
 def simulate_pii_masking(payload: SimulateRequest, db: Session = Depends(get_db)):
     """입력 프롬프트에 대해 PII 탐지 및 마스킹을 시뮬레이션하고, 
     WORM 감사 로그를 DB에 기록합니다.
@@ -221,7 +222,7 @@ def simulate_pii_masking(payload: SimulateRequest, db: Session = Depends(get_db)
 # 3. WORM Audit Logs Forensics
 # ==========================================
 
-@router.get("/audit-logs", response_model=List[AuditLogRead])
+@router.get("/audit-logs", response_model=List[AuditLogRead], dependencies=[Depends(require_permission("compliance:read"))])
 def list_audit_logs(
     requester_id: Optional[str] = Query(None, description="요청자 ID 필터"),
     key_id: Optional[str] = Query(None, description="가상 API Key ID 필터"),
@@ -251,7 +252,7 @@ def list_audit_logs(
 # 4. Compliance Statistics & Metrics
 # ==========================================
 
-@router.get("/stats", response_model=ComplianceStats)
+@router.get("/stats", response_model=ComplianceStats, dependencies=[Depends(require_permission("compliance:read"))])
 def get_compliance_stats(db: Session = Depends(get_db)):
     """컴플라이언스 대시보드 통계 지표를 반환합니다."""
     total_rules = db.query(PiiRule).count()

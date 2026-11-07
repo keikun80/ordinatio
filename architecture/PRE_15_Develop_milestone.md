@@ -6,7 +6,7 @@
 **대상 시스템**: AI Orchestrator (`aiorche`) 온프레미스 에어갭 어플라이언스  
 **작성 일자**: 2026-09-25  
 
-> 본 문서는 마스터 엔지니어링 계획서([`PRE_01_dashboard_engineering_plan.md`](./PRE_01_dashboard_engineering_plan.md)), 종합 결과 보고서([`PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md`](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md)), 갭 분석서([`PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md)), 시스템 프롬프트 거버넌스 결과서([`PRE_20_phase_system_prompt_implementation_and_test_results.md`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)) 및 루트 문서([`Develop_milestone.md`](../Develop_milestone.md))와 완전히 상호 동기화되어 유지 관리됩니다.
+> 본 문서는 마스터 엔지니어링 계획서([`PRE_01_dashboard_engineering_plan.md`](./PRE_01_dashboard_engineering_plan.md)), 종합 결과 보고서([`PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md`](./PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md)), 갭 분석서([`PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)), 시스템 프롬프트 거버넌스 결과서([`PRE_20_phase_system_prompt_implementation_and_test_results.md`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)) 및 루트 문서([`Develop_milestone.md`](../Develop_milestone.md))와 완전히 상호 동기화되어 유지 관리됩니다.
 
 ---
 

@@ -1,6 +1,9 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
+
+def get_utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class ModelPricingInfo(BaseModel):
     model_id: str
@@ -39,4 +42,4 @@ class FinOpsOverviewResponse(BaseModel):
     active_tenants_count: int
     pricing_matrix: FinOpsPricingMatrix
     tenants: List[TenantFinOpsSummary]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=get_utc_now)

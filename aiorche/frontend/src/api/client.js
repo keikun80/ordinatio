@@ -1,11 +1,34 @@
 // aiorche API Client Layer (Clean Architecture)
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+function getAuthHeaders(extra = {}) {
+  const token = localStorage.getItem('aiorche_token');
+  const headers = { ...extra };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// Central Request Interceptor with 401 Session Expiration Hook (A-4)
+async function authFetch(url, options = {}) {
+  const headers = getAuthHeaders(options.headers || {});
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('aiorche-session-expired', { detail: { url } }));
+    }
+  }
+  return res;
+}
+
 export const apiClient = {
   // --- System & Diagnostics ---
   async getHealth() {
     try {
-      const res = await fetch(`${API_BASE_URL}/health`);
+      const res = await fetch(`${API_BASE_URL}/health`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -15,7 +38,9 @@ export const apiClient = {
 
   async getSystemInfo() {
     try {
-      const res = await fetch(`${API_BASE_URL}/system/info`);
+      const res = await fetch(`${API_BASE_URL}/system/info`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -29,7 +54,9 @@ export const apiClient = {
 
   async runPreflight() {
     try {
-      const res = await fetch(`${API_BASE_URL}/system/preflight`);
+      const res = await fetch(`${API_BASE_URL}/system/preflight`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -48,20 +75,15 @@ export const apiClient = {
 
   // --- Multi-Tenant Governance (Phase 1) ---
   async getTenants() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/tenants`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getTenants offline, fallback to mock');
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/tenants`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async createTenant(data) {
     const res = await fetch(`${API_BASE_URL}/tenants`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -71,10 +93,35 @@ export const apiClient = {
     return await res.json();
   },
 
+  async updateTenant(tenantId, data) {
+    const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '테넌트 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteTenant(tenantId) {
+    const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '테넌트 삭제 실패');
+    }
+    return await res.json();
+  },
+
   async updateTenantBudget(tenantId, data) {
     const res = await fetch(`${API_BASE_URL}/external/tenants/${tenantId}/budget`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -86,27 +133,22 @@ export const apiClient = {
 
   // --- Virtual Key Lifecycle (Phase 1) ---
   async getVirtualKeys(params = {}) {
-    try {
-      const url = new URL(`${API_BASE_URL}/virtual-keys`);
-      if (params.tenant_id && params.tenant_id !== 'ALL') {
-        url.searchParams.append('tenant_id', params.tenant_id);
-      }
-      if (params.search) {
-        url.searchParams.append('search', params.search);
-      }
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getVirtualKeys offline, fallback to mock');
-      return null;
+    const url = new URL(`${API_BASE_URL}/virtual-keys`);
+    if (params.tenant_id && params.tenant_id !== 'ALL') {
+      url.searchParams.append('tenant_id', params.tenant_id);
     }
+    if (params.search) {
+      url.searchParams.append('search', params.search);
+    }
+    const res = await authFetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async createVirtualKey(data) {
     const res = await fetch(`${API_BASE_URL}/virtual-keys`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -119,7 +161,7 @@ export const apiClient = {
   async revokeVirtualKey(keyId, reason = '관리자에 의한 즉시 파기') {
     const res = await fetch(`${API_BASE_URL}/virtual-keys/${keyId}/revoke`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ revoked_reason: reason })
     });
     if (!res.ok) {
@@ -132,7 +174,7 @@ export const apiClient = {
   async updateVirtualKey(keyId, data) {
     const res = await fetch(`${API_BASE_URL}/virtual-keys/${keyId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -147,7 +189,8 @@ export const apiClient = {
       ? `${API_BASE_URL}/virtual-keys/${keyId}?force=true`
       : `${API_BASE_URL}/virtual-keys/${keyId}`;
     const res = await fetch(url, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json();
@@ -167,20 +210,15 @@ export const apiClient = {
 
   // --- Model Catalog & Dynamic Routing (Phase 2) ---
   async getModels() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/models`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getModels offline, fallback to mock');
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/models`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async createModel(data) {
     const res = await fetch(`${API_BASE_URL}/models`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -193,7 +231,7 @@ export const apiClient = {
   async updateModel(modelId, data) {
     const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -205,7 +243,8 @@ export const apiClient = {
 
   async deleteModel(modelId, force = true) {
     const res = await fetch(`${API_BASE_URL}/models/${encodeURIComponent(modelId)}?force=${force}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -219,7 +258,9 @@ export const apiClient = {
       const url = timeout 
         ? `${API_BASE_URL}/models/health-check?timeout=${encodeURIComponent(timeout)}` 
         : `${API_BASE_URL}/models/health-check`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -233,7 +274,8 @@ export const apiClient = {
       ? `${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health?timeout=${encodeURIComponent(timeout)}` 
       : `${API_BASE_URL}/models/${encodeURIComponent(modelId)}/health`;
     const res = await fetch(url, {
-      method: 'POST'
+      method: 'POST',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -245,7 +287,9 @@ export const apiClient = {
   // --- AgentRouter & Envoy AI Gateway (Phase 0.1) ---
   async getAgentRouterStatus() {
     try {
-      const res = await fetch(`${API_BASE_URL}/routing/agent-router/status`);
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/status`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -265,7 +309,7 @@ export const apiClient = {
     try {
       const res = await fetch(`${API_BASE_URL}/routing/agent-router/simulate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt, policy, tools, budget_spent_ratio: budgetSpentRatio })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -289,7 +333,9 @@ export const apiClient = {
 
   async getAgentRouterPolicies() {
     try {
-      const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`);
+      const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -357,7 +403,7 @@ export const apiClient = {
   async updateAgentRouterPolicies(policies) {
     const res = await fetch(`${API_BASE_URL}/routing/agent-router/policies`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ policies })
     });
     if (!res.ok) {
@@ -369,30 +415,22 @@ export const apiClient = {
 
 
   async getActiveRoutingPolicy(routeName = null) {
-    try {
-      const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getActiveRoutingPolicy offline, fallback to mock');
-      return null;
-    }
+    const url = routeName ? `${API_BASE_URL}/routing?route_name=${encodeURIComponent(routeName)}` : `${API_BASE_URL}/routing`;
+    const res = await authFetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async getRoutes() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/routing/routes`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getRoutes offline, fallback to local routes');
-      return [];
-    }
+    const res = await authFetch(`${API_BASE_URL}/routing/routes`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async getRoute(routeName) {
-    const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`);
+    const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   },
@@ -400,7 +438,7 @@ export const apiClient = {
   async createRoute(data) {
     const res = await fetch(`${API_BASE_URL}/routing/routes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -413,7 +451,7 @@ export const apiClient = {
   async updateRoute(routeName, data) {
     const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -425,7 +463,8 @@ export const apiClient = {
 
   async deleteRoute(routeName) {
     const res = await fetch(`${API_BASE_URL}/routing/routes/${encodeURIComponent(routeName)}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json();
@@ -438,7 +477,7 @@ export const apiClient = {
   async dryRunRouting(data) {
     const res = await fetch(`${API_BASE_URL}/routing/dry-run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -451,7 +490,7 @@ export const apiClient = {
   async testRouteCall(data) {
     const res = await fetch(`${API_BASE_URL}/routing/test-call`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -464,7 +503,7 @@ export const apiClient = {
   async testAllModelsCall(data) {
     const res = await fetch(`${API_BASE_URL}/routing/test-call-all`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -474,17 +513,17 @@ export const apiClient = {
     return await res.json();
   },
 
-  async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = 'sk-orch-system-diagnostics-appliance-key' }) {
+  async executeChatCompletion({ model, messages, temperature = 0.7, max_tokens = 512, apiKey = null }) {
     // Gateway endpoint: fallback to relative /v1/chat/completions or localhost:8000
     const gatewayUrl = window.location.port === '5173'
       ? '/v1/chat/completions'
       : `${(API_BASE_URL.replace(/\/api\/v1\/?$/, '') || 'http://localhost:8000')}/v1/chat/completions`;
+    const headers = apiKey
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }
+      : getAuthHeaders({ 'Content-Type': 'application/json', 'X-Console-Prompt-Studio': 'true' });
     const res = await fetch(gatewayUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
+      headers,
       body: JSON.stringify({
         model,
         messages,
@@ -503,7 +542,7 @@ export const apiClient = {
   async deployRouting(data) {
     const res = await fetch(`${API_BASE_URL}/routing/deploy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -515,7 +554,9 @@ export const apiClient = {
 
   async getRoutingHistory() {
     try {
-      const res = await fetch(`${API_BASE_URL}/routing/history`);
+      const res = await fetch(`${API_BASE_URL}/routing/history`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -531,32 +572,24 @@ export const apiClient = {
   },
 
   async getMetricsSummary() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/observability/metrics/summary`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getMetricsSummary offline, fallback to mock');
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/observability/metrics/summary`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   // --- FinOps & Billing (Phase 3) ---
   async getFinOpsOverview() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/finops/overview`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getFinOpsOverview offline, fallback to mock');
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/finops/overview`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async exportFinOpsInvoiceCsv(month = null) {
     const url = new URL(`${API_BASE_URL}/finops/invoices/export`);
     if (month) url.searchParams.append('month', month);
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const downloadUrl = window.URL.createObjectURL(blob);
@@ -572,22 +605,17 @@ export const apiClient = {
 
   // --- Compliance & PII Governance (Phase 4) ---
   async getPiiRules(activeOnly = false) {
-    try {
-      const url = new URL(`${API_BASE_URL}/compliance/rules`);
-      if (activeOnly) url.searchParams.append('active_only', 'true');
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getPiiRules offline, fallback to mock:', err);
-      return null;
-    }
+    const url = new URL(`${API_BASE_URL}/compliance/rules`);
+    if (activeOnly) url.searchParams.append('active_only', 'true');
+    const res = await authFetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async createPiiRule(ruleData) {
     const res = await fetch(`${API_BASE_URL}/compliance/rules`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(ruleData),
     });
     if (!res.ok) {
@@ -600,7 +628,7 @@ export const apiClient = {
   async updatePiiRule(ruleId, ruleData) {
     const res = await fetch(`${API_BASE_URL}/compliance/rules/${ruleId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(ruleData),
     });
     if (!res.ok) {
@@ -613,6 +641,7 @@ export const apiClient = {
   async deletePiiRule(ruleId) {
     const res = await fetch(`${API_BASE_URL}/compliance/rules/${encodeURIComponent(ruleId)}`, {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Failed to delete PII rule' }));
@@ -624,7 +653,7 @@ export const apiClient = {
   async simulatePiiMasking({ text, requester_id = 'admin-sim', key_id = null, model_id = null }) {
     const res = await fetch(`${API_BASE_URL}/compliance/simulate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text, requester_id, key_id, model_id }),
     });
     if (!res.ok) {
@@ -635,53 +664,38 @@ export const apiClient = {
   },
 
   async getAuditLogs(params = {}) {
-    try {
-      const url = new URL(`${API_BASE_URL}/compliance/audit-logs`);
-      if (params.requester_id) url.searchParams.append('requester_id', params.requester_id);
-      if (params.key_id) url.searchParams.append('key_id', params.key_id);
-      if (params.action_taken) url.searchParams.append('action_taken', params.action_taken);
-      if (params.is_blocked !== undefined && params.is_blocked !== null) {
-        url.searchParams.append('is_blocked', params.is_blocked);
-      }
-      if (params.limit) url.searchParams.append('limit', params.limit);
-      if (params.offset) url.searchParams.append('offset', params.offset);
-
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getAuditLogs offline, fallback to mock:', err);
-      return null;
+    const url = new URL(`${API_BASE_URL}/compliance/audit-logs`);
+    if (params.requester_id) url.searchParams.append('requester_id', params.requester_id);
+    if (params.key_id) url.searchParams.append('key_id', params.key_id);
+    if (params.action_taken) url.searchParams.append('action_taken', params.action_taken);
+    if (params.is_blocked !== undefined && params.is_blocked !== null) {
+      url.searchParams.append('is_blocked', params.is_blocked);
     }
+    if (params.limit) url.searchParams.append('limit', params.limit);
+    if (params.offset) url.searchParams.append('offset', params.offset);
+
+    const res = await authFetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async getComplianceStats() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/compliance/stats`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getComplianceStats offline, fallback to mock:', err);
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/compliance/stats`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   // --- Lifecycle & Patch Management (Phase 5) ---
   async getLifecycleComponents() {
-    try {
-      const res = await fetch(`${API_BASE_URL}/lifecycle/components`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getLifecycleComponents offline, fallback to mock:', err);
-      return null;
-    }
+    const res = await authFetch(`${API_BASE_URL}/lifecycle/components`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   },
 
   async verifyPatchBundle(patchData) {
     const res = await fetch(`${API_BASE_URL}/lifecycle/patches/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(patchData)
     });
     if (!res.ok) {
@@ -694,7 +708,7 @@ export const apiClient = {
   async runPatchDryRun(patchData) {
     const res = await fetch(`${API_BASE_URL}/lifecycle/patches/dry-run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(patchData)
     });
     if (!res.ok) {
@@ -707,7 +721,7 @@ export const apiClient = {
   async applyPatch(patchData) {
     const res = await fetch(`${API_BASE_URL}/lifecycle/patches/apply`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(patchData)
     });
     if (!res.ok) {
@@ -720,7 +734,7 @@ export const apiClient = {
   async rollbackPatch(rollbackData) {
     const res = await fetch(`${API_BASE_URL}/lifecycle/patches/rollback`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(rollbackData)
     });
     if (!res.ok) {
@@ -732,7 +746,9 @@ export const apiClient = {
 
   async getPatchHistory(limit = 20) {
     try {
-      const res = await fetch(`${API_BASE_URL}/lifecycle/patches/history?limit=${limit}`);
+      const res = await fetch(`${API_BASE_URL}/lifecycle/patches/history?limit=${limit}`, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -742,7 +758,9 @@ export const apiClient = {
   },
 
   async runLifecyclePreflight() {
-    const res = await fetch(`${API_BASE_URL}/lifecycle/preflight`);
+    const res = await fetch(`${API_BASE_URL}/lifecycle/preflight`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   },
@@ -750,7 +768,7 @@ export const apiClient = {
   async generateSupportBundle(bundleReq = {}) {
     const res = await fetch(`${API_BASE_URL}/lifecycle/support-bundle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(bundleReq)
     });
     if (!res.ok) {
@@ -771,7 +789,9 @@ export const apiClient = {
       if (params.target_type) url.searchParams.append('target_type', params.target_type);
       if (params.is_active !== undefined) url.searchParams.append('is_active', params.is_active);
       if (params.search) url.searchParams.append('search', params.search);
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders()
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -783,7 +803,7 @@ export const apiClient = {
   async createSystemPrompt(data) {
     const res = await fetch(`${API_BASE_URL}/system-prompts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -796,7 +816,7 @@ export const apiClient = {
   async updateSystemPrompt(promptId, data) {
     const res = await fetch(`${API_BASE_URL}/system-prompts/${promptId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -808,7 +828,8 @@ export const apiClient = {
 
   async deleteSystemPrompt(promptId) {
     const res = await fetch(`${API_BASE_URL}/system-prompts/${promptId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: '시스템 프롬프트 삭제 실패' }));
@@ -820,7 +841,7 @@ export const apiClient = {
   async resolveSystemPrompt(data) {
     const res = await fetch(`${API_BASE_URL}/system-prompts/resolve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -839,7 +860,12 @@ export const apiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: '로그인에 실패했습니다.' }));
-      throw new Error(err.detail || '로그인에 실패했습니다.');
+      const detailMsg = Array.isArray(err.detail)
+        ? err.detail.map((d) => d.msg || JSON.stringify(d)).join(', ')
+        : typeof err.detail === 'object' && err.detail !== null
+          ? JSON.stringify(err.detail)
+          : err.detail;
+      throw new Error(detailMsg || '로그인에 실패했습니다.');
     }
     return await res.json();
   },
@@ -923,7 +949,7 @@ export const apiClient = {
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers,
       body: JSON.stringify(userData)
     });
@@ -963,6 +989,78 @@ export const apiClient = {
       throw new Error(err.detail || '비밀번호 초기화 실패');
     }
     return await res.json();
+  },
+
+  // --- Role & Dynamic RBAC Governance ---
+  async getRoles() {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/roles`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '역할 목록 조회 실패' }));
+      throw new Error(err.detail || '역할 목록 조회 실패');
+    }
+    return await res.json();
+  },
+
+  async getRolePermissions() {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/roles/permissions`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '권한 목록 조회 실패' }));
+      throw new Error(err.detail || '권한 목록 조회 실패');
+    }
+    return await res.json();
+  },
+
+  async createRole(roleData) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/roles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(roleData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '역할 생성 실패' }));
+      throw new Error(err.detail || '역할 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async updateRole(roleId, roleData) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/roles/${roleId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(roleData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '역할 수정 실패' }));
+      throw new Error(err.detail || '역할 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteRole(roleId) {
+    const token = localStorage.getItem('aiorche_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE_URL}/roles/${roleId}`, {
+      method: 'DELETE',
+      headers
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '역할 삭제 실패' }));
+      throw new Error(err.detail || '역할 삭제 실패');
+    }
+    return true;
   }
 };
 

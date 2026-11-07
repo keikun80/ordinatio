@@ -28,8 +28,11 @@ class VirtualKeyResponse(BaseModel):
 
     key_id: str
     name: str
-    tenant_id: str
+    tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
+    tenant_budget_krw: Optional[float] = None
+    spent_krw: float = 0.0
+    total_tokens: int = 0
     key_prefix: str
     allowed_models: List[str] = []
     allowed_ip_cidrs: List[str] = []

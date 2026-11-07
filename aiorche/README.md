@@ -70,7 +70,8 @@ bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 �
 bash scripts/verify-phase4.sh   # Phase 4: PII 보안 거버넌스 및 WORM 감사 포렌식
 bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진
 bash scripts/verify-phase-system-prompt.sh # 시스템 프롬프트 거버넌스 & 동적 주입 엔진
-make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약, 85 Tests)
+make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약, 93 Tests)
+make verify-standalone-install # Phase 6: Standalone 설치 툴 및 Vagrant 검증 (7/7 PASS)
 ```
 
 ---
@@ -88,8 +89,9 @@ make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보�
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
 | **시스템 프롬프트** | 동적 시스템 프롬프트 거버넌스 & L7 인라인 주입 | ✅ 완료 | `verify-phase-system-prompt.sh` 통과 |
-| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 3-Tier RBAC | ✅ 완료 | `make verify-auth-rbac` 통과 (85 Tests) |
-| **Phase 6** | E2E 통합 검증, 보안 감사 및 에어갭 패키징 | 🚧 미구현 | — |
+| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 3-Tier RBAC | ✅ 완료 | `make verify-auth-rbac` 통과 (94 Tests) |
+| **Phase 6: Standalone** | RHEL 9 호환 Standalone 설치 툴(install.sh) & aiorche-ctl CLI | ✅ 완료 | `make verify-standalone-install` (7/7 PASS) |
+| **Phase 6: 현지화** | 15개 UI 컴포넌트 한글 리터럴 제거 & strings.js 일원화 | ✅ 완료 | `npm run build` (Vite Build PASS) |
 
 ---
 
@@ -127,8 +129,11 @@ make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보�
    - 개인정보 완전 필터링 Zero-PII 서포트 번들 암호화 ZIP 생성 및 즉시 다운로드
    - 5대 핵심 인프라(Postgres, Redis, Envoy, ext_proc, vLLM) Preflight 정밀 자가진단
    - 프론트엔드 `LifecycleTab.jsx`: 실시간 터미널 스트리밍 로그, 버전 배지 갱신 및 원클릭 배포 연동
-6. 🚧 **Phase 6: E2E 통합 검증 및 에어갭 패키징** — `미구현`
-   - Playwright E2E, Helm Chart, 오프라인 이미지 번들, SAST/컨테이너 스캔
+6. ✅ **Phase 6: Standalone 무인 패키징, 보안 하드닝 및 UI 현지화** — `구현완료`
+   - RHEL 9 호환 4단계 무인 설치 파이프라인(`install.sh`), 호스트 관리 CLI(`aiorche-ctl`), Vagrant 멀티 배포판 테스트베드
+   - 127.0.0.1 루프백 포트 격리 및 파일 퍼미션(600/700) 하드닝 (`PRE_33` 보안 검토 통과)
+   - 15개 프론트엔드 UI 컴포넌트 한글 리터럴 100% 제거 및 `strings.js` 중앙 집중화 (`PRE_35`)
+   - 차세대 엔터프라이즈 확장(오프라인 DRM 라이선스, Helm Chart, 시맨틱 캐싱 등)은 `PRE_28` 상용화 로드맵 참조
 
 ## 쿠버네티스 Pod 관리 (Kubernetes Operations)
 

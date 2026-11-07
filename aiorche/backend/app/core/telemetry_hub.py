@@ -364,24 +364,6 @@ class TelemetryHub:
         except Exception as e:
             logger.warning(f"Failed to query real compute pools from DB: {e}")
 
-        # If DB query failed or empty, fallback to default registered structure
-        if not pools:
-            pools = [
-                ComputePoolStatus(
-                    pool_name="On-Prem K8s (vLLM - Llama 3.1 8B)",
-                    infra="On-Prem K8s",
-                    pod_count=1,
-                    waiting_queue=0,
-                    gpu_memory_pct=65.0,
-                    gpu_metric_source="Local Node RAM",
-                    status="HEALTHY",
-                    model_id="meta-llama/Llama-3.1-8B-Instruct",
-                    engine="vLLM",
-                    workload="사내 AI 비서 / 챗봇",
-                    scaling_tech="KEDA + HPA",
-                    endpoint_url="http://vllm-llama8b.ai-serving:8000"
-                )
-            ]
         return pools
 
     def _get_real_model_traffic(self, current_total_rps: float = 0.0) -> List[ModelTrafficShare]:
@@ -454,7 +436,7 @@ class TelemetryHub:
             tps=envoy_kpis["tps"],
             ttft_ms=envoy_kpis["ttft"],
             error_rate_5xx=envoy_kpis["error_rate"],
-            cache_hit_rate=42.0,
+            cache_hit_rate=42.0 if envoy_kpis["rps"] > 0 else 0.0,
             cumulative_cost_krw=round(cumulative_cost, 0),
             active_connections=len(self.active_connections),
             compute_pools=pools,
@@ -470,7 +452,7 @@ class TelemetryHub:
         
         rps = self._latest_telemetry.rps if self._latest_telemetry else 0.0
         tps = self._latest_telemetry.tps if self._latest_telemetry else 0.0
-        ttft = self._latest_telemetry.ttft_ms if self._latest_telemetry else 3.1
+        ttft = self._latest_telemetry.ttft_ms if self._latest_telemetry else 0.0
         err_rate = self._latest_telemetry.error_rate_5xx if self._latest_telemetry else 0.0
         active_conn = len(self.active_connections)
 
@@ -482,7 +464,7 @@ class TelemetryHub:
             tps=tps,
             ttft_ms=ttft,
             error_rate_5xx=err_rate,
-            cache_hit_rate=42.0,
+            cache_hit_rate=42.0 if rps > 0 else 0.0,
             cumulative_cost_krw=round(cost, 0),
             active_connections=active_conn,
             compute_pools=pools,

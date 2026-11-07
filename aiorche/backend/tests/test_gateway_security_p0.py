@@ -210,15 +210,39 @@ def test_system_diagnostics_key_allowed_in_strict_production(client: TestClient,
     assert res.status_code not in [401, 403]
 
 
-def test_routing_test_call_uses_system_diagnostics_key_and_succeeds(client: TestClient, monkeypatch):
+def test_routing_test_call_uses_system_diagnostics_key_and_succeeds(client: TestClient, db_session, monkeypatch):
     """
     보안 검증 6: 라우팅 탭의 '게이트웨이 즉시 호출 테스트'(/api/v1/routing/test-call)가
     ALLOW_DEV_MOCK_KEYS = False 상태에서도 401/403 오류 없이 정상 동작함
     """
+    from app.models.user import User
+    from app.core.security import hash_password
+
     monkeypatch.setattr(settings, "ALLOW_DEV_MOCK_KEYS", False)
+
+    db_session.query(User).filter(User.username == "sa-diag-test").delete()
+    db_session.commit()
+    sa = User(
+        username="sa-diag-test",
+        full_name="진단 관리자",
+        email="sa-diag@aiorche.local",
+        password_hash=hash_password("DiagSecret123!"),
+        role="SUPER_ADMIN",
+        is_active=True
+    )
+    db_session.add(sa)
+    db_session.commit()
+
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"username": "sa-diag-test", "password": "DiagSecret123!"}
+    )
+    assert login_res.status_code == 200
+    admin_token = login_res.json()["access_token"]
 
     res = client.post(
         "/api/v1/routing/test-call",
+        headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "route_name": "financial-advisor-v1",
             "method": "header",
@@ -230,3 +254,87 @@ def test_routing_test_call_uses_system_diagnostics_key_and_succeeds(client: Test
     data = res.json()
     assert data["request_headers"].get("Authorization") == f"Bearer {SYSTEM_DIAGNOSTICS_KEY}"
     assert data["dispatched_route"] == "financial-advisor-v1"
+
+
+def test_c1_system_diagnostics_key_not_static_and_blocked_from_external_ip(client: TestClient, monkeypatch):
+    """
+    보안 검증 7 (C-1): SYSTEM_DIAGNOSTICS_KEY는 하드코딩된 평문이 아닌 SECRET_KEY 기반 HMAC 파생 키이며,
+    외부 공인 IP(예: 203.0.113.195)에서 호출 시 403 Forbidden으로 차단됨
+    """
+    from app.core.security import SYSTEM_DIAGNOSTICS_KEY
+    assert SYSTEM_DIAGNOSTICS_KEY != "sk-orch-system-diagnostics-appliance-key"
+    assert SYSTEM_DIAGNOSTICS_KEY.startswith("sk-orch-diag-")
+
+    monkeypatch.setattr(settings, "ALLOW_DEV_MOCK_KEYS", False)
+    res_ext = client.post(
+        "/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {SYSTEM_DIAGNOSTICS_KEY}",
+            "X-Forwarded-For": "203.0.113.195"
+        },
+        json={
+            "model": "meta-llama/Llama-3-8B-Instruct",
+            "messages": [{"role": "user", "content": "외부에서 진단키 도용 시도"}]
+        }
+    )
+    assert res_ext.status_code == 403
+    assert "접속이 허용되지 않은 클라이언트 IP 대역입니다" in res_ext.json()["detail"]
+
+
+def test_c2_ssrf_validation_blocks_metadata_and_internal_ports():
+    """
+    보안 검증 8 (C-2): validate_upstream_endpoint_url이 클라우드 메타데이터(169.254.169.254),
+    비-HTTP 스킴(file://), 내부 제어 포트(5432, 6379, 9901, 18000)를 차단함
+    """
+    from app.core.security import validate_upstream_endpoint_url
+
+    for malicious_url in [
+        "http://169.254.169.254/latest/meta-data/",
+        "http://envoy:9901/quitquitquit",
+        "http://127.0.0.1:6379/",
+        "http://postgres:5432/",
+        "file:///etc/passwd",
+    ]:
+        with pytest.raises(ValueError):
+            validate_upstream_endpoint_url(malicious_url)
+
+    # 정상 서빙 엔드포인트는 통과
+    assert validate_upstream_endpoint_url("http://192.168.1.50:8000/v1/chat/completions") == "http://192.168.1.50:8000/v1/chat/completions"
+
+
+def test_h1_xff_header_spoofing_prevented(client: TestClient, db_session):
+    """
+    보안 검증 9 (H-1): 클라이언트가 X-Forwarded-For 앞에 허용 IP를 위조하여 전송하더라도
+    Envoy가 끝에 추가한 실제 클라이언트 IP(우측 끝 hop)를 기준으로 검증하여 403 차단함
+    """
+    raw_key = generate_virtual_key()
+    spoof_target_key = VirtualKey(
+        key_id="vk-xff-spoof-test",
+        key_hash=hash_virtual_key(raw_key),
+        key_prefix=raw_key[:16],
+        tenant_id="dept-wm",
+        name="XFF 스푸핑 방어 검증 키",
+        allowed_models=[],
+        allowed_ip_cidrs=["10.100.0.0/16"],
+        rpm_limit=100,
+        tpm_limit=50000,
+        is_active=True,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30)
+    )
+    db_session.add(spoof_target_key)
+    db_session.commit()
+
+    # 공격자가 "X-Forwarded-For: 10.100.25.14"를 위조해 보냈으나 프록시가 실제 IP "203.0.113.195"를 우측에 추가한 상황
+    res_spoofed = client.post(
+        "/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {raw_key}",
+            "X-Forwarded-For": "10.100.25.14, 203.0.113.195"
+        },
+        json={
+            "model": "meta-llama/Llama-3-8B-Instruct",
+            "messages": [{"role": "user", "content": "XFF 스푸핑 요청"}]
+        }
+    )
+    assert res_spoofed.status_code == 403
+    assert "203.0.113.195" in res_spoofed.json()["detail"]

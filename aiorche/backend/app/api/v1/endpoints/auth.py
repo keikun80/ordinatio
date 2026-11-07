@@ -1,8 +1,16 @@
 import uuid
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -14,6 +22,8 @@ from app.core.security import (
     hash_session_token
 )
 from app.models.user import User, UserSession
+from app.models.role import Role
+from app.core.permissions import ALL_PERMISSION_CODES
 from app.schemas.user import (
     UserLoginRequest,
     UserLoginResponse,
@@ -24,16 +34,27 @@ from app.api.deps import get_current_user, extract_token_from_request
 
 router = APIRouter(prefix="/auth", tags=["User Authentication & Session Management"])
 
-def _build_user_response(user: User) -> UserResponse:
-    now = datetime.utcnow()
-    is_locked = bool(user.locked_until and user.locked_until > now)
+def _build_user_response(user: User, db: Optional[Session] = None) -> UserResponse:
+    now = datetime.now(timezone.utc)
+    locked_until = _to_utc(user.locked_until)
+    is_locked = bool(locked_until and locked_until > now)
     tenant_name = user.tenant.name if user.tenant else None
+
+    permissions = []
+    if user.role == "SUPER_ADMIN":
+        permissions = ["*"] + ALL_PERMISSION_CODES
+    elif db:
+        role_obj = db.query(Role).filter(Role.name == user.role).first()
+        if role_obj and role_obj.permissions:
+            permissions = role_obj.permissions
+
     return UserResponse(
         id=user.id,
         username=user.username,
         full_name=user.full_name,
         email=user.email,
         role=user.role,
+        permissions=permissions,
         tenant_id=user.tenant_id,
         tenant_name=tenant_name,
         is_active=user.is_active,
@@ -52,9 +73,11 @@ def login(
     db: Session = Depends(get_db)
 ):
     """Authenticate user with Argon2id, enforce lockout on 5 failures, and revoke duplicate sessions."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
-    user = db.query(User).filter(User.username == req.username).first()
+    user = db.query(User).filter(
+        or_(User.username == req.username, User.email == req.username)
+    ).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -68,8 +91,9 @@ def login(
         )
 
     # 1. Check account lockout
-    if user.locked_until and user.locked_until > now:
-        remaining_seconds = int((user.locked_until - now).total_seconds())
+    locked_until = _to_utc(user.locked_until)
+    if locked_until and locked_until > now:
+        remaining_seconds = int((locked_until - now).total_seconds())
         remaining_minutes = max(1, (remaining_seconds + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -149,7 +173,7 @@ def login(
         access_token=access_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=_build_user_response(user)
+        user=_build_user_response(user, db)
     )
 
 @router.post("/logout")
@@ -171,9 +195,12 @@ def logout(
     return {"message": "성공적으로 로그아웃되었습니다."}
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Retrieve currently authenticated user profile and permissions."""
-    return _build_user_response(current_user)
+    return _build_user_response(current_user, db)
 
 @router.post("/password")
 def change_password(

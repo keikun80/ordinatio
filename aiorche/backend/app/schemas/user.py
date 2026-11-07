@@ -3,8 +3,8 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 class UserLoginRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=64, description="사용자 아이디")
-    password: str = Field(..., min_length=6, description="비밀번호")
+    username: str = Field(..., min_length=1, max_length=255, description="사용자 아이디 또는 이메일")
+    password: str = Field(..., min_length=1, description="비밀번호")
 
 
 class UserResponse(BaseModel):
@@ -13,6 +13,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: str
     role: str  # SUPER_ADMIN, TENANT_ADMIN, VIEWER
+    permissions: List[str] = []
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
     is_active: bool

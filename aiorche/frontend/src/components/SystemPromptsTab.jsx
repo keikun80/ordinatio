@@ -19,8 +19,12 @@ import {
   Globe
 } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { strings } from '../constants/strings';
+import { useAuth } from '../context/AuthContext';
 
 export default function SystemPromptsTab({ onNotify }) {
+  const { isSuperAdmin, hasPermission } = useAuth();
+  const canWritePrompts = isSuperAdmin || hasPermission('prompts:write');
   const [prompts, setPrompts] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [virtualKeys, setVirtualKeys] = useState([]);
@@ -48,7 +52,7 @@ export default function SystemPromptsTab({ onNotify }) {
   const [simKeyId, setSimKeyId] = useState('');
   const [simRouteName, setSimRouteName] = useState('');
   const [simTenantId, setSimTenantId] = useState('');
-  const [simUserMessage, setSimUserMessage] = useState('사내 규정에 맞는 대출 상품 추천해줘');
+  const [simUserMessage, setSimUserMessage] = useState(strings.systemPrompts.defaultSimUserMessage);
   const [simClientSysMsg, setSimClientSysMsg] = useState('');
   const [simResult, setSimResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -56,34 +60,25 @@ export default function SystemPromptsTab({ onNotify }) {
   // Quick Templates
   const TEMPLATES = [
     {
-      label: '금융 보안 가드레일',
-      name: '금융 보안 및 컴플라이언스 가드레일',
-      desc: '개인정보 유출 방지 및 금융소비자보호법 준수 지침',
+      label: strings.systemPrompts.presets.guardrailLabel,
+      name: strings.systemPrompts.presets.guardrailName,
+      desc: strings.systemPrompts.presets.guardrailDesc,
       targetType: 'GLOBAL',
-      content: `[사내 보안 및 금융 컴플라이언스 기본 지침]
-1. 금융거래정보, 주민등록번호, 계좌 비밀번호 등 개인 식별 정보를 절대 외부로 유출하거나 요구하지 마십시오.
-2. 사내 규정과 금융소비자보호법을 철저히 준수하며 객관적이고 신뢰할 수 있는 정보를 제공하십시오.
-3. 불확실한 투자 조언이나 확정적 수익률 보장은 엄격히 금지됩니다.`
+      content: strings.systemPrompts.presets.guardrailContent
     },
     {
-      label: 'PB 자산관리 상담',
-      name: '자산관리(WM) 고객 상담 표준 페르소나',
-      desc: '자산관리부 소속 전용 고품격 금융 상담 페르소나',
+      label: strings.systemPrompts.presets.wmLabel,
+      name: strings.systemPrompts.presets.wmName,
+      desc: strings.systemPrompts.presets.wmDesc,
       targetType: 'TENANT',
-      content: `[자산관리(WM) 고객 상담 표준 페르소나]
-- 귀하는 최고 수준의 금융 전문 프라이빗 뱅커(PB) 어시스턴트입니다.
-- 고객의 자산 포트폴리오를 다각도로 분석하고, 위험 성향에 맞춘 최적의 자산 배분 방안을 정중하고 격조 높은 어조로 제안하십시오.
-- 답변 시 항상 고객의 투자 리스크 관리 방안을 함께 안내해야 합니다.`
+      content: strings.systemPrompts.presets.wmContent
     },
     {
-      label: '시큐어 코딩 지침',
-      name: '사내 개발팀 시큐어 코딩 및 SQL 최적화 지침',
-      desc: '개발 지원 라우트 전용 보안 코딩 표준',
+      label: strings.systemPrompts.presets.secureCodeLabel,
+      name: strings.systemPrompts.presets.secureCodeName,
+      desc: strings.systemPrompts.presets.secureCodeDesc,
       targetType: 'ROUTE',
-      content: `[사내 개발 표준 시큐어 코딩 지침]
-- 생성되는 모든 코드는 SQL Injection, XSS, 하드코딩된 Secret이 없는지 엄격히 점검하십시오.
-- PEP8 및 표준 린트 규칙을 준수하고, 시간 복잡도와 메모리 효율성을 고려한 최적화 코드를 작성하십시오.
-- 가능한 한 단위 테스트 코드(Unit Test)를 함께 작성하여 신뢰성을 확보하십시오.`
+      content: strings.systemPrompts.presets.secureCodeContent
     }
   ];
 
@@ -104,7 +99,7 @@ export default function SystemPromptsTab({ onNotify }) {
       setTenants(Array.isArray(tenantList) ? tenantList : []);
     } catch (e) {
       console.error('Failed to load system prompts data:', e);
-      onNotify('ERROR', '시스템 프롬프트 데이터 로딩에 실패했습니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.loadFailed);
     } finally {
       setIsLoading(false);
     }
@@ -168,12 +163,12 @@ export default function SystemPromptsTab({ onNotify }) {
   const handleSavePrompt = async (e) => {
     e.preventDefault();
     if (!formName.trim() || !formContent.trim()) {
-      onNotify('ERROR', '프롬프트 명칭과 본문은 필수 입력 사항입니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.nameAndContentRequired);
       return;
     }
 
     if (formTargetType !== 'GLOBAL' && !formTargetId) {
-      onNotify('ERROR', `${formTargetType} 바인딩 대상을 선택해 주십시오.`);
+      onNotify('ERROR', strings.systemPrompts.alerts.targetRequired(formTargetType));
       return;
     }
 
@@ -189,7 +184,7 @@ export default function SystemPromptsTab({ onNotify }) {
       const t = tenants.find((x) => (x.tenant_id || x.id) === formTargetId);
       targetName = t ? `${t.name} (${t.department_code || t.code})` : formTargetId;
     } else {
-      targetName = '전사 공통 (Global)';
+      targetName = strings.systemPrompts.table.globalTarget;
     }
 
     const payload = {
@@ -207,16 +202,16 @@ export default function SystemPromptsTab({ onNotify }) {
     try {
       if (editingPrompt) {
         await apiClient.updateSystemPrompt(editingPrompt.prompt_id, payload);
-        onNotify('SUCCESS', `시스템 프롬프트 [${payload.name}]가 수정되었습니다.`);
+        onNotify('SUCCESS', strings.systemPrompts.alerts.promptUpdated(payload.name));
       } else {
         await apiClient.createSystemPrompt(payload);
-        onNotify('SUCCESS', `시스템 프롬프트 [${payload.name}]가 성공적으로 등록되었습니다.`);
+        onNotify('SUCCESS', strings.systemPrompts.alerts.promptCreated(payload.name));
       }
       setShowEditModal(false);
       await loadAllData();
     } catch (err) {
       console.error('Save prompt error:', err);
-      onNotify('ERROR', err.message || '프롬프트 저장에 실패했습니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.saveFailed(err.message));
     } finally {
       setIsLoading(false);
     }
@@ -232,9 +227,9 @@ export default function SystemPromptsTab({ onNotify }) {
           item.prompt_id === p.prompt_id ? { ...item, is_active: nextActive } : item
         )
       );
-      onNotify('SUCCESS', `[${p.name}] 프롬프트가 ${nextActive ? '활성화' : '비활성화'}되었습니다.`);
+      onNotify('SUCCESS', strings.systemPrompts.alerts.statusChanged(p.name, nextActive));
     } catch (err) {
-      onNotify('ERROR', '상태 변경에 실패했습니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.statusFailed);
     }
   };
 
@@ -244,11 +239,11 @@ export default function SystemPromptsTab({ onNotify }) {
     setIsLoading(true);
     try {
       await apiClient.deleteSystemPrompt(promptToDelete.prompt_id);
-      onNotify('SUCCESS', `시스템 프롬프트 [${promptToDelete.name}]가 영구 삭제되었습니다.`);
+      onNotify('SUCCESS', strings.systemPrompts.alerts.deletedSuccess(promptToDelete.name));
       setPromptToDelete(null);
       await loadAllData();
     } catch (err) {
-      onNotify('ERROR', err.message || '프롬프트 삭제에 실패했습니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.deleteFailed(err.message));
     } finally {
       setIsLoading(false);
     }
@@ -272,7 +267,7 @@ export default function SystemPromptsTab({ onNotify }) {
       });
       setSimResult(res);
     } catch (e) {
-      onNotify('ERROR', '시뮬레이션 실행 중 오류가 발생했습니다.');
+      onNotify('ERROR', strings.systemPrompts.alerts.simError);
     } finally {
       setIsSimulating(false);
     }
@@ -293,14 +288,19 @@ export default function SystemPromptsTab({ onNotify }) {
         <div>
           <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ScrollText size={24} color="#38bdf8" />
-            <span>시스템 프롬프트 거버넌스</span>
+            <span>{strings.systemPrompts.headerTitle}</span>
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '4px' }}>
-            사내 표준 페르소나 및 금융 보안 가드레일을 등록하고, <strong>[라우팅 정책 · API Key · 테넌트]</strong>에 1:1로 연결하여 LLM 호출 시 자동 주입합니다.
+            {strings.systemPrompts.headerSubtitlePrefix}<strong>{strings.systemPrompts.headerSubtitleStrong}</strong>{strings.systemPrompts.headerSubtitleSuffix}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!canWritePrompts && (
+            <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+              {strings.virtualKeys.readOnlyBadge}
+            </span>
+          )}
           <button
             className="btn btn-secondary"
             data-testid="sp-btn-open-simulator"
@@ -314,17 +314,18 @@ export default function SystemPromptsTab({ onNotify }) {
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Play size={15} color="#38bdf8" />
-            <span>주입 시뮬레이터</span>
+            <span>{strings.systemPrompts.btnOpenSimulator}</span>
           </button>
           <button
             className="btn btn-primary"
             data-testid="sp-btn-open-create"
             data-function-id="FNC-SP-OPEN-CREATE"
-            onClick={handleOpenCreateModal}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            disabled={!canWritePrompts}
+            onClick={() => canWritePrompts && handleOpenCreateModal()}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: canWritePrompts ? 1 : 0.45, cursor: canWritePrompts ? 'pointer' : 'not-allowed' }}
           >
             <Plus size={16} />
-            <span>신규 시스템 프롬프트 등록</span>
+            <span>{strings.systemPrompts.btnRegister}</span>
           </button>
         </div>
       </div>
@@ -332,42 +333,42 @@ export default function SystemPromptsTab({ onNotify }) {
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div className="card" data-testid="sp-card-total" style={{ padding: '16px', borderLeft: '4px solid #38bdf8' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>총 등록 프롬프트</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.totalRegistered}</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-            {totalCount} <span style={{ fontSize: '0.88rem', fontWeight: 400, color: '#10b981' }}>({activeCount}개 활성)</span>
+            {totalCount} <span style={{ fontSize: '0.88rem', fontWeight: 400, color: '#10b981' }}>{strings.systemPrompts.kpi.activeCountSuffix(activeCount)}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            전사 가드레일 & 표준 페르소나 목록
+            {strings.systemPrompts.kpi.totalDesc}
           </div>
         </div>
 
         <div className="card" data-testid="sp-card-route" style={{ padding: '16px', borderLeft: '4px solid #818cf8' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>라우팅 정책 바인딩</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.routeBinding}</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#818cf8', marginTop: '4px' }}>
-            {routeBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>개 라우트</span>
+            {routeBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.routeCountSuffix}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            목적별 인프라 라우트 전용 지침
+            {strings.systemPrompts.kpi.routeDesc}
           </div>
         </div>
 
         <div className="card" data-testid="sp-card-vkey" style={{ padding: '16px', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>API Key 바인딩</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.vkeyBinding}</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f59e0b', marginTop: '4px' }}>
-            {vkeyBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>개 가상키</span>
+            {vkeyBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.vkeyCountSuffix}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            최우선 적용 (1순위 타겟)
+            {strings.systemPrompts.kpi.vkeyDesc}
           </div>
         </div>
 
         <div className="card" data-testid="sp-card-tenant-global" style={{ padding: '16px', borderLeft: '4px solid #10b981' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>테넌트 / 전사 바인딩</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.tenantGlobalBinding}</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>
-            {tenantBindingCount + globalBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>(테넌트 {tenantBindingCount}, 전사 {globalBindingCount})</span>
+            {tenantBindingCount + globalBindingCount} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.tenantGlobalCount(tenantBindingCount, globalBindingCount)}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            부서 공통 및 전사 보안 가드레일
+            {strings.systemPrompts.kpi.tenantGlobalDesc}
           </div>
         </div>
       </div>
@@ -376,13 +377,13 @@ export default function SystemPromptsTab({ onNotify }) {
       <div className="card" data-testid="sp-filter-card" style={{ padding: '14px 18px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginRight: '6px' }}>바인딩 대상:</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginRight: '6px' }}>{strings.systemPrompts.filterScopeLabel}</span>
             {[
-              { id: 'ALL', label: '전체 보기' },
-              { id: 'ROUTE', label: '라우팅 정책' },
-              { id: 'VIRTUAL_KEY', label: 'API Key' },
-              { id: 'TENANT', label: '테넌트 / 부서' },
-              { id: 'GLOBAL', label: '전사 공통' }
+              { id: 'ALL', label: strings.systemPrompts.filterAll },
+              { id: 'ROUTE', label: strings.systemPrompts.filterRouteTab },
+              { id: 'VIRTUAL_KEY', label: strings.systemPrompts.filterKeyTab },
+              { id: 'TENANT', label: strings.systemPrompts.filterTenantTab },
+              { id: 'GLOBAL', label: strings.systemPrompts.filterGlobalTab }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -401,7 +402,7 @@ export default function SystemPromptsTab({ onNotify }) {
             <input
               type="text"
               data-testid="sp-input-search"
-              placeholder="프롬프트 명칭, 타겟 검색..."
+              placeholder={strings.systemPrompts.searchPromptsPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-input"
@@ -463,14 +464,15 @@ export default function SystemPromptsTab({ onNotify }) {
                         {p.injection_mode}
                       </span>
                       <button
-                        onClick={() => handleToggleActive(p)}
+                        onClick={() => canWritePrompts && handleToggleActive(p)}
+                        disabled={!canWritePrompts}
                         className={`badge ${p.is_active ? 'active' : 'warn'}`}
                         data-testid={`sp-btn-toggle-${p.prompt_id}`}
                         data-function-id="FNC-SP-TOGGLE"
-                        style={{ cursor: 'pointer', border: 'none' }}
-                        title="클릭하여 활성화/비활성화 전환"
+                        style={{ cursor: canWritePrompts ? 'pointer' : 'not-allowed', border: 'none', opacity: canWritePrompts ? 1 : 0.6 }}
+                        title={strings.systemPrompts.toggleActiveTitle}
                       >
-                        {p.is_active ? '가동 중' : '비활성'}
+                        {p.is_active ? strings.systemPrompts.statusRunning : strings.systemPrompts.statusInactiveShort}
                       </button>
                     </div>
                   </div>
@@ -493,10 +495,10 @@ export default function SystemPromptsTab({ onNotify }) {
                       }}
                     >
                       <TargetIcon size={12} />
-                      <span>[{p.target_type}] {p.target_name || p.target_id || '전사 공통'}</span>
+                      <span>[{p.target_type}] {p.target_name || p.target_id || strings.systemPrompts.globalFallback}</span>
                     </span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }} data-testid={`sp-tokens-${p.prompt_id}`}>
-                      ~{p.estimated_tokens} 토큰
+                      ~{p.estimated_tokens} {strings.systemPrompts.tokensSuffix}
                     </span>
                   </div>
 
@@ -537,21 +539,23 @@ export default function SystemPromptsTab({ onNotify }) {
                     <button
                       className="btn btn-secondary btn-sm"
                       data-testid={`sp-btn-edit-${p.prompt_id}`}
-                      onClick={() => handleOpenEditModal(p)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
+                      disabled={!canWritePrompts}
+                      onClick={() => canWritePrompts && handleOpenEditModal(p)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', opacity: canWritePrompts ? 1 : 0.45, cursor: canWritePrompts ? 'pointer' : 'not-allowed' }}
                     >
                       <Sliders size={13} />
-                      <span>수정</span>
+                      <span>{strings.common.edit}</span>
                     </button>
                     <button
                       className="btn btn-danger btn-sm"
                       data-testid={`sp-btn-delete-${p.prompt_id}`}
                       data-function-id="FNC-SP-DELETE"
-                      onClick={() => setPromptToDelete(p)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
+                      disabled={!canWritePrompts}
+                      onClick={() => canWritePrompts && setPromptToDelete(p)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', opacity: canWritePrompts ? 1 : 0.45, cursor: canWritePrompts ? 'pointer' : 'not-allowed' }}
                     >
                       <Trash2 size={13} />
-                      <span>삭제</span>
+                      <span>{strings.common.delete}</span>
                     </button>
                   </div>
                 </div>
@@ -562,10 +566,10 @@ export default function SystemPromptsTab({ onNotify }) {
           <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
             <ScrollText size={36} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
             <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              조건에 일치하는 시스템 프롬프트가 없습니다.
+              {strings.systemPrompts.noPromptsFound}
             </div>
             <p style={{ fontSize: '0.82rem', marginTop: '6px' }}>
-              우측 상단의 [+ 신규 시스템 프롬프트 등록] 버튼을 눌러 라우트나 가상키에 지침을 연결해 보십시오.
+              {strings.systemPrompts.noPromptsHint}
             </p>
           </div>
         )}
@@ -579,7 +583,7 @@ export default function SystemPromptsTab({ onNotify }) {
               <div className="modal-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.08rem', fontWeight: 700, color: '#ffffff' }}>
                   <ScrollText size={20} color="#38bdf8" />
-                  <span>{editingPrompt ? '시스템 프롬프트 수정' : '신규 시스템 프롬프트 등록 및 타겟 연결'}</span>
+                  <span>{editingPrompt ? strings.systemPrompts.editorModal.editTitle : strings.systemPrompts.editorModal.createTitle}</span>
                 </div>
               </div>
 
@@ -589,7 +593,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '6px', padding: '10px 12px', marginBottom: '16px' }}>
                     <div style={{ fontSize: '0.76rem', color: '#38bdf8', fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <Sparkles size={14} />
-                      <span>빠른 템플릿 채우기:</span>
+                      <span>{strings.systemPrompts.quickTemplatesLabel}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {TEMPLATES.map((tpl, i) => (
@@ -610,12 +614,12 @@ export default function SystemPromptsTab({ onNotify }) {
 
                 {/* Name & Desc */}
                 <div className="form-group" style={{ marginBottom: '14px' }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>프롬프트 식별 명칭 <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label className="form-label" style={{ fontWeight: 600 }}>{strings.systemPrompts.editorModal.nameLabel} <span style={{ color: '#ef4444' }}>*</span></label>
                   <input
                     type="text"
                     className="form-input"
                     data-testid="sp-input-name"
-                    placeholder="예: 여신심사부 리스크 평가 표준 페르소나"
+                    placeholder={strings.systemPrompts.editorModal.namePlaceholder}
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     required
@@ -623,12 +627,12 @@ export default function SystemPromptsTab({ onNotify }) {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '14px' }}>
-                  <label className="form-label">설명 및 목적</label>
+                  <label className="form-label">{strings.common.description}</label>
                   <input
                     type="text"
                     className="form-input"
                     data-testid="sp-input-desc"
-                    placeholder="예: 대출 심사 봇 호출 시 여신 리스크 가이드라인 자동 삽입"
+                    placeholder={strings.systemPrompts.editorModal.namePlaceholder}
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                   />
@@ -637,16 +641,16 @@ export default function SystemPromptsTab({ onNotify }) {
                 {/* 1:1 Target Selection */}
                 <div className="form-group" style={{ marginBottom: '16px', background: 'var(--bg-panel)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                   <label className="form-label" style={{ fontWeight: 600, marginBottom: '10px', color: '#38bdf8' }}>
-                    1:1 바인딩 대상 선택 (Scope Target) <span style={{ color: '#ef4444' }}>*</span>
+                    {strings.systemPrompts.editorModal.scopeTargetLabel} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
 
                   {/* Radio Group */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
                     {[
-                      { id: 'ROUTE', label: '라우팅 정책 (Route)', icon: GitFork },
-                      { id: 'VIRTUAL_KEY', label: 'API Key', icon: KeyRound },
-                      { id: 'TENANT', label: '테넌트 / 부서', icon: Users },
-                      { id: 'GLOBAL', label: '전사 공통 (Global)', icon: Globe }
+                      { id: 'ROUTE', label: strings.systemPrompts.editorModal.targetRouteLabel, icon: GitFork },
+                      { id: 'VIRTUAL_KEY', label: strings.systemPrompts.filterKeyTab, icon: KeyRound },
+                      { id: 'TENANT', label: strings.systemPrompts.filterTenantTab, icon: Users },
+                      { id: 'GLOBAL', label: strings.systemPrompts.filterGlobalTab, icon: Globe }
                     ].map((item) => (
                       <label
                         key={item.id}
@@ -685,7 +689,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   {/* Target Dropdown based on type */}
                   {formTargetType === 'ROUTE' && (
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem' }}>적용할 라우트 선택</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>{strings.systemPrompts.editorModal.targetRouteLabel}</label>
                       <select
                         className="form-select"
                         data-testid="sp-select-target-route"
@@ -704,7 +708,7 @@ export default function SystemPromptsTab({ onNotify }) {
 
                   {formTargetType === 'VIRTUAL_KEY' && (
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem' }}>적용할 API Key 선택 (1순위 최고 우선권)</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>{strings.systemPrompts.editorModal.targetVkeyLabel}</label>
                       <select
                         className="form-select"
                         data-testid="sp-select-target-vkey"
@@ -714,7 +718,7 @@ export default function SystemPromptsTab({ onNotify }) {
                       >
                         {virtualKeys.map((k) => (
                           <option key={k.key_id || k.keyId} value={k.key_id || k.keyId}>
-                            {k.name} ({k.key_id || k.keyId}) - {k.tenant_name || k.tenantName || '테넌트'}
+                            {k.name} ({k.key_id || k.keyId}) - {k.tenant_name || k.tenantName || strings.systemPrompts.tenantFallback}
                           </option>
                         ))}
                       </select>
@@ -723,7 +727,7 @@ export default function SystemPromptsTab({ onNotify }) {
 
                   {formTargetType === 'TENANT' && (
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem' }}>적용할 테넌트/부서 선택</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem' }}>{strings.systemPrompts.editorModal.targetTenantLabel}</label>
                       <select
                         className="form-select"
                         data-testid="sp-select-target-tenant"
@@ -742,7 +746,7 @@ export default function SystemPromptsTab({ onNotify }) {
 
                   {formTargetType === 'GLOBAL' && (
                     <div style={{ fontSize: '0.78rem', color: '#38bdf8', padding: '6px 0' }} data-testid="sp-info-target-global">
-                      💡 특정 라우트나 가상키에 지정되지 않은 모든 일반 추론 요청에 기본 보안 가드레일로 자동 적용됩니다.
+                      {strings.systemPrompts.editorModal.globalTargetHint}
                     </div>
                   )}
                 </div>
@@ -750,20 +754,20 @@ export default function SystemPromptsTab({ onNotify }) {
                 {/* Injection Strategy & Active */}
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px', marginBottom: '16px' }}>
                   <div>
-                    <label className="form-label" style={{ fontWeight: 600 }}>주입 전략 (Injection Strategy)</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>{strings.systemPrompts.editorModal.strategyLabel}</label>
                     <select
                       className="form-select"
                       data-testid="sp-select-injection-mode"
                       value={formInjectionMode}
                       onChange={(e) => setFormInjectionMode(e.target.value)}
                     >
-                      <option value="PREPEND">PREPEND (사내 지침을 최상단에 우선 배치 - 권장)</option>
-                      <option value="OVERRIDE">OVERRIDE (클라이언트의 지침을 무시하고 강제 대체)</option>
-                      <option value="FALLBACK_ONLY">FALLBACK_ONLY (클라이언트가 지침을 안 보냈을 때만)</option>
+                      <option value="PREPEND">{strings.systemPrompts.editorModal.strategyPrepend}</option>
+                      <option value="OVERRIDE">{strings.systemPrompts.editorModal.strategyOverride}</option>
+                      <option value="FALLBACK_ONLY">{strings.systemPrompts.editorModal.strategyFallback}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontWeight: 600 }}>상태</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>{strings.systemPrompts.editorModal.statusLabel}</label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '38px', cursor: 'pointer', fontSize: '0.84rem' }}>
                       <input
                         type="checkbox"
@@ -771,7 +775,7 @@ export default function SystemPromptsTab({ onNotify }) {
                         checked={formIsActive}
                         onChange={(e) => setFormIsActive(e.target.checked)}
                       />
-                      <span>즉시 활성화</span>
+                      <span>{strings.systemPrompts.editorModal.statusImmediateActive}</span>
                     </label>
                   </div>
                 </div>
@@ -780,17 +784,17 @@ export default function SystemPromptsTab({ onNotify }) {
                 <div className="form-group" style={{ marginBottom: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
-                      시스템 프롬프트 본문 (System Prompt Content) <span style={{ color: '#ef4444' }}>*</span>
+                      {strings.systemPrompts.editorModal.contentLabel} <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <span style={{ fontSize: '0.74rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }} data-testid="sp-badge-tokens">
-                      글자수: {formContent.length}자 | 예상 토큰: ~{estimatedTokens} tokens
+                      {strings.systemPrompts.editorModal.contentMeta(formContent.length, estimatedTokens)}
                     </span>
                   </div>
                   <textarea
                     className="form-input"
                     data-testid="sp-textarea-content"
                     rows={7}
-                    placeholder="[사내 보안 및 금융 상담 지침]&#10;1. 귀하는 공인된 AI 어시스턴트로서...&#10;2. 고객의 개인 식별 정보를 수집하거나 노출하지 마십시오."
+                    placeholder={strings.systemPrompts.editorModal.contentPlaceholder}
                     value={formContent}
                     onChange={(e) => setFormContent(e.target.value)}
                     style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', lineHeight: 1.45 }}
@@ -807,7 +811,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   onClick={() => setShowEditModal(false)}
                   disabled={isLoading}
                 >
-                  취소
+                  {strings.common.cancel}
                 </button>
                 <button
                   type="submit"
@@ -818,7 +822,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Check size={16} />
-                  <span>{isLoading ? '저장 중...' : (editingPrompt ? '변경사항 저장' : '프롬프트 등록 및 연결')}</span>
+                  <span>{isLoading ? strings.systemPrompts.editorModal.btnSaving : (editingPrompt ? strings.systemPrompts.editorModal.btnSaveEdit : strings.systemPrompts.editorModal.btnSaveCreate)}</span>
                 </button>
               </div>
             </form>
@@ -833,26 +837,26 @@ export default function SystemPromptsTab({ onNotify }) {
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.08rem', fontWeight: 700, color: '#38bdf8' }}>
                 <Play size={20} />
-                <span>L7 게이트웨이 시스템 프롬프트 주입 시뮬레이터</span>
+                <span>{strings.systemPrompts.simModal.title}</span>
               </div>
             </div>
 
             <div className="modal-body" style={{ maxHeight: '74vh', overflowY: 'auto' }}>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                호출 컨텍스트(가상키, 라우트, 테넌트)를 조합하여, <strong>4단계 우선순위(Virtual Key &gt; Route &gt; Tenant &gt; Global)</strong>에 따라 어떤 시스템 프롬프트가 매칭되고 최종 페이로드가 어떻게 변조되는지 실시간으로 검증합니다.
+                {strings.systemPrompts.simModal.descP1}<strong>{strings.systemPrompts.simModal.descP2}</strong>{strings.systemPrompts.simModal.descP3}
               </p>
 
               {/* Context Selector Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px' }}>
                 <div>
-                  <label className="form-label" style={{ fontSize: '0.76rem' }}>1순위: 가상키 (Virtual Key)</label>
+                  <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.vkeyLabel}</label>
                   <select 
                     className="form-select" 
                     data-testid="sp-sim-select-key"
                     value={simKeyId} 
                     onChange={(e) => setSimKeyId(e.target.value)}
                   >
-                    <option value="">(선택 안 함 - 무시)</option>
+                    <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
                     {virtualKeys.map((k) => (
                       <option key={k.key_id || k.keyId} value={k.key_id || k.keyId}>{k.name}</option>
                     ))}
@@ -860,14 +864,14 @@ export default function SystemPromptsTab({ onNotify }) {
                 </div>
 
                 <div>
-                  <label className="form-label" style={{ fontSize: '0.76rem' }}>2순위: 라우트 (Route)</label>
+                  <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.routeLabel}</label>
                   <select 
                     className="form-select" 
                     data-testid="sp-sim-select-route"
                     value={simRouteName} 
                     onChange={(e) => setSimRouteName(e.target.value)}
                   >
-                    <option value="">(선택 안 함 - 무시)</option>
+                    <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
                     {routes.map((r) => (
                       <option key={r.policy_id || r.route_name} value={r.route_name}>{r.route_name}</option>
                     ))}
@@ -875,14 +879,14 @@ export default function SystemPromptsTab({ onNotify }) {
                 </div>
 
                 <div>
-                  <label className="form-label" style={{ fontSize: '0.76rem' }}>3순위: 테넌트 (Tenant)</label>
+                  <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.tenantLabel}</label>
                   <select 
                     className="form-select" 
                     data-testid="sp-sim-select-tenant"
                     value={simTenantId} 
                     onChange={(e) => setSimTenantId(e.target.value)}
                   >
-                    <option value="">(선택 안 함 - 무시)</option>
+                    <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
                     {tenants.map((t) => (
                       <option key={t.tenant_id || t.id} value={t.tenant_id || t.id}>{t.name}</option>
                     ))}
@@ -892,18 +896,18 @@ export default function SystemPromptsTab({ onNotify }) {
 
               {/* Client Message Inputs */}
               <div style={{ marginBottom: '12px' }}>
-                <label className="form-label" style={{ fontSize: '0.78rem' }}>클라이언트가 이미 보낸 System 프롬프트 (선택 사항)</label>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>{strings.systemPrompts.simModal.clientSystemLabel}</label>
                 <input
                   className="form-input"
                   data-testid="sp-sim-input-client-sys"
-                  placeholder="예: 친절하게 반말로 답변해줘 (공백 시 시스템 프롬프트 미포함)"
+                  placeholder={strings.systemPrompts.simModal.clientSystemPlaceholder}
                   value={simClientSysMsg}
                   onChange={(e) => setSimClientSysMsg(e.target.value)}
                 />
               </div>
 
               <div style={{ marginBottom: '14px' }}>
-                <label className="form-label" style={{ fontSize: '0.78rem' }}>사용자 입력 질문 (User Message)</label>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>{strings.systemPrompts.simModal.userMsgLabel}</label>
                 <input
                   className="form-input"
                   data-testid="sp-sim-input-user-msg"
@@ -922,7 +926,7 @@ export default function SystemPromptsTab({ onNotify }) {
                 style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '16px' }}
               >
                 <Play size={16} />
-                <span>{isSimulating ? '해석 및 합성 중...' : '시뮬레이션 실행 (우선순위 판정)'}</span>
+                <span>{isSimulating ? strings.systemPrompts.simModal.btnSimulating : strings.systemPrompts.simModal.btnSimulate}</span>
               </button>
 
               {/* Simulation Result Box */}
@@ -931,7 +935,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.88rem', color: simResult.matched ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle2 size={16} />
-                      <span>{simResult.matched ? `판정 성공: [${simResult.resolved_by}] 프롬프트 적용됨` : '일치하는 프롬프트 없음 (원본 유지)'}</span>
+                      <span>{simResult.matched ? strings.systemPrompts.simModal.resultMatched(simResult.resolved_by) : strings.systemPrompts.simModal.resultUnmatched}</span>
                     </div>
                     {simResult.matched_prompt && (
                       <span className="badge active" data-testid="sp-sim-result-badge" style={{ fontSize: '0.7rem' }}>
@@ -941,7 +945,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   </div>
 
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    <strong>최종 LLM에 전달되는 합성 페이로드 (Final Messages):</strong>
+                    <strong>{strings.systemPrompts.simModal.finalPayloadTitle}</strong>
                   </div>
                   <pre
                     data-testid="sp-sim-result-json"
@@ -972,7 +976,7 @@ export default function SystemPromptsTab({ onNotify }) {
                 onClick={() => setSimulatorOpen(false)} 
                 style={{ width: '100%' }}
               >
-                시뮬레이터 닫기
+                {strings.systemPrompts.simModal.btnClose}
               </button>
             </div>
           </div>
@@ -986,7 +990,7 @@ export default function SystemPromptsTab({ onNotify }) {
             <div className="modal-header" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', fontWeight: 700, fontSize: '1.05rem' }}>
                 <Trash2 size={20} />
-                <span>시스템 프롬프트 영구 삭제</span>
+                <span>{strings.systemPrompts.deleteModal.title}</span>
               </div>
             </div>
 
@@ -995,15 +999,15 @@ export default function SystemPromptsTab({ onNotify }) {
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ fontSize: '0.84rem', color: '#fca5a5', lineHeight: 1.5 }}>
-                    선택한 시스템 프롬프트를 데이터베이스에서 <strong>영구 삭제</strong>합니다.<br />
-                    삭제 시 해당 타겟({promptToDelete.target_type}: {promptToDelete.target_name || promptToDelete.target_id || '전사'})의 자동 주입이 즉시 중단됩니다.
+                    {strings.systemPrompts.deleteModal.warningP1}<strong>{strings.systemPrompts.deleteModal.warningP2}</strong>{strings.systemPrompts.deleteModal.warningP3}<br />
+                    {strings.systemPrompts.deleteModal.warningP4(promptToDelete.target_type, promptToDelete.target_name || promptToDelete.target_id || strings.systemPrompts.globalSimpleFallback)}
                   </div>
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-panel)', padding: '12px 14px', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  프롬프트 명칭: <strong style={{ color: '#ffffff' }}>{promptToDelete.name}</strong>
+                  {strings.systemPrompts.deleteModal.promptNameLabel} <strong style={{ color: '#ffffff' }}>{promptToDelete.name}</strong>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   ID: <code style={{ color: '#38bdf8' }}>{promptToDelete.prompt_id}</code>
@@ -1019,7 +1023,7 @@ export default function SystemPromptsTab({ onNotify }) {
                 onClick={() => setPromptToDelete(null)}
                 disabled={isLoading}
               >
-                취소
+                {strings.common.cancel}
               </button>
               <button
                 type="button"
@@ -1031,7 +1035,7 @@ export default function SystemPromptsTab({ onNotify }) {
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Trash2 size={15} />
-                <span>{isLoading ? '삭제 중...' : '영구 삭제 확인'}</span>
+                <span>{isLoading ? strings.systemPrompts.deleteModal.btnDeleting : strings.systemPrompts.deleteModal.btnConfirmDelete}</span>
               </button>
             </div>
           </div>

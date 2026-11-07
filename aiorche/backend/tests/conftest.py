@@ -1,6 +1,7 @@
 import sys
 import pytest
 from decimal import Decimal
+from datetime import datetime, timezone, timedelta
 
 # Guarantee singleton conftest module across both 'conftest' and 'tests.conftest'
 if __name__ in sys.modules:
@@ -16,6 +17,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
+from app.core.security import hash_password, create_access_token
 
 from app.core.config import settings
 settings.ALLOW_DEV_MOCK_KEYS = True
@@ -48,9 +50,91 @@ from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.system_prompt import SystemPrompt
 from app.models.user import User, UserSession
+from app.models.role import Role
+from app.core.permissions import ALL_PERMISSION_CODES
 
 # Create all tables and seed data immediately at module load
 Base.metadata.create_all(bind=test_engine)
+
+def get_test_super_admin_token() -> str:
+    db = TestSessionLocal()
+    try:
+        admin = db.query(User).filter(User.username == "test-super-admin").first()
+        now = datetime.now(timezone.utc)
+        if not admin:
+            admin = User(
+                id="usr-test-super-admin",
+                username="test-super-admin",
+                full_name="테스트 최고관리자",
+                email="test-admin@aiorche.local",
+                password_hash=hash_password("SuperAdmin123!"),
+                role="SUPER_ADMIN",
+                is_active=True
+            )
+            db.add(admin)
+            db.commit()
+
+        session_id = "sess-test-super-admin"
+        sess = db.query(UserSession).filter(UserSession.id == session_id).first()
+        if not sess:
+            sess = UserSession(
+                id=session_id,
+                user_id=admin.id,
+                session_token_hash="hash-test-super-admin",
+                ip_address="127.0.0.1",
+                user_agent="pytest",
+                last_activity_at=now,
+                expires_at=now + timedelta(hours=24),
+                is_revoked=False
+            )
+            db.add(sess)
+            db.commit()
+        else:
+            sess.is_revoked = False
+            sess.last_activity_at = now
+            sess.expires_at = now + timedelta(hours=24)
+            db.commit()
+
+        return create_access_token(
+            user_id=admin.id,
+            username=admin.username,
+            role=admin.role,
+            tenant_id=admin.tenant_id,
+            session_id=session_id,
+            expires_delta=timedelta(hours=24)
+        )
+    finally:
+        db.close()
+
+_orig_testclient_init = TestClient.__init__
+
+def _patched_testclient_init(self, *args, **kwargs):
+    _orig_testclient_init(self, *args, **kwargs)
+    try:
+        token = get_test_super_admin_token()
+        if token:
+            self.headers.setdefault("Authorization", f"Bearer {token}")
+    except Exception:
+        pass
+
+TestClient.__init__ = _patched_testclient_init
+
+_orig_testclient_request = TestClient.request
+
+def _patched_testclient_request(self, method, url, *args, **kwargs):
+    # Ensure super admin session is always intact in DB for authenticated test calls
+    db = TestSessionLocal()
+    try:
+        sess = db.query(UserSession).filter(UserSession.id == "sess-test-super-admin").first()
+        if not sess:
+            get_test_super_admin_token()
+    except Exception:
+        pass
+    finally:
+        db.close()
+    return _orig_testclient_request(self, method, url, *args, **kwargs)
+
+TestClient.request = _patched_testclient_request
 
 @pytest.fixture
 def client():
@@ -278,6 +362,38 @@ def seed_data():
                 injection_mode="PREPEND",
                 estimated_tokens=65,
                 is_active=True
+            )
+        ])
+
+    # Seed Default Roles if empty
+    if not db.query(Role).filter(Role.name == "SUPER_ADMIN").first():
+        db.add_all([
+            Role(
+                name="SUPER_ADMIN",
+                display_name="전사 최고관리자",
+                description="전사 플랫폼, 전 부서 테넌트, 모델 라우팅 및 보안 정책 총괄 최고 관리자",
+                is_system=True,
+                permissions=ALL_PERMISSION_CODES
+            ),
+            Role(
+                name="TENANT_ADMIN",
+                display_name="부서 관리자",
+                description="소속 부서(테넌트) 한정 가상키 발급/파기, 시스템 프롬프트, FinOps 모니터링 관리자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read", "governance:write",
+                    "prompts:read", "prompts:write", "finops:read", "prompt_studio:execute"
+                ]
+            ),
+            Role(
+                name="VIEWER",
+                display_name="일반 조회자",
+                description="전사 또는 소속 부서 운영 지표 및 감사 로그 열람 전용 읽기 사용자",
+                is_system=True,
+                permissions=[
+                    "overview:read", "routing:read", "governance:read",
+                    "prompts:read", "finops:read", "compliance:read", "lifecycle:read"
+                ]
             )
         ])
 

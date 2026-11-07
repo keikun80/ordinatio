@@ -8,6 +8,7 @@ from app.schemas.observability import (
     PromQLQueryRequest,
     PromQLQueryResponse
 )
+from app.api.deps import require_permission
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ async def websocket_telemetry_stream(websocket: WebSocket):
     except Exception:
         telemetry_hub.disconnect(websocket)
 
-@router.get("/metrics/summary", response_model=ObservabilitySummaryResponse)
+@router.get("/metrics/summary", response_model=ObservabilitySummaryResponse, dependencies=[Depends(require_permission("overview:read"))])
 def get_observability_metrics_summary(db: Session = Depends(get_db)):
     """Returns real-time aggregated metrics summary for the Admin Overview dashboard."""
     telemetry = telemetry_hub.generate_current_telemetry()
@@ -47,7 +48,7 @@ def get_observability_metrics_summary(db: Session = Depends(get_db)):
         uptime_seconds=round(uptime, 1)
     )
 
-@router.post("/promql", response_model=PromQLQueryResponse)
+@router.post("/promql", response_model=PromQLQueryResponse, dependencies=[Depends(require_permission("overview:read"))])
 def execute_promql_query(req: PromQLQueryRequest):
     """Proxy/execute PromQL query for Grafana and custom charting."""
     # Air-gapped safe query handler

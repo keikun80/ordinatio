@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Crosshair, Copy, Check, X, ShieldAlert, Sparkles } from 'lucide-react';
+import { strings } from '../constants/strings';
 
 /**
  * DevInspector: 화면 요소 및 기능 식별자(Screen ID, data-testid, Function ID) 실시간 탐색 도구
@@ -104,19 +105,19 @@ export default function DevInspector({ isActive, onToggle }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Crosshair size={16} color="#38bdf8" />
-          <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#38bdf8' }}>UI 식별자 인스펙터 활성</span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>[Ctrl+Shift+D 로 종료]</span>
+          <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#38bdf8' }}>{strings.inspector.activeBanner}</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.inspector.closeHint}</span>
         </div>
         {copiedId && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#34d399', fontWeight: 600 }}>
             <Check size={14} />
-            <span>복사됨: {copiedId}</span>
+            <span>{strings.inspector.copiedNotice(copiedId)}</span>
           </div>
         )}
         <button
           onClick={onToggle}
           style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-          title="인스펙터 닫기"
+          title={strings.inspector.closeTooltip}
         >
           <X size={16} />
         </button>
@@ -137,7 +138,7 @@ export default function DevInspector({ isActive, onToggle }) {
             <span style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 700 }}>
               &lt;{hoveredInfo.tagName}{hoveredInfo.role ? `:${hoveredInfo.role}` : ''}&gt;
             </span>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>클릭 시 TestID 복사</span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{strings.inspector.hoverTooltip}</span>
           </div>
 
           {hoveredInfo.screenId && (

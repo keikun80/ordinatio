@@ -17,23 +17,41 @@ from app.schemas.virtual_key import (
     VirtualKeyValidateRequest,
     VirtualKeyValidateResponse,
 )
-from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key
+from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key, SYSTEM_DIAGNOSTICS_KEY_ID
+from app.api.deps import require_permission, get_tenant_scope
 
 router = APIRouter(prefix="/virtual-keys", tags=["Virtual Key Lifecycle"])
 
-@router.get("", response_model=List[VirtualKeyResponse])
+def _normalize_ip_cidrs(cidrs: Optional[List[str]]) -> List[str]:
+    if not cidrs:
+        return []
+    normalized: List[str] = []
+    for item in cidrs:
+        if not item:
+            continue
+        for part in str(item).split(","):
+            cleaned = part.strip()
+            if cleaned:
+                normalized.append(cleaned)
+    return normalized
+
+@router.get("", response_model=List[VirtualKeyResponse], dependencies=[Depends(require_permission("governance:read"))])
 def list_virtual_keys(
     tenant_id: Optional[str] = Query(None, description="테넌트(부서) ID 필터"),
     search: Optional[str] = Query(None, description="키 명칭 또는 Key ID 검색어"),
     is_active: Optional[bool] = Query(None, description="활성화 여부 필터"),
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
     가상 API Key 목록 조회 (원문 키 제외, 보안상 마스킹된 접두사만 반환)
     """
     query = db.query(VirtualKey).join(Tenant, VirtualKey.tenant_id == Tenant.tenant_id, isouter=True)
+    query = query.filter(VirtualKey.key_id != SYSTEM_DIAGNOSTICS_KEY_ID)
 
-    if tenant_id and tenant_id != "ALL":
+    if tenant_scope:
+        query = query.filter(VirtualKey.tenant_id == tenant_scope)
+    elif tenant_id and tenant_id != "ALL":
         query = query.filter(VirtualKey.tenant_id == tenant_id)
 
     if is_active is not None:
@@ -56,6 +74,9 @@ def list_virtual_keys(
                 name=k.name,
                 tenant_id=k.tenant_id,
                 tenant_name=k.tenant.name if k.tenant else None,
+                tenant_budget_krw=float(k.tenant.monthly_budget_krw) if k.tenant and k.tenant.monthly_budget_krw is not None else 0.0,
+                spent_krw=float(k.spent_krw or 0.0),
+                total_tokens=int(k.total_tokens or 0),
                 key_prefix=k.key_prefix,
                 allowed_models=k.allowed_models or [],
                 allowed_ip_cidrs=k.allowed_ip_cidrs or [],
@@ -70,14 +91,23 @@ def list_virtual_keys(
         )
     return results
 
-@router.post("", response_model=VirtualKeyCreateResponse, status_code=status.HTTP_201_CREATED)
-def create_virtual_key(payload: VirtualKeyCreate, db: Session = Depends(get_db)):
+@router.post("", response_model=VirtualKeyCreateResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("governance:write"))])
+def create_virtual_key(
+    payload: VirtualKeyCreate,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    db: Session = Depends(get_db)
+):
     """
     신규 가상 API Key 발급
     - 32자리 sk-orch-<hex> 보안 토큰 생성
     - Argon2id 단방향 솔트 해시 계산 및 DB 저장
     - **원문 토큰(raw_key)은 본 응답에서 단 1회만 제공**
     """
+    if tenant_scope and payload.tenant_id != tenant_scope:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="소속 부서(테넌트) 이외의 타 부서용 가상 API Key는 발급할 수 없습니다."
+        )
     tenant = db.query(Tenant).filter(Tenant.tenant_id == payload.tenant_id).first()
     if not tenant:
         raise HTTPException(
@@ -97,7 +127,7 @@ def create_virtual_key(payload: VirtualKeyCreate, db: Session = Depends(get_db))
         tenant_id=tenant.tenant_id,
         name=payload.name,
         allowed_models=payload.allowed_models,
-        allowed_ip_cidrs=payload.allowed_ip_cidrs,
+        allowed_ip_cidrs=_normalize_ip_cidrs(payload.allowed_ip_cidrs),
         rpm_limit=payload.rpm_limit,
         tpm_limit=payload.tpm_limit,
         is_active=True,
@@ -112,6 +142,9 @@ def create_virtual_key(payload: VirtualKeyCreate, db: Session = Depends(get_db))
         name=virtual_key.name,
         tenant_id=virtual_key.tenant_id,
         tenant_name=tenant.name,
+        tenant_budget_krw=float(tenant.monthly_budget_krw) if tenant.monthly_budget_krw is not None else 0.0,
+        spent_krw=float(virtual_key.spent_krw or 0.0),
+        total_tokens=int(virtual_key.total_tokens or 0),
         key_prefix=virtual_key.key_prefix,
         allowed_models=virtual_key.allowed_models or [],
         allowed_ip_cidrs=virtual_key.allowed_ip_cidrs or [],
@@ -125,10 +158,11 @@ def create_virtual_key(payload: VirtualKeyCreate, db: Session = Depends(get_db))
         raw_key=raw_key
     )
 
-@router.patch("/{key_id}/revoke", response_model=VirtualKeyResponse)
+@router.patch("/{key_id}/revoke", response_model=VirtualKeyResponse, dependencies=[Depends(require_permission("governance:write"))])
 def revoke_virtual_key(
     key_id: str,
     payload: VirtualKeyRevokeRequest,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
@@ -137,6 +171,8 @@ def revoke_virtual_key(
     key = db.query(VirtualKey).filter(VirtualKey.key_id == key_id).first()
     if not key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="가상키를 찾을 수 없습니다.")
+    if tenant_scope and key.tenant_id != tenant_scope:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="타 부서의 가상 API Key를 파기할 권한이 없습니다.")
 
     key.is_active = False
     key.revoked_reason = payload.revoked_reason
@@ -148,6 +184,9 @@ def revoke_virtual_key(
         name=key.name,
         tenant_id=key.tenant_id,
         tenant_name=key.tenant.name if key.tenant else None,
+        tenant_budget_krw=float(key.tenant.monthly_budget_krw) if key.tenant and key.tenant.monthly_budget_krw is not None else 0.0,
+        spent_krw=float(key.spent_krw or 0.0),
+        total_tokens=int(key.total_tokens or 0),
         key_prefix=key.key_prefix,
         allowed_models=key.allowed_models or [],
         allowed_ip_cidrs=key.allowed_ip_cidrs or [],
@@ -160,10 +199,11 @@ def revoke_virtual_key(
         updated_at=key.updated_at
     )
 
-@router.patch("/{key_id}", response_model=VirtualKeyResponse)
+@router.patch("/{key_id}", response_model=VirtualKeyResponse, dependencies=[Depends(require_permission("governance:write"))])
 def update_virtual_key(
     key_id: str,
     payload: VirtualKeyUpdate,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
@@ -172,13 +212,15 @@ def update_virtual_key(
     key = db.query(VirtualKey).filter(VirtualKey.key_id == key_id).first()
     if not key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="가상키를 찾을 수 없습니다.")
+    if tenant_scope and key.tenant_id != tenant_scope:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="타 부서의 가상 API Key를 수정할 권한이 없습니다.")
 
     if payload.name is not None:
         key.name = payload.name
     if payload.allowed_models is not None:
         key.allowed_models = payload.allowed_models
     if payload.allowed_ip_cidrs is not None:
-        key.allowed_ip_cidrs = payload.allowed_ip_cidrs
+        key.allowed_ip_cidrs = _normalize_ip_cidrs(payload.allowed_ip_cidrs)
     if payload.rpm_limit is not None:
         key.rpm_limit = payload.rpm_limit
     if payload.tpm_limit is not None:
@@ -198,6 +240,9 @@ def update_virtual_key(
         name=key.name,
         tenant_id=key.tenant_id,
         tenant_name=key.tenant.name if key.tenant else None,
+        tenant_budget_krw=float(key.tenant.monthly_budget_krw) if key.tenant and key.tenant.monthly_budget_krw is not None else 0.0,
+        spent_krw=float(key.spent_krw or 0.0),
+        total_tokens=int(key.total_tokens or 0),
         key_prefix=key.key_prefix,
         allowed_models=key.allowed_models or [],
         allowed_ip_cidrs=key.allowed_ip_cidrs or [],
@@ -210,10 +255,11 @@ def update_virtual_key(
         updated_at=key.updated_at
     )
 
-@router.delete("/{key_id}", response_model=VirtualKeyDeleteResponse)
+@router.delete("/{key_id}", response_model=VirtualKeyDeleteResponse, dependencies=[Depends(require_permission("governance:write"))])
 def delete_virtual_key(
     key_id: str,
     force: bool = Query(False, description="활성 상태 키도 강제 파기 후 영구 삭제 허용"),
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
@@ -226,6 +272,11 @@ def delete_virtual_key(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"삭제할 가상 API Key를 찾을 수 없습니다: {key_id}"
+        )
+    if tenant_scope and key.tenant_id != tenant_scope:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="타 부서의 가상 API Key를 삭제할 권한이 없습니다."
         )
 
     if key.is_active and not force:

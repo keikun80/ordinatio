@@ -8,7 +8,7 @@ class VirtualKey(Base):
     key_id = Column(String(64), primary_key=True, index=True)
     key_hash = Column(String(128), unique=True, nullable=False)
     key_prefix = Column(String(16), nullable=False, index=True)
-    tenant_id = Column(String(64), ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    tenant_id = Column(String(64), ForeignKey("tenants.tenant_id"), nullable=True, index=True)
     name = Column(String(128), nullable=False)
     allowed_models = Column(JSON, default=list, nullable=False)
     allowed_ip_cidrs = Column(JSON, default=list, nullable=False)

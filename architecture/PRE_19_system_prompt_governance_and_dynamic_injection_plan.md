@@ -413,8 +413,8 @@ def resolve_and_inject_system_prompt(
      - 신규 프롬프트 생성 ➔ 라우팅 정책 또는 가상키 1:1 바인딩 ➔ 테스트벤치 즉시 호출 ➔ LLM 응답에 지침 반영 확인 ➔ 프롬프트 수정/삭제
   2. 브라우저 실화면 캡처 증적 확보
   3. 아키텍처 문서 및 보고서 원스톱 동기화:
-     - `architecture/PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md` 갱신
-     - `architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md` 갱신
+     - `architecture/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md` 갱신
+     - `architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md` 갱신
      - `architecture/README.md` 및 `aiorche/README.md` 최신 상태 반영
 - **완료 기준 (DoD)**:
   - E2E 전 시나리오 결함 0건 통과.

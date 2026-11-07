@@ -14,8 +14,17 @@ from app.schemas.model_catalog import (
     ModelCatalogResponse,
     ModelHealthCheckResult
 )
+from app.api.deps import require_permission
+from app.core.security import encrypt_upstream_key, decrypt_upstream_key, mask_api_key, validate_upstream_endpoint_url
 
 router = APIRouter()
+
+def _serialize_model(m: ModelCatalog) -> ModelCatalogResponse:
+    """Serialize ModelCatalog into ModelCatalogResponse with masked API key."""
+    resp = ModelCatalogResponse.model_validate(m)
+    resp.api_key = mask_api_key(m.api_key)
+    return resp
+
 
 async def probe_endpoint(
     endpoint: str,
@@ -29,6 +38,11 @@ async def probe_endpoint(
     Probe a serving model endpoint based on its provider protocol.
     Returns: (is_healthy, status_code, latency_ms, error_message)
     """
+    try:
+        validate_upstream_endpoint_url(endpoint)
+    except ValueError as ssrf_err:
+        return False, 400, 0.0, f"SSRF 보안 차단: {ssrf_err}"
+
     base_url = endpoint.rstrip('/')
     urls_to_try = [base_url]
     try:
@@ -83,7 +97,7 @@ async def probe_endpoint(
     last_status = None
     start_time = time.perf_counter()
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
         for target in urls_to_try:
             for path in probe_paths:
                 full_url = f"{target}{path}"
@@ -109,7 +123,7 @@ async def probe_endpoint(
     total_latency = round((time.perf_counter() - start_time) * 1000, 2)
     return False, last_status, total_latency, last_err
 
-@router.get("/health-check", response_model=List[ModelHealthCheckResult])
+@router.get("/health-check", response_model=List[ModelHealthCheckResult], dependencies=[Depends(require_permission("routing:read"))])
 async def check_all_models_health(
     timeout: Optional[float] = Query(default=None, ge=0.5, le=60.0, description="수동 지정 헬스체크 타임아웃 (초)"),
     db: Session = Depends(get_db)
@@ -124,7 +138,7 @@ async def check_all_models_health(
         is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
             m.target_endpoint,
             m.serving_engine or "vLLM",
-            api_key=m.api_key,
+            api_key=decrypt_upstream_key(m.api_key),
             auth_type=m.auth_type,
             provider=getattr(m, "provider", "openai"),
             timeout=eff_timeout
@@ -147,7 +161,7 @@ async def check_all_models_health(
     results = await asyncio.gather(*[_check(m) for m in models])
     return results
 
-@router.post("/{model_id:path}/health", response_model=ModelHealthCheckResult)
+@router.post("/{model_id:path}/health", response_model=ModelHealthCheckResult, dependencies=[Depends(require_permission("routing:read"))])
 async def check_single_model_health(
     model_id: str,
     timeout: Optional[float] = Query(default=None, ge=0.5, le=60.0, description="수동 지정 헬스체크 타임아웃 (초)"),
@@ -165,7 +179,7 @@ async def check_single_model_health(
     is_healthy, status_code, latency_ms, error_msg = await probe_endpoint(
         model.target_endpoint,
         model.serving_engine or "vLLM",
-        api_key=model.api_key,
+        api_key=decrypt_upstream_key(model.api_key),
         auth_type=model.auth_type,
         provider=getattr(model, "provider", "openai"),
         timeout=eff_timeout
@@ -185,14 +199,23 @@ async def check_single_model_health(
         checked_at=datetime.now(timezone.utc)
     )
 
-@router.get("", response_model=List[ModelCatalogResponse])
+@router.get("", response_model=List[ModelCatalogResponse], dependencies=[Depends(require_permission("routing:read"))])
 def list_models(db: Session = Depends(get_db)):
-    """List all serving models in catalog"""
-    return db.query(ModelCatalog).all()
+    """List all serving models in catalog with masked API keys"""
+    models = db.query(ModelCatalog).all()
+    return [_serialize_model(m) for m in models]
 
-@router.post("", response_model=ModelCatalogResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ModelCatalogResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("routing:write"))])
 def create_model(model_in: ModelCatalogCreate, db: Session = Depends(get_db)):
-    """Register a new LLM serving model to catalog"""
+    """Register a new LLM serving model to catalog with Fernet encrypted API key"""
+    try:
+        validate_upstream_endpoint_url(model_in.target_endpoint)
+    except ValueError as ssrf_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"비인가 업스트림 엔드포인트 차단 (SSRF 보호): {ssrf_err}"
+        )
+
     existing = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_in.model_id).first()
     if existing:
         raise HTTPException(
@@ -207,26 +230,30 @@ def create_model(model_in: ModelCatalogCreate, db: Session = Depends(get_db)):
             detail=f"Alias '{model_in.alias}' already used by another model."
         )
 
-    model = ModelCatalog(**model_in.model_dump())
+    model_dict = model_in.model_dump()
+    if model_dict.get("api_key"):
+        model_dict["api_key"] = encrypt_upstream_key(model_dict["api_key"])
+
+    model = ModelCatalog(**model_dict)
     db.add(model)
     db.commit()
     db.refresh(model)
-    return model
+    return _serialize_model(model)
 
-@router.get("/{model_id:path}", response_model=ModelCatalogResponse)
+@router.get("/{model_id:path}", response_model=ModelCatalogResponse, dependencies=[Depends(require_permission("routing:read"))])
 def get_model(model_id: str, db: Session = Depends(get_db)):
-    """Get serving model details by model_id"""
+    """Get serving model details by model_id with masked API key"""
     model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()
     if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model '{model_id}' not found."
         )
-    return model
+    return _serialize_model(model)
 
-@router.patch("/{model_id:path}", response_model=ModelCatalogResponse)
+@router.patch("/{model_id:path}", response_model=ModelCatalogResponse, dependencies=[Depends(require_permission("routing:write"))])
 def update_model(model_id: str, model_in: ModelCatalogUpdate, db: Session = Depends(get_db)):
-    """Update serving model attributes (status, pricing, endpoint)"""
+    """Update serving model attributes (status, pricing, endpoint, encrypted API key)"""
     model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()
     if not model:
         raise HTTPException(
@@ -235,14 +262,32 @@ def update_model(model_id: str, model_in: ModelCatalogUpdate, db: Session = Depe
         )
 
     update_data = model_in.model_dump(exclude_unset=True)
+    if "target_endpoint" in update_data and update_data["target_endpoint"] is not None:
+        try:
+            validate_upstream_endpoint_url(update_data["target_endpoint"])
+        except ValueError as ssrf_err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"비인가 업스트림 엔드포인트 차단 (SSRF 보호): {ssrf_err}"
+            )
+    if "api_key" in update_data:
+        val = update_data["api_key"]
+        if val and not ("..." in val or val == "sk-***"):
+            update_data["api_key"] = encrypt_upstream_key(val)
+        elif val and ("..." in val or val == "sk-***"):
+            # Masked placeholder sent back from client; do not overwrite existing DB key
+            del update_data["api_key"]
+        else:
+            update_data["api_key"] = None
+
     for field, value in update_data.items():
         setattr(model, field, value)
 
     db.commit()
     db.refresh(model)
-    return model
+    return _serialize_model(model)
 
-@router.delete("/{model_id:path}", status_code=status.HTTP_200_OK)
+@router.delete("/{model_id:path}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("routing:write"))])
 def delete_model(model_id: str, force: bool = False, db: Session = Depends(get_db)):
     """Delete a serving model from the catalog (with routing dependency safety check)"""
     model = db.query(ModelCatalog).filter(ModelCatalog.model_id == model_id).first()

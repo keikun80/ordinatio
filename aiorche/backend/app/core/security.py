@@ -1,5 +1,8 @@
 from passlib.context import CryptContext
 import secrets
+import base64
+from typing import Optional, Dict, Any
+from cryptography.fernet import Fernet, InvalidToken
 
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
@@ -27,7 +30,7 @@ verify_key = verify_virtual_key
 # Human User Password & JWT Token Security
 # ------------------------------------------------------------------------------
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from app.core.config import settings
@@ -53,10 +56,11 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None
 ) -> str:
     """Generate signed JWT access token for web console & control plane."""
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode: Dict[str, Any] = {
         "sub": user_id,
@@ -65,7 +69,7 @@ def create_access_token(
         "tenant_id": tenant_id,
         "sid": session_id,
         "exp": expire,
-        "iat": datetime.utcnow()
+        "iat": now
     }
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -77,34 +81,60 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     except JWTError:
         return None
 
-# System Diagnostics Virtual Key for appliance loopback testing
-SYSTEM_DIAGNOSTICS_KEY = "sk-orch-system-diagnostics-appliance-key"
+# System Diagnostics Virtual Key for appliance loopback testing (HMAC-derived per SECRET_KEY, never static plaintext)
+import hmac
+import ipaddress
+from urllib.parse import urlsplit
+
+SYSTEM_DIAGNOSTICS_KEY = (
+    f"sk-orch-diag-{hmac.new(settings.SECRET_KEY.encode('utf-8'), b'aiorche-system-diagnostics', hashlib.sha256).hexdigest()[:27]}"
+)
 SYSTEM_DIAGNOSTICS_KEY_ID = "vk-system-diagnostics"
+INTERNAL_DIAGNOSTICS_CIDRS = [
+    "127.0.0.0/8",
+    "::1/128",
+    "172.16.0.0/12",
+    "192.168.65.0/24",
+    "10.0.0.0/8",
+]
 
 def ensure_system_diagnostics_key(db_session):
     """
     Ensure the official system diagnostics virtual key is seeded into DB.
-    This enables dashboard one-click gateway test calls and prompt studio
-    without creating security bypasses or mock backdoors.
+    Restricted to internal loopback/container CIDRs and derived from SECRET_KEY.
     """
     from app.models.virtual_key import VirtualKey
     from app.models.tenant import Tenant
     
+    expected_prefix = SYSTEM_DIAGNOSTICS_KEY[:16]
     existing = db_session.query(VirtualKey).filter(VirtualKey.key_id == SYSTEM_DIAGNOSTICS_KEY_ID).first()
     if existing:
+        needs_update = False
+        if existing.key_prefix != expected_prefix:
+            existing.key_prefix = expected_prefix
+            existing.key_hash = hash_virtual_key(SYSTEM_DIAGNOSTICS_KEY)
+            needs_update = True
+        if existing.allowed_ip_cidrs != INTERNAL_DIAGNOSTICS_CIDRS:
+            existing.allowed_ip_cidrs = list(INTERNAL_DIAGNOSTICS_CIDRS)
+            needs_update = True
+        if needs_update:
+            try:
+                db_session.commit()
+            except Exception:
+                db_session.rollback()
         return existing
     
     tenant = db_session.query(Tenant).first()
-    tenant_id = tenant.tenant_id if tenant else "dept-wm"
+    tenant_id = tenant.tenant_id if tenant else None
     
     diag_key = VirtualKey(
         key_id=SYSTEM_DIAGNOSTICS_KEY_ID,
         key_hash=hash_virtual_key(SYSTEM_DIAGNOSTICS_KEY),
-        key_prefix=SYSTEM_DIAGNOSTICS_KEY[:16],
+        key_prefix=expected_prefix,
         tenant_id=tenant_id,
-        name="[시스템] 대시보드 진단 및 즉시 호출 전용 키",
+        name="[시스템] 대시보드 진단 및 즉시 호출 전용 키 (내부 루프백 전용)",
         allowed_models=[],
-        allowed_ip_cidrs=[],
+        allowed_ip_cidrs=list(INTERNAL_DIAGNOSTICS_CIDRS),
         rpm_limit=1000,
         tpm_limit=1000000,
         is_active=True,
@@ -116,3 +146,118 @@ def ensure_system_diagnostics_key(db_session):
     except Exception:
         db_session.rollback()
     return diag_key
+
+
+# ------------------------------------------------------------------------------
+# SSRF Validation for Upstream Model Endpoints (C-2)
+# ------------------------------------------------------------------------------
+_FORBIDDEN_UPSTREAM_HOSTS = {
+    "metadata.google.internal",
+    "metadata",
+    "169.254.169.254",
+    "postgres",
+    "aiorche-postgres",
+    "redis",
+    "aiorche-redis",
+    "envoy",
+    "aiorche-envoy",
+}
+_FORBIDDEN_UPSTREAM_PORTS = {5432, 6379, 9901, 18000}
+
+def validate_upstream_endpoint_url(url: str) -> str:
+    """
+    Validate upstream LLM target_endpoint URL to prevent SSRF attacks against
+    cloud metadata endpoints (169.254.169.254), non-HTTP schemes, or internal
+    control-plane services (PostgreSQL 5432, Redis 6379, Envoy Admin 9901, xDS 18000).
+    Raises ValueError if the URL is unsafe.
+    """
+    if not url or not isinstance(url, str):
+        raise ValueError("유효하지 않은 엔드포인트 URL입니다.")
+    cleaned = url.strip()
+    parsed = urlsplit(cleaned)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(f"허용되지 않는 URL 프로토콜 스킴입니다 ({scheme or '없음'}). http:// 또는 https://만 허용됩니다.")
+
+    hostname = (parsed.hostname or "").lower().strip()
+    if not hostname:
+        raise ValueError("엔드포인트 URL에 유효한 호스트명이 없습니다.")
+
+    if hostname in _FORBIDDEN_UPSTREAM_HOSTS:
+        raise ValueError(f"보안 정책상 내부 인프라 또는 메타데이터 호스트({hostname})로의 접근은 차단됩니다.")
+
+    try:
+        ip_obj = ipaddress.ip_address(hostname)
+        if ip_obj.is_link_local or ip_obj in ipaddress.ip_network("169.254.0.0/16"):
+            raise ValueError(f"보안 정책상 링크-로컬/클라우드 메타데이터 IP 대역({hostname})은 차단됩니다.")
+    except ValueError as e:
+        if "보안 정책상" in str(e):
+            raise
+
+    try:
+        port = parsed.port
+    except ValueError:
+        raise ValueError("엔드포인트 URL의 포트 번호가 유효하지 않습니다.")
+
+    if port in _FORBIDDEN_UPSTREAM_PORTS:
+        raise ValueError(f"보안 정책상 내부 제어 평면 포트({port})로의 업스트림 연결은 차단됩니다.")
+
+    return cleaned
+
+
+# ------------------------------------------------------------------------------
+# Upstream Model Provider API Key Fernet Encryption & Masking (A-2)
+# ------------------------------------------------------------------------------
+def _get_fernet_key() -> bytes:
+    """Derive deterministic 32-byte URL-safe base64 key from appliance SECRET_KEY."""
+    digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest)
+
+def encrypt_upstream_key(key: Optional[str]) -> Optional[str]:
+    """
+    Encrypt upstream provider API key (e.g. OpenAI, Anthropic, vLLM)
+    using Fernet symmetric encryption derived from appliance SECRET_KEY.
+    Returns ciphertext prefixed with 'enc:'.
+    """
+    if not key or not key.strip():
+        return None
+    if key.startswith("enc:"):
+        return key
+    if "..." in key or key == "sk-***":
+        return None  # Masked placeholder passed back; should not overwrite
+    f = Fernet(_get_fernet_key())
+    ciphertext = f.encrypt(key.encode("utf-8")).decode("utf-8")
+    return f"enc:{ciphertext}"
+
+def decrypt_upstream_key(cipher_text: Optional[str]) -> Optional[str]:
+    """
+    Decrypt upstream provider API key.
+    If the key does not start with 'enc:', returns plain key for backward compatibility.
+    """
+    if not cipher_text:
+        return None
+    if not cipher_text.startswith("enc:"):
+        return cipher_text
+    raw_cipher = cipher_text[4:]
+    f = Fernet(_get_fernet_key())
+    try:
+        return f.decrypt(raw_cipher.encode("utf-8")).decode("utf-8")
+    except (InvalidToken, Exception):
+        return cipher_text
+
+def mask_api_key(key: Optional[str]) -> Optional[str]:
+    """
+    Mask an API key for safe display in UI/API responses (never exposes plaintext).
+    e.g. 'sk-ant-api03-123456789' -> 'sk-...6789'
+    """
+    if not key:
+        return None
+    decrypted = decrypt_upstream_key(key) if key.startswith("enc:") else key
+    if not decrypted:
+        return None
+    if len(decrypted) <= 8:
+        return "sk-***"
+    prefix = decrypted[:4] if decrypted.startswith("sk-") else decrypted[:3]
+    suffix = decrypted[-4:]
+    return f"{prefix}...{suffix}"
+

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS virtual_keys (
     key_id VARCHAR(64) PRIMARY KEY,
     key_hash VARCHAR(128) NOT NULL UNIQUE,
     key_prefix VARCHAR(16) NOT NULL,
-    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(tenant_id) ON DELETE RESTRICT,
+    tenant_id VARCHAR(64) REFERENCES tenants(tenant_id) ON DELETE RESTRICT,
     name VARCHAR(128) NOT NULL,
     allowed_models JSONB NOT NULL DEFAULT '[]'::jsonb,
     allowed_ip_cidrs JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -111,33 +111,6 @@ CREATE TABLE IF NOT EXISTS patch_histories (
     applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 초기 시드 데이터 삽입
-INSERT INTO tenants (tenant_id, name, department_code, monthly_budget_krw, is_hard_cap_enabled)
-VALUES
-    ('dept-01', '자산관리본부 (WM)', 'WM-100', 10000000.00, TRUE),
-    ('dept-02', '여신심사부', 'LOAN-200', 5000000.00, TRUE),
-    ('dept-03', '리스크관리부', 'RISK-300', 10000000.00, TRUE),
-    ('dept-04', '마케팅본부', 'MKT-400', 2000000.00, TRUE),
-    ('dept-05', '준법감시팀', 'COMP-500', 3000000.00, FALSE)
-ON CONFLICT (tenant_id) DO NOTHING;
-
-INSERT INTO model_catalogs (model_id, alias, backend_infra, serving_engine, execution_method, target_endpoint, input_price_per_1k, output_price_per_1k)
-VALUES
-    ('meta-llama/Llama-3.1-8B-Instruct', 'financial-advisor-v1', 'On-Prem K8s', 'vLLM', 'k8s', 'http://vllm-llama8b.ai-serving:8000', 0.8000, 2.4000),
-    ('meta-llama/Llama-3.1-8B-FineTuned-v2', 'financial-advisor-canary', 'On-Prem K8s', 'vLLM', 'k8s', 'http://vllm-llama8b-canary.ai-serving:8000', 0.8000, 2.4000),
-    ('meta-llama/Llama-3.1-70B-Instruct', 'deep-risk-evaluator', 'Bare-Metal GPU', 'vLLM', 'direct', 'http://10.20.4.12:8000', 3.5000, 10.5000),
-    ('Solar-10.7B-Financial', 'compliance-auditor', 'Private VM', 'vLLM', 'docker-compose', 'http://vllm-solar.ai-serving:8000', 1.2000, 3.6000),
-    ('qwen2.5:14b', 'ollama-local-advisor', 'Local Server', 'Ollama', 'direct', 'http://127.0.0.1:11434', 0.5000, 1.5000)
-ON CONFLICT (model_id) DO NOTHING;
-
-INSERT INTO pii_rules (rule_id, name, entity_type, regex_pattern, confidence_threshold, action)
-VALUES
-    ('pii-rrn', '주민등록번호', 'RRN', '\d{2}([0]\d|[1][0-2])\d{2}-[1-4]\d{6}', 0.95, 'MASK'),
-    ('pii-account', '은행 계좌번호', 'BANK_ACCOUNT', '(\d{3,6}-\d{2,6}-\d{3,6})', 0.85, 'HASH'),
-    ('pii-card', '신용카드 번호', 'CREDIT_CARD', '\d{4}-\d{4}-\d{4}-\d{4}', 0.90, 'MASK'),
-    ('pii-employee', '사내 행번/사번', 'EMPLOYEE_ID', 'EMP-[A-Z]{2}\d{5}', 0.80, 'BLOCK')
-ON CONFLICT (rule_id) DO NOTHING;
-
 -- 6. 긴급 패치 및 배포 이력 (Patch History)
 CREATE TABLE IF NOT EXISTS patch_history (
     patch_id VARCHAR(64) PRIMARY KEY,
@@ -154,7 +127,7 @@ CREATE TABLE IF NOT EXISTS patch_history (
 
 CREATE INDEX IF NOT EXISTS idx_patch_history_applied_at ON patch_history (applied_at DESC);
 
--- 7. AgentRouter 4대 지능형 라우팅 정책
+-- 7. AgentRouter 4대 지능형 라우팅 정책 슬롯 (모델 매핑은 웹 UI에서 사용자가 직접 지정)
 CREATE TABLE IF NOT EXISTS agent_router_policies (
     policy_id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(128) NOT NULL,
@@ -166,10 +139,10 @@ CREATE TABLE IF NOT EXISTS agent_router_policies (
 
 INSERT INTO agent_router_policies (policy_id, name, description, is_active, config)
 VALUES
-    ('QualityFirst', 'QualityFirst (품질 우선)', '복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 70B 모델로 우선 분기하고 단순 질의는 8B로 처리합니다.', TRUE, '{"reasoning_model": "meta-llama/Llama-3.1-70B-Instruct", "fast_model": "meta-llama/Llama-3.1-8B-Instruct", "enforce_reasoning_for_tools": true, "reasoning_cluster": "cluster_vllm_reasoning_72b", "fast_cluster": "cluster_vllm_fast_8b"}'::jsonb),
-    ('LeastCost', 'LeastCost (비용 최적화)', '테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 8B 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.', TRUE, '{"budget_threshold_pct": 80.0, "economic_model": "meta-llama/Llama-3.1-8B-Instruct", "standard_model": "meta-llama/Llama-3.1-70B-Instruct", "economic_cluster": "cluster_vllm_fast_8b", "standard_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
-    ('LatencyOptimized', 'LatencyOptimized (지연시간 최적화)', '초저지연(TTFT) 보장을 위해 경량 8B 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.', TRUE, '{"target_latency_ms": 200, "primary_fast_model": "meta-llama/Llama-3.1-8B-Instruct", "allow_reasoning_override": true, "reasoning_model": "meta-llama/Llama-3.1-70B-Instruct", "fast_cluster": "cluster_vllm_fast_8b", "reasoning_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
-    ('SelfHealingFallback', 'SelfHealingFallback (자가 치유 폴백)', '업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.', TRUE, '{"primary_fallback_model": "qwen2.5:14b", "secondary_fallback_model": "Solar-10.7B-Financial", "max_retries": 2, "timeout_seconds": 5, "fallback_cluster": "cluster_vllm_inference_pool"}'::jsonb)
+    ('QualityFirst', 'QualityFirst (품질 우선)', '복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 모델로 우선 분기하고 단순 질의는 경량 모델로 처리합니다.', TRUE, '{"reasoning_model": "", "fast_model": "", "enforce_reasoning_for_tools": true, "reasoning_cluster": "cluster_vllm_reasoning_72b", "fast_cluster": "cluster_vllm_fast_8b"}'::jsonb),
+    ('LeastCost', 'LeastCost (비용 최적화)', '테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.', TRUE, '{"budget_threshold_pct": 80.0, "economic_model": "", "standard_model": "", "economic_cluster": "cluster_vllm_fast_8b", "standard_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
+    ('LatencyOptimized', 'LatencyOptimized (지연시간 최적화)', '초저지연(TTFT) 보장을 위해 경량 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.', TRUE, '{"target_latency_ms": 200, "primary_fast_model": "", "allow_reasoning_override": true, "reasoning_model": "", "fast_cluster": "cluster_vllm_fast_8b", "reasoning_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
+    ('SelfHealingFallback', 'SelfHealingFallback (자가 치유 폴백)', '업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.', TRUE, '{"primary_fallback_model": "", "secondary_fallback_model": "", "max_retries": 2, "timeout_seconds": 5, "fallback_cluster": "cluster_vllm_inference_pool"}'::jsonb)
 ON CONFLICT (policy_id) DO NOTHING;
 
 

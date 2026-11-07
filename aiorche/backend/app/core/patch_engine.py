@@ -4,7 +4,7 @@ import hashlib
 import base64
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class PatchEngine:
             "applied_version": version,
             "strategy": "Kubernetes RollingUpdate (PDB minAvailable: 2)",
             "logs": logs,
-            "applied_at": datetime.utcnow()
+            "applied_at": datetime.now(timezone.utc)
         }
 
     @staticmethod
@@ -204,7 +204,7 @@ class PatchEngine:
             "target_component": target_component,
             "restored_version": rollback_to_version,
             "logs": logs,
-            "rolled_back_at": datetime.utcnow()
+            "rolled_back_at": datetime.now(timezone.utc)
         }
 
     @staticmethod
@@ -212,7 +212,7 @@ class PatchEngine:
         """5대 핵심 인프라 컴포넌트 자가 진단 실행."""
         return {
             "status": "HEALTHY",
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "overall_health": "100% 정상 (All 5 components operational)",
             "checks": {
                 "postgres": {

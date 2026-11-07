@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Numeric, DateTime, func
+from sqlalchemy import Column, String, Boolean, Numeric, DateTime, Text, func
 from app.db.base import Base
 
 class ModelCatalog(Base):
@@ -14,7 +14,7 @@ class ModelCatalog(Base):
     output_price_per_1k = Column(Numeric(10, 4), default=2.4, nullable=False)
     cache_discount_ratio = Column(Numeric(5, 4), default=0.25, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    api_key = Column(String(255), nullable=True)  # Upstream endpoint API Key
+    api_key = Column(Text, nullable=True)  # Upstream endpoint API Key (Fernet-encrypted)
     auth_type = Column(String(32), nullable=True, default="none")  # 'none', 'apikey', 'bearer'
     provider = Column(String(32), nullable=True, default="openai")  # 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'
     health_check_timeout = Column(Numeric(5, 2), default=3.0, nullable=True)  # Health check timeout in seconds

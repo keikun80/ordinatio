@@ -35,7 +35,8 @@ def test_model_catalog_crud():
     assert created_data["alias"] == "solar-pro-financial"
     assert created_data["serving_engine"] == "Ollama"
     assert created_data["execution_method"] == "direct"
-    assert created_data["api_key"] == "sec-apikey-12345"
+    # A-2: Model API key returned is securely masked
+    assert created_data["api_key"] == "sec...2345"
     assert created_data["auth_type"] == "apikey"
 
     # 3. Get model details
@@ -44,7 +45,7 @@ def test_model_catalog_crud():
     assert get_res.json()["backend_infra"] == "On-Prem K8s"
     assert get_res.json()["serving_engine"] == "Ollama"
     assert get_res.json()["execution_method"] == "direct"
-    assert get_res.json()["api_key"] == "sec-apikey-12345"
+    assert get_res.json()["api_key"] == "sec...2345"
     assert get_res.json()["auth_type"] == "apikey"
 
     # 4. Update model (change to bearer)
@@ -64,7 +65,7 @@ def test_model_catalog_crud():
     assert patch_res.json()["serving_engine"] == "vLLM"
     assert patch_res.json()["execution_method"] == "k8s"
     assert patch_res.json()["is_active"] is False
-    assert patch_res.json()["api_key"] == "sec-bearer-67890"
+    assert patch_res.json()["api_key"] == "sec...7890"
     assert patch_res.json()["auth_type"] == "bearer"
 
     # 5. Delete model (referenced in active route fails with 400 when force=false)
@@ -427,7 +428,7 @@ async def test_model_catalog_endpoint_auth_options():
     }
     res_api = client.post("/api/v1/models", json=model_apikey)
     assert res_api.status_code == 201
-    assert res_api.json()["api_key"] == "my-secret-apikey-123"
+    assert res_api.json()["api_key"] == "my-...-123"
     assert res_api.json()["auth_type"] == "apikey"
 
     # 2. Register a model with 'bearer' option
@@ -443,7 +444,7 @@ async def test_model_catalog_endpoint_auth_options():
     }
     res_bearer = client.post("/api/v1/models", json=model_bearer)
     assert res_bearer.status_code == 201
-    assert res_bearer.json()["api_key"] == "sk-proj-bearer-secret-456"
+    assert res_bearer.json()["api_key"] == "sk-p...-456"
     assert res_bearer.json()["auth_type"] == "bearer"
 
     # 3. Test probe_endpoint with apikey header injection
@@ -516,7 +517,7 @@ def test_update_model_attributes():
     assert updated_data["target_endpoint"] == "http://127.0.0.1:9000"
     assert updated_data["input_price_per_1k"] == 1.5
     assert updated_data["output_price_per_1k"] == 3.0
-    assert updated_data["api_key"] == "new-bearer-token"
+    assert updated_data["api_key"] == "new...oken"
     assert updated_data["auth_type"] == "bearer"
     assert updated_data["is_active"] is False
 

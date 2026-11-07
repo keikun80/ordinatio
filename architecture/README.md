@@ -21,8 +21,8 @@
 | **PRE_09** | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./PRE_09_phase5_lifecycle_and_hotfix_engine.md) | **Phase 5: 어플라이언스 수명주기 제어 및 RSA-4096 긴급 패치**<br>- 에어갭 오프라인 RSA-4096 서명 검증(`patch.tar.gz + patch.sig`)<br>- 4단계 무중단 핫픽스 롤링 및 자동 롤백, Zero-PII 서포트 번들 스트리밍 | **100% PASS**<br>(46/46 Tests) |
 | **PRE_10** | [PRE_10_INTEGRATED_FUNCTIONAL_TEST_SPEC.md](./PRE_10_INTEGRATED_FUNCTIONAL_TEST_SPEC.md) | **Phase 0~5 통합 기능 테스트 스펙 (E2E 검증 명세)**<br>- 백엔드 명세 대비 구현 정합성 전수 판정표 (OK / ALT)<br>- 프론트엔드 전 화면 대화형 UI 요소 전수 점검 및 통신 컬러 매핑 규격 | 완료 |
 | **PRE_11** | [PRE_11_REAL_DATA_INTEGRATION_PLAN.md](./PRE_11_REAL_DATA_INTEGRATION_PLAN.md) | **실데이터 및 온프레미스 LLM 백엔드 연동 계획서**<br>- Mock 시뮬레이션 데이터를 실제 DB 및 vLLM/Ollama 클러스터로 전환<br>- 스프린트 A~D 마일스톤 및 RACI 실행 계획표 | 실행 준비 |
-| **PRE_12** | [PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md) | **Phase 0~5 종합 총괄 보고서 (Executive Master Report)**<br>- Phase 0~5 전 모듈 아키텍처 및 46개 테스트 100% 통과 매트릭스<br>- 브라우저 E2E 실환경 시연 증적, 9대 아키텍처 결정 기록(ADR-01~09) 총괄 | 최신 현행화 |
-| **PRE_13** | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md) | **Phase 0~5 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 실제 구현율 100% 추적 감사<br>- 에어갭 최적화 아키텍처 결정(ADR) 전수 매핑 및 후속 Phase 6 연계 과제 | 최신 현행화 |
+| **PRE_12** | [PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md](./PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) | **Phase 0~6 종합 총괄 보고서 (Executive Master Report)**<br>- Phase 0~6 전 모듈 아키텍처 및 94개 백엔드 테스트 100% 통과 매트릭스<br>- Standalone 7/7 PASS, strings.js 100% 현지화, Phase C/B/A 상용 하드닝 완료, 17대 아키텍처 결정(ADR-01~17) 총괄 | 최신 현행화 |
+| **PRE_13** | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) | **Phase 0~6 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 Phase 0~6 핵심 런타임 구현율 100% 추적 감사<br>- Phase C/B/A 상용 하드닝(비루트, Alembic, Fernet 암호화, RoutingTab 모듈화, 401 인터셉터) 및 17대 ADR 전수 매핑 | 최신 현행화 |
 | **PRE_14** | [PRE_14_GAP_MARKET_PLACE.md](./PRE_14_GAP_MARKET_PLACE.md) | **엔터프라이즈 AI 마켓플레이스 연동 갭 분석서**<br>- 사내 AI 모델 스토어 및 프라이빗 레지스트리 연동 아키텍처 갭 분석<br>- 모델 온보딩 자동화 및 멀티 테넌트 권한 배포 방안 | 분석 완료 |
 | **PRE_15** | [PRE_15_Develop_milestone.md](./PRE_15_Develop_milestone.md) | **차세대 개발 마일스톤 (Milestone 6 ~ 8) 로드맵**<br>- M6: 프로덕션 릴리즈 패키징, 오프라인 Helm, 실시간 웹훅, WORM 불변 트리거<br>- M7: 에어갭 로컬 시맨틱 캐싱, 프롬프트 인젝션 방어, DB 정기 백업 & DR<br>- M8: 엔터프라이즈 SSO/RBAC, 모델 실시간 벤치마크, 스트리밍 PII 가드레일 | 최신 현행화 |
 | **PRE_16** | [PRE_16_gateway_browser_test_troubleshooting_report.md](./PRE_16_gateway_browser_test_troubleshooting_report.md) | **웹브라우저 LLM 테스트 연동 및 게이트웨이 즉시 호출 장애 해결 보고서**<br>- Ollama 미다운로드 모델 기본 설정 불일치 해소<br>- Docker 네트워크 브릿지 격리 해제 및 호스트:컨테이너 포트(11435 vs 11434) 정정<br>- 라우팅 테스트 클라이언트 45초 타임아웃 패치 및 브라우저 E2E 검증(200 OK) 완료 | **검증 완료**<br>(E2E PASS) |
@@ -40,12 +40,21 @@
 | **PRE_28** | [PRE_28_commercial_packaging_and_enterprise_expansion_plan.md](./PRE_28_commercial_packaging_and_enterprise_expansion_plan.md) | **상용화 패키징 및 엔터프라이즈 확장 구축·테스트 계획서**<br>- Stage 1: 오프라인 라이선스(RSA-4096/HW바인딩), Helm 차트, 단일 tar.gz 인스톨러, 셋업 마법사<br>- Stage 2: 사내 디렉토리 연동(AD/LDAP, SAML/OIDC), TOTP MFA, 1-Click 암호화 백업/DR, 사내 알림 웹훅<br>- Stage 3: 시맨틱 캐싱(비용 40~60% 절감), L7 프롬프트 탈옥 방어 가드레일, 화이트라벨링, 엔터프라이즈 SDK<br>- 단계별 구축 계획, 세부 테스트 매트릭스, 자동화 검증 스크립트 규격 및 라이선스 티어링 정의 | **설계 완료** |
 | **PRE_29** | [PRE_29_agent_router_dynamic_cluster_configuration_report.md](./PRE_29_agent_router_dynamic_cluster_configuration_report.md) | **AgentRouter 동적 Envoy 업스트림 클러스터 사용자 구성 및 시스템 하드코딩 제거 구현 보고서**<br>- 클러스터 고정 시스템 상수 및 `meta-llama` 하드코딩 모델 완전 제거<br>- 4대 지능형 라우팅 정책 내 동적 클러스터 `<input>` 편집 UI 및 모델 카탈로그 실시간 동적 바인딩<br>- 인텐트 분석 카드 메뉴 4종(복잡도, 티어, 타깃모델, 클러스터) 대화형 실시간 수동 에디트(Manual Override) 구현 | **100% PASS**<br>(85/85 Tests) |
 | **PRE_30** | [PRE_30_remote_endpoint_telemetry_and_topology_resolution_report.md](./PRE_30_remote_endpoint_telemetry_and_topology_resolution_report.md) | **원격 URL 엔드포인트 실시간 텔레메트리 스크래핑 및 인프라 토폴로지 자동 식별 보고서**<br>- 로컬 호스트 RAM 강제 대입 결함 해소 및 vLLM Prometheus `/metrics` 실시간 스크래핑 엔진 탑재<br>- 원격 블랙박스 API graceful N/A 분기 및 엔드포인트 URL 기반 스마트 인프라 토폴로지 자동 판별<br>- `On-Prem K8s / k8s` 동어반복 제거, 프론트엔드 카드 중복 줄 정비 및 86개 테스트 100% 무회귀 통과 | **100% PASS**<br>(86/86 Tests) |
+| **PRE_31** | [PRE_31_rhel_compatible_vagrant_installer_plan.md](./PRE_31_rhel_compatible_vagrant_installer_plan.md) | **RHEL 호환 계열 리눅스 단일 호스트 Standalone 모드 전자동 설치 스크립트 개발 계획서**<br>- 인프라 사전 요구사항(OS/방화벽/SELinux/Docker) 매뉴얼 분리 정의<br>- Standalone 배포 스크립트(`install.sh`) 4단계 파이프라인(레이아웃/시크릿, 이미지, DB/관리자, Systemd/헬스)<br>- 어플라이언스 수명주기 관리 CLI(`aiorche-ctl`) 및 Vagrant 테스트베드 연동 사양 정의 | **설계 완료** |
+| **PRE_32** | [PRE_32_standalone_installer_implementation_and_test_results.md](./PRE_32_standalone_installer_implementation_and_test_results.md) | **RHEL 호환 계열 리눅스 Standalone 모드 전자동 설치 툴 및 Vagrant 테스트베드 구현·검증 결과 보고서**<br>- `PREREQUISITES.md` 인프라 매뉴얼 및 Standalone Docker Compose / .env 템플릿 완비<br>- `install.sh` 4단계 무인 설치 파이프라인 및 호스트 관리 CLI(`aiorche-ctl`) 8종 명령 구현<br>- Vagrantfile 멀티 배포판(EL_DISTRO) 연동 및 DoD 자동화 검증 스위트 7/7 전 항목 100% PASS 달성 | **100% PASS**<br>(7/7 Tests) |
+| **PRE_33** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | **AI Orchestrator Standalone 어플라이언스 종합 보안 검토 및 하드닝 보고서**<br>- 5대 보안 통제 영역(네트워크 격리, RBAC/Argon2id, 암호화 키 관리, PII/WORM, SELinux/firewalld) 정밀 진단<br>- DB/Redis 루프백(`127.0.0.1`) 격리, .env 및 백업 아카이브 `chmod 600/700` 권한 통제 강화 완료<br>- 금융보안원 전자금융기반시설 기준 및 국정원 폐쇄망 보안 규격 충족 확인 | **검토 완료** |
+| **PRE_34** | [PRE_34_frontend_ui_strings_localization_plan.md](./PRE_34_frontend_ui_strings_localization_plan.md) | **프론트엔드 UI 한글 텍스트 전수 `strings.js` 중앙 집중화 및 로컬라이제이션 엔지니어링 계획서**<br>- 14개 JSX 컴포넌트 내 하드코딩 한글 텍스트 100% 제거 및 `strings.*` 네임스페이스 계층화<br>- 다국어(i18n) 및 고객사 화이트라벨링 확장성 확보, 5단계 점진적 리팩토링 로드맵 수립<br>- `data-testid` UI 택소노미 보존 및 E2E 시나리오 100% 무회귀 빌드 검증 기준 정의 | **설계 완료** |
+| **PRE_35** | [PRE_35_frontend_ui_strings_implementation_and_test_results.md](./PRE_35_frontend_ui_strings_implementation_and_test_results.md) | **프론트엔드 UI 한글 하드코딩 제거 및 `strings.js` 중앙 집중화 리팩토링 및 검증 보고서**<br>- `strings.js` 단일 진실 공급원 전면 확장 및 15개 UI 컴포넌트 한글 리터럴 100% 제거 (0건 달성)<br>- Vite 프로덕션 빌드 정상 완료(2.08s) 및 백엔드 86개 테스트 100% 무회귀 통과 | **100% PASS**<br>(Vite Build PASS) |
+| **PRE_36** | [PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md](./PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md) | **아키텍처-구현 갭(GAP) 분석 기반 엔터프라이즈 상용화 개발 로드맵**<br>- 14대 잔여 GAP(DRM 라이선스, 셋업 마법사, Helm, 시맨틱 캐싱 등) 전수 분석<br>- 3대 마일스톤(Phase 7: DRM/온보딩, Phase 8: 시맨틱캐시/보안, Phase 9: 엔터프라이즈 융합) 상세 실행 계획 | **설계 완료** |
+| **PRE_37** | [PRE_37_user_role_and_tenant_edit_engineering_plan.md](./PRE_37_user_role_and_tenant_edit_engineering_plan.md) | **사용자 및 계정 관리(UsersTab) Role 및 그룹(Tenant) 편집 기능 엔지니어링 계획서**<br>- 사용자 목록 내 ✏️ [수정] 모달 구현 및 Role/Tenant/이름/이메일 변경 파이프라인<br>- API 클라이언트 HTTP PATCH 정합화 및 strings.js 단일 진실 공급원 준수 | **구현 및 검증 완료**<br>(Vite & 86/86 PASS) |
+| **PRE_38** | [PRE_38_dynamic_role_management_engineering_plan_and_test_results.md](./PRE_38_dynamic_role_management_engineering_plan_and_test_results.md) | **사용자 역할(Role) 추가·수정·삭제 동적 RBAC 관리 엔진 및 전 도메인 PBAC 구현 계획서 및 결과 보고서**<br>- 커스텀 Role 추가/수정/삭제 REST API 및 10대 도메인 · 17종 세부 권한(Permissions) 매트릭스<br>- 전 엔드포인트 PBAC(`require_permission`) 적용, 전 탭 UI 권한 가드 및 JWT 헤더 일원화<br>- Vite 빌드 및 백엔드 93개 테스트 100% 통과 | **구현 및 검증 완료**<br>(Vite & 93/93 PASS) |
+| **PRE_39** | [PRE_39_all_domains_rbac_inspection_plan.md](./PRE_39_all_domains_rbac_inspection_plan.md) | **전 도메인(10대 도메인 · 17종 권한) RBAC/PBAC 적용 현황 4계층 정밀 검사 계획서**<br>- Axis 1(백엔드 수직 PBAC), Axis 2(테넌트 수평 격리), Axis 3(사이드바/헤더 메뉴 가시성), Axis 4(탭 내부 행/인라인 컨트롤 가드) 전수 감사 매트릭스<br>- 인라인 액션 버튼(PII 룰 행, 프롬프트 토글, 예산 긴급증액, 패치 롤백, 모델 수정/삭제, 사용자/역할 행) 세부 보완 계획 수립 | **계획 완료** |
 
 ---
 
 ## 🧭 순차적 구현 가이드라인 (Sequential Implementation & Reproducibility Guide)
 
-본 아키텍처 문서군을 기반으로 현재 프로젝트(`aiorche/`, 78개 테스트 100% PASS)와 **완전히 동일한 프로덕션 시스템을 단 한 번의 재작업 없이 개발하기 위한 공식 실행 순서 및 불변 원칙**입니다.
+본 아키텍처 문서군을 기반으로 현재 프로젝트(`aiorche/`, 93개 테스트 100% PASS)와 **완전히 동일한 프로덕션 시스템을 단 한 번의 재작업 없이 개발하기 위한 공식 실행 순서 및 불변 원칙**입니다.
 
 ### 1. 단계별 최적 개발 순서 (9단계 파이프라인)
 
@@ -75,7 +84,7 @@
 ### 2. 동일한 구현을 보장하는 3대 불변 원칙 (3 Golden Invariants)
 
 1. **원칙 1: ADR 우선 원칙 (Architecture Decision First)**
-   - `PRE_01`의 초기 구상(Kafka, Go xDS 데몬, 500MB spaCy Presidio)을 그대로 구현하지 말고, [`PRE_12`](./PRE_12_PHASE_0_TO_5_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_5.md)의 **ADR-01 ~ ADR-13** 최적화 설계를 최우선 기준으로 채택합니다:
+   - `PRE_01`의 초기 구상(Kafka, Go xDS 데몬, 500MB spaCy Presidio)을 그대로 구현하지 말고, [`PRE_12`](./PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) 및 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)의 **ADR-01 ~ ADR-15** 최적화 설계를 최우선 기준으로 채택합니다:
      - `FastAPI REST RDS v3` (`/api/v1/xds/v3/discovery:routes`)
      - 단일 DB 트랜잭션 동기식 원자적 계량 API (`POST /api/v1/external/usage/report`)
      - 자체 고속 정규식 PII 마스킹 엔진 (`<1ms`)
@@ -121,7 +130,10 @@ bash scripts/verify-phase-system-prompt.sh
 # 사용자 인증 및 RBAC 권한 통제 (DoD)
 make verify-auth-rbac
 
-# 백엔드 전체 회귀 테스트 (85개 테스트 100% PASS)
+# Standalone 모드 설치 툴 및 Vagrant 프로비저닝 (DoD)
+make verify-standalone-install
+
+# 백엔드 전체 회귀 테스트 (93개 테스트 100% PASS)
 cd backend && uv run pytest -v
 ```
 

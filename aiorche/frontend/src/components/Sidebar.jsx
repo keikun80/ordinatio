@@ -12,19 +12,30 @@ import {
   Cpu,
   Compass,
   ScrollText,
-  Users
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiClient } from '../api/client';
+import { strings } from '../constants/strings';
 
 export default function Sidebar({ 
   activeTab, 
   setActiveTab, 
   routingSubTab = 'routing', 
-  setRoutingSubTab, 
-  unreadPatchCount = 1 
+  setRoutingSubTab
 }) {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
+  const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
+  const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
   const [isRoutingExpanded, setIsRoutingExpanded] = useState(true);
+  const [systemInfo, setSystemInfo] = useState(null);
+
+  useEffect(() => {
+    apiClient.getSystemInfo().then((info) => {
+      if (info) setSystemInfo(info);
+    });
+  }, []);
 
   // Automatically expand accordion when routing tab is activated
   useEffect(() => {
@@ -34,9 +45,9 @@ export default function Sidebar({
   }, [activeTab]);
 
   const routingSubItems = [
-    { id: 'routing', label: '라우팅 스튜디오', icon: GitFork },
-    { id: 'catalog', label: '서빙 모델 풀', icon: Cpu },
-    { id: 'dispatch', label: 'AgentRouter & 테스트', icon: Compass }
+    { id: 'routing', label: strings.nav.menus.routingStudio, icon: GitFork },
+    { id: 'catalog', label: strings.nav.menus.servingPool, icon: Cpu },
+    { id: 'dispatch', label: strings.nav.menus.agentRouterDispatch, icon: Compass }
   ];
 
   const handleRoutingHeaderClick = () => {
@@ -57,20 +68,39 @@ export default function Sidebar({
   };
 
   const navItems = [
-    { id: 'overview', label: '통합 관제 홈', icon: LayoutDashboard },
-    { 
-      id: 'routing', 
-      label: '모델 & 라우팅', 
-      icon: GitFork, 
-      isAccordion: true,
-      subItems: routingSubItems
-    },
-    { id: 'virtual-keys', label: '가상 API Key & 부서', icon: KeyRound },
-    { id: 'system-prompts', label: '시스템 프롬프트 거버넌스', icon: ScrollText },
-    { id: 'finops', label: 'FinOps 비용 & 예산', icon: Coins },
-    { id: 'compliance', label: 'PII 보안 & 감사 로그', icon: ShieldAlert },
-    { id: 'prompt-studio', label: '프롬프트 스튜디오', icon: Sparkles },
-    ...(isSuperAdmin ? [{ id: 'users', label: '사용자 및 계정 관리', icon: Users }] : [])
+    ...(isSuperAdmin || hasPermission('overview:read') ? [
+      { id: 'overview', label: strings.nav.menus.overview, icon: LayoutDashboard }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('routing:read') ? [
+      { 
+        id: 'routing', 
+        label: strings.nav.menus.modelRouting, 
+        icon: GitFork, 
+        isAccordion: true,
+        subItems: routingSubItems
+      }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('governance:read') ? [
+      { id: 'virtual-keys', label: strings.nav.menus.virtualKeys, icon: KeyRound }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('prompts:read') ? [
+      { id: 'system-prompts', label: strings.nav.menus.systemPrompts, icon: ScrollText }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('finops:read') ? [
+      { id: 'finops', label: strings.nav.menus.finops, icon: Coins }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('compliance:read') ? [
+      { id: 'compliance', label: strings.nav.menus.compliance, icon: ShieldAlert }
+    ] : []),
+    ...(isSuperAdmin || hasPermission('prompt_studio:execute') ? [
+      { id: 'prompt-studio', label: strings.nav.menus.promptStudio, icon: Sparkles }
+    ] : []),
+    ...(canAccessUsers ? [
+      { id: 'users', label: strings.nav.menus.users, icon: Users }
+    ] : []),
+    ...(canAccessRoles ? [
+      { id: 'roles', label: strings.nav.menus.roles, icon: ShieldCheck }
+    ] : [])
   ];
 
   return (
@@ -98,7 +128,7 @@ export default function Sidebar({
                   onClick={handleRoutingHeaderClick}
                   data-testid={`com-tab-${item.id}`}
                   data-screen-id="SCR-RT-00"
-                  title="클릭하여 모델 & 라우팅 하위 메뉴 펼치기/접기"
+                  title={strings.nav.toggleSubmenuTooltip}
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
@@ -148,10 +178,10 @@ export default function Sidebar({
       <div className="sidebar-footer" data-testid="com-sidebar-footer">
         <div className="sidebar-status-pill" data-testid="com-sidebar-status-pill">
           <span className="status-dot"></span>
-          <span>에어갭 자체 운영 모드</span>
+          <span>{strings.nav.airgapMode}</span>
         </div>
         <div style={{ marginTop: '8px', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-          솔루션 코어 v1.2.0 | Apache 2.0
+          {strings.nav.solutionCoreVersionDynamic(systemInfo?.version, systemInfo?.license)}
         </div>
       </div>
     </aside>

@@ -100,6 +100,18 @@ export function AuthProvider({ children }) {
     };
   }, [user, token, logout, resetActivityTimer]);
 
+  // Central 401 Session Expiration Interceptor (A-4)
+  useEffect(() => {
+    const handleSessionExpired = (e) => {
+      console.warn('Central 401 unauthorized request detected:', e.detail);
+      logout('session_expired');
+    };
+    window.addEventListener('aiorche-session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('aiorche-session-expired', handleSessionExpired);
+    };
+  }, [logout]);
+
   // Login handler
   const login = async (username, password) => {
     setLogoutReason(null);
@@ -121,6 +133,18 @@ export function AuthProvider({ children }) {
     return roles.includes(user.role);
   };
 
+  const hasPermission = (permissionCode) => {
+    if (!user) return false;
+    if (user.role === 'SUPER_ADMIN') return true;
+    const permissions = user.permissions || [];
+    if (permissions.includes('*') || permissions.includes(permissionCode)) return true;
+    if (permissionCode.endsWith(':read')) {
+      const writeEquiv = permissionCode.replace(':read', ':write');
+      if (permissions.includes(writeEquiv)) return true;
+    }
+    return false;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -136,7 +160,8 @@ export function AuthProvider({ children }) {
         isSuperAdmin,
         isTenantAdmin,
         isViewer,
-        hasRole
+        hasRole,
+        hasPermission
       }}
     >
       {children}

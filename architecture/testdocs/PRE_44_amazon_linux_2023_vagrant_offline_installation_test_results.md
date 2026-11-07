@@ -107,3 +107,4 @@ Loaded image: envoyproxy/envoy:v1.31.2
 1. **Amazon Linux 2023** 환경에서도 단일 오프라인 압축 번들(`aiorche-appliance-v1.0.0.tar.gz`)이 외부 인터넷 의존성 없이 `make up`만으로 100% 정상 자립 기동되었습니다.
 2. 초기 관리자 비밀번호를 UI 안내와 동일한 **`admin1234!`**로 일원화하여, 호스트 브라우저에서 `http://localhost:5173` 접속 시 즉시 성공적인 로그인이 가능함을 실증 검증하였습니다.
 3. 이로써 AI Orchestrator Standalone 어플라이언스는 **엔터프라이즈 3대 주요 리눅스 배포판군(Rocky Linux 9, Ubuntu 24.04 LTS, Amazon Linux 2023)** 전체에서 완전한 이식성과 신뢰성을 확보하였습니다.
+

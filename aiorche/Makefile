@@ -1,5 +1,5 @@
 .PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down init-admin \
-	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-standalone-install \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -19,9 +19,10 @@ help:
 	@echo ""
 	@echo "  [Production / Appliance Release Mode (On-Demand Only)]"
 	@echo "  make build                     - Build frontend production distribution bundle (frontend/dist)"
-	@echo "  make prod-build                - Build immutable Production Docker images (Nginx static + FastAPI)"
-	@echo "  make prod-up                   - Build & run immutable Production Docker Compose stack"
+	@echo "  make prod-build                - Build air-gapped standalone archive (dist/aiorche-appliance-v*.tar.gz with all Docker images)"
+	@echo "  make prod-up                   - Run local production stack using built images"
 	@echo "  make prod-down                 - Stop Production Docker Compose stack"
+	@echo "  make verify-offline-bundle     - End-to-end test of standalone package (unpack -> make up -> healthcheck -> down)"
 	@echo ""
 	@echo "  [DoD Automated Verification]"
 	@echo "  make verify-phase0             - Run Phase 0 DoD verification (Foundations & Envoy AI Gateway)"
@@ -91,11 +92,10 @@ down:
 	@docker compose down
 
 prod-build:
-	@echo "==> Building Production Frontend Bundle & Immutable Docker Images..."
-	@cd frontend && npm run build
-	@docker build -t aiorche-backend:prod ./backend
-	@docker build --target prod -t aiorche-frontend:prod ./frontend
-	@echo "✅ Production images (aiorche-backend:prod, aiorche-frontend:prod) built successfully."
+	@bash scripts/package-offline-bundle.sh
+
+verify-offline-bundle:
+	@bash scripts/verify-offline-bundle.sh
 
 prod-up: prod-build
 	@echo "==> Starting Immutable Production Stack (Nginx Static + FastAPI Production)..."

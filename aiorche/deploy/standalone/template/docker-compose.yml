@@ -1,0 +1,145 @@
+# ==============================================================================
+# AI Orchestrator Standalone Appliance Docker Compose Specification
+# Self-Contained Air-Gapped Appliance Architecture (Enterprise Linux & macOS)
+# ==============================================================================
+
+version: "3.8"
+
+networks:
+  aiorche-net:
+    name: aiorche-net
+    driver: bridge
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Metastore: PostgreSQL 15
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiorche-postgres
+    restart: always
+    networks:
+      - aiorche-net
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-aiorche_db}
+    ports:
+      # 로컬 루프백 전용 바인딩 (외부 노출 차단)
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aiorche_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # 2. Quota & Distributed Cache: Redis 7
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aiorche-redis
+    restart: always
+    networks:
+      - aiorche-net
+    ports:
+      # 로컬 루프백 전용 바인딩 (외부 노출 차단)
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ----------------------------------------------------------------------------
+  # 3. L7 Ingress: Envoy AI Gateway
+  # ----------------------------------------------------------------------------
+  envoy:
+    image: envoyproxy/envoy:v1.31.2
+    container_name: aiorche-envoy
+    restart: always
+    networks:
+      - aiorche-net
+    ports:
+      # 외부 트래픽 수신 포트
+      - "${ENVOY_PORT:-8080}:8080"
+      # 관리 콘솔 (로컬 루프백 한정)
+      - "127.0.0.1:${ENVOY_ADMIN_PORT:-9901}:9901"
+    volumes:
+      - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["/usr/local/bin/envoy", "-c", "/etc/envoy/envoy.yaml", "--service-cluster", "aiorche-cluster", "--service-node", "envoy-standalone"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/tcp | grep -q 1F90 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # 4. Control Plane: FastAPI Backend
+  # ----------------------------------------------------------------------------
+  backend:
+    image: aiorche-backend:prod
+    container_name: aiorche-backend
+    restart: always
+    networks:
+      - aiorche-net
+    env_file:
+      - .env
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-aiorche_db}
+      REDIS_URL: redis://redis:6379/0
+      ENVOY_INTERNAL_HOST: envoy
+      ENVOY_INTERNAL_PORT: 8080
+      JWT_ALGORITHM: HS256
+      ALLOW_DEV_MOCK_KEYS: "false"
+    ports:
+      # 로컬 루프백 전용 바인딩 (외부 직접 노출 차단, Envoy 경유)
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ----------------------------------------------------------------------------
+  # 5. Presentation: React SPA on Nginx
+  # ----------------------------------------------------------------------------
+  frontend:
+    image: aiorche-frontend:prod
+    container_name: aiorche-frontend
+    restart: always
+    networks:
+      - aiorche-net
+    ports:
+      # 웹 브라우저 대시보드 포트
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+

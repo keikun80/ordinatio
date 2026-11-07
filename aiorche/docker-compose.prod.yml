@@ -22,7 +22,7 @@ services:
     ports: !override
       - "${FRONTEND_PORT:-5173}:80"
     healthcheck: !override
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3

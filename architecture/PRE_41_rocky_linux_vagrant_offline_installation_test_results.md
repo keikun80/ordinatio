@@ -152,3 +152,4 @@ Loaded image: envoyproxy/envoy:v1.31.2
 ## 6. 결론
 1. `make prod-build`로 빌드된 단일 오프라인 번들(`aiorche-appliance-v1.0.0.tar.gz`)은 외부 인터넷 연결이 완전히 차단된 폐쇄망 Rocky Linux 9 환경에서도 추가 다운로드나 외부 의존성 없이 `make up` 명령 하나만으로 100% 자립 기동되었습니다.
 2. 5대 핵심 서비스(PostgreSQL, Redis, Backend, Envoy L7 Gateway, Frontend)가 모두 정상 헬스체크를 달성하였으며, 보안 시크릿 자동화, Argon2id 기반 슈퍼관리자 계정 생성, 백업 기능까지 실증 검증을 성공적으로 마쳤습니다.
+

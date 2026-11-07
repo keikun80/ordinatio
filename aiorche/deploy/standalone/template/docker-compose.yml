@@ -107,8 +107,8 @@ services:
       JWT_ALGORITHM: HS256
       ALLOW_DEV_MOCK_KEYS: "false"
     ports:
-      # 로컬 루프백 전용 바인딩 (외부 직접 노출 차단, Envoy 경유)
-      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+      # 백엔드 API 포트 (외부 관리망 및 포트포워딩 수신 허용)
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy

@@ -87,6 +87,7 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 | :--- | :--- | :---: |
 | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./07_appliance_and_packaging/PRE_09_phase5_lifecycle_and_hotfix_engine.md) | **어플라이언스 수명주기 제어 및 RSA-4096 긴급 패치 엔진**<br>- RSA-4096 서명 오프라인 패치 검증, 4단계 무중단 롤링 핫픽스 & 롤백 | **100% PASS** |
 | [PRE_40_standalone_offline_appliance_packaging_plan.md](./07_appliance_and_packaging/PRE_40_standalone_offline_appliance_packaging_plan.md) | **독립형 오프라인 어플라이언스 원클릭 패키징 및 구동 보고서**<br>- `make prod-build` ➔ 단일 tar.gz 번들 생성 ➔ 타깃 서버 `make up` 원클릭 기동 | **100% PASS** |
+| [PRE_45_standalone_appliance_release_engineering_plan.md](./07_appliance_and_packaging/PRE_45_standalone_appliance_release_engineering_plan.md) | **오프라인 어플라이언스 릴리즈 엔지니어링 계획서**<br>- 5단계 릴리즈 생명주기, 이중 체크섬, RSA-4096 서명, 고객사 전입 검증기 및 make release 자동화 | **계획 완료** |
 
 ---
 

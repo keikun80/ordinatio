@@ -37,3 +37,4 @@ OS_DISTRO=bento/rockylinux-9 vagrant up      # Rocky Linux 9 테스트
 OS_DISTRO=bento/ubuntu-24.04 vagrant up      # Ubuntu 24.04 LTS 테스트
 OS_DISTRO=bento/amazonlinux-2023 vagrant up  # Amazon Linux 2023 테스트
 ```
+

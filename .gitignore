@@ -34,3 +34,9 @@ yarn-error.log*
 # Vagrant
 .vagrant/
 
+# Security / Release Private Keys
+*private*.pem
+*.key
+deploy/security/*private*.pem
+
+

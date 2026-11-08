@@ -38,6 +38,12 @@ dist-ssr/
 .env
 .env.local
 
+# Security / Release Private Keys
+*private*.pem
+*.key
+deploy/security/*private*.pem
+
+
 # IDE
 .idea/
 .vscode/

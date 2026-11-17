@@ -28,7 +28,12 @@ ADMIN_PASSWORD=""
 DATACENTER_NAME="온프레미스 주전산센터"
 CLUSTER_REGION="DC-1 서울"
 SKIP_BUILD=false
+SKIP_PULL=false
+USE_LOCAL_BUILD=false
 SEED_DEMO_DATA=false
+
+BACKEND_IMAGE="keikun808/ordinatio-backend:v1.0.2"
+FRONTEND_IMAGE="keikun808/ordinatio-frontend:v1.0.2"
 
 INITIAL_ADMIN_USERNAME="admin"
 INITIAL_ADMIN_EMAIL="admin@ordinatio.local"
@@ -98,7 +103,11 @@ usage() {
     echo "      --cluster-region     클러스터 리전/존 명칭 지정 (기본값: DC-1 서울)"
     echo "      --target-dir PATH    설치 대상 디렉토리 (기본값: /opt/ordinatio)"
     echo "      --source-dir PATH    ordinatio 소스 루트 디렉토리"
-    echo "      --skip-build         컨테이너 이미지 빌드 단계 생략"
+    echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:v1.0.2)"
+    echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:v1.0.2)"
+    echo "      --skip-pull          컨테이너 이미지 다운로드(Pull) 단계 생략"
+    echo "      --skip-build         컨테이너 이미지 다운로드/빌드 단계 생략"
+    echo "      --build              Docker Hub 대신 로컬 소스 빌드 강제"
     echo "      --seed-demo          데모/샘플 데이터(테넌트, 모델, 감사로그) 적재 (기본값: 클린 설치)"
     echo "  -h, --help               도움말 출력"
     echo ""
@@ -182,8 +191,25 @@ while [[ $# -gt 0 ]]; do
             SOURCE_DIR="$2"
             shift 2
             ;;
+        --backend-image)
+            BACKEND_IMAGE="$2"
+            shift 2
+            ;;
+        --frontend-image)
+            FRONTEND_IMAGE="$2"
+            shift 2
+            ;;
+        --skip-pull)
+            SKIP_PULL=true
+            shift
+            ;;
         --skip-build)
             SKIP_BUILD=true
+            SKIP_PULL=true
+            shift
+            ;;
+        --build)
+            USE_LOCAL_BUILD=true
             shift
             ;;
         --seed-demo)
@@ -258,6 +284,8 @@ log_success "포트 점유 사전 점검 완료."
 echo ""
 log_info "설치 대상 경로: ${BOLD}${TARGET_DIR}${NC}"
 log_info "소스 파일 경로: ${BOLD}${SOURCE_DIR}${NC}"
+log_info "백엔드 이미지 : ${BOLD}${BACKEND_IMAGE}${NC}"
+log_info "프론트 이미지 : ${BOLD}${FRONTEND_IMAGE}${NC}"
 log_info "데이터센터 식별: ${BOLD}${DATACENTER_NAME} (${CLUSTER_REGION})${NC}"
 log_info "도커 브릿지 IP: ${BOLD}${DOCKER_BRIDGE_GATEWAY_IP}${NC}"
 
@@ -316,6 +344,8 @@ sed \
   -e "s|__DATACENTER_NAME__|${DATACENTER_NAME}|g" \
   -e "s|__CLUSTER_REGION__|${CLUSTER_REGION}|g" \
   -e "s/SEED_DEMO_DATA=false/SEED_DEMO_DATA=${SEED_DEMO_DATA}/g" \
+  -e "s|__BACKEND_IMAGE__|${BACKEND_IMAGE}|g" \
+  -e "s|__FRONTEND_IMAGE__|${FRONTEND_IMAGE}|g" \
   -e "s/__INITIAL_ADMIN_USERNAME__/${INITIAL_ADMIN_USERNAME}/g" \
   -e "s/__INITIAL_ADMIN_EMAIL__/${INITIAL_ADMIN_EMAIL}/g" \
   -e "s/__BACKEND_PORT__/${BACKEND_PORT}/g" \
@@ -338,7 +368,7 @@ chmod 600 "${TARGET_DIR}/.env"
 log_success "Standalone 환경 설정(.env) 보안 권한 적용 완료."
 
 # ------------------------------------------------------------------------------
-# [Step 2] 컨테이너 이미지 프로비저닝 (Load / Build)
+# [Step 2] 컨테이너 이미지 프로비저닝 (Docker Hub / Load / Build)
 # ------------------------------------------------------------------------------
 echo ""
 echo -e "${BOLD}================================================================${NC}"
@@ -350,7 +380,7 @@ if [ -f "$OFFLINE_TAR" ]; then
     log_info "에어갭 오프라인 이미지 아카이브 로딩 중: ${OFFLINE_TAR}"
     docker load -i "$OFFLINE_TAR"
     log_success "오프라인 이미지 로드 완료."
-elif [ "$SKIP_BUILD" = false ]; then
+elif [ "$USE_LOCAL_BUILD" = true ]; then
     log_info "로컬 컨테이너 이미지 빌드 수행 중 (backend & frontend)..."
     mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
     cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
@@ -358,8 +388,24 @@ elif [ "$SKIP_BUILD" = false ]; then
     
     docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" build
     log_success "컨테이너 이미지 빌드 완료."
+elif [ "$SKIP_PULL" = false ] && [ "$SKIP_BUILD" = false ]; then
+    log_info "Docker Hub에서 컨테이너 이미지 다운로드(Pull) 중..."
+    log_info "  - Backend:  ${BACKEND_IMAGE}"
+    if ! docker pull "${BACKEND_IMAGE}"; then
+        log_warn "Docker Hub 다운로드 실패. 로컬 소스 빌드로 전환합니다..."
+        mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
+        cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
+        cp -r "${SOURCE_DIR}/frontend"/* "${TARGET_DIR}/frontend/" || true
+        docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" build
+    fi
+    log_info "  - Frontend: ${FRONTEND_IMAGE}"
+    docker pull "${FRONTEND_IMAGE}" 2>/dev/null || true
+    
+    docker tag "${BACKEND_IMAGE}" ordinatio-backend:latest 2>/dev/null || true
+    docker tag "${FRONTEND_IMAGE}" ordinatio-frontend:latest 2>/dev/null || true
+    log_success "컨테이너 이미지 프로비저닝 완료."
 else
-    log_info "이미지 빌드 단계 생략 (--skip-build)."
+    log_info "이미지 다운로드 단계 생략 (--skip-pull / --skip-build)."
 fi
 
 # ------------------------------------------------------------------------------

@@ -76,9 +76,35 @@ export default function DevInspector({ isActive, onToggle }) {
       if (target) {
         const idToCopy = target.getAttribute('data-testid') || target.getAttribute('data-screen-id');
         if (idToCopy) {
-          navigator.clipboard.writeText(idToCopy);
-          setCopiedId(idToCopy);
-          setTimeout(() => setCopiedId(null), 2000);
+          const notifySuccess = () => {
+            setCopiedId(idToCopy);
+            setTimeout(() => setCopiedId(null), 2000);
+          };
+
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(idToCopy)
+              .then(notifySuccess)
+              .catch(() => fallbackCopy(idToCopy));
+          } else {
+            fallbackCopy(idToCopy);
+          }
+
+          function fallbackCopy(text) {
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = text;
+              ta.style.position = 'fixed';
+              ta.style.left = '-999999px';
+              document.body.appendChild(ta);
+              ta.focus();
+              ta.select();
+              document.execCommand('copy');
+              document.body.removeChild(ta);
+              notifySuccess();
+            } catch (err) {
+              console.error('DevInspector fallback copy failed:', err);
+            }
+          }
         }
       }
     };

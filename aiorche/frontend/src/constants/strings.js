@@ -710,6 +710,8 @@ export const strings = {
       statusBlocked: '🔴 차단됨 (즉시 호출 차단)',
       allowedModelsLabel: (count) => `허용 대상 AI 모델 (등록된 모델 풀: ${count}개)`,
       modelsCountAllowed: (count) => `${count}개 모델 허용됨`,
+      noModelsEmpty: '현재 카탈로그에 등록된 AI 모델이 없습니다.',
+      goToCatalogAction: '동적 라우팅/모델 카탈로그에서 모델 등록하기',
       btnDeleteKey: '가상키 영구 삭제',
       btnSaving: '저장 중...',
       btnSave: '변경 내용 저장'
@@ -726,6 +728,9 @@ export const strings = {
       ipWhitelistPlaceholder: '미입력 시 전체 IP 허용 (예: 0.0.0.0/0, 10.100.0.0/16)',
       allowedModelsLabel: (count) => `허용 대상 AI 모델 (등록된 모델 풀: ${count}개)`,
       modelsCountSelected: (count) => `${count}개 모델 선택됨`,
+      noModelsEmpty: '현재 카탈로그에 등록된 AI 모델이 없습니다.',
+      noModelsNotice: '가상 키 생성 전에 [동적 라우팅] 메뉴에서 모델을 먼저 등록하거나, 모델 제한 없이 발급 후 수정하십시오.',
+      goToCatalogAction: '동적 라우팅/모델 카탈로그에서 모델 등록하기',
       hardCapNoticeStrong: '하드 캡(Hard Cap) 예산 초과 즉시 차단:',
       hardCapNoticeDesc: '부서 예산 100% 도달 시 즉시 429 반환',
       btnCreating: '생성 및 암호화 중...',

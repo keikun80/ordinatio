@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 const LOCAL_STORAGE_KEY = 'aiorche_virtual_keys_v1';
 const LOCAL_STORAGE_TENANTS_KEY = 'aiorche_tenants_v1';
 
-export default function VirtualKeysTab({ onNotify }) {
+export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   const auth = useAuth?.() || {};
   const isSuperAdmin = auth.isSuperAdmin || auth.user?.role === 'SUPER_ADMIN';
   const hasPermission = auth.hasPermission || (() => true);
@@ -470,10 +470,38 @@ export default function VirtualKeysTab({ onNotify }) {
 
   const handleCopySecret = () => {
     if (createdSecret && createdSecret.rawKey) {
-      navigator.clipboard.writeText(createdSecret.rawKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-      onNotify('INFO', strings.virtualKeys.alerts.keyCopied);
+      const text = createdSecret.rawKey;
+      const notifySuccess = () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+        onNotify('INFO', strings.virtualKeys.alerts.keyCopied);
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text)
+          .then(notifySuccess)
+          .catch(() => fallbackCopySecret(text));
+      } else {
+        fallbackCopySecret(text);
+      }
+
+      function fallbackCopySecret(str) {
+        try {
+          const textArea = document.createElement('textarea');
+          textArea.value = str;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          notifySuccess();
+        } catch (err) {
+          console.error('Fallback copy failed:', err);
+        }
+      }
     }
   };
 
@@ -798,40 +826,59 @@ export default function VirtualKeysTab({ onNotify }) {
                     <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{strings.virtualKeys.editModal.modelsCountAllowed(editModels.length)}</span>
                   </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    {registeredModels.map(m => {
-                      const isChecked = editModels.includes(m.id);
-                      return (
-                        <label
-                          key={m.id}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
-                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditModels([...editModels, m.id]);
-                              } else {
-                                setEditModels(editModels.filter(id => id !== m.id));
-                              }
+                    {registeredModels.length === 0 ? (
+                      <div style={{ width: '100%', padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        <div style={{ marginBottom: '6px', color: '#94a3b8' }}>{strings.virtualKeys.editModal.noModelsEmpty}</div>
+                        {onNavigateTab && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setEditingKey(null);
+                              onNavigateTab('routing');
                             }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
-                        </label>
-                      );
-                    })}
+                            style={{ fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
+                          >
+                            {strings.virtualKeys.editModal.goToCatalogAction} &rarr;
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      registeredModels.map(m => {
+                        const isChecked = editModels.includes(m.id);
+                        return (
+                          <label
+                            key={m.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                              color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditModels([...editModels, m.id]);
+                                } else {
+                                  setEditModels(editModels.filter(id => id !== m.id));
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                          </label>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
@@ -953,40 +1000,65 @@ export default function VirtualKeysTab({ onNotify }) {
                     <span style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{strings.virtualKeys.createKeyModal.modelsCountSelected(newKeyModels.length)}</span>
                   </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'rgba(15, 23, 42, 0.6)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    {registeredModels.map(m => {
-                      const isChecked = newKeyModels.includes(m.id);
-                      return (
-                        <label
-                          key={m.id}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                            border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
-                            color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewKeyModels([...newKeyModels, m.id]);
-                              } else {
-                                setNewKeyModels(newKeyModels.filter(id => id !== m.id));
-                              }
+                    {registeredModels.length === 0 ? (
+                      <div style={{ width: '100%', padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        <div style={{ marginBottom: '6px', color: '#f59e0b', fontWeight: 500 }}>
+                          <AlertTriangle size={15} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }} />
+                          {strings.virtualKeys.createKeyModal.noModelsEmpty}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                          {strings.virtualKeys.createKeyModal.noModelsNotice}
+                        </div>
+                        {onNavigateTab && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setShowCreateModal(false);
+                              onNavigateTab('routing');
                             }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
-                        </label>
-                      );
-                    })}
+                            style={{ fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
+                          >
+                            {strings.virtualKeys.createKeyModal.goToCatalogAction} &rarr;
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      registeredModels.map(m => {
+                        const isChecked = newKeyModels.includes(m.id);
+                        return (
+                          <label
+                            key={m.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              background: isChecked ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              border: `1px solid ${isChecked ? '#38bdf8' : 'rgba(255, 255, 255, 0.1)'}`,
+                              color: isChecked ? '#38bdf8' : 'var(--text-secondary)'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setNewKeyModels([...newKeyModels, m.id]);
+                                } else {
+                                  setNewKeyModels(newKeyModels.filter(id => id !== m.id));
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <span>{m.id} {m.alias ? `(${m.alias})` : ''}</span>
+                          </label>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 

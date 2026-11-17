@@ -152,7 +152,7 @@ function Dashboard() {
             )}
 
             {activeTab === 'virtual-keys' && canAccessGovernance && (
-              <VirtualKeysTab onNotify={addToast} />
+              <VirtualKeysTab onNotify={addToast} onNavigateTab={(tab) => setActiveTab(tab)} />
             )}
 
             {activeTab === 'system-prompts' && canAccessPrompts && (

@@ -509,69 +509,86 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ padding: '10px 12px', background: latestAuditLog?.action_taken === 'BLOCK' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', borderLeft: `3px solid ${latestAuditLog?.action_taken === 'BLOCK' ? '#ef4444' : '#10b981'}`, borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: latestAuditLog?.action_taken === 'BLOCK' ? '#ef4444' : '#34d399' }}>
-                <span>
-                  {latestAuditLog
-                    ? strings.overview.systemAlerts.auditEventTitle(latestAuditLog.action_taken, latestAuditLog.model_id)
-                    : strings.overview.systemAlerts.securityTitle}
-                </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  {latestAuditLog?.created_at
-                    ? new Date(latestAuditLog.created_at).toLocaleTimeString('ko-KR', { hour12: false })
-                    : strings.overview.systemAlerts.realTime}
-                </span>
+            {!latestAuditLog && clusterPools.length === 0 && !finOpsSummary ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                {strings.overview.systemAlerts.noAlerts}
               </div>
-              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                {latestAuditLog
-                  ? strings.overview.systemAlerts.auditEventDesc(latestAuditLog.requester_id, latestAuditLog.worm_storage_id, latestAuditLog.pii_detected_count)
-                  : strings.overview.systemAlerts.securityDesc}
-              </div>
-            </div>
+            ) : (
+              <>
+                {/* 1. Security & Compliance Log Alert */}
+                {latestAuditLog ? (
+                  <div style={{ padding: '10px 12px', background: latestAuditLog.action_taken === 'BLOCK' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', borderLeft: `3px solid ${latestAuditLog.action_taken === 'BLOCK' ? '#ef4444' : '#10b981'}`, borderRadius: '4px', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: latestAuditLog.action_taken === 'BLOCK' ? '#ef4444' : '#34d399' }}>
+                      <span>
+                        {strings.overview.systemAlerts.auditEventTitle(latestAuditLog.action_taken, latestAuditLog.model_id)}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {latestAuditLog.created_at
+                          ? new Date(latestAuditLog.created_at).toLocaleTimeString('ko-KR', { hour12: false })
+                          : strings.overview.systemAlerts.realTime}
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                      {strings.overview.systemAlerts.auditEventDesc(latestAuditLog.requester_id, latestAuditLog.worm_storage_id, latestAuditLog.pii_detected_count)}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {strings.overview.systemAlerts.noSecurityAlerts}
+                  </div>
+                )}
 
-            <div style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#38bdf8' }}>
-                <span>
-                  {clusterPools.length > 0
-                    ? strings.overview.systemAlerts.infraDynamicTitle(
-                        clusterPools.filter((p) => p.status === 'HEALTHY').length,
-                        clusterPools.length
-                      )
-                    : strings.overview.systemAlerts.infraTitle}
-                </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
-              </div>
-              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                {clusterPools.length > 0
-                  ? strings.overview.systemAlerts.infraDynamicDesc(
-                      clusterPools.map((p) => p.name || p.model).slice(0, 3).join(', ')
-                    )
-                  : strings.overview.systemAlerts.infraDesc}
-              </div>
-            </div>
+                {/* 2. Serving Pool Health & Infrastructure Alert */}
+                {clusterPools.length > 0 ? (
+                  <div style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#38bdf8' }}>
+                      <span>
+                        {strings.overview.systemAlerts.infraDynamicTitle(
+                          clusterPools.filter((p) => p.status === 'HEALTHY').length,
+                          clusterPools.length
+                        )}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                      {strings.overview.systemAlerts.infraDynamicDesc(
+                        clusterPools.map((p) => p.name || p.model).slice(0, 3).join(', ')
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {strings.overview.systemAlerts.noInfraAlerts}
+                  </div>
+                )}
 
-            <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f59e0b' }}>
-                <span>
-                  {finOpsSummary
-                    ? strings.overview.systemAlerts.finopsDynamicTitle(
-                        finOpsSummary.overall_burn_rate_pct,
-                        (finOpsSummary.tenants || []).filter((t) => t.is_blocked).length
-                      )
-                    : strings.overview.systemAlerts.finopsTitle}
-                </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
-              </div>
-              <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
-                {finOpsSummary
-                  ? strings.overview.systemAlerts.finopsDynamicDesc(
-                      finOpsSummary.total_spent_krw,
-                      finOpsSummary.total_budget_krw,
-                      finOpsSummary.active_tenants_count
-                    )
-                  : strings.overview.systemAlerts.finopsDesc}
-              </div>
-            </div>
+                {/* 3. FinOps & Tenant Budget Alert */}
+                {finOpsSummary ? (
+                  <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f59e0b' }}>
+                      <span>
+                        {strings.overview.systemAlerts.finopsDynamicTitle(
+                          finOpsSummary.overall_burn_rate_pct,
+                          (finOpsSummary.tenants || []).filter((t) => t.is_blocked).length
+                        )}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                      {strings.overview.systemAlerts.finopsDynamicDesc(
+                        finOpsSummary.total_spent_krw,
+                        finOpsSummary.total_budget_krw,
+                        finOpsSummary.active_tenants_count
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {strings.overview.systemAlerts.noFinopsAlerts}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

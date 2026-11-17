@@ -164,6 +164,44 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     loadData();
   }, []);
 
+  // Open Create Key Modal with live model catalog refresh & local storage fallback
+  const handleOpenCreateModal = async () => {
+    if (!canWriteGovernance) return;
+    setShowCreateModal(true);
+    try {
+      const liveModels = await apiClient.getModels();
+      if (Array.isArray(liveModels)) {
+        const mapped = liveModels.map((m) => ({
+          id: m.model_id,
+          name: m.alias || m.name || m.model_id,
+          alias: m.alias
+        }));
+        setRegisteredModels(mapped);
+        setNewKeyModels(mapped.map((m) => m.id));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch live models on modal open, checking localStorage cache:', e);
+      // localStorage 캐시 fallback
+      try {
+        const cached = localStorage.getItem('aiorche_models');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const mappedCached = parsed.map((m) => ({
+              id: m.id || m.model_id,
+              name: m.name || m.alias || m.id || m.model_id,
+              alias: m.alias
+            }));
+            setRegisteredModels(mappedCached);
+            setNewKeyModels(mappedCached.map((m) => m.id));
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('Failed to parse cached models:', cacheErr);
+      }
+    }
+  };
+
   // Open Edit Key Modal
   const handleOpenEdit = (keyItem) => {
     setEditingKey(keyItem);
@@ -552,7 +590,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
             data-function-id="FNC-VK-OPEN-MODAL"
             disabled={!canWriteGovernance}
             title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
-            onClick={() => { if (!canWriteGovernance) return; setShowCreateModal(true); }}
+            onClick={handleOpenCreateModal}
             style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
           >
             <Plus size={16} />

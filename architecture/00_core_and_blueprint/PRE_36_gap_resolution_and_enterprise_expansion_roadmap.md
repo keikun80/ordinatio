@@ -1,15 +1,15 @@
 # PRE_36: 아키텍처-구현 갭(GAP) 분석 기반 엔터프라이즈 상용화 개발 로드맵 (Gap Resolution & Enterprise Expansion Roadmap)
 
-**문서 번호**: AIORCHE-DEV-ROADMAP-20261106  
+**문서 번호**: ORDINATIO-DEV-ROADMAP-20261106  
 **기준 문서**: `architecture/PRE_01_dashboard_engineering_plan.md`, `architecture/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md`, `architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md`, `architecture/PRE_28_commercial_packaging_and_enterprise_expansion_plan.md`  
-**대상 시스템**: AI Orchestrator Appliance (100% 폐쇄망 엔터프라이즈 AI 통합 제어 평면)  
+**대상 시스템**: Ordinatio Appliance (100% 폐쇄망 엔터프라이즈 AI 통합 제어 평면)  
 **작성 일자**: 2026-11-06 (Phase 0~6 완결 기반 차세대 확장 로드맵)  
 
 ---
 
 ## 1. 개요 및 배경 (Executive Summary)
 
-현재 AI Orchestrator는 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면(L7 C++ Envoy Gateway, AgentRouter 4대 자율 라우팅, 6종 Provider 동적 URL 조합기, 가상키/테넌트 거버넌스, 1초 WebSocket 관제, PII 마스킹/WORM 감사, RSA-4096 핫픽스, 시스템 프롬프트 L7 인라인 주입, 금융권 RBAC 인증, Standalone 무인 설치기, 프론트엔드 strings.js 100% 현지화)**을 100% 완비하고, 86개 백엔드 단위/통합 테스트 및 7개 Standalone 설치 검증을 무회귀 통과한 프로덕션 레디 상태입니다.
+현재 Ordinatio는 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면(L7 C++ Envoy Gateway, AgentRouter 4대 자율 라우팅, 6종 Provider 동적 URL 조합기, 가상키/테넌트 거버넌스, 1초 WebSocket 관제, PII 마스킹/WORM 감사, RSA-4096 핫픽스, 시스템 프롬프트 L7 인라인 주입, 금융권 RBAC 인증, Standalone 무인 설치기, 프론트엔드 strings.js 100% 현지화)**을 100% 완비하고, 86개 백엔드 단위/통합 테스트 및 7개 Standalone 설치 검증을 무회귀 통과한 프로덕션 레디 상태입니다.
 
 그러나 본 제품을 금융사, 공공기관, 대기업 전산실 등에 **실제 유료 상용 소프트웨어(Commercial Enterprise Appliance)**로 판매·공급하기 위해서는, 마스터 아키텍처 문서군에 정의된 잔여 상용화 과제 14종(GAP-01 ~ GAP-14)을 체계적으로 해결해야 합니다.
 
@@ -21,7 +21,7 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                     AI Orchestrator 아키텍처 GAP 분류 및 마일스톤 매핑                                      │
+│                                     Ordinatio 아키텍처 GAP 분류 및 마일스톤 매핑                                      │
 ├───────────────────────────────────────┬───────────────────────────────────────┬────────────────────────────────────────┤
 │     Phase 7: 상용 판매 기반 & 온보딩    │     Phase 8: 세일즈 킬러 & 인지 보안    │     Phase 9: 엔터프라이즈 인프라 융합    │
 │              [P0 / Sprint 1]          │              [P0 / Sprint 2]          │              [P1 / Sprint 3]           │
@@ -45,14 +45,14 @@
 
 #### 세부 엔지니어링 작업 명세
 1. **[GAP-01] 오프라인 DRM 라이선스 엔진 (`backend/app/core/license_engine.py`)**:
-   - `aiorche-license.lic` 파일 규격 정의 (페이로드 JSON + RSA-4096 / Ed25519 서명).
+   - `ordinatio-license.lic` 파일 규격 정의 (페이로드 JSON + RSA-4096 / Ed25519 서명).
    - CPU Processor ID + MAC Address + UUID 조합의 단방향 하드웨어 핑거프린트 바인딩 (`hardware_fingerprint.py`).
    - L7 게이트웨이 `ext_proc` 및 백엔드 미들웨어에 허용 RPS(`max_rps`) 및 테넌트 수 초과 차단 인터셉터 탑재.
    - 만료 후 14일 Grace Period 통제 및 대시보드 상단 갱신 경고 배너 렌더링.
 2. **[GAP-02] 브라우저 기반 최초 셋업 마법사 (`frontend/src/components/SetupWizard.jsx`)**:
    - 시스템 최초 기동 시 라이선스 및 슈퍼관리자가 없으면 `/setup`으로 자동 라우팅.
    - 3단계 위저드: Step 1 (라이선스 업로드 & 유효성 검증) ➔ Step 2 (슈퍼관리자 생성) ➔ Step 3 (5대 인프라 Preflight 진단) ➔ 관제 홈 진입.
-3. **[GAP-03] 엔터프라이즈 Helm Chart 및 오프라인 번들러 (`deploy/helm/aiorche/`)**:
+3. **[GAP-03] 엔터프라이즈 Helm Chart 및 오프라인 번들러 (`deploy/helm/ordinatio/`)**:
    - `values.yaml` 매개변수화 (외장 PostgreSQL/Oracle 연동, HPA 오토스케일링, Non-Root Security Context).
    - `scripts/package-airgap-release.sh` 및 `load-images.sh` 원클릭 오프라인 이미지 번들링 스크립트 작성.
 4. **[GAP-12] WORM 감사 로그 PostgreSQL DB 레벨 UPDATE/DELETE 거부 트리거 (`deploy/postgres/init.sql`)**:
@@ -103,21 +103,21 @@
 #### 세부 엔지니어링 작업 명세
 1. **[GAP-05] 사내 LDAP/Active Directory & SAML 2.0/OIDC SSO & TOTP MFA**:
    - LDAPS 기반 Bind & Search 파이프라인 (`backend/app/core/ldap_auth.py`).
-   - 사내 그룹 ➔ aiorche 역할/테넌트 자동 매핑 (`CN=AI_Admins` ➔ `SUPER_ADMIN`).
+   - 사내 그룹 ➔ ordinatio 역할/테넌트 자동 매핑 (`CN=AI_Admins` ➔ `SUPER_ADMIN`).
    - SAML 2.0 / OIDC SP 메타데이터 자동 생성 (`/api/v1/auth/sso/metadata.xml`).
    - 관리자 계정 필수 RFC 6238 표준 TOTP 2단계 인증 및 QR 코드 출력 (`mfa_totp.py`).
 2. **[GAP-06] 1-클릭 암호화 DB 백업 및 재해 복구(DR) 파이프라인 (`backend/app/core/backup_engine.py`)**:
    - `pg_dump` + AES-256-GCM 암호화 백업 아카이브(`.enc`) 일일 자동 스케줄링.
-   - 관리자 웹 화면 및 CLI(`aiorche-ctl restore`) 기반 1-클릭 시점 복원(PITR, RTO 15분 / RPO 1시간 충족).
+   - 관리자 웹 화면 및 CLI(`ordinatio-ctl restore`) 기반 1-클릭 시점 복원(PITR, RTO 15분 / RPO 1시간 충족).
 3. **[GAP-09] 화이트라벨링(OEM) 관리자 포털 (`frontend/src/components/BrandingSettingsModal.jsx`)**:
    - 고객사 로고(SVG/PNG) 업로드 및 브라우저 파비콘(Favicon) 동적 교체.
    - 포털 시스템 명칭(예: "KB금융그룹 GenAI 오케스트레이션 포털") 및 프라이머리 테마 액센트 컬러 동적 변경.
 4. **[GAP-10] 부서별 월간 과금 정산서 자동 PDF/Excel 발행 엔진**:
    - 매월 1일 자정 테넌트별 사용량/비용 집계 후 금융 표준 포맷의 PDF 청구서 및 Excel(.xlsx) 리포트 자동 생성.
 5. **[GAP-11] 다국어 클라이언트 전용 SDK 배포**:
-   - `aiorche-sdk-python` (에어갭 wheel 파일 배포).
-   - `aiorche-sdk-java` (Spring Boot 3.x Starter).
-   - `aiorche-sdk-ts` (TypeScript 클라이언트).
+   - `ordinatio-sdk-python` (에어갭 wheel 파일 배포).
+   - `ordinatio-sdk-java` (Spring Boot 3.x Starter).
+   - `ordinatio-sdk-ts` (TypeScript 클라이언트).
 6. **[GAP-14] 비동기 대량 배치(Batch) 추론 큐 (`backend/app/core/batch_queue.py`)**:
    - 대량 문서/데이터셋 비동기 작업 큐 및 상태 폴링 엔드포인트 (`/v1/batches`).
 

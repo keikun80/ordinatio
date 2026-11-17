@@ -1,4 +1,4 @@
-# AI Orchestrator Release Notes - v1.0.1
+# Ordinatio Release Notes - v1.0.1
 
 **Release Date**: 2026-11-17  
 **Release Type**: Maintenance & Reliability Hotfix Release  
@@ -33,8 +33,8 @@
 
 ## 🧪 테스트 검증 현황
 
-- **백엔드 자동화 테스트**: **102 / 102 Tests 100% PASS** (`cd aiorche/backend && uv run pytest -v`)
-- **프론트엔드 프로덕션 빌드**: **Vite Build PASS** (`cd aiorche/frontend && npm run build`)
+- **백엔드 자동화 테스트**: **102 / 102 Tests 100% PASS** (`cd ordinatio/backend && uv run pytest -v`)
+- **프론트엔드 프로덕션 빌드**: **Vite Build PASS** (`cd ordinatio/frontend && npm run build`)
 - **오프라인 Standalone 설치 파이프라인**: **7 / 7 Tests 100% PASS** (`make verify-standalone-install`)
 
 ---

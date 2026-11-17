@@ -1,4 +1,4 @@
-# AI Orchestrator Release Notes - v1.0.2
+# Ordinatio Release Notes - v1.0.2
 
 **Release Date**: 2026-11-17  
 **Release Type**: Feature Enhancement & Configuration Externalization Release  
@@ -10,7 +10,7 @@
 ## 🌟 주요 개선 및 변경 사항 (Key Improvements & Changes)
 
 1. **선언적 외부 환경설정 파일 분리 지원 (`install.conf`)**:
-   - `aiorche/deploy/install.conf.example` 및 `aiorche/deploy/standalone/install.conf.example` 제공.
+   - `ordinatio/deploy/install.conf.example` 및 `ordinatio/deploy/standalone/install.conf.example` 제공.
    - 대화형 프롬프트 입력 없이 사전에 준비된 `install.conf` 파일을 참조하여 100% 무인(Silent/Unattended) 설치 완벽 지원.
    - `-c | --config <PATH>` 옵션 지원 및 계층적 설정 탐색 우선순위 (`CLI 플래그 > install.conf > Built-in Defaults`) 적용.
    - 설정 파일 로드 시 `chmod 600` 보안 권한 축소를 자동 적용하여 DB 암호 및 관리자 초기 비밀번호 유출 원천 차단.
@@ -28,8 +28,8 @@
 
 ## 🧪 테스트 검증 현황
 
-- **백엔드 자동화 테스트**: **102 / 102 Tests 100% PASS** (`cd aiorche/backend && uv run pytest -v`)
-- **프론트엔드 프로덕션 빌드**: **Vite Build PASS** (`cd aiorche/frontend && npm run build`)
+- **백엔드 자동화 테스트**: **102 / 102 Tests 100% PASS** (`cd ordinatio/backend && uv run pytest -v`)
+- **프론트엔드 프로덕션 빌드**: **Vite Build PASS** (`cd ordinatio/frontend && npm run build`)
 - **오프라인 Standalone 설치 파이프라인**: **7 / 7 Tests 100% PASS** (`make verify-standalone-install`)
 
 ---

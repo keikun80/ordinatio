@@ -1,8 +1,8 @@
 # AI 오케스트레이터 통합 기능 테스트 명세서 및 전수 점검 보고서
 
-**문서 번호**: AIORCHE-INT-TEST-20260912  
+**문서 번호**: ORDINATIO-INT-TEST-20260912  
 **작성 일자**: 2026-09-12  
-**대상 시스템**: AI Orchestrator Appliance (Backend: FastAPI Python, Frontend: React 18 + Vite, Ingress: Envoy L7)  
+**대상 시스템**: Ordinatio Appliance (Backend: FastAPI Python, Frontend: React 18 + Vite, Ingress: Envoy L7)  
 **기준 설계 문서**: `dashboard_arch/dashboard_engineering_plan.md`, `admin_dashboard_design.md`  
 
 ---
@@ -26,7 +26,7 @@
 | **B-02** | 헬스 체크 | Liveness 및 Readiness 프로브 (`GET /health`, `/health/ready`) | **OK** | `health.py`에 DB/Redis ping 상태 기반 실시간 점검 로직 구현 완료. |
 | **B-03** | 헬스 체크 | 5대 인프라(Postgres, Redis, Kafka, vLLM, DCGM) 사전진단 | **ALT** | **대체 구현**: 에어갭 단일 어플라이언스 환경에서 독립 실행을 위해 Kafka/DCGM 하드웨어 클러스터 대신 프로세스 소켓 진단 및 사전점검 시뮬레이션 어댑터(`preflight.py`)로 구현. |
 | **B-04** | 테넌트 관리 | 사내 조직도 기반 부서별 테넌트 CRUD REST API | **OK** | `tenants.py`에 `GET /tenants`, `POST /tenants`, `GET /tenants/{id}` 등 DB 영속 연동 완료. |
-| **B-05** | 가상키 거버넌스 | 가상 API Key 발급 (`sk-orch-` 생성, 단 1회 노출) | **OK** | `virtual_keys.py`, `security.py`에 난독화 가상키 생성 및 1회 노출 응답 규격 구현. |
+| **B-05** | 가상키 거버넌스 | 가상 API Key 발급 (`sk-ord-` 생성, 단 1회 노출) | **OK** | `virtual_keys.py`, `security.py`에 난독화 가상키 생성 및 1회 노출 응답 규격 구현. |
 | **B-06** | 가상키 거버넌스 | Argon2id 단방향 솔트 해싱 및 DB 영속화 | **OK** | 평문 키는 DB에 저장되지 않으며 Argon2id 솔트 해시만 안전하게 영속화됨. |
 | **B-07** | 가상키 거버넌스 | IP CIDR 화이트리스트 및 RPM/TPM 속도 제한 | **OK** | Pydantic 스키마 및 DB 컬럼(`allowed_ip_cidrs`, `rpm_limit`, `tpm_limit`) 검증 연동. |
 | **B-08** | 가상키 거버넌스 | 가상 API Key 즉시 파기(Revocation) 및 수정 | **OK** | `PATCH /virtual-keys/{id}/revoke`, `PATCH /virtual-keys/{id}` 엔드포인트 완벽 구현. |

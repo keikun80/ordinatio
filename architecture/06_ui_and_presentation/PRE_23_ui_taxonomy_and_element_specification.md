@@ -118,7 +118,7 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 | `SCR-VK-M01`| `vk-modal-input-cidr` | `input` | 허용 IP CIDR 대역 | - | 폼 필드 (IP Whitelist) |
 | `SCR-VK-M01`| `vk-modal-btn-submit` | `btn` | 발급 완료 및 비밀키 생성 | `FNC-VK-ISSUE` | `POST /api/v1/virtual-keys` |
 | `SCR-VK-M01`| `vk-modal-btn-cancel` | `btn` | 취소 | - | 모달 닫기 |
-| `SCR-VK-M02`| `vk-modal-secret` | `modal` | 1회성 비밀키 노출 팝업 | - | `sk-orch-...` 평문 1회 표출 |
+| `SCR-VK-M02`| `vk-modal-secret` | `modal` | 1회성 비밀키 노출 팝업 | - | `sk-ord-...` 평문 1회 표출 |
 | `SCR-VK-M02`| `vk-modal-secret-value`| `input` | 생성된 API Key | - | 읽기 전용 비밀키 값 |
 | `SCR-VK-M02`| `vk-modal-btn-copy-secret`| `btn` | 비밀키 전체 복사 | - | 클립보드 복사 |
 | `SCR-VK-M02`| `vk-modal-btn-close-secret`| `btn` | 복사 완료 및 닫기 | - | 모달 닫기 (영구 마스킹) |

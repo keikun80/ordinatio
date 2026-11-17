@@ -1,10 +1,10 @@
-# AI Orchestrator 오프라인 어플라이언스 릴리즈 엔지니어링 계획서 (PRE_45)
+# Ordinatio 오프라인 어플라이언스 릴리즈 엔지니어링 계획서 (PRE_45)
 
 ## 1. 릴리즈 개요 및 배경
 
-본 문서는 `aiorche/dist/` 디렉터리에 생성된 독립형 오프라인 어플라이언스 번들(`aiorche-appliance-v1.0.0.tar.gz`)을 **엔터프라이즈 및 공공·금융 고객사 폐쇄망(Air-Gapped) 환경에 안전하고 신뢰성 있게 릴리즈(Release)**하기 위한 소프트웨어 공학 표준 배포 계획서입니다.
+본 문서는 `ordinatio/dist/` 디렉터리에 생성된 독립형 오프라인 어플라이언스 번들(`ordinatio-appliance-v1.0.0.tar.gz`)을 **엔터프라이즈 및 공공·금융 고객사 폐쇄망(Air-Gapped) 환경에 안전하고 신뢰성 있게 릴리즈(Release)**하기 위한 소프트웨어 공학 표준 배포 계획서입니다.
 
-AI Orchestrator는 외부 SaaS 및 퍼블릭 인터넷 호출이 100% 차단된 환경에서 작동하므로, 일반적인 클라우드 SaaS 배포와 달리 **"아티팩트 자체의 암호학적 무결성, 오프라인 전자서명, 공급망 보안(SBOM), 3대 엔터프라이즈 OS 실증 증적 및 고객사 전입 검증 도구 동봉"**이 핵심 요건입니다.
+Ordinatio는 외부 SaaS 및 퍼블릭 인터넷 호출이 100% 차단된 환경에서 작동하므로, 일반적인 클라우드 SaaS 배포와 달리 **"아티팩트 자체의 암호학적 무결성, 오프라인 전자서명, 공급망 보안(SBOM), 3대 엔터프라이즈 OS 실증 증적 및 고객사 전입 검증 도구 동봉"**이 핵심 요건입니다.
 
 ---
 
@@ -14,12 +14,12 @@ AI Orchestrator는 외부 SaaS 및 퍼블릭 인터넷 호출이 100% 차단된 
 
 ```text
 dist/release/v1.0.0/
-├── aiorche-appliance-v1.0.0.tar.gz          # [핵심] 5대 Docker 이미지, compose, Makefile 포함 본체 번들 (384MB)
-├── aiorche-appliance-v1.0.0.tar.gz.sha256   # SHA-256 체크섬 파일
-├── aiorche-appliance-v1.0.0.tar.gz.sha512   # SHA-512 체크섬 파일 (금융권 감사 대응)
-├── aiorche-appliance-v1.0.0.tar.gz.sig      # RSA-4096 비대칭 키 전자서명 파일
-├── aiorche-vendor-public.pem                # 벤더 공식 RSA-4096 서명 검증용 공개키
-├── SBOM-aiorche-v1.0.0.json                 # 공급망 보안 소프트웨어 자재명세서 (CycloneDX/SPDX 형식)
+├── ordinatio-appliance-v1.0.0.tar.gz          # [핵심] 5대 Docker 이미지, compose, Makefile 포함 본체 번들 (384MB)
+├── ordinatio-appliance-v1.0.0.tar.gz.sha256   # SHA-256 체크섬 파일
+├── ordinatio-appliance-v1.0.0.tar.gz.sha512   # SHA-512 체크섬 파일 (금융권 감사 대응)
+├── ordinatio-appliance-v1.0.0.tar.gz.sig      # RSA-4096 비대칭 키 전자서명 파일
+├── ordinatio-vendor-public.pem                # 벤더 공식 RSA-4096 서명 검증용 공개키
+├── SBOM-ordinatio-v1.0.0.json                 # 공급망 보안 소프트웨어 자재명세서 (CycloneDX/SPDX 형식)
 ├── SECURITY_AUDIT_REPORT.md                 # 컨테이너 취약점(CVE) 점검 및 보안 하드닝 리포트
 ├── OFFLINE_INSTALL_GUIDE.md                 # 1분 퀵스타트 및 운영자 핸드북
 ├── verify-release.sh                        # 고객사 수신 후 원클릭 무결성 및 서명 검증 스크립트
@@ -30,10 +30,10 @@ dist/release/v1.0.0/
 
 | 파일명 | 용도 및 규격 | 필수 여부 |
 | :--- | :--- | :---: |
-| `aiorche-appliance-v{VER}.tar.gz` | 단일 오프라인 어플라이언스 설치 아카이브 (Docker 5종 이미지 내장) | **필수** |
+| `ordinatio-appliance-v{VER}.tar.gz` | 단일 오프라인 어플라이언스 설치 아카이브 (Docker 5종 이미지 내장) | **필수** |
 | `.sha256` / `.sha512` | 파일 손상 및 전송 오류 탐지용 해시 체크섬 | **필수** |
 | `.sig` | RSA-4096 비대칭 키 기반 위변조 방지 전자서명 (PKCS#1 v1.5 / PSS) | **필수** |
-| `aiorche-vendor-public.pem` | 고객사 보안팀이 패키지 위변조 여부를 오프라인 검증할 수 있는 공인 공개키 | **필수** |
+| `ordinatio-vendor-public.pem` | 고객사 보안팀이 패키지 위변조 여부를 오프라인 검증할 수 있는 공인 공개키 | **필수** |
 | `SBOM-*.json` | 오픈소스 라이선스 및 패키지 의존성 추적 자재명세서 (CycloneDX 1.5) | 엔터프라이즈 권고 |
 | `verify-release.sh` | 수신 측에서 `sha256sum`, `openssl dgst`를 자동 실행하는 검증기 | **필수** |
 | `OFFLINE_INSTALL_GUIDE.md` | 인터넷 없는 환경에서 `tar -xzf` 및 `make up` 실행 안내서 | **필수** |
@@ -67,23 +67,23 @@ dist/release/v1.0.0/
 
 ### Stage 2: 프로덕션 빌드 실행 (`make prod-build`)
 - 최신 프론트엔드 정적 파일 컴파일 (`npm run build`)
-- 최신 도커 이미지 5종 패키징 (`aiorche-backend:prod`, `aiorche-frontend:prod`, postgres, redis, envoy)
-- `dist/aiorche-appliance-v{VERSION}.tar.gz` 아카이브 생성.
+- 최신 도커 이미지 5종 패키징 (`ordinatio-backend:prod`, `ordinatio-frontend:prod`, postgres, redis, envoy)
+- `dist/ordinatio-appliance-v{VERSION}.tar.gz` 아카이브 생성.
 
 ### Stage 3: 암호학적 서명 및 무결성 아티팩트 생성
 1. **이중 체크섬 계산**:
    ```bash
-   sha256sum aiorche-appliance-v1.0.0.tar.gz > aiorche-appliance-v1.0.0.tar.gz.sha256
-   sha512sum aiorche-appliance-v1.0.0.tar.gz > aiorche-appliance-v1.0.0.tar.gz.sha512
+   sha256sum ordinatio-appliance-v1.0.0.tar.gz > ordinatio-appliance-v1.0.0.tar.gz.sha256
+   sha512sum ordinatio-appliance-v1.0.0.tar.gz > ordinatio-appliance-v1.0.0.tar.gz.sha512
    ```
 2. **RSA-4096 비대칭 전자서명**:
    벤더 개인키(`release-private.pem`)를 사용하여 번들 다이제스트에 서명:
    ```bash
-   openssl dgst -sha256 -sign release-private.pem -out aiorche-appliance-v1.0.0.tar.gz.sig aiorche-appliance-v1.0.0.tar.gz
+   openssl dgst -sha256 -sign release-private.pem -out ordinatio-appliance-v1.0.0.tar.gz.sig ordinatio-appliance-v1.0.0.tar.gz
    ```
 3. **공개키 검증 증적 확인**:
    ```bash
-   openssl dgst -sha256 -verify aiorche-vendor-public.pem -signature aiorche-appliance-v1.0.0.tar.gz.sig aiorche-appliance-v1.0.0.tar.gz
+   openssl dgst -sha256 -verify ordinatio-vendor-public.pem -signature ordinatio-appliance-v1.0.0.tar.gz.sig ordinatio-appliance-v1.0.0.tar.gz
    # 출력: Verified OK
    ```
 
@@ -102,11 +102,11 @@ dist/release/v1.0.0/
 ### Stage 5: 고객사 인도 채널별 패키징 및 유통
 고객사의 반입 승인 프로세스에 맞춰 다음 세 가지 채널 규격으로 패키징합니다:
 1. **채널 A: 보안 전용 USB / 외장 매체 인도용 패키지**
-   - 상기 아티팩트 10종을 단일 압축본(`aiorche-delivery-v1.0.0.zip`)으로 묶어 보안 봉인 매체로 전달.
+   - 상기 아티팩트 10종을 단일 압축본(`ordinatio-delivery-v1.0.0.zip`)으로 묶어 보안 봉인 매체로 전달.
 2. **채널 B: 사내 프라이빗 아티팩토리(Nexus / Harbor / JFrog) 적재**
    - 원클릭 cURL 스크립트로 고객사 폐쇄망 레지스트리에 아티팩트 업로드.
 3. **채널 C: 사내 프라이빗 오브젝트 스토리지 (S3 / MinIO)**
-   - `s3://customer-airgap-releases/aiorche/v1.0.0/` 업로드.
+   - `s3://customer-airgap-releases/ordinatio/v1.0.0/` 업로드.
 
 ---
 
@@ -116,16 +116,16 @@ dist/release/v1.0.0/
 
 ```bash
 #!/usr/bin/env bash
-# verify-release.sh - AI Orchestrator Customer Delivery Verifier
+# verify-release.sh - Ordinatio Customer Delivery Verifier
 set -euo pipefail
 
 echo "==> 1. Checking SHA-256 Checksum..."
-sha256sum -c aiorche-appliance-v1.0.0.tar.gz.sha256
+sha256sum -c ordinatio-appliance-v1.0.0.tar.gz.sha256
 
 echo "==> 2. Verifying RSA-4096 Cryptographic Signature..."
-openssl dgst -sha256 -verify aiorche-vendor-public.pem \
-    -signature aiorche-appliance-v1.0.0.tar.gz.sig \
-    aiorche-appliance-v1.0.0.tar.gz
+openssl dgst -sha256 -verify ordinatio-vendor-public.pem \
+    -signature ordinatio-appliance-v1.0.0.tar.gz.sig \
+    ordinatio-appliance-v1.0.0.tar.gz
 
 echo "🎉 [SUCCESS] The release artifact is authentic, intact, and officially signed by the vendor."
 ```

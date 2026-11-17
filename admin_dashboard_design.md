@@ -2,7 +2,7 @@
 
 > **문서 버전**: v2.3 (Phase 0 ~ Phase 5 전체 100% 구현 완료 현행화, 6종 Provider 규격화 & 헬스체크 타임아웃 수동 제어 반영)  
 > **최종 갱신일**: 2026-09-25  
-> **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
+> **대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
 > **검증 상태**: **Phase 0 ~ Phase 5 전체 100% PASS (66 / 66 백엔드 테스트 통과 & React 18 웹 콘솔 연동 완료)**
 
 ---
@@ -33,7 +33,7 @@
 ## 2. 정보 구조 (Information Architecture / Sitemap)
 
 ```
-[통합 관리 콘솔: AI Orchestrator Admin Console]
+[통합 관리 콘솔: Ordinatio Admin Console]
 │
 ├── ✅ 📊 1. 글로벌 관제 홈 (Global Overview & Grafana) — 구현완료 (Phase 3)
 │    ├── ✅ 실시간 핵심 KPI (RPS, TPS, TTFT, 에러율, 일일 누적 비용)
@@ -51,7 +51,7 @@
 │
 ├── ✅ 🔑 3. 가상 API 키 & 테넌트 거버넌스 (Virtual Key & Tenants) — 구현완료 (Phase 1)
 │    ├── ✅ 조직/부서/프로젝트 테넌트 계층 관리 및 월간 예산 설정
-│    ├── ✅ 가상 API Key 발급 마법사 (`sk-orch-` 접두사, Argon2id 단방향 솔트 해싱, 1회성 시크릿 노출)
+│    ├── ✅ 가상 API Key 발급 마법사 (`sk-ord-` 접두사, Argon2id 단방향 솔트 해싱, 1회성 시크릿 노출)
 │    ├── ✅ 허용 모델, CIDR IP 화이트리스트, RPM/TPM 속도 제한
 │    └── ✅ 활성 키 모니터링, 실시간 설정 변경 및 원클릭 즉시 파기(Revoke)
 │
@@ -93,7 +93,7 @@
 
 ```
 +---------------------------------------------------------------------------------------------------------+
-|  AI ORCHESTRATOR ADMIN  [고객사 로고]                     [운영 환경: 온프레미스 DC1]  (👤 홍길동 SRE팀장)  |
+|  ORDINATIO ADMIN  [고객사 로고]                     [운영 환경: 온프레미스 DC1]  (👤 홍길동 SRE팀장)  |
 +---------------------------------------------------------------------------------------------------------+
 | [대시보드]  [모델/라우팅]  [가상키/테넌트]  [FinOps비용]  [보안/감사]  [시스템패치]  [플레이그라운드]        |
 +---------------------------------------------------------------------------------------------------------+
@@ -175,7 +175,7 @@ K8s 매니페스트 수동 변경 없이 GUI에서 다중 백엔드 모델(vLLM,
 ### ✅ 화면 3: 가상 API 키 & 멀티 테넌트 거버넌스 (Virtual Key & Tenants) — `구현완료 (Phase 1)`
 
 사내 부서나 챗봇 시스템에 안전하게 접근 권한을 부여하고, 백엔드 GPU 주소를 노출하지 않도록 가상 API Key를 발급 및 회수합니다.
-- **보안 표준**: 접두사 `sk-orch-` 적용, DB 저장 시 **Argon2id 솔트 해싱**, 생성 시 **단 1회 시크릿 모달 노출**.
+- **보안 표준**: 접두사 `sk-ord-` 적용, DB 저장 시 **Argon2id 솔트 해싱**, 생성 시 **단 1회 시크릿 모달 노출**.
 - **백엔드 연동**: `/api/v1/tenants` (부서 CRUD), `/api/v1/virtual-keys` (발급/수정/파기), `/api/v1/external/me` (클라이언트 자가 검증).
 
 ```
@@ -398,7 +398,7 @@ CREATE TABLE tenants (
 CREATE TABLE virtual_keys (
     key_id VARCHAR(64) PRIMARY KEY,              -- 'vk-live-wm-bot-01'
     key_hash VARCHAR(128) NOT NULL UNIQUE,       -- Argon2id 단방향 솔트 해시
-    key_prefix VARCHAR(16) NOT NULL,             -- 'sk-orch-a1b2' (식별용 접두사)
+    key_prefix VARCHAR(16) NOT NULL,             -- 'sk-ord-a1b2' (식별용 접두사)
     tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(tenant_id),
     name VARCHAR(128) NOT NULL,
     allowed_models JSONB NOT NULL DEFAULT '[]',  -- ["meta-llama/Llama-3.1-8B", "Llama-3.1-70B"]
@@ -537,10 +537,10 @@ GET /api/v1/xds/v3/discovery:routes
   "resources": [
     {
       "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
-      "name": "aiorche_model_routes",
+      "name": "ordinatio_model_routes",
       "virtual_hosts": [
         {
-          "name": "aiorche_vhost",
+          "name": "ordinatio_vhost",
           "domains": ["*"],
           "routes": [
             {
@@ -800,7 +800,7 @@ Content-Type: application/json
 
 ```bash
 # 전체 테스트 실행 명령어
-cd aiorche/backend && uv run pytest -v
+cd ordinatio/backend && uv run pytest -v
 # 결과: 66 passed in 10.97s (100% PASS)
 ```
 
@@ -815,7 +815,7 @@ cd aiorche/backend && uv run pytest -v
 | **End-to-End 및 통합 검증** | 실데이터 통합 파이프라인 및 L7 게이트웨이 인그레스 검증 | `test_gateway.py` 등 통합 | 66 / 66 PASS (100%) |
 | **총계** | **Phase 0 ~ Phase 5 전 기능 상용 배포 및 UI 연동 완료** | **전체 테스트 스위트** | **66 / 66 PASS (100%)** |
 
-### 7.1 Kubernetes 클러스터 상용 배포 상태 (`aiorche` 네임스페이스)
+### 7.1 Kubernetes 클러스터 상용 배포 상태 (`ordinatio` 네임스페이스)
 - `postgres`: RDBMS 메타데이터 및 WORM 감사로그 불변 스토어 (Running)
 - `redis`: 실시간 RPM/TPM 속도 제한 분산 카운터 및 세션 캐시 (Running)
 - `backend`: FastAPI 클린 코어 컨트롤 플레인 (Running)

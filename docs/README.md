@@ -30,7 +30,7 @@ docs/
     ├── 02_routing_modal_add_rule.png             # 신규 동적 라우트 생성 & 테넌트 멀티셀렉트 모달
     ├── 03_virtual_keys_main.png                  # 거버넌스 부서 테넌트 & 가상 API Key 목록
     ├── 03_governance_modal_add_department.png    # 신규 부서(테넌트) 등록 모달
-    ├── 03_virtual_keys_modal_issue_key.png       # sk-orch- 가상 API Key 발급 마법사
+    ├── 03_virtual_keys_modal_issue_key.png       # sk-ord- 가상 API Key 발급 마법사
     ├── 08_system_prompts_main.png                # 시스템 프롬프트 거버넌스 카탈로그 & KPI 대시보드
     ├── 08_system_prompts_modal_add.png           # 신규 시스템 프롬프트 등록 & 다계층 바인딩 모달
     ├── 08_system_prompts_simulator.png           # 실시간 L7 프롬프트 주입 시뮬레이터 검증 모달
@@ -113,7 +113,7 @@ python3 -m http.server 8080 --directory docs
 3. **8대 핵심 거버넌스 메뉴 상세 매뉴얼**:
    - **글로벌 관제 홈**: 1초 주기 WebSocket 메트릭, GPU 클러스터 히트맵, 시스템 상태 지표
    - **모델 & 라우팅 스튜디오**: 6종 Provider 규격화, 헬스체크 타임아웃 수동 조절, 라우트 정책 인라인 편집, 테넌트 멀티셀렉트 드롭다운, 커스텀 하위 경로(`/v1/tech/chat/completions`), 전체 LLM 일괄 동시 테스트(Test All Linked LLMs)
-   - **거버넌스 (부서 테넌트 & API Key)**: 신규 부서(테넌트) 등록, `sk-orch-` 가상 API Key 발급, Argon2id 해싱, 1회성 시크릿 노출, 테넌트 쿼터, 키 즉시 파기(Revoke) 및 영구 삭제(Purge)
+   - **거버넌스 (부서 테넌트 & API Key)**: 신규 부서(테넌트) 등록, `sk-ord-` 가상 API Key 발급, Argon2id 해싱, 1회성 시크릿 노출, 테넌트 쿼터, 키 즉시 파기(Revoke) 및 영구 삭제(Purge)
    - **시스템 프롬프트 거버넌스**: 전사/테넌트/라우트/가상키 4단계 바인딩 우선순위, 3대 주입 모드(PREPEND/APPEND/OVERRIDE), 실시간 L7 주입 시뮬레이터
    - **FinOps 비용 & 예산**: 부서별 실시간 토큰(Prompt/Completion/Total) 미터링 및 USD 과금 집계, 80% 조기경보, 100% Hard Cap 차단, UTF-8 BOM CSV 청구서 내보내기
    - **PII 보안 & 감사 포렌식**: MASK/HASH/BLOCK 정규식 엔진, WORM 불변 감사로그 적재 및 검색 필터

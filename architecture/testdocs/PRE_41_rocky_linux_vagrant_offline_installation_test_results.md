@@ -1,7 +1,7 @@
 # Rocky Linux 9 Vagrant 오프라인 어플라이언스 단일 번들 설치 검증 보고서 (PRE_41)
 
 ## 1. 개요 및 목적
-본 문서는 `make prod-build`를 통해 생성된 `dist/` 디렉터리의 단일 오프라인 압축 번들(`aiorche-appliance-v1.0.0.tar.gz`)을 **Rocky Linux 9 가상머신(Vagrant + VirtualBox)** 환경에 이관하고, 오프라인 에어갭 조건 하에서 `make up` 명령 하나로 스탠드얼론 어플라이언스가 완벽하게 기동 및 동작하는지 실증 검증한 결과를 기록합니다.
+본 문서는 `make prod-build`를 통해 생성된 `dist/` 디렉터리의 단일 오프라인 압축 번들(`ordinatio-appliance-v1.0.0.tar.gz`)을 **Rocky Linux 9 가상머신(Vagrant + VirtualBox)** 환경에 이관하고, 오프라인 에어갭 조건 하에서 `make up` 명령 하나로 스탠드얼론 어플라이언스가 완벽하게 기동 및 동작하는지 실증 검증한 결과를 기록합니다.
 
 ---
 
@@ -22,13 +22,13 @@
 
 ## 3. 오프라인 설치 아티팩트
 
-- **배포 아카이브**: `aiorche/dist/aiorche-appliance-v1.0.0.tar.gz` (368MB)
-- **무결성 체크섬**: `aiorche/dist/aiorche-appliance-v1.0.0.tar.gz.sha256`
+- **배포 아카이브**: `ordinatio/dist/ordinatio-appliance-v1.0.0.tar.gz` (368MB)
+- **무결성 체크섬**: `ordinatio/dist/ordinatio-appliance-v1.0.0.tar.gz.sha256`
 - **아카이브 구성**:
   - `docker-compose.yml`: 오프라인 5대 컨테이너 오케스트레이션 정의
   - `Makefile`: `make up`, `make down`, `make restart`, `make status`, `make logs`, `make init-admin`, `make backup`
   - `.env.example`: 프로덕션 보안 기본값 템플릿
-  - `images/aiorche-images.tar.gz`: 5대 핵심 도커 이미지 사전 패키징 (Backend, Frontend, Postgres 15, Redis 7, Envoy v1.31.2)
+  - `images/ordinatio-images.tar.gz`: 5대 핵심 도커 이미지 사전 패키징 (Backend, Frontend, Postgres 15, Redis 7, Envoy v1.31.2)
   - `scripts/offline-load.sh`: 도커 엔진 오프라인 이미지 자동 인제스트 스크립트
   - `scripts/wait-healthy.sh`: 컨테이너 헬스체크 및 초기 관리자 자동 부트스트랩 스크립트
   - `README.md`: 에어갭 운영자용 1분 퀵스타트 가이드
@@ -41,15 +41,15 @@
 Rocky Linux 9 가상머신 내부에서 번들 체크섬을 검증하여 파일 손상이나 변조가 없음을 확인했습니다:
 ```bash
 ==> SHA-256 무결성 검증 수행...
-aiorche-appliance-v1.0.0.tar.gz: OK
+ordinatio-appliance-v1.0.0.tar.gz: OK
 ✅ SHA-256 무결성 검증 성공!
 ```
 
 ### 4.2. 아카이브 압축 해제 및 디렉토리 구조화
-`/opt/aiorche-appliance` 디렉터리로 압축 해제 완료:
+`/opt/ordinatio-appliance` 디렉터리로 압축 해제 완료:
 ```bash
-==> 아카이브 압축 해제 중: /opt/aiorche-appliance ...
-==> 압축 해제된 작업 디렉토리 (/opt/aiorche-appliance/aiorche-appliance) 파일 목록:
+==> 아카이브 압축 해제 중: /opt/ordinatio-appliance ...
+==> 압축 해제된 작업 디렉토리 (/opt/ordinatio-appliance/ordinatio-appliance) 파일 목록:
 -rw-r--r--. 1 root root  2487 Nov  7 05:49 docker-compose.yml
 -rw-r--r--. 1 root root  1746 Nov  7 05:49 Makefile
 -rw-r--r--. 1 root root  1420 Nov  7 05:49 .env.example
@@ -63,28 +63,28 @@ drwxr-xr-x. 2 root root    56 Nov  7 05:53 scripts
 
 ```text
 ==> Loading packaged offline Docker images...
-Loaded image: aiorche-backend:prod
-Loaded image: aiorche-frontend:prod
+Loaded image: ordinatio-backend:prod
+Loaded image: ordinatio-frontend:prod
 Loaded image: postgres:15-alpine
 Loaded image: redis:7-alpine
 Loaded image: envoyproxy/envoy:v1.31.2
 ==> Generating production .env with secure random secrets...
-==> Starting AI Orchestrator Appliance Stack...
- Container aiorche-postgres  Creating
- Container aiorche-redis  Creating
- Container aiorche-backend  Creating
- Container aiorche-frontend  Creating
- Container aiorche-envoy  Creating
+==> Starting Ordinatio Appliance Stack...
+ Container ordinatio-postgres  Creating
+ Container ordinatio-redis  Creating
+ Container ordinatio-backend  Creating
+ Container ordinatio-frontend  Creating
+ Container ordinatio-envoy  Creating
 ==> Waiting for 5 appliance services to achieve healthy state...
-  • Checking aiorche-postgres...  [HEALTHY]
-  • Checking aiorche-redis...     [HEALTHY]
-  • Checking aiorche-backend...   [HEALTHY]
-  • Checking aiorche-envoy...     [HEALTHY]
-  • Checking aiorche-frontend...  [HEALTHY]
+  • Checking ordinatio-postgres...  [HEALTHY]
+  • Checking ordinatio-redis...     [HEALTHY]
+  • Checking ordinatio-backend...   [HEALTHY]
+  • Checking ordinatio-envoy...     [HEALTHY]
+  • Checking ordinatio-frontend...  [HEALTHY]
 ==> Bootstrapping initial admin account inside container...
 
 ========================================================================
-🎉 AI Orchestrator Appliance Successfully Started! (Air-Gapped)
+🎉 Ordinatio Appliance Successfully Started! (Air-Gapped)
 ========================================================================
   • Web Console (UI)    : http://10.0.2.15:5173
   • L7 AI Gateway       : http://10.0.2.15:8080/v1
@@ -106,7 +106,7 @@ Loaded image: envoyproxy/envoy:v1.31.2
 | **Envoy Admin** | `GET http://127.0.0.1:9901/ready` | HTTP 200, `LIVE` 응답 | HTTP 200, LIVE | **PASS** |
 | **Envoy L7 Gateway** | `GET http://127.0.0.1:8080/v1/models` | HTTP 200 (OpenAI 호환 게이트웨이 활성) | HTTP 200 | **PASS** |
 | **슈퍼관리자 인증** | `POST http://127.0.0.1:8000/api/v1/auth/login` | JWT 토큰 발급 및 `SUPER_ADMIN` 확인 | `access_token` 발급 완료, 권한 `["*"]` | **PASS** |
-| **데이터베이스 백업** | `make backup` | `backups/aiorche_backup_*.sql` 생성 | 24KB SQL 덤프 생성 완료 | **PASS** |
+| **데이터베이스 백업** | `make backup` | `backups/ordinatio_backup_*.sql` 생성 | 24KB SQL 덤프 생성 완료 | **PASS** |
 | **호스트 머신 연동** | 호스트 브라우저/CLI `http://127.0.0.1:5173` | 포트포워딩을 통한 UI 및 L7 접근 | HTTP 200 정상 응답 | **PASS** |
 
 ### 5.1. 슈퍼관리자 인증 응답 전문 (VM 내부 실행 증적)
@@ -119,7 +119,7 @@ Loaded image: envoyproxy/envoy:v1.31.2
     "id": "667bc523-d2ea-49c7-80ca-c7b5ea691181",
     "username": "admin",
     "full_name": "시스템 최고관리자",
-    "email": "admin@aiorche.local",
+    "email": "admin@ordinatio.local",
     "role": "SUPER_ADMIN",
     "permissions": [
       "*",
@@ -150,6 +150,6 @@ Loaded image: envoyproxy/envoy:v1.31.2
 ---
 
 ## 6. 결론
-1. `make prod-build`로 빌드된 단일 오프라인 번들(`aiorche-appliance-v1.0.0.tar.gz`)은 외부 인터넷 연결이 완전히 차단된 폐쇄망 Rocky Linux 9 환경에서도 추가 다운로드나 외부 의존성 없이 `make up` 명령 하나만으로 100% 자립 기동되었습니다.
+1. `make prod-build`로 빌드된 단일 오프라인 번들(`ordinatio-appliance-v1.0.0.tar.gz`)은 외부 인터넷 연결이 완전히 차단된 폐쇄망 Rocky Linux 9 환경에서도 추가 다운로드나 외부 의존성 없이 `make up` 명령 하나만으로 100% 자립 기동되었습니다.
 2. 5대 핵심 서비스(PostgreSQL, Redis, Backend, Envoy L7 Gateway, Frontend)가 모두 정상 헬스체크를 달성하였으며, 보안 시크릿 자동화, Argon2id 기반 슈퍼관리자 계정 생성, 백업 기능까지 실증 검증을 성공적으로 마쳤습니다.
 

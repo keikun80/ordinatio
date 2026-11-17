@@ -1,9 +1,9 @@
-# AI Orchestrator 차세대 개발 마일스톤 및 기능 로드맵 설계서 (Develop_milestone.md)
+# Ordinatio 차세대 개발 마일스톤 및 기능 로드맵 설계서 (Develop_milestone.md)
 
-**문서 번호**: AIORCHE-DEV-MILESTONE-20260925  
+**문서 번호**: ORDINATIO-DEV-MILESTONE-20260925  
 **문서 버전**: v2.3 (Phase 0 ~ Phase 5 상용 배포 및 78개 테스트 100% 통과, 시스템 프롬프트 거버넌스 반영)  
 **문서 상태**: APPROVED / ACTIVE  
-**대상 시스템**: AI Orchestrator (`aiorche`) 온프레미스 에어갭 어플라이언스  
+**대상 시스템**: Ordinatio (`ordinatio`) 온프레미스 에어갭 어플라이언스  
 **작성 일자**: 2026-09-25  
 
 > 본 문서는 마스터 엔지니어링 계획서([`PRE_01_dashboard_engineering_plan.md`](./PRE_01_dashboard_engineering_plan.md)), 종합 결과 보고서([`PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md`](./PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md)), 갭 분석서([`PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)), 시스템 프롬프트 거버넌스 결과서([`PRE_20_phase_system_prompt_implementation_and_test_results.md`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)) 및 루트 문서([`Develop_milestone.md`](../Develop_milestone.md))와 완전히 상호 동기화되어 유지 관리됩니다.
@@ -28,7 +28,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                             AI Orchestrator 기능 구현 상태 현황표                                  │
+│                             Ordinatio 기능 구현 상태 현황표                                  │
 ├─────────────────────────────────────────────────┬────────────────────────────────────────────────┤
 │             ✅ 구현 완료 (Implemented: 100%)    │            🚧 미구현 (Unimplemented: 백로그)   │
 ├─────────────────────────────────────────────────┼────────────────────────────────────────────────┤
@@ -69,7 +69,7 @@
    - L7 Envoy ext_proc 스트림 페이로드 변조 및 라우팅 테스트벤치 실시간 프롬프트 주입 연동.
    - 프론트엔드 전용 거버넌스 대시보드(`SystemPromptsTab.jsx`), 1:1 바인딩 마법사 모달, 실시간 글자수/토큰 카운터.
 5. ✅ **가상 API Key & 테넌트 거버넌스 (Phase 1)**:
-   - `sk-orch-` 접두사, Argon2id 솔트 단방향 해싱, 발급 시 단 1회 평문 노출 모달.
+   - `sk-ord-` 접두사, Argon2id 솔트 단방향 해싱, 발급 시 단 1회 평문 노출 모달.
    - 키 수정/파기/영구 삭제 수명주기, 허용 모델 화이트리스트(`allowed_models`), 부서별 테넌트 격리.
 6. ✅ **FinOps & 비용 관제 (Phase 3)**:
    - 원화(₩) 기준 테넌트 월간 예산 계량(Metering), 80% 조기 경보, 100% 하드 캡(Hard Cap) 도달 시 HTTP 429 즉시 차단.
@@ -114,11 +114,11 @@
 #### 6.1 오프라인 Helm Chart & 에어갭 단일 설치 번들러 [미구현 1]
 - **현 상태**: Docker Compose 로컬 스택 및 K8s 원시 매니페스트(`deploy/k8s/`)만 존재하며, 단일 Helm 릴리즈 패키지 부재.
 - **구현 계획**:
-  1. `deploy/helm/aiorche/`: Envoy, Backend, Frontend, Postgres, Redis를 하나의 Release로 묶는 표준 Helm v3 차트 개발 (`Chart.yaml`, `values.yaml`, `templates/`).
-  2. `scripts/save-images.sh`: 베이스 이미지 및 앱 컨테이너 이미지를 단일 압축 아카이브(`aiorche-images-v1.0.tar.gz`)로 패키징.
+  1. `deploy/helm/ordinatio/`: Envoy, Backend, Frontend, Postgres, Redis를 하나의 Release로 묶는 표준 Helm v3 차트 개발 (`Chart.yaml`, `values.yaml`, `templates/`).
+  2. `scripts/save-images.sh`: 베이스 이미지 및 앱 컨테이너 이미지를 단일 압축 아카이브(`ordinatio-images-v1.0.tar.gz`)로 패키징.
   3. `scripts/load-images.sh`: 고객사 내부 폐쇄망 Docker Registry / Harbor 레지스트리로 일괄 Push.
   4. `scripts/preflight-check.sh`: CPU, GPU, 포트 충돌(8000, 5173, 8080, 5432, 6379), 볼륨 권한 검사 자동화.
-- **DoD**: 단일 `helm install aiorche ./deploy/helm/aiorche` 명령으로 5개 Pod 정상 기동 및 트래픽 서빙 확인.
+- **DoD**: 단일 `helm install ordinatio ./deploy/helm/ordinatio` 명령으로 5개 Pod 정상 기동 및 트래픽 서빙 확인.
 
 #### 6.2 예산 임계치 도달 실시간 웹훅(Webhook) 디스패처 [미구현 2]
 - **현 상태**: 80% 경고 및 100% 하드캡 429 차단은 동작하나, 외부 사내 협업툴 알림 연동 미구현.
@@ -159,7 +159,7 @@
 #### 6.5 Playwright 관리자 포털 E2E 자동화 테스트 스위트 [미구현 5]
 - **현 상태**: 단위/통합 테스트(pytest 78개)와 브라우저 서브에이전트 수동 증적만 존재, 자동화 E2E 스위트 부재.
 - **구현 계획**:
-  1. `aiorche/tests-e2e/`: Playwright 기반 프론트엔드 E2E 테스트 스위트 구성.
+  1. `ordinatio/tests-e2e/`: Playwright 기반 프론트엔드 E2E 테스트 스위트 구성.
   2. 7대 전 화면 탐색, 키 발급/삭제, 라우트 정책 생성, 프롬프트 바인딩, 긴급 패치 업로드 자동화 시나리오 작성.
 - **DoD**: `npm run test:e2e` 단일 명령으로 전 시나리오 Headless 통과.
 
@@ -197,7 +197,7 @@
 - **구현 계획**:
   1. 백엔드 모듈 `app/core/backup_manager.py` 및 CLI `scripts/backup-restore.sh` 구현.
   2. 스케줄링: 매일 자정 또는 6시간 주기로 PostgreSQL 전체 덤프 후 AES-256 암호화 압축 아카이브 보관.
-  3. 원클릭 복구 CLI: `make restore-db BACKUP_FILE=aiorche_backup_YYYYMMDD.dump.enc`.
+  3. 원클릭 복구 CLI: `make restore-db BACKUP_FILE=ordinatio_backup_YYYYMMDD.dump.enc`.
 - **DoD**: 백업 파일 생성 ➔ DB 인위적 삭제 ➔ 원클릭 복원 후 데이터 100% 일치 확인.
 
 ---

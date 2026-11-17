@@ -1,6 +1,6 @@
-# AI Orchestrator 오프라인 폐쇄망(Air-Gapped) 설치 및 운영 가이드
+# Ordinatio 오프라인 폐쇄망(Air-Gapped) 설치 및 운영 가이드
 
-본 가이드는 외부 인터넷 연결이 100% 차단된 고객사 인프라에 AI Orchestrator 단일 어플라이언스를 안전하게 설치하고 기동하기 위한 퀵스타트 매뉴얼입니다.
+본 가이드는 외부 인터넷 연결이 100% 차단된 고객사 인프라에 Ordinatio 단일 어플라이언스를 안전하게 설치하고 기동하기 위한 퀵스타트 매뉴얼입니다.
 
 ---
 
@@ -24,8 +24,8 @@ bash verify-release.sh
 
 ### Step 2: 아카이브 압축 해제
 ```bash
-tar -xzf aiorche-appliance-v1.0.0.tar.gz
-cd aiorche-appliance
+tar -xzf ordinatio-appliance-v1.0.0.tar.gz
+cd ordinatio-appliance
 ```
 
 ### Step 3: 원클릭 서비스 기동
@@ -50,7 +50,7 @@ make up
 
 ## 4. 일상 운영 및 관리 명령어
 
-모든 운영은 `aiorche-appliance` 디렉터리 내 `Makefile`을 통해 단일 명령어로 수행됩니다:
+모든 운영은 `ordinatio-appliance` 디렉터리 내 `Makefile`을 통해 단일 명령어로 수행됩니다:
 
 ```bash
 make status       # 전체 5대 컨테이너 상태 및 헬스체크 조회

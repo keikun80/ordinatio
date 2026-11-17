@@ -1,14 +1,14 @@
-# PRE_21: AI Orchestrator 전체 Make 명령어 테스트 계획서 (Make Commands Comprehensive Test Plan)
+# PRE_21: Ordinatio 전체 Make 명령어 테스트 계획서 (Make Commands Comprehensive Test Plan)
 
 ## 1. 문서 개요 및 목적 (Executive Summary)
 
 ### 1.1 개요
-본 문서는 AI Orchestrator 프로젝트의 표준 빌드, 테스트, 배포, 오케스트레이션 제어 도구인 `Makefile`(루트 및 `aiorche/Makefile`)에 정의된 **모든 Make 명령어(총 30여 개 타겟)**에 대한 체계적인 테스트 계획 및 검증 기준을 정의합니다.
+본 문서는 Ordinatio 프로젝트의 표준 빌드, 테스트, 배포, 오케스트레이션 제어 도구인 `Makefile`(루트 및 `ordinatio/Makefile`)에 정의된 **모든 Make 명령어(총 30여 개 타겟)**에 대한 체계적인 테스트 계획 및 검증 기준을 정의합니다.
 
 ### 1.2 목적
 1. **완전한 동작성 검증**: 정의된 모든 Make 타겟이 사전 정의된 입력과 환경에서 오류(Non-zero Exit Code) 없이 의도한 동작을 완수하는지 검증.
 2. **에어갭(Air-Gapped) 불변식 준수**: 모든 명령어 실행 중 외부 인터넷(CDN, 외부 원격 레지스트리 등)으로의 불필요한 아웃바운드 트래픽이 발생하지 않고 로컬 패키지 및 인프라 자립성을 유지하는지 확인.
-3. **루트-서브모듈 포워딩 무결성**: 루트 디렉토리(`/Users/jason/project/오케스트레이터/Makefile`)에서 호출한 명령이 `aiorche/Makefile`로 올바르게 위임되는지 검증.
+3. **루트-서브모듈 포워딩 무결성**: 루트 디렉토리(`/Users/jason/project/오케스트레이터/Makefile`)에서 호출한 명령이 `ordinatio/Makefile`로 올바르게 위임되는지 검증.
 4. **상태 보존 및 멱등성(Idempotency)**: 반복 실행(Re-entrant) 시 시스템 구성 파괴나 예기치 않은 데이터 손실 없이 안전하게 작동하는지 검증.
 5. **Makefile 자체의 정합성 보완**: `.PHONY` 선언 누락, 미구현 타겟(`lint`, `build`), 신규 스크립트(`verify-phase-system-prompt`) 연동 누락을 식별하고 개선.
 
@@ -29,11 +29,11 @@
 
 ### 2.2 현황 진단 및 개선 과제 (Makefile Gap Analysis)
 1. **`.PHONY` 선언 불일치**:
-   - `aiorche/Makefile` 1행: `verify-phase0_1`, `verify-phase5`가 `.PHONY` 목록에 누락되어 있음.
+   - `ordinatio/Makefile` 1행: `verify-phase0_1`, `verify-phase5`가 `.PHONY` 목록에 누락되어 있음.
 2. **미구현 타겟 존재**:
    - `lint`, `build`가 `.PHONY`에 선언되어 있으나 실제 타겟 블록이 정의되어 있지 않아 실행 시 에러 발생(`make: Nothing to be done for 'lint'`).
 3. **신규 검증 스크립트 미등록**:
-   - `aiorche/scripts/verify-phase-system-prompt.sh`가 생성되어 있으나 Makefile 타겟(`verify-phase-system-prompt`)으로 연동되지 않음.
+   - `ordinatio/scripts/verify-phase-system-prompt.sh`가 생성되어 있으나 Makefile 타겟(`verify-phase-system-prompt`)으로 연동되지 않음.
 4. **대화형/상주형 타겟 타임아웃 및 가이드 부재**:
    - `run-backend`, `run-frontend`, `k8s-logs`는 포그라운드 상주 프로세스이므로 자동화 테스트 시 타임아웃 또는 백그라운드 구동 후 종료 확인 절차가 필요.
 
@@ -80,11 +80,11 @@ graph TD
 - **실행**:
   ```bash
   make help
-  cd aiorche && make help
+  cd ordinatio && make help
   ```
 - **기대 결과**:
   - Exit Code: `0`
-  - 표준 출력(stdout)에 `AI Orchestrator (aiorche) Build & Management Commands`, `[Local & Development]`, `[Kubernetes Pod Lifecycle & Operations]` 섹션이 포함됨.
+  - 표준 출력(stdout)에 `Ordinatio (ordinatio) Build & Management Commands`, `[Local & Development]`, `[Kubernetes Pod Lifecycle & Operations]` 섹션이 포함됨.
 
 #### TC-MAKE-02: `make setup`
 - **목적**: 백엔드 Python 가상환경(`uv sync`) 및 프론트엔드 Node 모듈(`npm install`) 셋업 검증.
@@ -203,7 +203,7 @@ graph TD
 - **실행**: `make down`
 - **기대 결과**:
   - Exit Code: `0`
-  - 모든 aiorche 관련 컨테이너 정지 및 네트워크 리소스 정리 완료.
+  - 모든 ordinatio 관련 컨테이너 정지 및 네트워크 리소스 정리 완료.
 
 ---
 
@@ -219,7 +219,7 @@ graph TD
   - Exit Code: `0`.
 
 #### TC-MAKE-18: `make k8s-status`
-- **목적**: `aiorche` 네임스페이스 내 Pod, Service, ConfigMap, Deployment 상태 조회 검증.
+- **목적**: `ordinatio` 네임스페이스 내 Pod, Service, ConfigMap, Deployment 상태 조회 검증.
 - **실행**: `make k8s-status`
 - **기대 결과**: Exit Code `0`, 모든 리소스 테이블 포맷 출력.
 
@@ -230,9 +230,9 @@ graph TD
 - **실행 시퀀스**:
   ```bash
   make k8s-stop
-  kubectl get pods -n aiorche # 0 Pods 확인
+  kubectl get pods -n ordinatio # 0 Pods 확인
   make k8s-start
-  kubectl get pods -n aiorche # 5 Running 확인
+  kubectl get pods -n ordinatio # 5 Running 확인
   ```
 - **기대 결과**: 스케일 다운/업 간 데이터 유실 없음, Exit Code `0`.
 
@@ -242,7 +242,7 @@ graph TD
 - **기대 결과**: 각 Deployment의 기존 Pod 종료 및 신규 Pod 기동 완료, Exit Code `0`.
 
 #### TC-MAKE-21: `make k8s-logs`
-- **목적**: `app.kubernetes.io/part-of=aiorche` 라벨 기반 전체 컨테이너 로그 스트리밍 검증.
+- **목적**: `app.kubernetes.io/part-of=ordinatio` 라벨 기반 전체 컨테이너 로그 스트리밍 검증.
 - **실행 방식 (Smoke Test)**:
   ```bash
   timeout 3s make k8s-logs || true
@@ -297,14 +297,14 @@ sequenceDiagram
     autonumber
     actor Tester as 운영자 / QA 엔지니어
     participant RootMake as Root Makefile
-    participant SubMake as aiorche/Makefile
+    participant SubMake as ordinatio/Makefile
     participant LocalHost as 로컬 호스트 (uv/npm)
     participant Docker as Docker Engine
     participant K8s as Kubernetes 클러스터
 
     Note over Tester,LocalHost: [Step 1: Tier 1 로컬 및 DoD 검증]
     Tester->>RootMake: make help / make setup / make test
-    RootMake->>SubMake: 포워딩 (%: make -C aiorche $@)
+    RootMake->>SubMake: 포워딩 (%: make -C ordinatio $@)
     SubMake->>LocalHost: uv sync, pytest, npm build
     LocalHost-->>Tester: 100% PASS 확인
 
@@ -333,7 +333,7 @@ sequenceDiagram
 
 ## 6. Makefile 결함 개선 및 동기화 권장사항 (Immediate Remediation)
 
-테스트 수행 전, 발굴된 4가지 개선사항을 `aiorche/Makefile`에 선제적으로 적용합니다:
+테스트 수행 전, 발굴된 4가지 개선사항을 `ordinatio/Makefile`에 선제적으로 적용합니다:
 
 1. **`verify-phase-system-prompt` 타겟 추가**:
    ```makefile
@@ -365,7 +365,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | **반환 코드** | 모든 타겟의 프로세스 반환 코드가 `0` (정상 종료) | 0이 아닌 에러 코드 발생 (Syntax error, command not found 등) |
 | **에어갭 준수** | 실행 중 외부 인터넷 호출 차단(Mocking/로컬 번들 사용) | 외부 CDN, 외부 LLM 직접 호출, 외부 원격 telemetry 시도 시 |
-| **포워딩 무결성** | 루트 디렉토리 실행 결과와 `aiorche/` 디렉토리 직접 실행 결과 100% 동일 | 루트 호출 시 디렉토리 경로 오류(`cd` 실패 등) 발생 |
+| **포워딩 무결성** | 루트 디렉토리 실행 결과와 `ordinatio/` 디렉토리 직접 실행 결과 100% 동일 | 루트 호출 시 디렉토리 경로 오류(`cd` 실패 등) 발생 |
 | **리소스 정리** | `down` 및 `k8s-delete` 후 고아 컨테이너/Pod 잔존 없음 | 프로세스 좀비 잔류, 포트 점유 충돌 |
 | **DoD 정합성** | `verify-phase*` 전 스크립트 Assertions 100% 통과 | 하나라도 FAILED 또는 검증 누락 |
 
@@ -373,8 +373,8 @@ sequenceDiagram
 
 ## 8. 결론 및 향후 계획
 
-본 테스트 계획서는 AI Orchestrator의 모노레포 관리 품질을 상용 엔터프라이즈 수준으로 확보하기 위한 표준 지침입니다.
+본 테스트 계획서는 Ordinatio의 모노레포 관리 품질을 상용 엔터프라이즈 수준으로 확보하기 위한 표준 지침입니다.
 테스트 계획에 명시된 대로:
-1. `aiorche/Makefile`의 누락 타겟(`lint`, `build`, `verify-phase-system-prompt` 등)을 선행 보완하고,
+1. `ordinatio/Makefile`의 누락 타겟(`lint`, `build`, `verify-phase-system-prompt` 등)을 선행 보완하고,
 2. 자동화 스크립트를 통해 Dry-Run 및 Tier 1 로컬 실행 검증을 완료한 뒤,
 3. Tier 2(Docker) 및 Tier 3(K8s) 환경에서 배포/스케일링 무결성을 최종 검증합니다.

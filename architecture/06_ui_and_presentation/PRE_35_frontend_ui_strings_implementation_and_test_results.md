@@ -64,7 +64,7 @@ python3 -c "import os, re
 
 ### 3.2 Vite 프로덕션 빌드 (Production Bundle Build)
 ```bash
-npm --prefix aiorche/frontend run build
+npm --prefix ordinatio/frontend run build
 # vite v6.4.3 building for production...
 # dist/index.html                   1.18 kB │ gzip:   0.72 kB
 # dist/assets/index-Dm11S4yw.css   23.12 kB │ gzip:   5.22 kB

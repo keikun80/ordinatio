@@ -1,7 +1,7 @@
 # PRE_38: 사용자 역할(Role) 추가·수정·삭제 동적 RBAC 관리 엔진 및 에디터 구현 계획서 및 결과 보고서
 
-**문서 번호**: AIORCHE-ENG-PLAN-20261106-ROLE-MGR  
-**대상 시스템**: AI Orchestrator Appliance (`aiorche/`)  
+**문서 번호**: ORDINATIO-ENG-PLAN-20261106-ROLE-MGR  
+**대상 시스템**: Ordinatio Appliance (`ordinatio/`)  
 **작성 일자**: 2026-11-06  
 **관련 모듈**: RBAC 인가 엔진, 역할(Role) CRUD API, 사용자 관리 포털 (`UsersTab.jsx` / `RoleManager`)  
 **검증 상태**: 계획 수립 및 구현 진행  
@@ -10,7 +10,7 @@
 
 ## 1. 개요 및 목적 (Executive Summary)
 
-현재 AI Orchestrator는 3대 고정 시스템 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`) 체계로 구성되어 있어, 고객사 및 운영팀에서 사내 조직 특성에 맞는 커스텀 역할(예: `SECURITY_AUDITOR` 보안 감사관, `FINOPS_MANAGER` 재무 관리자, `OPERATOR` 모델 운영자 등)을 신규 정의하거나 불필요한 역할을 삭제할 수 없는 한계가 존재합니다.
+현재 Ordinatio는 3대 고정 시스템 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`) 체계로 구성되어 있어, 고객사 및 운영팀에서 사내 조직 특성에 맞는 커스텀 역할(예: `SECURITY_AUDITOR` 보안 감사관, `FINOPS_MANAGER` 재무 관리자, `OPERATOR` 모델 운영자 등)을 신규 정의하거나 불필요한 역할을 삭제할 수 없는 한계가 존재합니다.
 
 본 엔지니어링 프로젝트는 **고객사 운영팀이 웹 관리 콘솔에서 직접 역할을 동적으로 추가(Add), 편집(Edit), 삭제(Delete)하고, 각 역할별 8대 제어 평면 권한(Permissions)을 세밀하게 제어할 수 있는 동적 RBAC Role 관리 엔진(Role Manager)을 구축**하는 것을 목적으로 합니다.
 
@@ -109,19 +109,19 @@ class Role(Base):
 
 ### 6.1. 구현된 컴포넌트 및 소스 파일
 1. **데이터베이스 모델 및 스키마**:
-   - [`aiorche/backend/app/models/role.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/models/role.py): `Role` ORM 모델 정의 (`id`, `name`, `display_name`, `description`, `is_system`, `permissions`, `created_at`, `updated_at`).
-   - [`aiorche/backend/app/schemas/role.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/schemas/role.py): Pydantic V2 표준 `RoleCreate`, `RoleUpdate`, `RoleResponse`, `PermissionInfo` 스키마.
-   - [`aiorche/backend/app/core/permissions.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/core/permissions.py): 8대 제어 평면 17개 표준 세부 권한 코드 및 카테고리 정의.
+   - [`ordinatio/backend/app/models/role.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/models/role.py): `Role` ORM 모델 정의 (`id`, `name`, `display_name`, `description`, `is_system`, `permissions`, `created_at`, `updated_at`).
+   - [`ordinatio/backend/app/schemas/role.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/schemas/role.py): Pydantic V2 표준 `RoleCreate`, `RoleUpdate`, `RoleResponse`, `PermissionInfo` 스키마.
+   - [`ordinatio/backend/app/core/permissions.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/core/permissions.py): 8대 제어 평면 17개 표준 세부 권한 코드 및 카테고리 정의.
 2. **시드 및 초기화**:
-   - [`aiorche/backend/app/db/init_db.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/db/init_db.py): 기동 시 3대 시스템 기본 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`) 자동 시딩.
+   - [`ordinatio/backend/app/db/init_db.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/db/init_db.py): 기동 시 3대 시스템 기본 역할(`SUPER_ADMIN`, `TENANT_ADMIN`, `VIEWER`) 자동 시딩.
 3. **백엔드 REST API**:
-   - [`aiorche/backend/app/api/v1/endpoints/roles.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/api/v1/endpoints/roles.py): Role CRUD 및 권한 인벤토리 API 엔드포인트.
-   - [`aiorche/backend/app/api/v1/endpoints/users.py`](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/api/v1/endpoints/users.py): 사용자 생성/수정 시 동적 Role 유효성 검증 연동.
+   - [`ordinatio/backend/app/api/v1/endpoints/roles.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/roles.py): Role CRUD 및 권한 인벤토리 API 엔드포인트.
+   - [`ordinatio/backend/app/api/v1/endpoints/users.py`](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/users.py): 사용자 생성/수정 시 동적 Role 유효성 검증 연동.
 4. **프론트엔드 API 클라이언트 및 다국어**:
-   - [`aiorche/frontend/src/api/client.js`](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/api/client.js): `getRoles()`, `getRolePermissions()`, `createRole()`, `updateRole()`, `deleteRole()` API 연동.
-   - [`aiorche/frontend/src/constants/strings.js`](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/constants/strings.js): `strings.roles` 네임스페이스 신설 (하드코딩 0건).
+   - [`ordinatio/frontend/src/api/client.js`](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/api/client.js): `getRoles()`, `getRolePermissions()`, `createRole()`, `updateRole()`, `deleteRole()` API 연동.
+   - [`ordinatio/frontend/src/constants/strings.js`](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/constants/strings.js): `strings.roles` 네임스페이스 신설 (하드코딩 0건).
 5. **프론트엔드 포털 UI**:
-   - [`aiorche/frontend/src/components/UsersTab.jsx`](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/components/UsersTab.jsx):
+   - [`ordinatio/frontend/src/components/UsersTab.jsx`](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/components/UsersTab.jsx):
      - 사용자 목록(`users`)과 역할 관리(`roles`) 서브 탭 네비게이션.
      - 4종 Role KPI 요약 지표 카드.
      - Role 테이블 (`data-testid="roles-table"`), 시스템 기본 보호 배지, 사용자 카운트, 작업 버튼.
@@ -134,10 +134,10 @@ class Role(Base):
 | 검증 항목 | 검증 명령 | 수행 결과 | 판정 |
 | :--- | :--- | :--- | :---: |
 | **정적 분석 (한글 검사)** | Python 정규식 스캔 | JSX/코드 내 하드코딩된 한글 **0건 (EXACTLY ZERO)** | **PASS** |
-| **프론트엔드 빌드** | `npm --prefix aiorche/frontend run build` | `✓ 1892 modules transformed (built in 4.53s)` | **PASS** |
-| **역할 단위/통합 테스트** | `cd aiorche/backend && uv run pytest tests/test_roles.py -v` | **6 passed in 1.27s** | **PASS** |
-| **RBAC 통합 테스트** | `cd aiorche/backend && uv run pytest tests/test_auth_rbac.py -v` | **7 passed in 3.11s** | **PASS** |
-| **백엔드 전체 회귀 테스트** | `cd aiorche/backend && uv run pytest -q` | **92 passed in 62.31s (100% PASS)** | **PASS** |
+| **프론트엔드 빌드** | `npm --prefix ordinatio/frontend run build` | `✓ 1892 modules transformed (built in 4.53s)` | **PASS** |
+| **역할 단위/통합 테스트** | `cd ordinatio/backend && uv run pytest tests/test_roles.py -v` | **6 passed in 1.27s** | **PASS** |
+| **RBAC 통합 테스트** | `cd ordinatio/backend && uv run pytest tests/test_auth_rbac.py -v` | **7 passed in 3.11s** | **PASS** |
+| **백엔드 전체 회귀 테스트** | `cd ordinatio/backend && uv run pytest -q` | **92 passed in 62.31s (100% PASS)** | **PASS** |
 
 ### 6.3. 보안 안전성 검증
 1. **시스템 기본 역할 삭제 시도 시 차단**: `DELETE /api/v1/roles/SUPER_ADMIN` 호출 시 `400 Bad Request` ("시스템 기본 역할은 보호되어 삭제 불가") 확인 완료.
@@ -151,7 +151,7 @@ class Role(Base):
 ### 7.1. 결함 보고 내용 및 근본 원인 분석
 - **현상**: `SEC_AUDITOR` 역할을 신규 생성하고 조회 권한(`governance:read`, `compliance:read`)만 설정하였음에도, 해당 사용자가 가상 API Key를 생성할 수 있었던 버그.
 - **근본 원인**:
-  1. **백엔드 엔드포인트 무방비**: `aiorche/backend/app/api/v1/endpoints/virtual_keys.py`의 `create_virtual_key`, `revoke_virtual_key`, `update_virtual_key`, `delete_virtual_key` 엔드포인트에 세부 권한 의존성(`require_permission("governance:write")`)이 누락되어 인증 여부와 무관하게 호출 가능했음.
+  1. **백엔드 엔드포인트 무방비**: `ordinatio/backend/app/api/v1/endpoints/virtual_keys.py`의 `create_virtual_key`, `revoke_virtual_key`, `update_virtual_key`, `delete_virtual_key` 엔드포인트에 세부 권한 의존성(`require_permission("governance:write")`)이 누락되어 인증 여부와 무관하게 호출 가능했음.
   2. **프론트엔드 버튼 노출**: `VirtualKeysTab.jsx`가 사용자의 세부 권한(`governance:write`)을 판별하지 않고 `[+ 신규 API Key 발급]`, `[+ 신규 부서 등록]` 버튼을 상시 활성화하고 있었음.
   3. **사용자 응답 내 권한 정보 부재**: `/api/v1/auth/me` 및 `/api/v1/auth/login` 응답에 사용자가 보유한 역할의 세부 권한 코드 목록(`permissions: [...]`)이 포함되지 않았음.
 
@@ -178,7 +178,7 @@ class Role(Base):
 ## 8. 전 도메인(10대 도메인 · 17종 권한 코드) RBAC/PBAC 전수 점검 및 완전 강화 (PRE_38.2)
 
 ### 8.1. 전수 감사(Audit) 결과
-프로젝트 전체 14개 백엔드 엔드포인트 모듈(`aiorche/backend/app/api/v1/endpoints/`)과 프론트엔드 전체 탭 컴포넌트를 대상으로 `app/core/permissions.py`에 정의된 **10대 도메인 · 17종 세부 권한 코드(PBAC)** 적용 실태를 전수 검사하여 아래 구간의 누락을 식별 및 즉시 보완함:
+프로젝트 전체 14개 백엔드 엔드포인트 모듈(`ordinatio/backend/app/api/v1/endpoints/`)과 프론트엔드 전체 탭 컴포넌트를 대상으로 `app/core/permissions.py`에 정의된 **10대 도메인 · 17종 세부 권한 코드(PBAC)** 적용 실태를 전수 검사하여 아래 구간의 누락을 식별 및 즉시 보완함:
 
 | 도메인 | 세부 권한 코드 | 백엔드 엔드포인트 모듈 | 조치 전 상태 | 조치 후 상태 (PBAC 완전 적용) |
 | :--- | :--- | :--- | :--- | :--- |

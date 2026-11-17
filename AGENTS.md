@@ -1,4 +1,4 @@
-# AI Orchestrator 프로젝트 규칙 및 개발 가이드라인
+# Ordinatio 프로젝트 규칙 및 개발 가이드라인
 
 본 프로젝트는 고객사 인프라에 100% 설치되어 운영되는 **고객 자율 운영형 폐쇄망(Air-Gapped) 어플라이언스**입니다.
 모든 에이전트는 아래의 아키텍처 원칙과 엔지니어링 표준을 반드시 준수해야 합니다.
@@ -12,7 +12,7 @@
    - 벤더(개발사)는 오케스트레이터의 **긴급 보안 패치/핫픽스 번들**만 오프라인 서명(.tar.gz + RSA-4096) 형태로 제공합니다.
 3. **디렉토리 역할 분리**:
    - `architecture/`: 소프트웨어 공학적 설계 문서, 단계별 엔지니어링 계획서 (`PRE_01_dashboard_engineering_plan.md` 등 `PRE_{번호}_` 체계).
-   - `aiorche/`: **실제 상용급 구현 모노레포** (`backend/`, `frontend/`, `deploy/`, `scripts/`, `Makefile`, `docker-compose.yml`).
+   - `ordinatio/`: **실제 상용급 구현 모노레포** (`backend/`, `frontend/`, `deploy/`, `scripts/`, `Makefile`, `docker-compose.yml`).
 
 ## 2. 단계별 구현 및 검증 원칙 (Phased Engineering & DoD)
 - 모든 기능 구현은 `architecture/PRE_01_dashboard_engineering_plan.md`의 Phase(0~4) 정의에 따라 순차적으로 진행합니다.
@@ -28,17 +28,17 @@
    - `architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_{N}.md`로 **완료된 최신 Phase({N})에 맞춰 파일명 변경(리네이밍) 및 구버전 파일 삭제**.
    - Phase 0부터 {N}까지의 요구사항 대비 구현율(100%), ADR-01~0N, 미구현/미테스트 및 권장 과제 전면 현행화.
 4. **디렉토리 인덱스 및 마스터 계획서 동기화**:
-   - `architecture/README.md`, `architecture/PRE_01_dashboard_engineering_plan.md`, `aiorche/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.
+   - `architecture/README.md`, `architecture/PRE_01_dashboard_engineering_plan.md`, `ordinatio/README.md` 내 상태 배지, 파일 링크, 테스트 통과 수치 즉각 일치화.
 
 ## 4. 기술 스택별 표준 규칙
 1. **Backend (Python)**:
    - 의존성 및 가상환경 관리는 반드시 `uv`를 사용합니다 (`uv sync`, `uv run pytest`).
    - 시스템 Python과의 충돌을 방지하기 위해 테스트 및 CLI 실행 시 `uv run` 또는 `.venv/bin/`을 항상 사용합니다.
    - Pydantic 환경설정은 V2 표준(`model_config = SettingsConfigDict(...)`)을 준수합니다.
-   - 가상 API Key는 `sk-orch-` 접두사를 가지며, DB 저장 시 Argon2id 단방향 솔트 해싱을 적용합니다.
+   - 가상 API Key는 `sk-ord-` 접두사를 가지며, DB 저장 시 Argon2id 단방향 솔트 해싱을 적용합니다.
 2. **Frontend (React + Vite)**:
    - React 18 + Vite + Lucide React 기반 모듈식 구조를 유지합니다.
    - 에어갭 환경을 위해 순수 Vanilla CSS 기반 커스텀 디자인 시스템(Glassmorphism, Dark Slate Theme)을 유지합니다.
 3. **Gateway & Infra**:
    - L7 AI Gateway는 Envoy(xDS 동적 제어)를 사용합니다.
-   - 스택 관리는 `aiorche/Makefile`의 표준 타깃(`make setup`, `make test`, `make run-backend`, `make run-frontend`, `make verify-phase0`)을 활용합니다.
+   - 스택 관리는 `ordinatio/Makefile`의 표준 타깃(`make setup`, `make test`, `make run-backend`, `make run-frontend`, `make verify-phase0`)을 활용합니다.

@@ -1,8 +1,8 @@
 # Phase 0 ~ Phase 6 엔지니어링 갭 분석 및 구현 상태 점검 보고서 (현행화 완료)
 
-**문서 번호**: AIORCHE-GAP-ANALYSIS-20261117  
+**문서 번호**: ORDINATIO-GAP-ANALYSIS-20261117  
 **기준 문서**: `architecture/PRE_01_dashboard_engineering_plan.md`, `architecture/PRE_15_Develop_milestone.md`, `architecture/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md`  
-**분석 대상**: 상용급 모노레포(`aiorche/`), 단일 어플라이언스 인스톨러(`install.sh`), 릴리즈 태그(`v1.0.2`)  
+**분석 대상**: 상용급 모노레포(`ordinatio/`), 단일 어플라이언스 인스톨러(`install.sh`), 릴리즈 태그(`v1.0.2`)  
 **작성 일자**: 2026-11-17 (최신 현행화: 102 Tests PASS, Read 120s / Connect 10s 타임아웃 분리, ALB 신뢰 프록시, 클린 설치 모드 완결)  
 
 ---
@@ -12,8 +12,8 @@
 마스터 엔지니어링 계획서(`PRE_01_dashboard_engineering_plan.md`) 및 최신 상용화 요구사항에 정의된 **Phase 0부터 Phase 6(기반 스택, L7 Gateway, 테넌트/가상키, xDS 라우팅, FinOps, PII/WORM, 핫픽스 엔진, 동적 시스템 프롬프트, 금융권 RBAC, Standalone 설치기, 프론트엔드 strings.js 현지화, ALB 신뢰 프록시, 엔터프라이즈 클린 모드)**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 최신 현행화하였습니다.
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-orch-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, 에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `aiorche-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`)**.
-- **자동화 테스트 검증율**: **102 / 102 백엔드 테스트 100% PASS** (`cd aiorche/backend && uv run pytest -v`) + **7 / 7 Standalone 설치 검증 100% PASS** (`make verify-standalone-install`) + **Vite 프로덕션 빌드 PASS (번들 경량화 및 코드 스플리팅)**.
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, 에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`)**.
+- **자동화 테스트 검증율**: **102 / 102 백엔드 테스트 100% PASS** (`cd ordinatio/backend && uv run pytest -v`) + **7 / 7 Standalone 설치 검증 100% PASS** (`make verify-standalone-install`) + **Vite 프로덕션 빌드 PASS (번들 경량화 및 코드 스플리팅)**.
 - **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **17건** (ADR-01 ~ ADR-17 공식 최신화 완료).
 - **상용 고도화 및 하드닝 (Phase C/B/A)**: **100% 완료** (비루트 컨테이너, Alembic 마이그레이션, UTC 시간대 정합화, RoutingTab 모듈화, 비인가 차단 강화, Upstream API Key Fernet 암호화/마스킹, 401 세션 인터셉터).
 - **잔여 상용화 엔터프라이즈 과제 (GAP)**: 총 **14건** (유사도별 4대 도메인으로 체계적 재배치 완료).
@@ -25,13 +25,13 @@
 | 도메인 / 단계 | 설계서 요구 기능 | 실제 구현 상태 | 자동화 테스트 여부 | 비고 |
 | :--- | :--- | :---: | :---: | :--- |
 | **Phase 0: 기반 인프라** | 모노레포 구조 및 빌드 도구 표준화 | ✅ **구현 완료** | ✅ **테스트 완료** | `uv`, Vite, Makefile, docker-compose |
-| | K8s 5개 Pod 배포 매니페스트 | ✅ **구현 완료** | ✅ **테스트 완료** | `aiorche` 네임스페이스 5개 Pod |
+| | K8s 5개 Pod 배포 매니페스트 | ✅ **구현 완료** | ✅ **테스트 완료** | `ordinatio` 네임스페이스 5개 Pod |
 | | Liveness/Readiness 프로브 API | ✅ **구현 완료** | ✅ **테스트 완료** | `test_health_check`, `test_readiness_check` |
 | | 5대 인프라 Preflight 자가진단 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_system_info`, `GET /system/preflight` |
 | | Zero-PII 서포트 번들 암호화 생성 | ✅ **구현 완료** | ✅ **테스트 완료** | `POST /api/v1/system/support-bundle` |
 | **Phase 1: 테넌시 & 가상키** | 테넌트(부서) CRUD REST API | ✅ **구현 완료** | ✅ **테스트 완료** | `test_tenant_lifecycle` (GET/POST/PATCH) |
 | | 가상 API Key 발급/수명주기/파기 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_virtual_key_*` (발급, 파기, 수정) |
-| | `sk-orch-` 생성 & Argon2id 해싱 | ✅ **구현 완료** | ✅ **테스트 완료** | 단 1회 노출 모달 및 DB 단방향 해싱 |
+| | `sk-ord-` 생성 & Argon2id 해싱 | ✅ **구현 완료** | ✅ **테스트 완료** | 단 1회 노출 모달 및 DB 단방향 해싱 |
 | | 사내 AI 클라이언트 자가진단 API | ✅ **구현 완료** | ✅ **테스트 완료** | `GET /api/v1/external/me`, `/models` |
 | | L7 게이트웨이 사용량 보고 API | ✅ **구현 완료** | ✅ **테스트 완료** | `POST /api/v1/external/usage/report` |
 | | 사내 ERP 부서 예산/하드캡 제어 | ✅ **구현 완료** | ✅ **테스트 완료** | `PATCH /api/v1/external/tenants/{id}/budget` |
@@ -73,7 +73,7 @@
 | | 동적 Role 관리 & 10대 도메인 17종 세부 권한(PBAC) | ✅ **구현 완료** | ✅ **테스트 완료** | `test_roles.py` (7종 테스트 전수 PASS) |
 | | **AWS ALB / Nginx 신뢰 프록시 헤더 보안 검증** | ✅ **구현 완료** | ✅ **테스트 완료** | `test_proxy_headers.py` (4종 테스트 PASS) |
 | | **게이트웨이 P0 보안 검증 (모의키 차단, SSRF 방어, XFF 스푸핑 방어)** | ✅ **구현 완료** | ✅ **테스트 완료** | `test_gateway_security_p0.py` (8종 PASS) |
-| **Phase 6: 배포 & 현지화** | RHEL 9 호환 Standalone `install.sh` 무인 설치기 & `aiorche-ctl` | ✅ **구현 완료** | ✅ **테스트 완료** | 4단계 파이프라인, DoD 7/7 PASS |
+| **Phase 6: 배포 & 현지화** | RHEL 9 호환 Standalone `install.sh` 무인 설치기 & `ordinatio-ctl` | ✅ **구현 완료** | ✅ **테스트 완료** | 4단계 파이프라인, DoD 7/7 PASS |
 | | 15개 UI 컴포넌트 한글 100% strings.js 중앙 집중화 | ✅ **구현 완료** | ✅ **검증 완료** | 정적 스캔 잔여 0건, Vite 빌드 통과 |
 | | **엔터프라이즈 순수 클린 설치 모드 (`SEED_DEMO_DATA=False`)** | ✅ **구현 완료** | ✅ **검증 완료** | 데모 시드 데이터 배제, 초기 관리자만 생성 |
 
@@ -113,7 +113,7 @@
 | :---: | :--- | :---: | :--- | :---: |
 | **GAP-01** | 오프라인 DRM 라이선스 엔진 | Stage 1 | RSA-4096 서명 `.lic` 파싱, CPU/MAC/UUID 하드웨어 핑거프린트 바인딩, 허용 RPS/테넌트 통제 | **P0 (필수)** |
 | **GAP-02** | 브라우저 최초 셋업 마법사 | Stage 1 | 미설치 시 `/setup` 자동 리다이렉트 ➔ 3단계(라이선스, 슈퍼관리자, Preflight) 웹 UI 위저드 | **P1** |
-| **GAP-03** | 엔터프라이즈 Helm Chart & 번들러 | Stage 1 | `deploy/helm/aiorche/` (K8s HPA, 외장 DB) 및 `package-airgap-release.sh` 이미지 패키징 | **P1** |
+| **GAP-03** | 엔터프라이즈 Helm Chart & 번들러 | Stage 1 | `deploy/helm/ordinatio/` (K8s HPA, 외장 DB) 및 `package-airgap-release.sh` 이미지 패키징 | **P1** |
 
 ### 도메인 2: 보안, 인증 & 네트워크 인프라 (Security & Infrastructure)
 | GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
@@ -135,7 +135,7 @@
 | **GAP-06** | 1-클릭 암호화 DB 백업/복원(DR) | Stage 2 | AES-256-GCM 암호화 DB 덤프 자동 스케줄링, UI/CLI 1-클릭 시점 복원(PITR, RTO 15분) | **P1** |
 | **GAP-09** | 화이트라벨링(OEM) 커스텀 브랜딩 | Stage 3 | 고객사 로고 업로드, 파비콘 동적 교체, 시스템 명칭 및 프라이머리 컬러 팔레트 동적 변경 | **P2** |
 | **GAP-10** | 부서별 월간 정산서 자동 PDF/Excel | Stage 3 | 매월 1일 자정 테넌트별 사용량/비용 집계 후 금융 표준 PDF 및 Excel(.xlsx) 리포트 자동 생성 | **P2** |
-| **GAP-11** | 다국어 클라이언트 전용 SDK 배포 | Stage 3 | `aiorche-sdk-python` (wheel 번들), `aiorche-sdk-java` (Spring Boot Starter), `aiorche-sdk-ts` | **P2** |
+| **GAP-11** | 다국어 클라이언트 전용 SDK 배포 | Stage 3 | `ordinatio-sdk-python` (wheel 번들), `ordinatio-sdk-java` (Spring Boot Starter), `ordinatio-sdk-ts` | **P2** |
 | **GAP-12** | WORM 감사 PostgreSQL DB 트리거 | Milestone 6 | `audit_logs` 테이블 레코드에 대한 DB 관리자 레벨의 강제 UPDATE/DELETE 거부 트리거 함수 | **P2** |
 
 ---

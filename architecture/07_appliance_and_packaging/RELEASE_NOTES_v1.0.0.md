@@ -1,4 +1,4 @@
-# AI Orchestrator Release Notes - v1.0.0
+# Ordinatio Release Notes - v1.0.0
 
 **Release Date**: 2026-11-08  
 **Release Type**: Major Production GA Release  
@@ -9,10 +9,10 @@
 ## 🌟 주요 기능 하이라이트 (Key Features)
 
 1. **단일 아카이브 완전 자립 패키징**:
-   - `aiorche-appliance-v1.0.0.tar.gz` 하나로 5대 핵심 도커 이미지, 오프라인 로더, 헬스체커, 관리용 Makefile을 원스톱 제공.
+   - `ordinatio-appliance-v1.0.0.tar.gz` 하나로 5대 핵심 도커 이미지, 오프라인 로더, 헬스체커, 관리용 Makefile을 원스톱 제공.
 2. **Envoy L7 인텔리전트 AI 게이트웨이**:
    - OpenAI 호환 API 규격 지원 (`/v1/chat/completions`).
-   - 가상 API 키(`sk-orch-*`) 기반 테넌트 분리 및 토큰 버킷 레이트 리미팅.
+   - 가상 API 키(`sk-ord-*`) 기반 테넌트 분리 및 토큰 버킷 레이트 리미팅.
 3. **엔터프라이즈 거버넌스 및 보안**:
    - Microsoft Presidio 기반 고속 개인정보(PII) 실시간 마스킹.
    - WORM(Write Once, Read Many) 불변 감사 로그 및 SHA-256 서명 체인 무결성 보장.

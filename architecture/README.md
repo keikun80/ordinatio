@@ -1,6 +1,6 @@
-# AI Orchestrator Domain Architecture & Documentation Index
+# Ordinatio Domain Architecture & Documentation Index
 
-이 디렉토리는 AI Orchestrator의 **소프트웨어 공학 설계서, 도메인별 최신 구현 보고서, 아키텍처 결정서(ADR) 및 종합 로드맵**을 체계적으로 보관합니다.  
+이 디렉토리는 Ordinatio의 **소프트웨어 공학 설계서, 도메인별 최신 구현 보고서, 아키텍처 결정서(ADR) 및 종합 로드맵**을 체계적으로 보관합니다.  
 중복되거나 이전 단계에서 대체된 문서는 모두 정비되었으며, **시간적으로 가장 최근에 구현 및 검증된 핵심 문서만 도메인 단위로 구조화**되어 있습니다. 테스트와 검증에 관련된 모든 문서는 [`testdocs/`](./testdocs/README.md)에 별도로 분리 관리됩니다.
 
 ---
@@ -12,7 +12,7 @@
 
 | 문서 파일 | 핵심 내용 및 범위 | 상태 |
 | :--- | :--- | :---: |
-| [PRE_00_comparison.md](./00_core_and_blueprint/PRE_00_comparison.md) | **사전 벤치마킹 및 비교 분석서**<br>- aiorche vs LiteLLM vs Kong AI vs Envoy AI 4자 아키텍처 비교 | 완료 |
+| [PRE_00_comparison.md](./00_core_and_blueprint/PRE_00_comparison.md) | **사전 벤치마킹 및 비교 분석서**<br>- ordinatio vs LiteLLM vs Kong AI vs Envoy AI 4자 아키텍처 비교 | 완료 |
 | [PRE_01_dashboard_engineering_plan.md](./00_core_and_blueprint/PRE_01_dashboard_engineering_plan.md) | **마스터 엔지니어링 계획서 (Master Blueprint)**<br>- FURPS+ 요구공학, Clean Architecture, DDD, Phase 0~6 로드맵 | 최신 현행화 |
 | [PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md](./00_core_and_blueprint/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) | **Phase 0~6 종합 총괄 보고서 (Executive Master Report)**<br>- 전 모듈 아키텍처 총괄, ADR-01~17 의사결정 기록 및 무회귀 성과 | 최신 현행화 |
 | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md](./00_core_and_blueprint/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) | **Phase 0~6 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 런타임 구현율 100% 추적 및 상용 하드닝 완료 | 최신 현행화 |
@@ -47,7 +47,7 @@ vLLM Prometheus `/metrics` 스크래핑, 인프라 토폴로지 자동 판별 �
 | 문서 파일 | 핵심 내용 및 범위 | 상태 |
 | :--- | :--- | :---: |
 | [PRE_08_phase4_pii_governance_and_worm_audit.md](./03_security_and_governance/PRE_08_phase4_pii_governance_and_worm_audit.md) | **인라인 PII 마스킹 & WORM 감사 포렌식 엔진**<br>- 개인정보 탐지(주민번호/카드/전화/이메일), MASK/HASH/BLOCK, WORM 로그 | **100% PASS** |
-| [PRE_33_security_review_and_hardening_report.md](./03_security_and_governance/PRE_33_security_review_and_hardening_report.md) | **AI Orchestrator 종합 보안 검토 및 하드닝 보고서**<br>- 루프백 격리, .env 권한(600), SSRF 방어, X-Forwarded-For 스푸핑 방어 | **검토 완료** |
+| [PRE_33_security_review_and_hardening_report.md](./03_security_and_governance/PRE_33_security_review_and_hardening_report.md) | **Ordinatio 종합 보안 검토 및 하드닝 보고서**<br>- 루프백 격리, .env 권한(600), SSRF 방어, X-Forwarded-For 스푸핑 방어 | **검토 완료** |
 
 ---
 

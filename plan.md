@@ -1,9 +1,9 @@
 # 상업용 오픈소스 기반 AI 서비스 오케스트레이터 아키텍처 설계서 (plan.md)
 
-**문서 번호**: AIORCHE-ARCH-PLAN-20261117  
+**문서 번호**: ORDINATIO-ARCH-PLAN-20261117  
 **문서 버전**: v2.4 (Phase 0 ~ Phase 6 상용급 구현 완료, 17대 ADR 및 백엔드 94/94 테스트 100% 통과 반영)  
 **문서 상태**: APPROVED / CURRENT  
-**대상 시스템**: AI Orchestrator (`aiorche`) 온프레미스 에어갭 어플라이언스  
+**대상 시스템**: Ordinatio (`ordinatio`) 온프레미스 에어갭 어플라이언스  
 **최종 갱신일**: 2026-11-17  
 
 본 문서는 금융권 및 엔터프라이즈 환경의 엄격한 규제(전자금융감독규정, 개인정보보호법, 망분리 규제)를 완벽히 준수하며, **고객사 전용 인프라(On-Premise / Private VPC)에 100% 완전 독립 설치되어 고객이 직접 운영하는 소프트웨어(Customer-Managed Self-Hosted Appliance)** 아키텍처와 실제 상용 구현 명세를 정의합니다.
@@ -62,12 +62,12 @@
 
 | 분류 | 컴포넌트 | 라이선스 | 고객사 설치 환경에서의 역할 및 구현 상세 (ADR) |
 | :--- | :--- | :--- | :--- |
-| **통합 웹 콘솔** | **AI Orchestrator Admin Console** | 자체 개발 (MIT) | • **React 18 + Vite + 순수 Vanilla CSS** Glassmorphism Dark Theme<br>• 7대 통합 관제 스튜디오 내장 (개요, 라우팅, 키, 프롬프트, FinOps, 감사, 패치)<br>• Grafana iFrame 종속 완전 제거 및 AGPLv3 리스크 원천 배제 ([ADR-04]) |
+| **통합 웹 콘솔** | **Ordinatio Admin Console** | 자체 개발 (MIT) | • **React 18 + Vite + 순수 Vanilla CSS** Glassmorphism Dark Theme<br>• 7대 통합 관제 스튜디오 내장 (개요, 라우팅, 키, 프롬프트, FinOps, 감사, 패치)<br>• Grafana iFrame 종속 완전 제거 및 AGPLv3 리스크 원천 배제 ([ADR-04]) |
 | **Control Plane API** | **Orchestrator Core Service** | 자체 개발 (FastAPI/Python) | • 클린 아키텍처 기반 비동기 코어 REST API (`/api/v1/`)<br>• Envoy L7 프록시를 위한 **REST RDS v3 (`discovery:routes`)** 동적 라우트 컴파일 ([ADR-01])<br>• 5대 인프라 Preflight 헬스체크 및 Zero-PII 서포트 번들 암호화 생성 |
 | **L7 Ingress 프록시** | **Envoy AI Gateway (v1.31+)** | Apache 2.0 | • 초저지연 C++ L7 인그레스 프록시 (Zero-Copy SSE 스트리밍 바이패스)<br>• REST RDS 동적 라우트 수신, 슬라이딩 윈도우 TPM/RPM 레이트 리미팅<br>• L7 Reverse Proxy와 Control Plane Gateway 분리 구조 ([ADR-17]) |
 | **지능형 라우팅 엔진** | **AgentRouter Engine** | 자체 개발 | • 실시간 프롬프트 인텐트 및 복잡도 인지 분류 (LIGHT vs REASONING_HEAVY)<br>• 4대 자율 라우팅 정책(QualityFirst, LeastCost, LatencyOptimized, SelfHealingFallback)<br>• 세션 해시 기반 KV-Cache 어피니티 유지 |
 | **시스템 프롬프트 거버넌스** | **Dynamic Prompt Engine** | 자체 개발 | • 독립 프롬프트 카탈로그 및 1:1 유연 바인딩 (`ROUTE`, `VIRTUAL_KEY`, `TENANT`, `GLOBAL`)<br>• L7 ext_proc 스트림 페이로드 인라인 주입 (PREPEND, OVERRIDE, FALLBACK_ONLY) ([ADR-13]) |
-| **보안 및 키 거버넌스** | **Virtual Key Manager** | 자체 개발 | • `sk-orch-` 가상 API Key 발급, **Argon2id 솔트 단방향 해싱** 저장<br>• 발급 시 단 1회 평문 노출 모달, 허용 모델 화이트리스트(`allowed_models`) 통제 |
+| **보안 및 키 거버넌스** | **Virtual Key Manager** | 자체 개발 | • `sk-ord-` 가상 API Key 발급, **Argon2id 솔트 단방향 해싱** 저장<br>• 발급 시 단 1회 평문 노출 모달, 허용 모델 화이트리스트(`allowed_models`) 통제 |
 | **인증 & RBAC** | **Local Auth & Dynamic PBAC** | 자체 개발 (JWT / Argon2id) | • 폐쇄망 자립형 로컬 DB 기반 인증 및 동적 권한 제어 ([ADR-15, ADR-16])<br>• 10대 도메인 17종 세부 권한 매트릭스, 금융권 보안(30분 활동만료, 5회 잠금) |
 | **PII 개인정보 마스킹** | **Fast Inline PII Engine** | 자체 개발 (정규식) | • 초경량 인라인 탐지 엔진 (<2ms 초저지연, 대용량 NLP 모델 배제) ([ADR-05])<br>• 주민등록번호, 계좌번호, 카드번호, 사번 등 실시간 **MASK, HASH, BLOCK** |
 | **FinOps & 비용 관제** | **FinOps Metering Engine** | 자체 개발 | • 원화(₩) 기준 테넌트 월간 예산 계량 및 80% 조기 경보, **Hard Cap 100% 429 즉각 차단**<br>• 1초 주기 WebSocket 스트림 관제, Excel 호환 UTF-8 BOM CSV 청구서 다운로드 |
@@ -145,7 +145,7 @@ flowchart TD
     CP_API -->|"REST RDS v3 무중단 갱신"| Envoy
 
     %% Runtime Inference Flow
-    Client -->|"추론 요청 (Bearer sk-orch-*)"| Envoy
+    Client -->|"추론 요청 (Bearer sk-ord-*)"| Envoy
     Envoy <-->|"API Key 검증 & 쿼터 차단(429)"| Redis
     Envoy --> AgentRouter
     AgentRouter --> SystemPrompt
@@ -193,7 +193,7 @@ flowchart TD
 * **WORM 감사 DB 기반 모델 점유율**: 하드코딩이 아닌 실제 적재된 추론 데이터를 기반으로 모델별 점유율 실시간 산출.
 
 ### 5.2 가상 API Key 및 테넌트 거버넌스 (Virtual Keys Studio)
-* **`sk-orch-` 접두사 및 Argon2id 솔트 단방향 해싱**: DB 침해 시에도 원문 키 복원 불가.
+* **`sk-ord-` 접두사 및 Argon2id 솔트 단방향 해싱**: DB 침해 시에도 원문 키 복원 불가.
 * **1회성 평문 노출 모달**: 발급 시점에 단 1회만 평문을 노출하고 이후 원문 재조회 불가.
 * **키 수명주기 통제**: 활성/비활성화, 즉각 파기(Revoke), 허용 모델 화이트리스트(`allowed_models`), 사내 CIDR IP 대역 제한.
 
@@ -232,19 +232,19 @@ flowchart TD
 ### 6.1 RHEL 9 호환 Standalone 단일 호스트 무인 설치기 (`install.sh`)
 * **단일 호스트 완전 자동화 파이프라인**:
   1. 호스트 OS (RHEL 9, Rocky Linux 9, CentOS Stream 9, Ubuntu 24.04) 및 Docker/Compose 감지.
-  2. 에어갭 로컬 디렉토리 구조 자동 생성 (`/opt/aiorche/`).
+  2. 에어갭 로컬 디렉토리 구조 자동 생성 (`/opt/ordinatio/`).
   3. `docker-compose.yml` 컨테이너 기동 및 127.0.0.1 루프백 포트 격리.
   4. 5대 컨테이너 헬스체크 및 `make init-admin` 관리자 계정 생성 완료.
-* **호스트 제어 CLI (`aiorche-ctl`) 8종 명령 인터페이스**:
-  * `aiorche-ctl status`, `start`, `stop`, `restart`, `logs`, `backup`, `preflight`, `version` 제공.
+* **호스트 제어 CLI (`ordinatio-ctl`) 8종 명령 인터페이스**:
+  * `ordinatio-ctl status`, `start`, `stop`, `restart`, `logs`, `backup`, `preflight`, `version` 제공.
 
 ### 6.2 Kubernetes 에어갭 배포 매니페스트 (`deploy/k8s/`)
 * **5개 코어 파드 구성**:
-  * `aiorche-gateway` (Envoy L7 프록시, PDB 적용)
-  * `aiorche-backend` (FastAPI Control Plane, 3 Replicas Rolling)
-  * `aiorche-frontend` (Nginx + React 18 SPA 정적 번들)
-  * `aiorche-postgres` (StatefulSet, PV WORM 스토리지)
-  * `aiorche-redis` (StatefulSet, Rate Limiter)
+  * `ordinatio-gateway` (Envoy L7 프록시, PDB 적용)
+  * `ordinatio-backend` (FastAPI Control Plane, 3 Replicas Rolling)
+  * `ordinatio-frontend` (Nginx + React 18 SPA 정적 번들)
+  * `ordinatio-postgres` (StatefulSet, PV WORM 스토리지)
+  * `ordinatio-redis` (StatefulSet, Rate Limiter)
 
 ---
 
@@ -254,7 +254,7 @@ flowchart TD
 
 ```bash
 # 1. 백엔드 전체 94개 단위/통합 테스트 (100% PASS)
-cd aiorche/backend && uv run pytest -v
+cd ordinatio/backend && uv run pytest -v
 # 결과: 94 passed in 3.42s (100% PASS)
 
 # 2. Standalone 무인 설치기 7개 테스트 (100% PASS)
@@ -262,7 +262,7 @@ make verify-standalone-install
 # 결과: 7 / 7 PASSED (100% PASS)
 
 # 3. 프론트엔드 프로덕션 빌드 (Vite PASS)
-cd aiorche/frontend && npm run build
+cd ordinatio/frontend && npm run build
 # 결과: 번들 청크 분할 완료 및 빌드 성공 (에러 0건)
 ```
 
@@ -279,7 +279,7 @@ cd aiorche/frontend && npm run build
 | **동적 시스템 프롬프트** | `test_system_prompts.py` | ROUTE/KEY/TENANT 1:1 바인딩, 위계적 우선순위, ext_proc 주입 | **PASS (7/7)** |
 | **인증 & 동적 PBAC** | `test_auth_rbac.py` | 로컬 DB Argon2id 해싱, 3-Tier RBAC, 30분 만료, 5회 잠금, 커스텀 Role | **PASS (8/8)** |
 | **엔터프라이즈 확장** | `test_enterprise_extension.py` | 역할별 세부 권한 매트릭스 인가 및 본인 강등 방지 | **PASS (7/7)** |
-| **Standalone 인스톨러** | `test_standalone_installer.sh` | 디렉토리 구조, 바이너리 퍼미션, 루프백 바인딩, aiorche-ctl CLI | **PASS (7/7)** |
+| **Standalone 인스톨러** | `test_standalone_installer.sh` | 디렉토리 구조, 바이너리 퍼미션, 루프백 바인딩, ordinatio-ctl CLI | **PASS (7/7)** |
 
 ---
 

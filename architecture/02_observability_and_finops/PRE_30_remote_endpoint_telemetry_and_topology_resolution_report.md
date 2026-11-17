@@ -2,7 +2,7 @@
 
 ## 1. 개요 및 배경
 
-본 보고서는 고객 자율 운영형 폐쇄망 어플라이언스 **AI Orchestrator**의 **통합 관제 홈 메뉴 대시보드(OverviewTab)** 내 **LLM 서빙 인프라 풀 상태(Multi-Compute Pools)**에서, 등록된 서빙 모델이 원격지 URL 엔드포인트(NVIDIA NIM, 외부 클라우드 SaaS, 사내 독립 컨테이너 등)로 제공될 때 발생하던 **시스템/GPU 점유율 불일치** 및 **인프라 라우팅 표기(`On-Prem K8s / k8s`) 모순** 결함을 근본적으로 해결한 엔지니어링 내역과 검증 증적을 기술합니다.
+본 보고서는 고객 자율 운영형 폐쇄망 어플라이언스 **Ordinatio**의 **통합 관제 홈 메뉴 대시보드(OverviewTab)** 내 **LLM 서빙 인프라 풀 상태(Multi-Compute Pools)**에서, 등록된 서빙 모델이 원격지 URL 엔드포인트(NVIDIA NIM, 외부 클라우드 SaaS, 사내 독립 컨테이너 등)로 제공될 때 발생하던 **시스템/GPU 점유율 불일치** 및 **인프라 라우팅 표기(`On-Prem K8s / k8s`) 모순** 결함을 근본적으로 해결한 엔지니어링 내역과 검증 증적을 기술합니다.
 
 ---
 
@@ -111,4 +111,4 @@ flowchart TD
 * `test_remote_endpoint_metrics_and_na_fallback`: 통과 (vLLM Prometheus 파싱 및 N/A 폴백 검증)
 * 백엔드 전체 테스트 스위트: **86개 전건 통과 (100% PASS)**
 * 프론트엔드 Vite 빌드: **통과 (`built in 3.88s`)**
-* Docker 이미지 및 컨테이너: **정상 재빌드 및 가동 완료 (`aiorche-backend`, `aiorche-frontend`)**
+* Docker 이미지 및 컨테이너: **정상 재빌드 및 가동 완료 (`ordinatio-backend`, `ordinatio-frontend`)**

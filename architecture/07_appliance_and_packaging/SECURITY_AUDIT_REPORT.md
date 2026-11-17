@@ -1,7 +1,7 @@
-# AI Orchestrator 엔터프라이즈 보안 감사 보고서 (v1.0.0)
+# Ordinatio 엔터프라이즈 보안 감사 보고서 (v1.0.0)
 
 ## 1. 보안 아키텍처 개요
-AI Orchestrator는 금융, 공공, 대기업의 엄격한 보안 요구사항을 충족하도록 설계된 **100% 폐쇄망(Air-Gapped) 전용 어플라이언스**입니다.
+Ordinatio는 금융, 공공, 대기업의 엄격한 보안 요구사항을 충족하도록 설계된 **100% 폐쇄망(Air-Gapped) 전용 어플라이언스**입니다.
 
 ## 2. 7대 핵심 보안 제어 표준 (Security Controls)
 1. **Zero External Egress (망분리 완전 자립)**:
@@ -11,7 +11,7 @@ AI Orchestrator는 금융, 공공, 대기업의 엄격한 보안 요구사항을
 3. **최소 권한 원칙 (Non-Root Containers)**:
    - 백엔드(FastAPI) 및 프론트엔드(Nginx) 컨테이너는 격리된 비루트(`appuser`, UID 10001) 권한으로 구동됩니다.
 4. **암호화 자격 증명 관리**:
-   - 가상 API 키(`sk-orch-*`)는 DB에 Argon2id 단방향 솔트 해시 알고리즘으로 저장되어 평문 유출이 불가능합니다.
+   - 가상 API 키(`sk-ord-*`)는 DB에 Argon2id 단방향 솔트 해시 알고리즘으로 저장되어 평문 유출이 불가능합니다.
 5. **PII 실시간 마스킹 (Presidio)**:
    - 주민등록번호, 신용카드, 이메일, 전화번호 등 민감 개인정보는 L7 게이트웨이 유입 즉시 마스킹 처리됩니다.
 6. **WORM (Write Once, Read Many) 불변 감사 로그**:

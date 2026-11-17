@@ -1,7 +1,7 @@
 # Ubuntu 24.04 LTS Vagrant 오프라인 어플라이언스 단일 번들 설치 검증 보고서 (PRE_43)
 
 ## 1. 개요 및 목적
-본 문서는 Rocky Linux 9 검증(PRE_41) 완료 후, **Ubuntu 24.04 LTS (Noble Numbat)** 가상 머신 환경에서 `dist/` 디렉터리의 최신 오프라인 압축 번들(`aiorche-appliance-v1.0.0.tar.gz`)을 통한 원클릭 무인 설치 및 `make up` 스탠드얼론 기동 검증 결과를 기록합니다.
+본 문서는 Rocky Linux 9 검증(PRE_41) 완료 후, **Ubuntu 24.04 LTS (Noble Numbat)** 가상 머신 환경에서 `dist/` 디렉터리의 최신 오프라인 압축 번들(`ordinatio-appliance-v1.0.0.tar.gz`)을 통한 원클릭 무인 설치 및 `make up` 스탠드얼론 기동 검증 결과를 기록합니다.
 
 이전 테스트에서 식별되었던 **백엔드 포트 바인딩(`0.0.0.0:8000`) 및 프론트엔드 동일 오리진 프록시(`/api/v1`)** 패치가 반영된 최신 번들을 기반으로 실증 검증을 수행하였습니다.
 
@@ -25,8 +25,8 @@
 
 ## 3. 배포 아티팩트 및 최신 패치 내역
 
-- **배포 아카이브**: `aiorche/dist/aiorche-appliance-v1.0.0.tar.gz` (384MB)
-- **무결성 체크섬**: `aiorche/dist/aiorche-appliance-v1.0.0.tar.gz.sha256`
+- **배포 아카이브**: `ordinatio/dist/ordinatio-appliance-v1.0.0.tar.gz` (384MB)
+- **무결성 체크섬**: `ordinatio/dist/ordinatio-appliance-v1.0.0.tar.gz.sha256`
 - **반영된 주요 패치**:
   1. `docker-compose.yml`: 백엔드 포트 바인딩을 `0.0.0.0:8000:8000`으로 개방하여 가상머신 외부(호스트 브라우저) 통신 보장
   2. `client.js`: 프로덕션 빌드 시 상대 경로 `/api/v1` 프록시를 자동 사용하여 포트/CORS 이슈 원천 차단
@@ -38,36 +38,36 @@
 
 ### 4.1. SHA-256 무결성 검증
 ```bash
-==> 번들 발견: /opt/aiorche-src/오케스트레이터/aiorche/dist/aiorche-appliance-v1.0.0.tar.gz
+==> 번들 발견: /opt/ordinatio-src/오케스트레이터/ordinatio/dist/ordinatio-appliance-v1.0.0.tar.gz
 ==> SHA-256 무결성 검증 수행...
-aiorche-appliance-v1.0.0.tar.gz: OK
+ordinatio-appliance-v1.0.0.tar.gz: OK
 ✅ SHA-256 무결성 검증 성공!
 ```
 
 ### 4.2. 아카이브 압축 해제 및 `make up` 구동
 ```text
 ==> Loading packaged offline Docker images...
-Loaded image: aiorche-backend:prod
-Loaded image: aiorche-frontend:prod
+Loaded image: ordinatio-backend:prod
+Loaded image: ordinatio-frontend:prod
 Loaded image: postgres:15-alpine
 Loaded image: redis:7-alpine
 Loaded image: envoyproxy/envoy:v1.31.2
 ==> Generating production .env with secure random secrets...
-==> Starting AI Orchestrator Appliance Stack...
- Container aiorche-postgres  Creating
- Container aiorche-redis  Creating
- Container aiorche-backend  Creating
- Container aiorche-frontend  Creating
- Container aiorche-envoy  Creating
+==> Starting Ordinatio Appliance Stack...
+ Container ordinatio-postgres  Creating
+ Container ordinatio-redis  Creating
+ Container ordinatio-backend  Creating
+ Container ordinatio-frontend  Creating
+ Container ordinatio-envoy  Creating
 ==> Waiting for 5 appliance services to achieve healthy state...
-  • Checking aiorche-postgres...  [HEALTHY]
-  • Checking aiorche-redis...     [HEALTHY]
-  • Checking aiorche-backend...   [HEALTHY]
-  • Checking aiorche-envoy...     [HEALTHY]
-  • Checking aiorche-frontend...  [HEALTHY]
+  • Checking ordinatio-postgres...  [HEALTHY]
+  • Checking ordinatio-redis...     [HEALTHY]
+  • Checking ordinatio-backend...   [HEALTHY]
+  • Checking ordinatio-envoy...     [HEALTHY]
+  • Checking ordinatio-frontend...  [HEALTHY]
 
 ========================================================================
-🎉 AI Orchestrator Appliance Successfully Started! (Air-Gapped)
+🎉 Ordinatio Appliance Successfully Started! (Air-Gapped)
 ========================================================================
   • Web Console (UI)    : http://10.0.2.15:5173
   • L7 AI Gateway       : http://10.0.2.15:8080/v1
@@ -88,7 +88,7 @@ Loaded image: envoyproxy/envoy:v1.31.2
 | **Envoy L7 Gateway** | `GET http://localhost:8080/v1/models` | HTTP 200 (L7 라우팅 관문) | HTTP 200 | **PASS** |
 | **호스트 로그인 (Direct)** | `POST http://localhost:8000/api/v1/auth/login` | JWT 발급 및 `SUPER_ADMIN` 확인 | 18개 전 권한 발급 완료 | **PASS** |
 | **호스트 로그인 (Proxy)** | `POST http://localhost:5173/api/v1/auth/login` | 동일 오리진 Nginx 프록시 로그인 | 18개 전 권한 발급 완료 | **PASS** |
-| **DB 원클릭 백업** | `make backup` | `backups/aiorche_backup_*.sql` 생성 | 24KB SQL 덤프 생성 완료 | **PASS** |
+| **DB 원클릭 백업** | `make backup` | `backups/ordinatio_backup_*.sql` 생성 | 24KB SQL 덤프 생성 완료 | **PASS** |
 
 ### 5.1. 호스트 머신에서의 슈퍼관리자 인증 응답
 ```json
@@ -103,7 +103,7 @@ Loaded image: envoyproxy/envoy:v1.31.2
 ---
 
 ## 6. 결론
-1. **Ubuntu 24.04 LTS (Noble Numbat)** 환경에서도 단일 오프라인 압축 번들(`aiorche-appliance-v1.0.0.tar.gz`)이 외부 인터넷 의존성 없이 `make up`만으로 100% 정상 기동되었습니다.
+1. **Ubuntu 24.04 LTS (Noble Numbat)** 환경에서도 단일 오프라인 압축 번들(`ordinatio-appliance-v1.0.0.tar.gz`)이 외부 인터넷 의존성 없이 `make up`만으로 100% 정상 기동되었습니다.
 2. 백엔드 외부 포트 바인딩 및 프론트엔드 동일 오리진 프록시 패치로 인해, 가상머신 외부(호스트 브라우저)에서 `http://localhost:5173` 접속 시 로그인 오류 없이 즉시 대시보드로 진입 가능함을 입증하였습니다.
-3. 이로써 AI Orchestrator Standalone 어플라이언스는 **Enterprise Linux 계열(Rocky Linux 9, RHEL 9)**과 **Debian 계열(Ubuntu 24.04 LTS)** 모두에서 100% 호환성 및 무결성을 입증하였습니다.
+3. 이로써 Ordinatio Standalone 어플라이언스는 **Enterprise Linux 계열(Rocky Linux 9, RHEL 9)**과 **Debian 계열(Ubuntu 24.04 LTS)** 모두에서 100% 호환성 및 무결성을 입증하였습니다.
 

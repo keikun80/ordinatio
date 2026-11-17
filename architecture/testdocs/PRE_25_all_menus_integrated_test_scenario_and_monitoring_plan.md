@@ -1,10 +1,10 @@
 # [PRE-25] AI 오케스트레이터 전체 메뉴 활용 및 모니터링 통합 테스트 시나리오 & 계획서
 ## All-Menus Integrated Operational Test Scenario & Comprehensive Monitoring Specification
 
-**문서 번호**: AIORCHE-DOC-PRE25-TEST-SCENARIO  
+**문서 번호**: ORDINATIO-DOC-PRE25-TEST-SCENARIO  
 **작성 일자**: 2026-09-26  
 **문서 버전**: v1.0 (Phase 0 ~ Phase 5 및 시스템 프롬프트 거버넌스 전면 통합)  
-**대상 시스템**: AI Orchestrator Enterprise Appliance (100% Air-Gapped On-Premise)  
+**대상 시스템**: Ordinatio Enterprise Appliance (100% Air-Gapped On-Premise)  
 **관련 표준**: [`PRE_01_dashboard_engineering_plan.md`](./PRE_01_dashboard_engineering_plan.md), [`PRE_10_INTEGRATED_FUNCTIONAL_TEST_SPEC.md`](./PRE_10_INTEGRATED_FUNCTIONAL_TEST_SPEC.md), [`PRE_23_ui_taxonomy_and_element_specification.md`](./PRE_23_ui_taxonomy_and_element_specification.md)
 
 ---
@@ -12,7 +12,7 @@
 ## 1. 개요 및 테스트 목표 (Executive Summary & Objectives)
 
 ### 1.1 배경 및 목적
-AI Orchestrator는 폐쇄망(Air-Gapped) 온프레미스 인프라에서 구동되는 고객 자율 운영형 어플라이언스입니다.  
+Ordinatio는 폐쇄망(Air-Gapped) 온프레미스 인프라에서 구동되는 고객 자율 운영형 어플라이언스입니다.  
 본 문서는 관리자 웹 콘솔에 존재하는 **8대 핵심 메뉴(글로벌 관제 홈, 모델 & 라우팅 스튜디오, 거버넌스, 시스템 프롬프트 거버넌스, FinOps 비용 & 예산, PII 보안 & 감사 포렌식, 긴급 패치 & 자가진단, 프롬프트 스튜디오)**를 유기적으로 연결하여, 실제 금융·엔터프라이즈 업무 흐름에 맞춰 **모든 메뉴를 순차적으로 활용하고 그에 따른 인프라·보안·비용 텔레메트리를 실시간으로 종합 모니터링**하는 **통합 테스트 시나리오(End-to-End Integrated Scenario)**를 정의합니다.
 
 ### 1.2 5대 검증 불변 원칙 (5 Verification Invariants)
@@ -31,7 +31,7 @@ AI Orchestrator는 폐쇄망(Air-Gapped) 온프레미스 인프라에서 구동�
 | :---: | :--- | :---: | :--- | :--- | :--- |
 | **Menu 1** | **글로벌 관제 홈**<br>(Overview) | `SCR-OV-01` | • WebSocket 텔레메트리<br>• 실시간 5대 KPI 뷰<br>• 모델 점유율 차트 | `GET /api/v1/observability/metrics`<br>`WS /api/v1/observability/ws` | • Ingress RPS, TPS<br>• TTFT(ms), P99 Latency<br>• 5xx 에러율 (0.00%)<br>• 당월 전사 누적 지출($) |
 | **Menu 2** | **모델 & 라우팅 스튜디오**<br>(Routing Studio) | `SCR-RT-01`<br>`SCR-RT-M01`<br>`SCR-RT-M02` | • 서빙 모델 풀(Ping All)<br>• 라우트 생성/인라인 편집<br>• 테넌트 멀티셀렉트 바인딩<br>• 지능형 정책 튜닝 | `GET/POST /api/v1/models`<br>`GET/POST/PUT /api/v1/routing/routes`<br>`POST /api/v1/routing/ping-all`<br>`POST /api/v1/routing/test-call` | • 모델별 활성 헬스(Healthy/Degraded)<br>• 라우트 가중치 분할율(%)<br>• 폴백 체인 순서<br>• 경로별 지연시간 |
-| **Menu 3** | **거버넌스**<br>(Tenant & Virtual Keys) | `SCR-VK-01`<br>`SCR-VK-M01`<br>`SCR-VK-M02`<br>`SCR-VK-M03` | • 신규 부서(테넌트) 등록<br>• `sk-orch-` 가상키 발급<br>• Argon2id 1회성 시크릿 노출<br>• 키 즉시 파기 및 영구 삭제 | `GET/POST /api/v1/tenants`<br>`GET/POST /api/v1/virtual-keys`<br>`PATCH /api/v1/virtual-keys/{id}/revoke`<br>`DELETE /api/v1/virtual-keys/{id}/purge` | • 부서별 월간 예산 한도($)<br>• 활성 키 수 (Active Keys)<br>• RPM / TPM 한도 준수율<br>• 솔트 해시 무결성 |
+| **Menu 3** | **거버넌스**<br>(Tenant & Virtual Keys) | `SCR-VK-01`<br>`SCR-VK-M01`<br>`SCR-VK-M02`<br>`SCR-VK-M03` | • 신규 부서(테넌트) 등록<br>• `sk-ord-` 가상키 발급<br>• Argon2id 1회성 시크릿 노출<br>• 키 즉시 파기 및 영구 삭제 | `GET/POST /api/v1/tenants`<br>`GET/POST /api/v1/virtual-keys`<br>`PATCH /api/v1/virtual-keys/{id}/revoke`<br>`DELETE /api/v1/virtual-keys/{id}/purge` | • 부서별 월간 예산 한도($)<br>• 활성 키 수 (Active Keys)<br>• RPM / TPM 한도 준수율<br>• 솔트 해시 무결성 |
 | **Menu 4** | **시스템 프롬프트 거버넌스**<br>(System Prompts) | `SCR-SP-01`<br>`SCR-SP-M01`<br>`SCR-SP-M02` | • 다계층 바인딩 프롬프트 등록<br>• 3대 주입 모드(PREPEND/etc)<br>• L7 실시간 주입 시뮬레이터 | `GET/POST/PUT /api/v1/system-prompts`<br>`POST /api/v1/system-prompts/simulate` | • 우선순위 매칭율(Key>Route>Tenant>Global)<br>• 주입 모드별 최종 페이로드 합성 여부<br>• 활성 룰셋 수 |
 | **Menu 5** | **FinOps 비용 & 예산**<br>(FinOps & Budget) | `SCR-FO-01` | • 부서별 실시간 토큰 미터링<br>• 소수점 정밀 USD 과금<br>• 80% 경보 / 100% Hard Cap<br>• UTF-8 BOM CSV 청구서 | `GET /api/v1/finops/overview`<br>`GET /api/v1/finops/pricing`<br>`GET /api/v1/finops/invoices/export` | • 부서별 Prompt/Completion 토큰<br>• 실시간 누적 소진액($)<br>• 예산 소진율(%)<br>• Hard Cap 차단(HTTP 429) 건수 |
 | **Menu 6** | **PII 보안 & 감사 포렌식**<br>(Compliance & WORM) | `SCR-CP-01`<br>`SCR-CP-M01`<br>`SCR-CP-M02` | • 금융 PII 탐지 룰셋 CRUD<br>• MASK/HASH/BLOCK 조치<br>• Presidio 시뮬레이터<br>• WORM 불변 감사로그 검색 | `GET/POST /api/v1/compliance/rules`<br>`POST /api/v1/compliance/simulate`<br>`GET /api/v1/compliance/audit-logs`<br>`GET /api/v1/compliance/stats` | • PII 탐지율 및 마스킹 건수<br>• WORM 테이블 불변 해시(SHA-256)<br>• 마스킹 처리 레이턴시 (<2ms)<br>• 비정상 탐지 차단율 |
@@ -92,7 +92,7 @@ flowchart TD
 ---
 
 ### Step 3. 가상 API Key 발급, Argon2id 솔트 암호화 및 1회성 시크릿 노출 검증 (Menu 3: 거버넌스)
-* **목적**: 실제 백엔드 LLM 토큰을 직접 노출하지 않고 부서 전용 가상 키(`sk-orch-...`)를 발급.
+* **목적**: 실제 백엔드 LLM 토큰을 직접 노출하지 않고 부서 전용 가상 키(`sk-ord-...`)를 발급.
 * **수행 절차**:
   1. `Menu 3. 거버넌스`에서 `[+ 신규 API Key 발급]` 버튼 클릭 (`SCR-VK-M01`).
   2. 소속 부서를 `AI 자산관리 혁신팀`으로 선택하고 속도 제한(RPM/TPM) 및 PII 강제 마스킹 설정 후 발급 (`POST /api/v1/virtual-keys`).
@@ -109,8 +109,8 @@ flowchart TD
   }
   ```
 * **검증 기준 (DoD)**:
-  - 응답 본문에 단 1회 원문 키(`sk-orch-...`)가 포함되고, 데이터베이스에는 Argon2id 단방향 솔트 해시만 영속화되어야 함.
-  - 가상키 목록 조회(`GET /api/v1/virtual-keys`) 시 마스킹된 접두사(`sk-orch-WM-***`)만 반환되어야 함.
+  - 응답 본문에 단 1회 원문 키(`sk-ord-...`)가 포함되고, 데이터베이스에는 Argon2id 단방향 솔트 해시만 영속화되어야 함.
+  - 가상키 목록 조회(`GET /api/v1/virtual-keys`) 시 마스킹된 접두사(`sk-ord-WM-***`)만 반환되어야 함.
 
 ---
 
@@ -204,7 +204,7 @@ flowchart TD
 ### Step 8. Envoy L7 게이트웨이 실 인그레스 트래픽 주입 & WORM 감사 검증 (Menu 2 라우팅 & Menu 6 감사)
 * **목적**: 실제 외부 애플리케이션 환경과 동일하게 Envoy L7 Gateway(Port 8080)로 가상키 인증 및 실 프롬프트를 전송하고 WORM 감사 테이블에 불변 적재되는지 검증.
 * **수행 절차**:
-  1. Step 3에서 발급받은 원문 가상키(`sk-orch-...`)를 `Authorization: Bearer` 헤더에 탑재.
+  1. Step 3에서 발급받은 원문 가상키(`sk-ord-...`)를 `Authorization: Bearer` 헤더에 탑재.
   2. Envoy 게이트웨이 엔드포인트로 PII가 포함된 질의를 전송:
      - 호출 URL: `POST http://localhost:8080/v1/routes/wm-wealth-route` (또는 커스텀 하위 경로 `POST http://localhost:8080/v1/wm-wealth/chat/completions`)
   3. `Menu 6. PII 보안 & 감사 포렌식`에서 WORM 감사 로그 검색 (`GET /api/v1/compliance/audit-logs?tenant_id=dept-fin-wm-test`).
@@ -284,11 +284,11 @@ flowchart TD
 
 ## 6. 자동화 테스트 스크립트 실행 및 DoD (Definition of Done)
 
-본 통합 시나리오는 자동화 스크립트 [`aiorche/scripts/verify_all_menus_integration_scenario.py`](../aiorche/scripts/verify_all_menus_integration_scenario.py) 및 Makefile 타깃(`make verify-all-menus`)을 통해 운영자 및 CI/CD 환경에서 원클릭으로 검증할 수 있습니다.
+본 통합 시나리오는 자동화 스크립트 [`ordinatio/scripts/verify_all_menus_integration_scenario.py`](../ordinatio/scripts/verify_all_menus_integration_scenario.py) 및 Makefile 타깃(`make verify-all-menus`)을 통해 운영자 및 CI/CD 환경에서 원클릭으로 검증할 수 있습니다.
 
 ### 실행 명령
 ```bash
-cd aiorche
+cd ordinatio
 make verify-all-menus
 # 또는 직접 실행:
 python3 scripts/verify_all_menus_integration_scenario.py

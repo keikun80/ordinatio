@@ -1,15 +1,15 @@
 # ==============================================================================
-# AI Orchestrator Root Makefile
-# Automatically forwards all targets to aiorche/Makefile
+# Ordinatio Root Makefile
+# Automatically forwards all targets to ordinatio/Makefile
 # ==============================================================================
 
-AIORCHE_DIR := aiorche
+ORDINATIO_DIR := ordinatio
 
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:
-	@$(MAKE) --no-print-directory -C $(AIORCHE_DIR) help
+	@$(MAKE) --no-print-directory -C $(ORDINATIO_DIR) help
 
 %:
-	@$(MAKE) --no-print-directory -C $(AIORCHE_DIR) $@
+	@$(MAKE) --no-print-directory -C $(ORDINATIO_DIR) $@

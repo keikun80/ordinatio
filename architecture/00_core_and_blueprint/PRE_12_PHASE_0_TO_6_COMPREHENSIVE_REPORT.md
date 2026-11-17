@@ -1,7 +1,7 @@
-# AI Orchestrator Phase 0 ~ 6 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
+# Ordinatio Phase 0 ~ 6 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
-**문서 번호**: AIORCHE-ENG-REP-20261117  
-**대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
+**문서 번호**: ORDINATIO-ENG-REP-20261117  
+**대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
 **작성 일자**: 2026-11-17 (Phase 0~6: 시스템 프롬프트 거버넌스, 금융권 RBAC, Standalone 무인 설치기, strings.js 현지화, ALB 신뢰 프록시, 120s 타임아웃 완결)  
 **검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 102/102 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
 
@@ -9,17 +9,17 @@
 
 ## 1. 종합 요약 및 엔지니어링 개요 (Executive Summary)
 
-본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, AWS ALB/Nginx 신뢰 프록시, Read 120s/Connect 10s 타임아웃 분리, 상용 인프라 표준화 Phase C/B/A)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
+본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`ordinatio/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, AWS ALB/Nginx 신뢰 프록시, Read 120s/Connect 10s 타임아웃 분리, 상용 인프라 표준화 Phase C/B/A)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                                              AI Orchestrator 에어갭 자립형 상용 모노레포 (aiorche/)                                                                  │
+│                                                              Ordinatio 에어갭 자립형 상용 모노레포 (ordinatio/)                                                                  │
 ├─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬─────────────────────┬───────────────────────┬───────────────────┬───────────────┬───────────────┤
 │    Phase 0 (기반)   │   Phase 1 (거버넌스)│    Phase 2 (라우팅) │    Phase 3 (FinOps) │  Phase 4 (Compliance│     Phase 5 (Lifecycle)│   시스템 프롬프트 │  Auth & RBAC  │  Phase 6 (배포)│
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────┼───────────────┼───────────────┤
 │ • 100% 에어갭 아키텍│ • 테넌트 부서별 분리│ • 다중 엔진(vLLM등) │ • 1초 WebSocket 관제│ • 자체 PII 마스킹   │ • 벤더 RSA-4096 서명  │ • ROUTE/KEY 1:1   │ • Local DB(Arg│ • RHEL 9 호환 │
-│ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • 무중단 롤링 배포    │ • L7 ext_proc 변조│ • 3-Tier RBAC │ • install.sh  │
-│ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 롤백 엔진    │ • PREPEND/OVERRIDE│ • 30분 활동만료│ • aiorche-ctl │
+│ • FastAPI Clean Core│ • sk-ord- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • 무중단 롤링 배포    │ • L7 ext_proc 변조│ • 3-Tier RBAC │ • install.sh  │
+│ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 롤백 엔진    │ • PREPEND/OVERRIDE│ • 30분 활동만료│ • ordinatio-ctl │
 │ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Dynamic URL 조합기│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 Preflight 진단  │ • 위계적 우선순위 │ • 5회오류15분잠│ • Vagrant 연동 │
 │ • Docker & K8s 배포 │ • Prometheus /metric│ • Read 120s / Conn 1│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII ZIP 번들   │ • 토큰 실시간계산 │ • ALB 신뢰프록│ • strings.js  │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────┼───────────────┼───────────────┤
@@ -41,7 +41,7 @@
 | **Phase 5** | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./PRE_09_phase5_lifecycle_and_hotfix_engine.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
 | **시스템 프롬프트** | [PRE_20_phase_system_prompt_implementation_and_test_results.md](./PRE_20_phase_system_prompt_implementation_and_test_results.md) | 1:1 타깃 바인딩(ROUTE/KEY/TENANT), L7 ext_proc 인라인 주입, 토큰 계산기, 프롬프트 카탈로그 UI | `make verify-phase-system-prompt` | 78 / 78 PASS |
 | **Auth & RBAC** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 로컬 DB(PostgreSQL) Argon2id 해싱, 3-Tier RBAC, 30분 활동만료, 5회 잠금, 단일 세션, make init-admin | `make verify-auth-rbac` | 85 / 85 PASS |
-| **Phase 6: Standalone** | [PRE_32_standalone_installer_implementation_and_test_results.md](./PRE_32_standalone_installer_implementation_and_test_results.md) | RHEL 9 호환 단일 호스트 Standalone install.sh 무인 설치기, aiorche-ctl CLI 8종, Vagrant 연동, 루프백 포트 격리 | `make verify-standalone-install` | 7 / 7 PASS |
+| **Phase 6: Standalone** | [PRE_32_standalone_installer_implementation_and_test_results.md](./PRE_32_standalone_installer_implementation_and_test_results.md) | RHEL 9 호환 단일 호스트 Standalone install.sh 무인 설치기, ordinatio-ctl CLI 8종, Vagrant 연동, 루프백 포트 격리 | `make verify-standalone-install` | 7 / 7 PASS |
 | **Phase 6: 현지화** | [PRE_35_frontend_ui_strings_implementation_and_test_results.md](./PRE_35_frontend_ui_strings_implementation_and_test_results.md) | 15개 UI 컴포넌트 한글 리터럴 100% 제거, strings.js 단일 진실 공급원 전면 일원화, Vite 빌드 통과 | `npm run build` | Vite Build PASS |
 | **Phase 6: 권한/그룹 편집** | [PRE_37_user_role_and_tenant_edit_engineering_plan.md](./PRE_37_user_role_and_tenant_edit_engineering_plan.md) | 사용자 관리 ✏️ [수정] 모달, Role 및 Tenant 변경 파이프라인, HTTP PATCH 정합화, 본인 강등 방지 | `npm run build` & `pytest` | 86/86 & Vite PASS |
 | **Phase 6: 동적 Role 관리** | [PRE_38_dynamic_role_management_engineering_plan_and_test_results.md](./PRE_38_dynamic_role_management_engineering_plan_and_test_results.md) | 커스텀 Role 추가/수정/삭제 REST API, 10대 도메인 17종 세부 권한 PBAC 전 엔드포인트/UI 적용, Vite 및 테스트 통과 | `npm run build` & `pytest` | 93/93 & Vite PASS |
@@ -53,7 +53,7 @@
 
 ```bash
 # 전체 테스트 실행 명령어
-cd aiorche/backend && uv run pytest -v
+cd ordinatio/backend && uv run pytest -v
 # 결과: 102 passed, 3 warnings in 78.95s (100% PASS)
 ```
 
@@ -63,7 +63,7 @@ cd aiorche/backend && uv run pytest -v
 | | `test_health_check` | Kubernetes Liveness 프로브 (`status: UP`) 검증 | **PASSED** |
 | | `test_readiness_check` | DB 및 캐시 연결 상태 기반 Kubernetes Readiness 확인 | **PASSED** |
 | | `test_system_info` | 어플라이언스 버전 및 폐쇄망 라이선스 정보 반환 | **PASSED** |
-| | `test_virtual_key_generation_and_hashing` | `sk-orch-` 접두사 생성 및 Argon2id 솔트 해싱 무결성 | **PASSED** |
+| | `test_virtual_key_generation_and_hashing` | `sk-ord-` 접두사 생성 및 Argon2id 솔트 해싱 무결성 | **PASSED** |
 | `test_virtual_keys.py` | `test_tenant_lifecycle` | 테넌트(부서) 목록 조회 및 신규 부서 등록 라이프사이클 | **PASSED** |
 | | `test_virtual_key_creation_one_time_exposure_and_argon2_hashing` | 단 1회 평문 노출, DB 내 해시 저장, 원문 재생성 불가 검증 | **PASSED** |
 | | `test_virtual_key_listing_does_not_leak_raw_key` | 키 목록 조회 시 평문 미노출 및 prefix 마스킹 검증 | **PASSED** |

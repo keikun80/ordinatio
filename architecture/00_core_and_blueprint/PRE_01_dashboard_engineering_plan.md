@@ -87,7 +87,7 @@
 
 ### 2.1 계층별 책임 및 설계 원칙 (Clean Architecture)
 1. **Presentation Layer**:
-   - HTTP 요청 파싱 및 가상키(`Authorization: Bearer sk-orch-...`) 검증
+   - HTTP 요청 파싱 및 가상키(`Authorization: Bearer sk-ord-...`) 검증
    - 실시간 메트릭 브로드캐스트를 위한 1초 주기 WebSocket 채널(`TelemetryHub`) 관리
 2. **Application Layer**:
    - 각 유스케이스(가상키 발급/파기/수정, Envoy xDS 라우팅 배포, FinOps 과금 집계, CSV 스트리밍) 오케스트레이션 수행
@@ -255,7 +255,7 @@ CREATE TABLE patch_histories (
      - 🚧 Keycloak JWT 검증 미들웨어 작성 (`JWKS` 캐싱 및 RBAC 인가 필터) — *Keycloak 실제 연동은 미구현, 현재 Bearer Token 검증 로직으로 대체*
      - ✅ Database DDL 스크립트 작성 (`deploy/postgres/init.sql`)
      - ✅ 테넌트 및 가상 API Key CRUD REST API 구현 (`tenants.py`, `virtual_keys.py`)
-     - ✅ 가상키 발급 시 `sk-orch-` 접두사 보안 토큰 생성 및 Argon2id 단방향 솔트 해싱 저장 로직 작성
+     - ✅ 가상키 발급 시 `sk-ord-` 접두사 보안 토큰 생성 및 Argon2id 단방향 솔트 해싱 저장 로직 작성
   2. **Frontend**:
      - ✅ `VirtualKeysTab.jsx`를 실제 백엔드 REST API와 연동
      - ✅ 신규 가상키 발급 시 생성된 토큰을 단 1회 팝업으로 복사할 수 있는 클립보드 UI 구현
@@ -361,7 +361,7 @@ CREATE TABLE patch_histories (
 - **주요 작업**:
   1. 🚧 Playwright 기반 관리자 전 플로우 E2E 자동화 시나리오 구축
   2. 🚧 에어갭 환경을 위한 로컬 폰트/에셋 자체 호스팅 번들링 (`next/font/local`)
-  3. 🚧 Helm Chart 및 KOTS(Kubernetes Off-The-Shelf) 패키징: 단일 `helm install ai-orchestrator-admin ./helm` 지원
+  3. 🚧 Helm Chart 및 KOTS(Kubernetes Off-The-Shelf) 패키징: 단일 `helm install ordinatio-admin ./helm` 지원
   4. 🚧 오프라인 이미지 번들 스크립트 작성 (`save-images.sh` / `load-images.sh`)
 - **완료 정의 (DoD)**: 🚧 외부 인터넷이 차단된 클린 VM/K8s 노드에서 단일 번들 파일로 10분 내 전체 대시보드가 정상 설치 및 가동될 것.
 
@@ -405,7 +405,7 @@ CREATE TABLE patch_histories (
 
 ### 6.1 배포 산출물 디렉토리 구조 (Air-Gapped Appliance Package)
 ```
-ai-orchestrator-admin-v1.2.0-offline.tar.gz
+ordinatio-admin-v1.2.0-offline.tar.gz
 ├── images/                        # 오프라인 OCI 컨테이너 이미지 아카이브
 │   ├── orchestrator-ui-v1.2.0.tar
 │   ├── orchestrator-api-v1.2.0.tar
@@ -426,11 +426,11 @@ ai-orchestrator-admin-v1.2.0-offline.tar.gz
 ```
 
 ### 6.2 오프라인 설치 프로세스 (Customer On-Premise Flow)
-1. 고객사 폐쇄망 망연계 솔루션을 통해 `ai-orchestrator-admin-v1.2.0-offline.tar.gz` 반입
+1. 고객사 폐쇄망 망연계 솔루션을 통해 `ordinatio-admin-v1.2.0-offline.tar.gz` 반입
 2. SHA-256 무결성 검증: `sha256sum -c CHECKSUM`
 3. 사내 프라이빗 레지스트리(Harbor)에 이미지 적재: `./scripts/load-images.sh --registry harbor.customer.co.kr`
-4. Helm을 통한 원클릭 배포: `helm install ai-orchestrator ./helm -f my-values.yaml`
-5. 사내 브라우저에서 `https://ai-orchestrator.customer.co.kr` 접속 후 즉시 운영 시작
+4. Helm을 통한 원클릭 배포: `helm install ordinatio ./helm -f my-values.yaml`
+5. 사내 브라우저에서 `https://ordinatio.customer.co.kr` 접속 후 즉시 운영 시작
 
 ---
 

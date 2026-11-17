@@ -794,13 +794,13 @@
 
         <div class="alert alert-info">
           <div class="alert-title">💡 에어갭 마스터 환경 변수 템플릿</div>
-          저장소 루트에 포함된 <code>aiorche/.env.example</code> 파일을 <code>aiorche/.env</code>로 복사하여 사용합니다.
+          저장소 루트에 포함된 <code>ordinatio/.env.example</code> 파일을 <code>ordinatio/.env</code>로 복사하여 사용합니다.
         </div>
 
         <h4>1. 저장소 복제 및 디렉토리 이동</h4>
         <pre><code># 1. 저장소 클론 (사내 내부 Git 리포지토리)
 git clone https://github.com/company-repo/orchestrator.git
-cd orchestrator/aiorche</code></pre>
+cd ordinatio</code></pre>
 
         <h4>2. 마스터 환경 설정 파일(.env) 생성 및 필수 파라미터 구성</h4>
         <pre><code># 2. 템플릿 복사
@@ -1151,7 +1151,7 @@ bash scripts/verify-phase5.sh</code></pre>
             </div>
             <ul>
               <li><strong>전역 타임아웃 조절 셀렉터 (1.0s ~ 30.0s):</strong> 콘솔 상단 툴바의 타임아웃 드롭다운을 통해 헬스 프로빙 대기 제한시간을 <code>1.0s</code>, <code>2.0s</code>, <code>3.0s</code>, <code>5.0s</code>, <code>10.0s</code>, <code>30.0s</code> 단위로 즉시 조절할 수 있습니다.</li>
-              <li><strong>브라우저 자동 영속화:</strong> 선택된 타임아웃 설정은 브라우저 <code>localStorage</code>(<code>aiorche_health_check_timeout</code>)에 자동 보관되어 페이지를 새로고침하거나 재방문해도 유지됩니다.</li>
+              <li><strong>브라우저 자동 영속화:</strong> 선택된 타임아웃 설정은 브라우저 <code>localStorage</code>(<code>ordinatio_health_check_timeout</code>)에 자동 보관되어 페이지를 새로고침하거나 재방문해도 유지됩니다.</li>
               <li><strong>전체 모델 일괄 헬스체크 (Ping All):</strong> <code>[전체 헬스체크 (Ping All)]</code> 버튼을 클릭하면 등록된 모든 모델의 <code>target_endpoint</code>로 백엔드가 설정된 타임아웃 값을 쿼리 파라미터(<code>?timeout=N</code>)로 전달하여 비동기(HTTPX) 핑 요청을 동시 전송합니다.</li>
               <li><strong>엔진별 헬스 경로 자동 분기:</strong>
                 <ul>
@@ -1245,19 +1245,19 @@ bash scripts/verify-phase5.sh</code></pre>
                 <tr>
                   <td><span class="badge badge-primary">경로 기반 (Path-based)</span></td>
                   <td><code>POST http://localhost:8080/v1/routes/{route_name}</code></td>
-                  <td><code>Authorization: Bearer sk-orch-...</code></td>
+                  <td><code>Authorization: Bearer sk-ord-...</code></td>
                   <td>Envoy가 내부 백엔드로 전달하며, 라우트 이름으로 타깃 모델 풀 자동 선택</td>
                 </tr>
                 <tr>
                   <td><span class="badge badge-success">커스텀 경로 (Custom Subpath)</span></td>
                   <td><code>POST http://localhost:8080/v1/{route_path}/chat/completions</code><br>(예: <code>/v1/tech/chat/completions</code>)</td>
-                  <td><code>Authorization: Bearer sk-orch-...</code></td>
+                  <td><code>Authorization: Bearer sk-ord-...</code></td>
                   <td>OpenAI SDK 규격의 <code>/chat/completions</code> 하위 경로를 자동 해석하여 대상 업스트림 모델로 오류(404) 없이 전달</td>
                 </tr>
                 <tr>
                   <td><span class="badge badge-purple">헤더 기반 (Header-based)</span></td>
                   <td><code>POST http://localhost:8080/v1/chat/completions</code></td>
-                  <td><code>Authorization: Bearer sk-orch-...</code><br><code>x-orche-route: {route_name}</code></td>
+                  <td><code>Authorization: Bearer sk-ord-...</code><br><code>x-orche-route: {route_name}</code></td>
                   <td>OpenAI 표준 엔드포인트를 그대로 유지하면서 <code>x-orche-route</code> 헤더를 통해 라우트 지정</td>
                 </tr>
               </tbody>
@@ -1281,7 +1281,7 @@ bash scripts/verify-phase5.sh</code></pre>
           <div class="alert alert-info">
             <div class="alert-title">💻 사내 AI 클라이언트 연동 코드 예시 (cURL)</div>
             <pre style="margin-top: 0.5rem; background: #0b1120; padding: 1rem; border-radius: 6px; font-size: 0.82rem; overflow-x: auto;"><code>curl -X POST "http://localhost:8080/v1/routes/financial-advisor-v1" \
-  -H "Authorization: Bearer sk-orch-your-virtual-key" \
+  -H "Authorization: Bearer sk-ord-your-virtual-key" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
@@ -1298,7 +1298,7 @@ bash scripts/verify-phase5.sh</code></pre>
       <div id="menu-virtual-keys" class="card">
         <h3>3. 거버넌스 (부서 테넌트 & 가상 API Key 관리)</h3>
         <p>
-          사내 부서 및 조직별로 고유 테넌트(부서)를 격리 생성하고, 실제 업스트림 인증 정보를 숨기는 가상 API Key(<code>sk-orch-...</code>)를
+          사내 부서 및 조직별로 고유 테넌트(부서)를 격리 생성하고, 실제 업스트림 인증 정보를 숨기는 가상 API Key(<code>sk-ord-...</code>)를
           발급하여 슬라이딩 윈도우 RPM/TPM 속도 제한과 월간 예산 한도를 강제 집행합니다.
         </p>
 
@@ -1354,7 +1354,7 @@ bash scripts/verify-phase5.sh</code></pre>
 
           <div class="alert alert-warning">
             <div class="alert-title">🔒 보안 불변 원칙: Argon2id 단방향 솔트 해싱</div>
-            발급된 원문 API Key(<code>sk-orch-...</code>)는 모달 생성 직후 <strong>단 1회만 화면에 노출</strong>되며,
+            발급된 원문 API Key(<code>sk-ord-...</code>)는 모달 생성 직후 <strong>단 1회만 화면에 노출</strong>되며,
             데이터베이스에는 최고 수준의 단방향 솔트 해시 알고리즘인 <strong>Argon2id</strong>로 변환되어 저장됩니다. 
             운영자를 포함한 그 누구도 데이터베이스에서 원문 키를 역산할 수 없습니다.
           </div>
@@ -1720,7 +1720,7 @@ docker compose down && docker compose up -d</code></pre>
         <p><strong>원인 및 해결:</strong></p>
         <ul>
           <li><strong>404 Not Found 발생 시:</strong> 요청 경로가 올바른지 확인하십시오. 라우팅 스튜디오에서 정의된 라우트 명칭에 맞춰 <code>POST http://localhost:8080/v1/routes/{route_name}</code>, 커스텀 하위 경로 <code>POST http://localhost:8080/v1/{route_path}/chat/completions</code>(예: <code>/v1/tech/chat/completions</code>) 또는 표준 <code>POST http://localhost:8080/v1/chat/completions</code> (헤더 <code>x-orche-route: {route_name}</code>) 형식으로 요청해야 합니다.</li>
-          <li><strong>인증 헤더 누락:</strong> <code>Authorization: Bearer sk-orch-...</code> 형식의 가상 API Key 헤더가 반드시 포함되어야 합니다.</li>
+          <li><strong>인증 헤더 누락:</strong> <code>Authorization: Bearer sk-ord-...</code> 형식의 가상 API Key 헤더가 반드시 포함되어야 합니다.</li>
           <li><strong>no healthy upstream 발생 시:</strong> Docker 네트워크 환경에서 IPv4 해석을 위해 <code>envoy.yaml</code>의 <code>backend_service</code> 클러스터에 <code>dns_lookup_family: V4_ONLY</code>가 선언되어 있는지 확인하고 Envoy 컨테이너를 재기동(<code>docker compose restart envoy</code>)하십시오.</li>
         </ul>
       </div>
@@ -1755,7 +1755,7 @@ docker compose down && docker compose up -d</code></pre>
         </div>
         <p><strong>원인 및 해결:</strong></p>
         <ul>
-          <li><strong>가상 API Key 테넌트 바인딩 확인:</strong> 호출 시 사용된 <code>sk-orch-...</code> 가상키가 <strong>[메뉴 3: 거버넌스]</strong>에서 해당 부서(테넌트)에 정상 귀속되어 있는지 확인하십시오. 테넌트가 매핑되지 않은 임의의 키는 전사 공통 또는 미분류로 집계될 수 있습니다.</li>
+          <li><strong>가상 API Key 테넌트 바인딩 확인:</strong> 호출 시 사용된 <code>sk-ord-...</code> 가상키가 <strong>[메뉴 3: 거버넌스]</strong>에서 해당 부서(테넌트)에 정상 귀속되어 있는지 확인하십시오. 테넌트가 매핑되지 않은 임의의 키는 전사 공통 또는 미분류로 집계될 수 있습니다.</li>
           <li><strong>스트리밍 토큰 집계:</strong> SSE 스트리밍(<code>stream: true</code>) 응답의 경우 최종 청크에 포함된 <code>usage</code> 페이로드를 Envoy ext_proc가 파싱하여 비동기 WORM 감사 로그 및 FinOps 버퍼로 전달합니다. 요청 클라이언트에서 <code>stream_options: {"include_usage": true}</code> 옵션이 전달되는지 확인하십시오.</li>
         </ul>
       </div>

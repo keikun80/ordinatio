@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ordinatio
+
+resources:
+  - 00-namespace.yaml
+  - 01-postgres.yaml
+  - 02-redis.yaml
+  - 03-backend.yaml
+  - 04-envoy.yaml
+  - 05-frontend.yaml

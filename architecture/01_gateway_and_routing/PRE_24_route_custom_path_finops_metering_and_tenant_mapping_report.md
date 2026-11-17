@@ -39,7 +39,7 @@
 ## 3. 해결 및 구현 내역 (Implementation Details)
 
 ### 3.1 Envoy & Backend 동적 커스텀 경로 디스패처
-- **Envoy L7 인그레스 확장 ([envoy.yaml](file:///Users/jason/project/오케스트레이터/aiorche/deploy/envoy/envoy.yaml))**:
+- **Envoy L7 인그레스 확장 ([envoy.yaml](file:///Users/jason/project/오케스트레이터/ordinatio/deploy/envoy/envoy.yaml))**:
   ```yaml
   - match:
       prefix: "/v1"
@@ -47,24 +47,24 @@
       cluster: backend_service
       timeout: 120s
   ```
-- **FastAPI 동적 경로 디스패처 ([gateway.py:L634-L688](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/api/v1/endpoints/gateway.py#L634-L688))**:
+- **FastAPI 동적 경로 디스패처 ([gateway.py:L634-L688](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/gateway.py#L634-L688))**:
   - `@router.post("/{custom_path:path}")`를 추가하여 `/v1/tech` 및 `/v1/tech/chat/completions` 요청을 활성 `RoutingPolicy`의 `match_conditions['path_prefix']`와 대조 후 해당 정책으로 자동 디스패치.
 
 ### 3.2 모델 카탈로그 엔드포인트 정정
 - `model_catalogs` 테이블의 `gemma2:2b` 레코드를 `http://ollama-gemma:11434/v1/chat/completions` (엔진: `Ollama`)로 정정.
 
-### 3.3 FinOps 실시간 토큰 계량 및 비용 누적 엔진 구현 ([gateway.py](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/api/v1/endpoints/gateway.py))
+### 3.3 FinOps 실시간 토큰 계량 및 비용 누적 엔진 구현 ([gateway.py](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/gateway.py))
 - `record_token_and_cost_metering` 헬퍼 함수 구현:
   - 모델 단가(`input_price_per_1k`, `output_price_per_1k`) 기반 원화(KRW) 비용 정밀 산출.
   - 가상 API Key 및 부서(Tenant)의 누적 토큰량과 집행 예산을 단일 트랜잭션으로 원자적 커밋(`db.commit()`).
   - 요청 헤더(`x-orche-tenant`) 또는 정책 매칭 조건(`tenant_codes`)을 참조하여 진단 키 호출이라도 해당 부서의 실적으로 정확히 귀속.
   - 응답 메타데이터(`orche_metadata.finops`)에 실시간 과금 정보 주입.
 
-### 3.4 라우트 테스트벤치 헤더 주입 및 정책 바인딩 ([routing.py](file:///Users/jason/project/오케스트레이터/aiorche/backend/app/api/v1/endpoints/routing.py))
+### 3.4 라우트 테스트벤치 헤더 주입 및 정책 바인딩 ([routing.py](file:///Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/routing.py))
 - `_execute_single_test_call`에서 `method: "path"` 및 `method: "header"` 모두에 대해 정책의 `tenant_codes[0]`를 `x-orche-tenant` 헤더로 자동 주입.
 - `tech-ass` 정책의 DB `match_conditions`에 `tenant_codes: ["TECH"]` 영속화.
 
-### 3.5 프론트엔드 UI 개선 ([FinOpsTab.jsx](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/components/FinOpsTab.jsx) & [RoutingTab.jsx](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/components/RoutingTab.jsx))
+### 3.5 프론트엔드 UI 개선 ([FinOpsTab.jsx](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/components/FinOpsTab.jsx) & [RoutingTab.jsx](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/components/RoutingTab.jsx))
 - **FinOps 화면**:
   - 부서별 카드 우측 상단에 `⚡ {totalTokens} tokens` 뱃지 추가.
   - 100원 미만 소액 소비에 대해 소수점 둘째 자리 정밀 표기(`₩0.66`, `₩1.30`) 지원.
@@ -115,7 +115,7 @@ curl -X POST "http://localhost:8080/v1/tech/chat/completions" ... ➔ HTTP 200 O
 ### 4.4 회귀 테스트 및 빌드 검증
 - **백엔드 테스트 스위트 (`uv run pytest`)**: **78 passed (100% 통과)**
 - **프론트엔드 프로덕션 빌드 (`npm run build`)**: **Vite build 2.11s 완료 (0 Errors)**
-- **컨테이너 핫 리로드**: `aiorche-backend`, `aiorche-envoy`, `aiorche-frontend` 정상 가동.
+- **컨테이너 핫 리로드**: `ordinatio-backend`, `ordinatio-envoy`, `ordinatio-frontend` 정상 가동.
 
 ---
 
@@ -123,8 +123,8 @@ curl -X POST "http://localhost:8080/v1/tech/chat/completions" ... ➔ HTTP 200 O
 
 | 파일 경로 | 구분 | 주요 변경 사항 |
 | :--- | :---: | :--- |
-| `aiorche/backend/app/api/v1/endpoints/gateway.py` | Backend | FinOps 실시간 계량 누적 함수 및 `/v1/{custom_path:path}` 동적 디스패처 구현 |
-| `aiorche/backend/app/api/v1/endpoints/routing.py` | Backend | 테스트벤치 호출 시 `x-orche-tenant` 자동 주입 로직 추가 |
-| `aiorche/deploy/envoy/envoy.yaml` | Infra | `/v1` 와일드카드 프리픽스 라우팅 룰 추가 |
-| `aiorche/frontend/src/components/FinOpsTab.jsx` | Frontend | 누적 토큰량 뱃지 및 소수점 정밀 통화 포맷팅 반영 |
-| `aiorche/frontend/src/components/RoutingTab.jsx` | Frontend | 등록된 테넌트 목록 드롭다운 및 인터랙티브 뱃지 칩 선택 UI 구현 |
+| `ordinatio/backend/app/api/v1/endpoints/gateway.py` | Backend | FinOps 실시간 계량 누적 함수 및 `/v1/{custom_path:path}` 동적 디스패처 구현 |
+| `ordinatio/backend/app/api/v1/endpoints/routing.py` | Backend | 테스트벤치 호출 시 `x-orche-tenant` 자동 주입 로직 추가 |
+| `ordinatio/deploy/envoy/envoy.yaml` | Infra | `/v1` 와일드카드 프리픽스 라우팅 룰 추가 |
+| `ordinatio/frontend/src/components/FinOpsTab.jsx` | Frontend | 누적 토큰량 뱃지 및 소수점 정밀 통화 포맷팅 반영 |
+| `ordinatio/frontend/src/components/RoutingTab.jsx` | Frontend | 등록된 테넌트 목록 드롭다운 및 인터랙티브 뱃지 칩 선택 UI 구현 |

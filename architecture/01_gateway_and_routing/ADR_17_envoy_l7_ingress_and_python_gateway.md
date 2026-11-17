@@ -2,7 +2,7 @@
 
 - **상태**: 승인됨 (Accepted)
 - **일자**: 2026-11-07
-- **결정자**: AI Orchestrator 아키텍처 팀
+- **결정자**: Ordinatio 아키텍처 팀
 - **관련 문서**: [PRE_01_dashboard_engineering_plan.md](file:///Users/jason/project/오케스트레이터/architecture/PRE_01_dashboard_engineering_plan.md), [PRE_05_dynamic_routing_and_xds.md](file:///Users/jason/project/오케스트레이터/architecture/PRE_05_dynamic_routing_and_xds.md), [PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md](file:///Users/jason/project/오케스트레이터/architecture/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)
 
 ---
@@ -35,7 +35,7 @@
         │ (역방향 프록시 / 내부 초저지연 통신)
         ▼
 ┌────────────────────────────────────────────────────────┐
-│  AI Orchestrator Core Gateway (FastAPI / Python)       │
+│  Ordinatio Core Gateway (FastAPI / Python)       │
 │  1. 인지형 동적 라우팅 (Cognitive Routing & Splitter)  │
 │     - 테넌트 쿼터, 가상 키(Argon2id) 인라인 인증      │
 │     - 모델 가용성, 헬스 프로빙, 지연시간 기반 분할   │
@@ -61,7 +61,7 @@
    - 대규모 동시 연결 관리, HTTP keep-alive, 기본 버퍼링 및 네트워크 레벨 보호.
    - REST RDS v3 엔드포인트(`/api/v1/xds/v3/discovery:routes`)를 통한 무중단 라우트 리비전 동기화 지원.
 2. **FastAPI 게이트웨이 역할 (`gateway.py`)**:
-   - 가상 API Key(`sk-orch-...`) 유효성 검증 및 테넌트 하드캡(Hard Cap) 차단.
+   - 가상 API Key(`sk-ord-...`) 유효성 검증 및 테넌트 하드캡(Hard Cap) 차단.
    - 인라인 PII 검사 및 마스킹 (`pii_engine.py`).
    - 시스템 프롬프트 동적 합성 및 주입.
    - 가중치 기반 카나리 분할, 조건부 헤더 매칭, 폴백 페일오버 실행.

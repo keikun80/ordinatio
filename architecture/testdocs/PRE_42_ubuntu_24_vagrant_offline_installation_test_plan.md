@@ -1,7 +1,7 @@
 # Ubuntu 24.04 LTS Vagrant 오프라인 어플라이언스 단일 번들 설치 및 검증 계획서 (PRE_42)
 
 ## 1. 개요 및 목적
-본 계획서는 기존 Rocky Linux 9(RHEL 계열) 가상 머신 테스트 완료에 이어, **Debian/Ubuntu 계열의 최신 표준인 Ubuntu 24.04 LTS (Noble Numbat)** 가상 머신 환경에서 `dist/` 디렉터리의 오프라인 단일 번들(`aiorche-appliance-v1.0.0.tar.gz`)을 설치하고 `make up` 원클릭 구동 및 전체 서비스 정상성을 검증하기 위한 상세 실행 절차입니다.
+본 계획서는 기존 Rocky Linux 9(RHEL 계열) 가상 머신 테스트 완료에 이어, **Debian/Ubuntu 계열의 최신 표준인 Ubuntu 24.04 LTS (Noble Numbat)** 가상 머신 환경에서 `dist/` 디렉터리의 오프라인 단일 번들(`ordinatio-appliance-v1.0.0.tar.gz`)을 설치하고 `make up` 원클릭 구동 및 전체 서비스 정상성을 검증하기 위한 상세 실행 절차입니다.
 
 ---
 
@@ -46,7 +46,7 @@
 ```
 
 ### Step 1: 오프라인 배포 아카이브 재생성 (`make prod-build`)
-- 이전 턴에서 수정한 [docker-compose.yml](file:///Users/jason/project/오케스트레이터/aiorche/deploy/standalone/template/docker-compose.yml)(백엔드 0.0.0.0 포트 개방) 및 [client.js](file:///Users/jason/project/오케스트레이터/aiorche/frontend/src/api/client.js)(프로덕션 `/api/v1` 프록시)을 반영하여 `dist/aiorche-appliance-v1.0.0.tar.gz` 재빌드.
+- 이전 턴에서 수정한 [docker-compose.yml](file:///Users/jason/project/오케스트레이터/ordinatio/deploy/standalone/template/docker-compose.yml)(백엔드 0.0.0.0 포트 개방) 및 [client.js](file:///Users/jason/project/오케스트레이터/ordinatio/frontend/src/api/client.js)(프로덕션 `/api/v1` 프록시)을 반영하여 `dist/ordinatio-appliance-v1.0.0.tar.gz` 재빌드.
 - SHA-256 체크섬 재계산.
 
 ### Step 2: `Vagrantfile` 설정 업데이트
@@ -81,7 +81,7 @@
 
 ### Step 4: Ubuntu 24.04 VM 구동 및 `make up` 배포
 - `vagrant up --provider=virtualbox` 실행
-- 무결성 검증 ➔ `/opt/aiorche-appliance` 압축 해제 ➔ `make up` 원클릭 스택 가동.
+- 무결성 검증 ➔ `/opt/ordinatio-appliance` 압축 해제 ➔ `make up` 원클릭 스택 가동.
 
 ### Step 5: 종합 서비스 프로브 및 브라우저 로그인 검증
 - **프로브 1**: `make status` (5개 컨테이너 healthy 확인)

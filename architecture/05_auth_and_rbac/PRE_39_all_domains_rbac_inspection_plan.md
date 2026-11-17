@@ -1,8 +1,8 @@
-# AI Orchestrator 전 도메인(10대 도메인 · 17종 권한) RBAC/PBAC 적용 현황 정밀 검사 계획서 (PRE_39)
+# Ordinatio 전 도메인(10대 도메인 · 17종 권한) RBAC/PBAC 적용 현황 정밀 검사 계획서 (PRE_39)
 
-**문서 번호**: AIORCHE-ARCH-PRE39-20261106  
+**문서 번호**: ORDINATIO-ARCH-PRE39-20261106  
 **작성 일자**: 2026-11-06  
-**대상 범위**: `aiorche/backend` (14개 라우터 · 50+ 엔드포인트) 및 `aiorche/frontend` (사이드바/헤더/10대 도메인 전체 탭 및 인라인 컨트롤)  
+**대상 범위**: `ordinatio/backend` (14개 라우터 · 50+ 엔드포인트) 및 `ordinatio/frontend` (사이드바/헤더/10대 도메인 전체 탭 및 인라인 컨트롤)  
 **목적**: 프로젝트에 존재하는 모든 기능에 대해 역할 기반(RBAC) 및 세부 권한 기반(PBAC) 접근 통제가 백엔드 API, 테넌트 수평 격리(Tenant Scoping), 프론트엔드 메뉴 노출, 그리고 화면 내 세부 조작 버튼까지 빈틈없이 적용되어 있는지 정밀 검사하기 위한 엔지니어링 감사 계획 수립.
 
 ---
@@ -13,7 +13,7 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
-│                    AI Orchestrator 전 도메인 RBAC / PBAC 4계층 정밀 검사 체계               │
+│                    Ordinatio 전 도메인 RBAC / PBAC 4계층 정밀 검사 체계               │
 ├──────────────────┬──────────────────┬────────────────────────┬─────────────────────────────┤
 │  Axis 1: 수직 인가 │  Axis 2: 수평 격리 │  Axis 3: 메뉴/화면 접근  │  Axis 4: 인라인 조작 제어    │
 │ (Backend PBAC)   │ (Tenant Scoping) │ (Navigation Visibility)│ (Inline Row/Control Guard)  │
@@ -30,7 +30,7 @@
 
 ## 2. 10대 도메인 × 17종 권한 코드 전수 검사 매트릭스
 
-[`app/core/permissions.py`](../aiorche/backend/app/core/permissions.py)에 정의된 17개 권한 코드별 백엔드 엔드포인트 및 프론트엔드 UI 검사 대상 목록입니다.
+[`app/core/permissions.py`](../ordinatio/backend/app/core/permissions.py)에 정의된 17개 권한 코드별 백엔드 엔드포인트 및 프론트엔드 UI 검사 대상 목록입니다.
 
 | # | 도메인명 | 권한 코드 | 백엔드 검사 대상 엔드포인트 | 프론트엔드 검사 대상 컴포넌트 및 세부 컨트롤 |
 | :-: | :--- | :--- | :--- | :--- |
@@ -51,10 +51,10 @@
 
 ### Phase 1: 백엔드 API 수직 인가(Vertical PBAC) 전수 정적/동적 검사
 1. **라우터 데코레이터 전수 스캔**:
-   - `aiorche/backend/app/api/v1/endpoints/` 내 14개 파일의 모든 `@router.(get|post|put|patch|delete)` 엔드포인트 시그니처를 추출하여 `Depends(require_permission(...))` 또는 `Depends(get_current_user)` 누락 여부를 100% 대조합니다.
+   - `ordinatio/backend/app/api/v1/endpoints/` 내 14개 파일의 모든 `@router.(get|post|put|patch|delete)` 엔드포인트 시그니처를 추출하여 `Depends(require_permission(...))` 또는 `Depends(get_current_user)` 누락 여부를 100% 대조합니다.
 2. **예외(Data-Plane / Public) 엔드포인트 적정성 검증**:
    - `POST /api/v1/auth/login` (로그인 엔드포인트)
-   - `POST /api/v1/virtual-keys/validate`, `GET /api/v1/external/me`, `GET /api/v1/external/models`, `POST /api/v1/external/usage/report` (`sk-orch-*` 가상 API Key 기반 데이터 평면 연동)
+   - `POST /api/v1/virtual-keys/validate`, `GET /api/v1/external/me`, `GET /api/v1/external/models`, `POST /api/v1/external/usage/report` (`sk-ord-*` 가상 API Key 기반 데이터 평면 연동)
    - `GET /api/v1/xds/v3/discovery:routes` (Envoy 내부 컨테이너 간 xDS 폴링)
    - 위 데이터 평면/내부 엔드포인트를 제외한 **모든 제어 평면(Control Plane) API가 100% JWT + PBAC로 보호**되는지 확인합니다.
 3. **Roles 조회 API 권한 점검**:
@@ -116,14 +116,14 @@
 
 | 구분 | 파일명 | 발견된 세부 미비점 | 조치 및 재검사 결과 | 상태 |
 | :---: | :--- | :--- | :--- | :---: |
-| **Backend** | [`roles.py`](../aiorche/backend/app/api/v1/endpoints/roles.py)<br>[`deps.py`](../aiorche/backend/app/api/deps.py) | `GET /api/v1/roles`, `GET /api/v1/roles/permissions`에 인증 가드 미부착 | `Depends(require_permission("users:read"))` 적용 완료 (`deps.py`에 `roles:manage -> users:read` 및 `<domain>:write -> <domain>:read` Implied Read 반영) | ✅ **PASS** |
-| **Frontend** | [`Sidebar.jsx`](../aiorche/frontend/src/components/Sidebar.jsx)<br>[`App.jsx`](../aiorche/frontend/src/App.jsx)<br>[`Header.jsx`](../aiorche/frontend/src/components/Header.jsx)<br>[`OverviewTab.jsx`](../aiorche/frontend/src/components/OverviewTab.jsx)<br>[`AuthContext.jsx`](../aiorche/frontend/src/context/AuthContext.jsx) | `users`, `roles` 외 일반 탭들은 해당 도메인 `:read` 권한이 없어도 사이드바에 노출됨 | • `Sidebar.jsx`: 9개 메뉴 전체에 도메인별 최소 권한(`overview:read`, `routing:read`, `governance:read`, `prompts:read`, `finops:read`, `compliance:read`, `prompt_studio:execute`, `users:read`, `roles:manage`) 필터링 적용<br>• `Header.jsx`: `[긴급 보안 패치]` 버튼을 `canAccessLifecycle` 보유 시에만 노출<br>• `App.jsx`: 기본 탭(`overview`) 권한이 없는 역할(`SEC_AUDITOR` 등) 로그인 시 보유한 첫 번째 허용 탭(`virtual-keys` 등)으로 자동 전환(`useEffect`) | ✅ **PASS** |
-| **Frontend** | [`ComplianceTab.jsx`](../aiorche/frontend/src/components/ComplianceTab.jsx) | 테이블 각 행(Row)의 `[저장]`, `[삭제]`, `[운용중 토글]`, `정규식 입력창`, `임계치 슬라이더`, `조치 드롭다운`이 `!canWriteCompliance` 상태에서 활성 상태임 | 행 내부 모든 입력폼(`<input>`, `<select>`, `<input type="range">`), 상태 배지 토글, `[저장]`, `[삭제]` 버튼에 `disabled={!canWriteCompliance}` 완벽 적용 | ✅ **PASS** |
-| **Frontend** | [`SystemPromptsTab.jsx`](../aiorche/frontend/src/components/SystemPromptsTab.jsx) | 카드 우측 상단 `[운용중/비활성]` 토글 버튼(`handleToggleActive`)이 활성 상태임 | 카드 상단 토글 버튼(`sp-btn-toggle-*`) 및 하단 `[수정]`, `[삭제]` 버튼 전체에 `disabled={!canWritePrompts}` 적용 | ✅ **PASS** |
-| **Frontend** | [`FinOpsTab.jsx`](../aiorche/frontend/src/components/FinOpsTab.jsx) | 부서 카드 내 `[긴급 한도 증액 및 차단 해제]` 버튼이 활성 상태이며, 403 에러 시 로컬 state를 강제 증액하는 Fallback이 존재함 | 버튼에 `disabled={!canWriteFinops}` 적용 및 `handleEmergencyIncrease` 내 오프라인 로컬 상태 변조 Fallback 완전 제거 | ✅ **PASS** |
-| **Frontend** | [`LifecycleTab.jsx`](../aiorche/frontend/src/components/LifecycleTab.jsx) | `[샘플 벤더 패치 번들 로드]`, 드롭존 파일 업로드, `[Dry-run]`, `[무중단 롤링 배포]`, `[긴급 롤백]` 버튼에 `!canWriteLifecycle` 가드 미적용 | 패치 로드·검증·배포·롤백 관련 모든 인라인 버튼 및 파일 드롭존에 `disabled={!canWriteLifecycle}` 적용 | ✅ **PASS** |
-| **Frontend** | [`RoutingTab.jsx`](../aiorche/frontend/src/components/RoutingTab.jsx)<br>[`PromptStudioTab.jsx`](../aiorche/frontend/src/components/PromptStudioTab.jsx) | 서빙 모델 풀(Catalog) 내 개별 모델 `[+ 추가]`, `[수정]`, `[삭제]` 버튼 및 라우팅 가중치 슬라이더/숫자 입력/균등분할/제거 버튼에 가드 미적용 | • `RoutingTab.jsx`: 모델 등록/추가/수정/삭제 버튼, 가중치 슬라이더/숫자 입력, 균등분할, 모델 제거 버튼 전체에 `disabled={!canWriteRouting}` 적용<br>• `PromptStudioTab.jsx`: 프롬프트 입력창 및 `[추론 실행]` 버튼에 `disabled={!canExecuteStudio}` 적용 | ✅ **PASS** |
-| **Frontend** | [`UsersTab.jsx`](../aiorche/frontend/src/components/UsersTab.jsx) | 사용자 행(Row) 액션 버튼 및 역할 행(Row) 액션 버튼에 개별 권한 가드 미적용 | 사용자 행(`[잠금 해제]`, `[수정]`, `[비밀번호 초기화]`, `[활성/비활성]`, `[삭제]`)에 `disabled={!canWriteUsers}`, 역할 행(`[수정]`, `[삭제]`)에 `disabled={!canManageRoles}` 적용 | ✅ **PASS** |
+| **Backend** | [`roles.py`](../ordinatio/backend/app/api/v1/endpoints/roles.py)<br>[`deps.py`](../ordinatio/backend/app/api/deps.py) | `GET /api/v1/roles`, `GET /api/v1/roles/permissions`에 인증 가드 미부착 | `Depends(require_permission("users:read"))` 적용 완료 (`deps.py`에 `roles:manage -> users:read` 및 `<domain>:write -> <domain>:read` Implied Read 반영) | ✅ **PASS** |
+| **Frontend** | [`Sidebar.jsx`](../ordinatio/frontend/src/components/Sidebar.jsx)<br>[`App.jsx`](../ordinatio/frontend/src/App.jsx)<br>[`Header.jsx`](../ordinatio/frontend/src/components/Header.jsx)<br>[`OverviewTab.jsx`](../ordinatio/frontend/src/components/OverviewTab.jsx)<br>[`AuthContext.jsx`](../ordinatio/frontend/src/context/AuthContext.jsx) | `users`, `roles` 외 일반 탭들은 해당 도메인 `:read` 권한이 없어도 사이드바에 노출됨 | • `Sidebar.jsx`: 9개 메뉴 전체에 도메인별 최소 권한(`overview:read`, `routing:read`, `governance:read`, `prompts:read`, `finops:read`, `compliance:read`, `prompt_studio:execute`, `users:read`, `roles:manage`) 필터링 적용<br>• `Header.jsx`: `[긴급 보안 패치]` 버튼을 `canAccessLifecycle` 보유 시에만 노출<br>• `App.jsx`: 기본 탭(`overview`) 권한이 없는 역할(`SEC_AUDITOR` 등) 로그인 시 보유한 첫 번째 허용 탭(`virtual-keys` 등)으로 자동 전환(`useEffect`) | ✅ **PASS** |
+| **Frontend** | [`ComplianceTab.jsx`](../ordinatio/frontend/src/components/ComplianceTab.jsx) | 테이블 각 행(Row)의 `[저장]`, `[삭제]`, `[운용중 토글]`, `정규식 입력창`, `임계치 슬라이더`, `조치 드롭다운`이 `!canWriteCompliance` 상태에서 활성 상태임 | 행 내부 모든 입력폼(`<input>`, `<select>`, `<input type="range">`), 상태 배지 토글, `[저장]`, `[삭제]` 버튼에 `disabled={!canWriteCompliance}` 완벽 적용 | ✅ **PASS** |
+| **Frontend** | [`SystemPromptsTab.jsx`](../ordinatio/frontend/src/components/SystemPromptsTab.jsx) | 카드 우측 상단 `[운용중/비활성]` 토글 버튼(`handleToggleActive`)이 활성 상태임 | 카드 상단 토글 버튼(`sp-btn-toggle-*`) 및 하단 `[수정]`, `[삭제]` 버튼 전체에 `disabled={!canWritePrompts}` 적용 | ✅ **PASS** |
+| **Frontend** | [`FinOpsTab.jsx`](../ordinatio/frontend/src/components/FinOpsTab.jsx) | 부서 카드 내 `[긴급 한도 증액 및 차단 해제]` 버튼이 활성 상태이며, 403 에러 시 로컬 state를 강제 증액하는 Fallback이 존재함 | 버튼에 `disabled={!canWriteFinops}` 적용 및 `handleEmergencyIncrease` 내 오프라인 로컬 상태 변조 Fallback 완전 제거 | ✅ **PASS** |
+| **Frontend** | [`LifecycleTab.jsx`](../ordinatio/frontend/src/components/LifecycleTab.jsx) | `[샘플 벤더 패치 번들 로드]`, 드롭존 파일 업로드, `[Dry-run]`, `[무중단 롤링 배포]`, `[긴급 롤백]` 버튼에 `!canWriteLifecycle` 가드 미적용 | 패치 로드·검증·배포·롤백 관련 모든 인라인 버튼 및 파일 드롭존에 `disabled={!canWriteLifecycle}` 적용 | ✅ **PASS** |
+| **Frontend** | [`RoutingTab.jsx`](../ordinatio/frontend/src/components/RoutingTab.jsx)<br>[`PromptStudioTab.jsx`](../ordinatio/frontend/src/components/PromptStudioTab.jsx) | 서빙 모델 풀(Catalog) 내 개별 모델 `[+ 추가]`, `[수정]`, `[삭제]` 버튼 및 라우팅 가중치 슬라이더/숫자 입력/균등분할/제거 버튼에 가드 미적용 | • `RoutingTab.jsx`: 모델 등록/추가/수정/삭제 버튼, 가중치 슬라이더/숫자 입력, 균등분할, 모델 제거 버튼 전체에 `disabled={!canWriteRouting}` 적용<br>• `PromptStudioTab.jsx`: 프롬프트 입력창 및 `[추론 실행]` 버튼에 `disabled={!canExecuteStudio}` 적용 | ✅ **PASS** |
+| **Frontend** | [`UsersTab.jsx`](../ordinatio/frontend/src/components/UsersTab.jsx) | 사용자 행(Row) 액션 버튼 및 역할 행(Row) 액션 버튼에 개별 권한 가드 미적용 | 사용자 행(`[잠금 해제]`, `[수정]`, `[비밀번호 초기화]`, `[활성/비활성]`, `[삭제]`)에 `disabled={!canWriteUsers}`, 역할 행(`[수정]`, `[삭제]`)에 `disabled={!canManageRoles}` 적용 | ✅ **PASS** |
 
 ---
 
@@ -135,7 +135,7 @@
      - `GLOBAL_READER` (전 도메인 `:read`): 전 도메인 조회 `200 OK`, 전 도메인 변경(`POST /models`, `POST /virtual-keys`, `POST /system-prompts`, `POST /compliance/rules`, `PATCH /external/tenants/{id}/budget`) `403 Forbidden` 완벽 차단 검증.
    - 전체 백엔드 테스트 스위트: **93 passed in pytest (100% PASS)**.
 2. **프론트엔드 프로덕션 빌드 및 컨테이너 동기화 검증**:
-   - `npm --prefix aiorche/frontend run build`: 문법/번들링 오류 0건 (`dist/` 빌드 성공).
-   - `aiorche-backend` 및 `aiorche-frontend` 컨테이너에 최신 코드 반영 및 재기동 완료.
+   - `npm --prefix ordinatio/frontend run build`: 문법/번들링 오류 0건 (`dist/` 빌드 성공).
+   - `ordinatio-backend` 및 `ordinatio-frontend` 컨테이너에 최신 코드 반영 및 재기동 완료.
 
 

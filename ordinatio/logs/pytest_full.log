@@ -1,0 +1,161 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.12, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/jason/project/오케스트레이터/ordinatio/backend
+configfile: pyproject.toml
+testpaths: tests
+plugins: asyncio-1.4.0, anyio-4.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 86 items
+
+tests/test_agent_router.py ...........                                   [ 12%]
+tests/test_auth_rbac.py .......                                          [ 20%]
+tests/test_compliance.py ........                                        [ 30%]
+tests/test_external_api.py ....                                          [ 34%]
+tests/test_finops_observability.py .......                               [ 43%]
+tests/test_gateway_security_p0.py ......                                 [ 50%]
+tests/test_health.py .....                                               [ 55%]
+tests/test_lifecycle.py ........                                         [ 65%]
+tests/test_phase1_system_prompt_schema.py ....                           [ 69%]
+tests/test_phase3_prompt_injection.py ...                                [ 73%]
+tests/test_routing.py ...........                                        [ 86%]
+tests/test_system_prompts.py .....                                       [ 91%]
+tests/test_virtual_keys.py .......                                       [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+.venv/lib/python3.12/site-packages/passlib/handlers/argon2.py:716
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/passlib/handlers/argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for argon2-cffi's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+tests/test_auth_rbac.py: 36 warnings
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/sqlalchemy/sql/schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+tests/test_auth_rbac.py: 13 warnings
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/auth.py:55: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_auth_rbac.py::test_login_success_and_me
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_inactivity_timeout_30m
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/security.py:59: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+tests/test_auth_rbac.py::test_login_success_and_me
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_inactivity_timeout_30m
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/security.py:68: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "iat": datetime.utcnow()
+
+tests/test_auth_rbac.py::test_login_success_and_me
+tests/test_auth_rbac.py::test_login_success_and_me
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_inactivity_timeout_30m
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/auth.py:28: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_auth_rbac.py::test_login_success_and_me
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_single_active_session_enforcement
+tests/test_auth_rbac.py::test_inactivity_timeout_30m
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/deps.py:75: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_auth_rbac.py::test_inactivity_timeout_30m
+  /Users/jason/project/오케스트레이터/ordinatio/backend/tests/test_auth_rbac.py:214: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    session.last_activity_at = datetime.utcnow() - timedelta(minutes=31)
+
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+tests/test_auth_rbac.py::test_rbac_super_admin_vs_tenant_admin
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/users.py:23: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_finops_observability.py::test_observability_metrics_summary
+tests/test_finops_observability.py::test_finops_overview_and_pricing
+tests/test_finops_observability.py::test_remote_endpoint_metrics_and_na_fallback
+tests/test_lifecycle.py::test_rsa_signature_verification_success
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/.venv/lib/python3.12/site-packages/pydantic/main.py:263: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_finops_observability.py::test_finops_overview_and_pricing
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/finops.py:82: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    day_of_month = datetime.utcnow().day
+
+tests/test_finops_observability.py::test_finops_csv_invoice_export
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/api/v1/endpoints/finops.py:159: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    response.headers["X-Export-Timestamp"] = datetime.utcnow().isoformat()
+
+tests/test_lifecycle.py::test_rolling_hotfix_apply_and_history_persistence
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/patch_engine.py:179: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "applied_at": datetime.utcnow()
+
+tests/test_lifecycle.py::test_rollback_lifecycle_and_version_restoration
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/patch_engine.py:207: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "rolled_back_at": datetime.utcnow()
+
+tests/test_lifecycle.py::test_preflight_diagnostics
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/patch_engine.py:215: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow(),
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:29: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp_str = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:31: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    bundle_filename = f"zero-pii-support-bundle-{datetime.utcnow().strftime('%Y%m%d')}.zip"
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:37: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "generated_at": datetime.utcnow().isoformat() + "Z",
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:84: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    f"[{datetime.utcnow().isoformat()}] INFO  ordinatio.system: System preflight completed. All probes UP.\n"
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:85: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    f"[{datetime.utcnow().isoformat()}] INFO  ordinatio.xds: RouteConfiguration revision 4 pushed to Envoy.\n"
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:86: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    f"[{datetime.utcnow().isoformat()}] WARN  ordinatio.ext_proc: Memory spike detected in ext_proc (CVE-2026-0812 warning).\n"
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:87: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    f"[{datetime.utcnow().isoformat()}] INFO  ordinatio.compliance: PII detection executed on session [ID: MASKED_SESSION]. Actions: MASK(1).\n"
+
+tests/test_lifecycle.py::test_zero_pii_support_bundle_zip_generation_and_download
+  /Users/jason/project/오케스트레이터/ordinatio/backend/app/core/support_bundle.py:88: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    f"[{datetime.utcnow().isoformat()}] INFO  ordinatio.finops: Aggregated hourly usage. Zero over-budget events.\n"
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 86 passed, 104 warnings in 60.46s (0:01:00) ==================

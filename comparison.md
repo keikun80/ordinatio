@@ -1,6 +1,6 @@
 # AI Gateway & Orchestrator 솔루션 기술 비교 분석서 (Comparison Analysis)
 
-본 문서는 고객 자율 운영형 폐쇄망 어플라이언스인 **AI Orchestrator (`aiorche`)**와 글로벌 시장의 대표적인 AI 게이트웨이 솔루션인 **LiteLLM**, **Kong AI Gateway**, **Envoy AI Gateway**의 아키텍처, 성능, 보안, 거버넌스 및 운영 모델을 다차원 기술 관점에서 비교 분석한 공식 문서입니다.
+본 문서는 고객 자율 운영형 폐쇄망 어플라이언스인 **Ordinatio (`ordinatio`)**와 글로벌 시장의 대표적인 AI 게이트웨이 솔루션인 **LiteLLM**, **Kong AI Gateway**, **Envoy AI Gateway**의 아키텍처, 성능, 보안, 거버넌스 및 운영 모델을 다차원 기술 관점에서 비교 분석한 공식 문서입니다.
 
 상세 문서는 [`architecture/PRE_00_comparison.md`](./architecture/PRE_00_comparison.md)에도 동일하게 유지 관리됩니다.
 
@@ -8,7 +8,7 @@
 
 ## 1. 종합 기술 비교 매트릭스 (Comprehensive Comparison Matrix)
 
-| 비교 영역 | 세부 항목 | **AI Orchestrator (본 프로젝트)** | **LiteLLM (Proxy)** | **Kong AI Gateway** | **Envoy AI Gateway** |
+| 비교 영역 | 세부 항목 | **Ordinatio (본 프로젝트)** | **LiteLLM (Proxy)** | **Kong AI Gateway** | **Envoy AI Gateway** |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **기본 정보** | **솔루션 성격** | **온프레미스 폐쇄망 AI 통합 어플라이언스** | 개발자 중심 경량 멀티 LLM SDK/프록시 | 범용 API Gateway + AI Proxy 플러그인 | 클라우드 네이티브 L7 인프라 프록시 |
 | | **라이선스/운영 주체** | **고객사 100% 자율 운영 (Air-Gapped)** | 오픈소스 (Apache 2.0) + 엔터프라이즈 | 오픈소스 + Kong Enterprise (유료) | 오픈소스 (Apache 2.0, CNCF 프로젝트) |
@@ -38,7 +38,7 @@
 
 ## 2. 솔루션별 아키텍처 비교 및 장단점 분석
 
-### 1. AI Orchestrator (`aiorche`) - 본 프로젝트
+### 1. Ordinatio (`ordinatio`) - 본 프로젝트
 - **장점**:
   1. **폐쇄망 엔터프라이즈 완결성**: 네트워크 게이트웨이, 지능형 라우터, 키 거버넌스, PII 마스킹, FinOps 예산 하드캡, 7대 웹 UI가 하나의 독립 패키지로 결합되어 추가 컴포넌트 없이 설치 즉시 운영 가능.
   2. **극대화된 성능과 지능의 결합**: 데이터 플레인은 C++ Envoy로 처리하여 초저지연을 달성하고, 라우팅 제어는 Python AgentRouter로 인텐트를 실시간 분류하여 GPU 컴퓨팅 비용을 최대 60% 절감.
@@ -88,7 +88,7 @@
 └────────────────────────────────────────────────────────────────────────┘
   │
   ├─▶ 1. 금융/공공 폐쇄망 온프레미스 + 완벽한 거버넌스 + GUI 필요
-  │      └─▶ [추천: AI Orchestrator] 
+  │      └─▶ [추천: Ordinatio] 
   │          - 100% 에어갭 자립성, Envoy L7 성능, AgentRouter 인텐트 분기,
   │            테넌트 예산 하드캡, WORM 감사로그, 7대 웹 콘솔 일체형 제공.
   │
@@ -109,7 +109,7 @@
 
 ## 4. 종합 평가 요약
 
-| 평가 지표 | **AI Orchestrator** | **LiteLLM** | **Kong AI Gateway** | **Envoy AI Gateway** |
+| 평가 지표 | **Ordinatio** | **LiteLLM** | **Kong AI Gateway** | **Envoy AI Gateway** |
 | :--- | :---: | :---: | :---: | :---: |
 | **처리 성능 (TTFT / Throughput)** | ★★★★★ | ★★★☆☆ | ★★★★☆ | ★★★★★ |
 | **폐쇄망 자립성 (Air-Gap Readiness)** | ★★★★★ | ★★★☆☆ | ★★★☆☆ | ★★★★☆ |

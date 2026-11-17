@@ -1238,7 +1238,7 @@
         </h1>
 
         <p class="lead">
-          <strong>AI Orchestrator (`aiorche`)</strong>는 전자금융감독규정 및 개인정보보호법 망분리 규제를 100% 충족하며,
+          <strong>Ordinatio (`ordinatio`)</strong>는 전자금융감독규정 및 개인정보보호법 망분리 규제를 100% 충족하며,
           고객사 전용 인프라(On-Prem / Private VPC)에 완전 독립 설치되는 <strong>자율 운영형 에어갭 어플라이언스</strong>입니다.
           C++ Envoy 기반 초저지연 프록시와 프롬프트 인텐트 인지 라우팅을 결합하여
           <strong>GPU 인프라 비용을 최대 60% 절감</strong>하고 전사 AI 거버넌스를 완성합니다.
@@ -1338,7 +1338,7 @@
               인가되지 않은 고비용 모델을 임의 호출하거나 사내 권한 통제가 전무합니다.
             </p>
             <div class="pain-resolution">
-              <strong>해결책:</strong> 원천 Key 격리 + `sk-orch-` 가상 API Key 발급 + Argon2id 단방향 솔트 해싱 + 키별 허용 모델 화이트리스트(`allowed_models`) 강제.
+              <strong>해결책:</strong> 원천 Key 격리 + `sk-ord-` 가상 API Key 발급 + Argon2id 단방향 솔트 해싱 + 키별 허용 모델 화이트리스트(`allowed_models`) 강제.
             </div>
           </div>
 
@@ -1638,7 +1638,7 @@
                 <h3>가상 API Key & 테넌트 격리 거버넌스</h3>
                 <p>
                   개발자에게 원천 모델 API 키를 일절 노출하지 않습니다.
-                  자체 `sk-orch-` 가상 API Key를 발급하고, DB 저장 시 최고 수준의
+                  자체 `sk-ord-` 가상 API Key를 발급하고, DB 저장 시 최고 수준의
                   암호화 표준인 Argon2id 솔트 단방향 해싱을 적용하여 내부 DB가 유출되어도 복호화가 불가능합니다.
                 </p>
                 <ul class="feature-bullet-list">
@@ -1656,7 +1656,7 @@
                   </li>
                 </ul>
                 <div class="feature-tech-pill-wrap">
-                  <span class="tech-pill">sk-orch- Standard</span>
+                  <span class="tech-pill">sk-ord- Standard</span>
                   <span class="tech-pill">Argon2id Hashing</span>
                   <span class="tech-pill">Tenant Isolation</span>
                   <span class="tech-pill">Model ACL Whitelist</span>

@@ -1,12 +1,12 @@
 # AI Gateway & Orchestrator 솔루션 기술 비교 분석서 (Comparison Analysis)
 
-본 문서는 고객 자율 운영형 폐쇄망 어플라이언스인 **AI Orchestrator (`aiorche`)**와 글로벌 시장의 대표적인 AI 게이트웨이 솔루션인 **LiteLLM**, **Kong AI Gateway**, **Envoy AI Gateway**의 아키텍처, 성능, 보안, 거버넌스 및 운영 모델을 다차원 기술 관점에서 비교 분석한 공식 문서입니다.
+본 문서는 고객 자율 운영형 폐쇄망 어플라이언스인 **Ordinatio (`ordinatio`)**와 글로벌 시장의 대표적인 AI 게이트웨이 솔루션인 **LiteLLM**, **Kong AI Gateway**, **Envoy AI Gateway**의 아키텍처, 성능, 보안, 거버넌스 및 운영 모델을 다차원 기술 관점에서 비교 분석한 공식 문서입니다.
 
 ---
 
 ## 1. 종합 기술 비교 매트릭스 (Comprehensive Comparison Matrix)
 
-| 비교 영역 | 세부 항목 | **AI Orchestrator (본 프로젝트)** | **LiteLLM (Proxy)** | **Kong AI Gateway** | **Envoy AI Gateway** |
+| 비교 영역 | 세부 항목 | **Ordinatio (본 프로젝트)** | **LiteLLM (Proxy)** | **Kong AI Gateway** | **Envoy AI Gateway** |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **기본 정보** | **솔루션 성격** | **온프레미스 폐쇄망 AI 통합 어플라이언스** | 개발자 중심 경량 멀티 LLM SDK/프록시 | 범용 API Gateway + AI Proxy 플러그인 | 클라우드 네이티브 L7 인프라 프록시 |
 | | **라이선스/운영 주체** | **고객사 100% 자율 운영 (Air-Gapped)** | 오픈소스 (Apache 2.0) + 엔터프라이즈 | 오픈소스 + Kong Enterprise (유료) | 오픈소스 (Apache 2.0, CNCF 프로젝트) |
@@ -36,9 +36,9 @@
 
 ## 2. 솔루션별 아키텍처 비교 및 장단점 분석
 
-### 1. AI Orchestrator (`aiorche`) - 본 프로젝트
+### 1. Ordinatio (`ordinatio`) - 본 프로젝트
 ```
-[클라이언트 요청: sk-orch-***]
+[클라이언트 요청: sk-ord-***]
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -113,7 +113,7 @@
 └────────────────────────────────────────────────────────────────────────┘
   │
   ├─▶ 1. 금융/공공 폐쇄망 온프레미스 + 완벽한 거버넌스 + GUI 필요
-  │      └─▶ [추천: AI Orchestrator] 
+  │      └─▶ [추천: Ordinatio] 
   │          - 100% 에어갭 자립성, Envoy L7 성능, AgentRouter 인텐트 분기,
   │            테넌트 예산 하드캡, WORM 감사로그, 7대 웹 콘솔 일체형 제공.
   │
@@ -134,7 +134,7 @@
 
 ## 4. 결론 요약
 
-| 지표 | **AI Orchestrator** | **LiteLLM** | **Kong AI Gateway** | **Envoy AI Gateway** |
+| 지표 | **Ordinatio** | **LiteLLM** | **Kong AI Gateway** | **Envoy AI Gateway** |
 | :--- | :---: | :---: | :---: | :---: |
 | **성능 (Throughput/TTFT)** | ★★★★★ | ★★★☆☆ | ★★★★☆ | ★★★★★ |
 | **폐쇄망 자립성 (Air-Gap)** | ★★★★★ | ★★★☆☆ | ★★★☆☆ | ★★★★☆ |
@@ -145,4 +145,4 @@
 | **운영 용이성 (All-in-One)** | ★★★★★ | ★★★★☆ | ★★★☆☆ | ★★☆☆☆ |
 
 > **요약 결론**:  
-> 본 프로젝트인 **AI Orchestrator**는 **Envoy AI Gateway의 C++ 초고성능 데이터 플레인**을 하부 엔진으로 채택하면서, 그 위에 **AgentRouter 인지 라우팅 엔진, Argon2id 가상키 거버넌스, 원화(₩) 기준 FinOps 예산 하드캡, 금융권 수준의 WORM PII 감사 로그, 그리고 7대 통합 웹 콘솔**을 유기적으로 결합하여, **고객사 인프라에 100% 자율 운영되는 완성형 엔터프라이즈 폐쇄망 어플라이언스**를 구현하였습니다.
+> 본 프로젝트인 **Ordinatio**는 **Envoy AI Gateway의 C++ 초고성능 데이터 플레인**을 하부 엔진으로 채택하면서, 그 위에 **AgentRouter 인지 라우팅 엔진, Argon2id 가상키 거버넌스, 원화(₩) 기준 FinOps 예산 하드캡, 금융권 수준의 WORM PII 감사 로그, 그리고 7대 통합 웹 콘솔**을 유기적으로 결합하여, **고객사 인프라에 100% 자율 운영되는 완성형 엔터프라이즈 폐쇄망 어플라이언스**를 구현하였습니다.

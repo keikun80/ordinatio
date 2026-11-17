@@ -1,15 +1,15 @@
 # AI Orchestrator Phase 0 ~ 6 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
-**문서 번호**: AIORCHE-ENG-REP-20261106  
+**문서 번호**: AIORCHE-ENG-REP-20261117  
 **대상 시스템**: AI Orchestrator Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-11-06 (Phase 0~6: 시스템 프롬프트 거버넌스, 금융권 RBAC, Standalone 무인 설치기, strings.js 현지화 완결)  
-**검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 94/94 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
+**작성 일자**: 2026-11-17 (Phase 0~6: 시스템 프롬프트 거버넌스, 금융권 RBAC, Standalone 무인 설치기, strings.js 현지화, ALB 신뢰 프록시, 120s 타임아웃 완결)  
+**검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 102/102 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
 
 ---
 
 ## 1. 종합 요약 및 엔지니어링 개요 (Executive Summary)
 
-본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, 상용 인프라 표준화 Phase C/B/A)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
+본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`aiorche/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, AWS ALB/Nginx 신뢰 프록시, Read 120s/Connect 10s 타임아웃 분리, 상용 인프라 표준화 Phase C/B/A)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -21,9 +21,9 @@
 │ • FastAPI Clean Core│ • sk-orch- Argon2id │ • Envoy L7 엔드포인트│ • 토큰 단위 표준과금│ • MASK/HASH/BLOCK   │ • 무중단 롤링 배포    │ • L7 ext_proc 변조│ • 3-Tier RBAC │ • install.sh  │
 │ • React 18 + Vite   │ • 가상키 수명주기   │ • 6종 Provider 규격 │ • Hard Cap 100% 차단│ • 룰 동적 등록/삭제 │ • 원클릭 롤백 엔진    │ • PREPEND/OVERRIDE│ • 30분 활동만료│ • aiorche-ctl │
 │ • 5대 인프라 자가진단│ • 외부 연동 REST 4종│ • Dynamic URL 조합기│ • UTF-8 BOM CSV     │ • WORM 불변 감사로그│ • 5대 Preflight 진단  │ • 위계적 우선순위 │ • 5회오류15분잠│ • Vagrant 연동 │
-│ • Docker & K8s 배포 │ • Prometheus /metric│ • 수동 타임아웃 조절│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII ZIP 번들   │ • 토큰 실시간계산 │ • make init-ad│ • strings.js  │
+│ • Docker & K8s 배포 │ • Prometheus /metric│ • Read 120s / Conn 1│ • 4종 FinOps 통계   │ • 포렌식 JSON 리포트│ • Zero-PII ZIP 번들   │ • 토큰 실시간계산 │ • ALB 신뢰프록│ • strings.js  │
 ├─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────┼───────────────────┼───────────────┼───────────────┤
-│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PASS│46/46 Tests (100% PASS)│78/78 Tests (PASS) │85/85 Tests(PASS│91/91 & 7/7 PAS│
+│ 5/5 Tests (100% PASS│15/15 Tests (100% PAS│23/23 Tests (100%)   │26/26 Tests (100% PAS│35/35 Tests (100% PASS│46/46 Tests (100% PASS)│78/78 Tests (PASS) │85/85 Tests(PAS│102/102 & 7/7 P│
 └─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴─────────────────────┴───────────────────────┴───────────────────┴───────────────┴───────────────┘
 ```
 
@@ -31,15 +31,13 @@
 
 ## 2. 단계별 세부 계획 및 테스트 보고서 아카이브
 
-각 단계별 상세 엔지니어링 설계서 및 개별 테스트 결과 보고서는 아래 파일에 영구 보존되어 있습니다.
-
 | 단계 | 문서 파일 링크 | 세부 범위 | 검증 스크립트 | 단위/통합 테스트 |
 | :--- | :--- | :--- | :--- | :---: |
 | **Phase 0** | [PRE_02_phase0_foundations_and_ai_gateway.md](./PRE_02_phase0_foundations_and_ai_gateway.md) | 공통 아키텍처, 디렉토리 구조, Liveness/Readiness 프로브, 시스템 자가진단, 무결성 번들 | `make verify-phase0` | 5 / 5 PASS |
 | **Phase 1** | [PRE_03_phase1_tenant_and_virtual_keys.md](./PRE_03_phase1_tenant_and_virtual_keys.md) | 멀티 테넌트 메타데이터, 가상키 발급/파기/수정, 1회성 시크릿 모달, 외부 API 4종 | `make verify-phase1` | 15 / 15 PASS |
-| **Phase 2** | [PRE_05_phase2_dynamic_routing_and_xds.md](./PRE_05_phase2_dynamic_routing_and_xds.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙 & 타임아웃 수동 조절(1.0s~30.0s), 6종 Provider 규격화, Envoy L7 엔드포인트/RDS, N-Way 분할 | `make verify-phase2` | 23 / 23 PASS |
+| **Phase 2** | [PRE_05_phase2_dynamic_routing_and_xds.md](./PRE_05_phase2_dynamic_routing_and_xds.md) | 동적 모델 카탈로그(다중 엔진), 실시간 헬스 프로빙 & 타임아웃 수동 조절(1.0s~30.0s), 6종 Provider 규격화, Envoy L7 엔드포인트/RDS, N-Way 분할, Read 120s / Connect 10s 타임아웃 분리 | `make verify-phase2` | 23 / 23 PASS |
 | **Phase 3** | [PRE_07_phase3_observability_and_finops_results.md](./PRE_07_phase3_observability_and_finops_results.md) | 1초 주기 WebSocket 스트림, 표준 토큰 과금 매트릭스, Hard Cap 429 차단, UTF-8 BOM CSV, 원격 텔레메트리 스크래핑 | `make verify-phase3` | 26 / 26 PASS |
-| **Phase 4** | [PRE_08_phase4_pii_governance_and_worm_audit.md](./PRE_08_phase4_pii_governance_and_worm_audit.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력 | `make verify-phase4` | 35 / 35 PASS |
+| **Phase 4** | [PRE_08_phase4_pii_governance_and_worm_audit.md](./PRE_08_phase4_pii_governance_and_worm_audit.md) | 자체 정규식 PII 엔진, MASK/HASH/BLOCK, WORM 감사로그, 룰 인앱 안전 삭제, JSON 증적 출력, 식별 항목 자동 정규식 매핑 | `make verify-phase4` | 35 / 35 PASS |
 | **Phase 5** | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./PRE_09_phase5_lifecycle_and_hotfix_engine.md) | 벤더 RSA-4096 서명 검증, 무중단 롤링 핫픽스, 원클릭 롤백, Preflight, Zero-PII ZIP 번들 | `make verify-phase5` | 46 / 46 PASS |
 | **시스템 프롬프트** | [PRE_20_phase_system_prompt_implementation_and_test_results.md](./PRE_20_phase_system_prompt_implementation_and_test_results.md) | 1:1 타깃 바인딩(ROUTE/KEY/TENANT), L7 ext_proc 인라인 주입, 토큰 계산기, 프롬프트 카탈로그 UI | `make verify-phase-system-prompt` | 78 / 78 PASS |
 | **Auth & RBAC** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 로컬 DB(PostgreSQL) Argon2id 해싱, 3-Tier RBAC, 30분 활동만료, 5회 잠금, 단일 세션, make init-admin | `make verify-auth-rbac` | 85 / 85 PASS |
@@ -47,15 +45,16 @@
 | **Phase 6: 현지화** | [PRE_35_frontend_ui_strings_implementation_and_test_results.md](./PRE_35_frontend_ui_strings_implementation_and_test_results.md) | 15개 UI 컴포넌트 한글 리터럴 100% 제거, strings.js 단일 진실 공급원 전면 일원화, Vite 빌드 통과 | `npm run build` | Vite Build PASS |
 | **Phase 6: 권한/그룹 편집** | [PRE_37_user_role_and_tenant_edit_engineering_plan.md](./PRE_37_user_role_and_tenant_edit_engineering_plan.md) | 사용자 관리 ✏️ [수정] 모달, Role 및 Tenant 변경 파이프라인, HTTP PATCH 정합화, 본인 강등 방지 | `npm run build` & `pytest` | 86/86 & Vite PASS |
 | **Phase 6: 동적 Role 관리** | [PRE_38_dynamic_role_management_engineering_plan_and_test_results.md](./PRE_38_dynamic_role_management_engineering_plan_and_test_results.md) | 커스텀 Role 추가/수정/삭제 REST API, 10대 도메인 17종 세부 권한 PBAC 전 엔드포인트/UI 적용, Vite 및 테스트 통과 | `npm run build` & `pytest` | 93/93 & Vite PASS |
+| **Phase 6: 보안 & 프록시** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | AWS ALB/Nginx 신뢰 프록시 헤더 검증, P0 보안 차단, Docker 브릿지 업스트림 연동 | `pytest` | **102 / 102 PASS** |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (93 / 93 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (102 / 102 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
 cd aiorche/backend && uv run pytest -v
-# 결과: 93 passed (100% PASS)
+# 결과: 102 passed, 3 warnings in 78.95s (100% PASS)
 ```
 
 | 테스트 파일 | 테스트 케이스 명칭 | 검증 목적 및 동작 내용 | 상태 |
@@ -71,6 +70,7 @@ cd aiorche/backend && uv run pytest -v
 | | `test_virtual_key_validation_and_model_authorization` | 허용 모델, CIDR 대역 일치 여부 및 L7 검증 통과 | **PASSED** |
 | | `test_virtual_key_revoke_lifecycle` | 원클릭 즉시 파기 및 파기 후 403 차단 검증 | **PASSED** |
 | | `test_virtual_key_update_lifecycle` | 키 명칭, 속도 제한(RPM/TPM), 상태 실시간 수정 및 영속화 | **PASSED** |
+| | `test_virtual_key_delete_lifecycle` | 가상키 삭제 라이프사이클 및 CASCADE 정리 검증 | **PASSED** |
 | `test_external_api.py` | `test_client_self_inspection_me_and_models` | 사내 AI 클라이언트 Bearer Token 자가 쿼터/모델 조회 | **PASSED** |
 | | `test_gateway_usage_reporting_and_cost_aggregation` | Envoy 추론 완료 보고 수신 및 토큰/비용 원자적 증가 | **PASSED** |
 | | `test_erp_tenant_budget_and_summary` | 사내 ERP 부서 월 예산 변경 및 Hard Cap 토글 | **PASSED** |
@@ -84,6 +84,8 @@ cd aiorche/backend && uv run pytest -v
 | | `test_model_serving_health_check` | 개별/전체 서빙 모델 핑 헬스체크 및 수동 타임아웃(?timeout=) 검증 | **PASSED** |
 | | `test_route_test_call_endpoint` | Envoy L7 라우팅 경로 실시간 테스트 호출 및 프록시 응답 | **PASSED** |
 | | `test_gateway_openai_chat_completions_ingress` | OpenAI 호환 게이트웨이 인그레스(`/v1/routes`, `/v1/chat/completions`) E2E | **PASSED** |
+| | `test_model_catalog_endpoint_auth_options` | 업스트림 모델 카탈로그 인증 옵션 및 Fernet 암호화 검증 | **PASSED** |
+| | `test_update_model_attributes` | 모델 메타데이터 및 서빙 속성 실시간 수정 검증 | **PASSED** |
 | `test_finops_observability.py` | `test_observability_metrics_summary` | 대시보드 관제용 실시간 지표 요약 REST API 검증 | **PASSED** |
 | | `test_observability_websocket_telemetry` | 1초 주기 WebSocket 스트림 연결, JSON 패킷 수신 및 ping-pong | **PASSED** |
 | | `test_observability_promql_proxy` | Grafana 및 커스텀 관제용 PromQL 프록시 질의 검증 | **PASSED** |
@@ -124,12 +126,24 @@ cd aiorche/backend && uv run pytest -v
 | | `test_model_authorization_restriction` | 가상키에 허용되지 않은 모델 호출 시 HTTP 403 인가 차단 | **PASSED** |
 | | `test_system_diagnostics_key_allowed_in_strict_production` | 엄격한 프로덕션 모드에서도 시스템 진단용 특수 키 통과 | **PASSED** |
 | | `test_routing_test_call_uses_system_diagnostics_key_and_succeeds` | 관리자 라우팅 스튜디오 테스트콜 시 시스템 진단 키 정상 적용 | **PASSED** |
-| `test_system_prompts.py` | `test_system_prompts_crud_and_bindings` | 시스템 프롬프트 카탈로그 CRUD 및 1:1 유연 바인딩 영속화 | **PASSED** |
-| | `test_prompt_injection_ext_proc_integration` | Envoy ext_proc 스트림 페이로드 인라인 주입 E2E 연동 | **PASSED** |
-| `test_phase1_system_prompt_schema.py` | `test_system_prompt_pydantic_schema_validation` | 시스템 프롬프트 Pydantic 스키마 유효성 및 경계값 검증 | **PASSED** |
-| | `test_prompt_resolve_schemas` | 위계적 프롬프트 해석 스키마 응답 구조 정합성 검증 | **PASSED** |
-| `test_phase3_prompt_injection.py` | `test_prompt_injector_resolution_hierarchy` | 바인딩 위계(`KEY` > `ROUTE` > `TENANT` > `GLOBAL`) 해석 검증 | **PASSED** |
-| | `test_prompt_injector_modes` | `PREPEND`, `OVERRIDE`, `FALLBACK_ONLY` 3대 주입 모드 동작 검증 | **PASSED** |
+| | `test_c1_system_diagnostics_key_not_static_and_blocked_from_external_ip` | 외부 IP에서 시스템 진단 키 스푸핑 시 즉시 차단 | **PASSED** |
+| | `test_c2_ssrf_validation_blocks_metadata_and_internal_ports` | 모델 엔드포인트 등록 시 AWS 메타데이터 및 내부 포트 SSRF 차단 | **PASSED** |
+| | `test_h1_xff_header_spoofing_prevented` | X-Forwarded-For 헤더 위조를 통한 CIDR 우회 공격 원천 차단 | **PASSED** |
+| `test_proxy_headers.py` | `test_trusted_proxy_ip_detection` | 신뢰 프록시 목록 기반 클라이언트 실제 IP 추출 검증 | **PASSED** |
+| | `test_get_client_real_ip_behind_alb` | AWS ALB 이중 프록시 환경에서 엔드 유저 실제 IP 정확 판별 | **PASSED** |
+| | `test_health_check_under_proxy_headers` | 리버스 프록시 하위에서 Liveness/Readiness 헬스체크 정합성 | **PASSED** |
+| | `test_root_endpoint_scheme_preservation` | X-Forwarded-Proto(HTTPS) 프로토콜 보존 및 리다이렉트 무결성 | **PASSED** |
+| `test_system_prompts.py` | `test_list_system_prompts` | 시스템 프롬프트 카탈로그 목록 조회 | **PASSED** |
+| | `test_create_and_delete_system_prompt` | 시스템 프롬프트 생성, 바인딩 및 안전 삭제 | **PASSED** |
+| | `test_create_system_prompt_target_id_validation` | 가상키/라우트/테넌트 대상 ID 유효성 사전 검증 | **PASSED** |
+| | `test_resolve_system_prompt_precedence_hierarchy` | 프롬프트 위계적 우선순위(`KEY` > `ROUTE` > `TENANT` > `GLOBAL`) 해석 | **PASSED** |
+| | `test_resolve_injection_modes` | `PREPEND`, `OVERRIDE`, `FALLBACK_ONLY` 주입 모드 평가 | **PASSED** |
+| `test_phase1_system_prompt_schema.py` | `test_system_prompt_table_creation_and_seed_data` | 시스템 프롬프트 DB 테이블 생성 및 시드 데이터 검증 | **PASSED** |
+| | `test_system_prompt_crud_operations` | 프롬프트 스키마 CRUD 무결성 검증 | **PASSED** |
+| | `test_system_prompt_pydantic_schema_validation` | Pydantic 스키마 유효성 및 경계값 검증 | **PASSED** |
+| | `test_prompt_resolve_schemas` | 프롬프트 해석 스키마 응답 구조 정합성 검증 | **PASSED** |
+| `test_phase3_prompt_injection.py` | `test_prompt_injector_resolution_hierarchy` | 인젝터 엔진 위계적 우선순위 합성 검증 | **PASSED** |
+| | `test_prompt_injector_modes` | 3대 주입 모드 페이로드 변조 검증 | **PASSED** |
 | | `test_ext_proc_server_injects_prompt_into_body` | ext_proc 서버가 인입 요청 본문에 프롬프트를 인라인 합성함 확인 | **PASSED** |
 | `test_auth_rbac.py` | `test_init_admin_script` | `make init-admin` CLI 스크립트를 통한 초기 슈퍼관리자 생성 검증 | **PASSED** |
 | | `test_login_success_and_me` | 올바른 자격증명 로그인, JWT 발급 및 `/auth/me` 세션 조회 | **PASSED** |
@@ -138,7 +152,7 @@ cd aiorche/backend && uv run pytest -v
 | | `test_single_active_session_enforcement` | 동일 계정 신규 로그인 시 기존 활성 세션 토큰 강제 무효화 | **PASSED** |
 | | `test_inactivity_timeout_30m` | 30분 미활동 경과 시 세션 자동 만료 및 재인증 요구 | **PASSED** |
 | | `test_rbac_super_admin_vs_tenant_admin` | 3-Tier 역할별 리소스 접근 통제 및 권한 격리 검증 | **PASSED** |
-| | `test_unauthenticated_request_strictly_blocked` | Authorization 헤더 부재 시 HTTP 401 Unauthorized 원천 차단 (A-1) | **PASSED** |
+| | `test_unauthenticated_request_strictly_blocked` | Authorization 헤더 부재 시 HTTP 401 Unauthorized 원천 차단 | **PASSED** |
 | `test_roles.py` | `test_list_roles_and_permissions` | 전체 역할 목록 조회, 권한 인벤토리 및 할당 사용자 수 집계 | **PASSED** |
 | | `test_create_and_update_custom_role` | 커스텀 Role 신규 생성, 중복/형식 검증, 표시명 및 권한 수정 | **PASSED** |
 | | `test_system_role_deletion_protection` | 시스템 기본 역할(`SUPER_ADMIN` 등) 삭제 시도 시 400 차단 | **PASSED** |
@@ -149,7 +163,7 @@ cd aiorche/backend && uv run pytest -v
 
 ---
 
-## 4. 17대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-17)
+## 4. 17대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-17 최신화)
 
 에어갭 폐쇄망 최적화 및 단일 어플라이언스 자립성을 위해 채택된 17대 아키텍처 결정(ADR) 목록입니다:
 
@@ -162,7 +176,7 @@ cd aiorche/backend && uv run pytest -v
 - **ADR-07**: K8s Deployment Rolling 갱신 대신 **단일 어플라이언스 컴포넌트 레지스트리 핫픽스 엔진** 채택.
 - **ADR-08**: 단일 vLLM HTTP 엔드포인트 가정 대신 **이종 서빙 런타임 카탈로그 & Envoy 이중 인그레스** 채택.
 - **ADR-09**: 정적 하드코딩 모델 점유율 대신 **WORM 감사 DB 집계 실데이터 점유율 산출** 채택.
-- **ADR-10**: 4초 고정 타임아웃 & 에러 마스킹 대신 **45.0초 현실적 타임아웃 & 1차 예외 즉시 리턴** 채택.
+- **ADR-10**: 조기 타임아웃(3s) & 고정 타임아웃(45s) 대신 **Connect 10.0s / Read 120.0s 분리 및 연결 오류 폴백 체인** 채택.
 - **ADR-11**: 단일 OpenAI 수동 URL 대신 **6종 Provider 규격화 & Dynamic URL 조합기** 채택.
 - **ADR-12**: 3.0초 단일 헬스체크 타임아웃 대신 **1.0s~30.0s 수동 조절 & 개별 DB 영속화** 채택.
 - **ADR-13**: 클라이언트 자체 시스템 프롬프트 의존 대신 **L7 ext_proc 동적 시스템 프롬프트 인라인 주입** 채택.
@@ -173,29 +187,6 @@ cd aiorche/backend && uv run pytest -v
 
 ---
 
-## 5. Phase C -> B -> A 상용화 고도화 및 하드닝 성과
+## 5. 결론 및 프로덕션 릴리즈 상태
 
-본 프로젝트는 프로덕션 릴리즈 품질 확보를 위해 3단계 역순 하드닝(Phase C -> Phase B -> Phase A)을 완벽히 완료하였습니다:
-
-1. **Phase C (상용 인프라 및 배포 표준화)**:
-   - `Makefile`, `README.md` 내 테스트 통과 지표 정합화 및 `make migrate` / `make migrate-rollback` 타깃 추가.
-   - 백엔드 Dockerfile 및 프론트엔드 Nginx Dockerfile 내 비루트 사용자(`appuser:appgroup`, UID 1000) 강제 적용.
-   - `docker-compose.yml` 내 `curl`/`wget` 기반 무중단 HEALTHCHECK 헬스 프로브 설정 및 `service_healthy` 의존성 체이닝.
-   - Alembic 데이터베이스 마이그레이션 프레임워크 구축 (`aiorche/backend/alembic/`).
-2. **Phase B (아키텍처 안정화 & 프론트엔드 모듈화)**:
-   - Python 3.12+ 호환성을 위해 280개에 달하던 `datetime.utcnow()` 비권장 호출을 100% `datetime.now(timezone.utc)`로 교체하여 비권장 경고 0건 달성.
-   - Envoy L7 인그레스와 Python 게이트웨이 실물 구현 정합화를 위한 `ADR-17` 공식 문서화 및 아키텍처 문서 동기화.
-   - 4,447라인에 달하던 모놀리식 `RoutingTab.jsx`를 서브탭 3종(`RoutingStudio`, `ModelCatalog`, `AgentRouterBench`), 모달 3종(`ModelFormModal`, `NewRouteModal`, `PolicyEditModal`), 상수 모듈로 분리 리팩토링.
-   - `App.jsx` 내 8대 대시보드 탭에 `React.lazy()` 및 `<Suspense>` 코드 스플리팅 적용, 초기 번들 크기 622KB -> 293KB로 53% 경량화 및 Vite 빌드 경고 완전 해소.
-3. **Phase A (보안 하드닝 & 데이터 무결성)**:
-   - `deps.py` 내 개발용 Mock 키 우회 로직(`ALLOW_DEV_MOCK_KEYS`) 전면 제거, 비인가 요청에 대해 HTTP 401 Unauthorized 원천 차단.
-   - 업스트림 모델 API Key를 Fernet 대칭키 암호화(`enc:...`)하여 PostgreSQL에 안전 저장, UI 반환 시 마스킹(`sec-...2345`), 브라우저 localStorage 저장 시 API Key 영구 배제.
-   - 서포트 번들 생성 및 다운로드 API에 `lifecycle:write` 세부 권한 강제 적용.
-   - `client.js` 내 에러 무시 Mock Fallback 블록 11개 전면 제거 및 401 세션 만료 글로벌 인터셉터 구현.
-
----
-
-## 6. 결론 및 향후 릴리즈 로드맵
-
-현재 시스템은 **Phase 0부터 Phase 6까지의 전체 필수 사양 및 Phase C/B/A 상용 하드닝이 100% 완료 및 무회귀 검증(94개 테스트 100% PASS, Standalone 7개 PASS, Vite 번들 최적화 빌드 PASS, 비권장 경고 0건)**되었으며, 단일 호스트 폐쇄망 서버에 무인으로 설치되어 고객 자율 운영이 가능한 상용급 프로덕션 레디 어플라이언스입니다.
-
+현재 시스템은 **Phase 0부터 Phase 6까지의 전체 필수 사양 및 Phase C/B/A 상용 하드닝이 100% 완료 및 무회귀 검증(102개 테스트 100% PASS, Standalone 7개 PASS, Vite 번들 최적화 빌드 PASS, 비권장 경고 0건, install.conf 외부화 및 v1.0.2 릴리즈 태깅 완료)**되었으며, 단일 호스트 폐쇄망 서버에 무인으로 설치되어 고객 자율 운영이 가능한 상용급 프로덕션 레디 어플라이언스입니다.

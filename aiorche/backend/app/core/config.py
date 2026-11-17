@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="allow")
 
     PROJECT_NAME: str = "AI Orchestrator Control Plane"
-    VERSION: str = "0.1.0"
+    VERSION: str = "1.0.2"
     API_V1_STR: str = "/api/v1"
     
     ENV: str = "development"
@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     ENVOY_INGRESS_URL: str = "http://127.0.0.1:8080"
     ENVOY_ADMIN_URL: str = "http://localhost:9901"
     ENVOY_XDS_PORT: int = 18000
+    DOCKER_BRIDGE_GATEWAY_IP: str = "172.20.0.1"
+
+    # Gateway Timeouts (Configurable via .env or install.conf)
+    GATEWAY_READ_TIMEOUT: float = 120.0
+    GATEWAY_CONNECT_TIMEOUT: float = 10.0
+    MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT: float = 3.0
 
     # Reverse Proxy & AWS ELB Configuration
     BEHIND_PROXY: bool = True

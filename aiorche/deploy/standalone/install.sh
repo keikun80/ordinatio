@@ -15,7 +15,13 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-INSTALLER_VERSION="1.0.0"
+INSTALLER_VERSION="1.0.2"
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# ------------------------------------------------------------------------------
+# Default Settings (Overridden by install.conf and then CLI flags)
+# ------------------------------------------------------------------------------
+CONFIG_FILE=""
 TARGET_DIR="/opt/aiorche"
 AUTO_APPROVE=false
 ADMIN_PASSWORD=""
@@ -23,7 +29,30 @@ DATACENTER_NAME="온프레미스 주전산센터"
 CLUSTER_REGION="DC-1 서울"
 SKIP_BUILD=false
 SEED_DEMO_DATA=false
-SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+INITIAL_ADMIN_USERNAME="admin"
+INITIAL_ADMIN_EMAIL="admin@aiorche.local"
+FRONTEND_PORT=80
+BACKEND_PORT=8000
+ENVOY_TRAFFIC_PORT=8080
+ENVOY_ADMIN_PORT=9901
+REDIS_PORT=6379
+POSTGRES_PORT=5432
+
+DOCKER_BRIDGE_GATEWAY_IP="172.20.0.1"
+BEHIND_PROXY=true
+TRUSTED_PROXIES="127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,testclient"
+ENVOY_XFF_NUM_TRUSTED_HOPS=1
+ENFORCE_SSL_REDIRECT=false
+
+GATEWAY_READ_TIMEOUT=120.0
+GATEWAY_CONNECT_TIMEOUT=10.0
+MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT=3.0
+
+CUSTOM_POSTGRES_PASSWORD=""
+CUSTOM_SECRET_KEY=""
+CUSTOM_PII_SALT=""
+CUSTOM_WORM_KEY=""
 
 # ------------------------------------------------------------------------------
 # Helper Functions
@@ -53,7 +82,7 @@ print_banner() {
  / ___ |_/ /   / /_/ / /  / /__/ / / /  __(__  ) /_/ /  / /_/ / 
 /_/  |_/___/   \____/_/   \___/_/ /_/\___/____/\__/_/   \__,_/  
                                                                 
-     Standalone Appliance Installer v1.0.0 (Enterprise Linux 9)
+     Standalone Appliance Installer v1.0.2 (Enterprise Linux 9)
 EOF
     echo -e "${NC}"
 }
@@ -62,8 +91,9 @@ usage() {
     echo -e "${BOLD}사용법:${NC} sudo $0 [OPTIONS]"
     echo ""
     echo "옵션:"
+    echo "  -c, --config PATH        외부 환경설정 파일 지정 (지정하지 않을 시 ./install.conf 또는 install.conf.example 탐색)"
     echo "  -y, --auto-approve       대화형 확인 프롬프트 생략 (무인 자동 설치)"
-    echo "      --admin-password     슈퍼관리자(admin@aiorche.local) 초기 비밀번호 지정 (미지정 시 무작위 생성)"
+    echo "      --admin-password     슈퍼관리자 초기 비밀번호 지정 (미지정 시 무작위 생성)"
     echo "      --datacenter-name    데이터센터 명칭 지정 (기본값: 온프레미스 주전산센터)"
     echo "      --cluster-region     클러스터 리전/존 명칭 지정 (기본값: DC-1 서울)"
     echo "      --target-dir PATH    설치 대상 디렉토리 (기본값: /opt/aiorche)"
@@ -76,10 +106,58 @@ usage() {
 }
 
 # ------------------------------------------------------------------------------
-# Option Parsing
+# Config File Loader
+# ------------------------------------------------------------------------------
+load_config_file() {
+    local conf="$1"
+    if [ -f "$conf" ]; then
+        log_info "외부 환경설정 파일 로드 중: ${conf}"
+        chmod 600 "$conf" 2>/dev/null || true
+        set -a
+        # shellcheck source=/dev/null
+        source "$conf"
+        set +a
+        log_success "환경설정 파일 적용 완료."
+        return 0
+    fi
+    return 1
+}
+
+# ------------------------------------------------------------------------------
+# 1차 파싱: --config 또는 -c 옵션 우선 확인
+# ------------------------------------------------------------------------------
+ARGS=("$@")
+for ((i=0; i<${#ARGS[@]}; i++)); do
+    case "${ARGS[i]}" in
+        -c|--config)
+            CONFIG_FILE="${ARGS[i+1]}"
+            ;;
+    esac
+done
+
+# 설정 파일 로드 (지정 파일 -> 현재 디렉토리 ./install.conf -> 소스 디렉토리)
+if [ -n "$CONFIG_FILE" ]; then
+    if ! load_config_file "$CONFIG_FILE"; then
+        log_error "지정된 설정 파일을 찾을 수 없습니다: ${CONFIG_FILE}"
+        exit 1
+    fi
+elif [ -f "./install.conf" ]; then
+    load_config_file "./install.conf"
+elif [ -f "${SOURCE_DIR}/deploy/install.conf" ]; then
+    load_config_file "${SOURCE_DIR}/deploy/install.conf"
+elif [ -f "${SOURCE_DIR}/deploy/standalone/install.conf" ]; then
+    load_config_file "${SOURCE_DIR}/deploy/standalone/install.conf"
+fi
+
+# ------------------------------------------------------------------------------
+# 2차 파싱: CLI 옵션이 설정 파일 값을 오버라이드
 # ------------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        -c|--config)
+            CONFIG_FILE="$2"
+            shift 2
+            ;;
         -y|--auto-approve)
             AUTO_APPROVE=true
             shift
@@ -159,8 +237,8 @@ if ! docker compose version &> /dev/null; then
 fi
 log_success "Docker Compose 확인 완료 ($(docker compose version --short))."
 
-# 4. 필수 포트 충돌 검사 (80, 8000, 8080, 9901)
-PORTS_TO_CHECK=(80 8000 8080 9901)
+# 4. 필수 포트 충돌 검사
+PORTS_TO_CHECK=("$FRONTEND_PORT" "$BACKEND_PORT" "$ENVOY_TRAFFIC_PORT" "$ENVOY_ADMIN_PORT")
 CONFLICT=false
 for p in "${PORTS_TO_CHECK[@]}"; do
     if ss -tulpn | grep -q ":${p}\b"; then
@@ -180,6 +258,8 @@ log_success "포트 점유 사전 점검 완료."
 echo ""
 log_info "설치 대상 경로: ${BOLD}${TARGET_DIR}${NC}"
 log_info "소스 파일 경로: ${BOLD}${SOURCE_DIR}${NC}"
+log_info "데이터센터 식별: ${BOLD}${DATACENTER_NAME} (${CLUSTER_REGION})${NC}"
+log_info "도커 브릿지 IP: ${BOLD}${DOCKER_BRIDGE_GATEWAY_IP}${NC}"
 
 if [ "$AUTO_APPROVE" = false ]; then
     read -p "Standalone 어플라이언스 설치를 시작하시겠습니까? (Y/n): " -r confirm
@@ -209,12 +289,17 @@ cp "${SOURCE_DIR}/deploy/standalone/docker-compose.standalone.yml" "${TARGET_DIR
 cp "${SOURCE_DIR}/deploy/postgres/init.sql" "${TARGET_DIR}/deploy/postgres/init.sql"
 cp "${SOURCE_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
 
-# 동적 암호화 시크릿 생성
-log_info "암호화 시크릿 및 해시 솔트 생성 중 (openssl rand)..."
-DYN_POSTGRES_PASS=$(openssl rand -hex 16)
-DYN_SECRET_KEY=$(openssl rand -hex 32)
-DYN_PII_SALT=$(openssl rand -hex 32)
-DYN_WORM_KEY=$(openssl rand -hex 32)
+# Docker Bridge Gateway IP 치환 (Envoy upstream 클러스터 주소)
+if [ -n "$DOCKER_BRIDGE_GATEWAY_IP" ] && [ "$DOCKER_BRIDGE_GATEWAY_IP" != "172.20.0.1" ]; then
+    log_info "Envoy 업스트림 브릿지 IP 치환 중: 172.20.0.1 -> ${DOCKER_BRIDGE_GATEWAY_IP}"
+    sed -i "s/address: 172.20.0.1/address: ${DOCKER_BRIDGE_GATEWAY_IP}/g" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
+fi
+
+# 동적 암호화 시크릿 결정
+DYN_POSTGRES_PASS="${CUSTOM_POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
+DYN_SECRET_KEY="${CUSTOM_SECRET_KEY:-$(openssl rand -hex 32)}"
+DYN_PII_SALT="${CUSTOM_PII_SALT:-$(openssl rand -hex 32)}"
+DYN_WORM_KEY="${CUSTOM_WORM_KEY:-$(openssl rand -hex 32)}"
 
 if [ -f "${TARGET_DIR}/.env" ]; then
     log_warn "기존 .env 파일이 존재하여 백업을 생성합니다 (${TARGET_DIR}/.env.bak)."
@@ -222,6 +307,7 @@ if [ -f "${TARGET_DIR}/.env" ]; then
     chmod 600 "${TARGET_DIR}/.env.bak"
 fi
 
+# .env.template 기반 .env 생성
 sed \
   -e "s/__DYNAMIC_POSTGRES_PASSWORD__/${DYN_POSTGRES_PASS}/g" \
   -e "s/__DYNAMIC_SECRET_KEY__/${DYN_SECRET_KEY}/g" \
@@ -230,6 +316,22 @@ sed \
   -e "s|__DATACENTER_NAME__|${DATACENTER_NAME}|g" \
   -e "s|__CLUSTER_REGION__|${CLUSTER_REGION}|g" \
   -e "s/SEED_DEMO_DATA=false/SEED_DEMO_DATA=${SEED_DEMO_DATA}/g" \
+  -e "s/__INITIAL_ADMIN_USERNAME__/${INITIAL_ADMIN_USERNAME}/g" \
+  -e "s/__INITIAL_ADMIN_EMAIL__/${INITIAL_ADMIN_EMAIL}/g" \
+  -e "s/__BACKEND_PORT__/${BACKEND_PORT}/g" \
+  -e "s/__FRONTEND_PORT__/${FRONTEND_PORT}/g" \
+  -e "s/__ENVOY_TRAFFIC_PORT__/${ENVOY_TRAFFIC_PORT}/g" \
+  -e "s/__ENVOY_ADMIN_PORT__/${ENVOY_ADMIN_PORT}/g" \
+  -e "s/__REDIS_PORT__/${REDIS_PORT}/g" \
+  -e "s/__POSTGRES_PORT__/${POSTGRES_PORT}/g" \
+  -e "s/__DOCKER_BRIDGE_GATEWAY_IP__/${DOCKER_BRIDGE_GATEWAY_IP}/g" \
+  -e "s/__GATEWAY_READ_TIMEOUT__/${GATEWAY_READ_TIMEOUT}/g" \
+  -e "s/__GATEWAY_CONNECT_TIMEOUT__/${GATEWAY_CONNECT_TIMEOUT}/g" \
+  -e "s/__MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT__/${MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT}/g" \
+  -e "s/__BEHIND_PROXY__/${BEHIND_PROXY}/g" \
+  -e "s|__TRUSTED_PROXIES__|${TRUSTED_PROXIES}|g" \
+  -e "s/__ENVOY_XFF_NUM_TRUSTED_HOPS__/${ENVOY_XFF_NUM_TRUSTED_HOPS}/g" \
+  -e "s/__ENFORCE_SSL_REDIRECT__/${ENFORCE_SSL_REDIRECT}/g" \
   "${SOURCE_DIR}/deploy/standalone/.env.template" > "${TARGET_DIR}/.env"
 
 chmod 600 "${TARGET_DIR}/.env"
@@ -250,7 +352,6 @@ if [ -f "$OFFLINE_TAR" ]; then
     log_success "오프라인 이미지 로드 완료."
 elif [ "$SKIP_BUILD" = false ]; then
     log_info "로컬 컨테이너 이미지 빌드 수행 중 (backend & frontend)..."
-    # Compose 파일 context 호환성을 위해 심볼릭 링크 또는 빌드 처리
     mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
     cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
     cp -r "${SOURCE_DIR}/frontend"/* "${TARGET_DIR}/frontend/" || true
@@ -289,18 +390,18 @@ fi
 log_success "데이터베이스 정상 연결 확인."
 
 # 슈퍼관리자 비밀번호 결정
-if [ -z "$ADMIN_PASSWORD" ]; then
-    ADMIN_PASSWORD="Orche!$(openssl rand -hex 6)"
+ADMIN_PASS="${ADMIN_PASSWORD:-${INITIAL_ADMIN_PASSWORD}}"
+if [ -z "$ADMIN_PASS" ]; then
+    ADMIN_PASS="Orche!$(openssl rand -hex 6)"
 fi
 
-log_info "초기 슈퍼관리자 계정 생성 (admin@aiorche.local)..."
-# 백엔드 컨테이너 1회 구동하여 init_admin 실행
+log_info "초기 슈퍼관리자 계정 생성 (${INITIAL_ADMIN_EMAIL})..."
 docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" run --rm --no-deps -e SEED_DEMO_DATA="${SEED_DEMO_DATA}" backend \
     python -m app.scripts.init_admin \
-    --username admin \
+    --username "${INITIAL_ADMIN_USERNAME}" \
     --full-name "시스템 최고관리자" \
-    --email "admin@aiorche.local" \
-    --password "$ADMIN_PASSWORD"
+    --email "${INITIAL_ADMIN_EMAIL}" \
+    --password "$ADMIN_PASS"
 
 log_success "슈퍼관리자 계정(Argon2id 솔트 해싱) 발급 완료."
 
@@ -350,27 +451,27 @@ log_info "서비스 엔드포인트 헬스 프로빙 대기 중..."
 sleep 5
 
 # 3대 핵심 헬스 검증
-log_info "1) Backend REST API 헬스 확인 (http://localhost:8000/health)..."
+log_info "1) Backend REST API 헬스 확인 (http://localhost:${BACKEND_PORT}/health)..."
 for i in {1..15}; do
-    if curl -sf http://localhost:8000/health &> /dev/null; then
+    if curl -sf "http://localhost:${BACKEND_PORT}/health" &> /dev/null; then
         log_success "Backend Control Plane: READY (HTTP 200)"
         break
     fi
     sleep 2
 done
 
-log_info "2) Envoy L7 Gateway 헬스 확인 (http://localhost:9901/ready)..."
+log_info "2) Envoy L7 Gateway 헬스 확인 (http://localhost:${ENVOY_ADMIN_PORT}/ready)..."
 for i in {1..10}; do
-    if curl -sf http://localhost:9901/ready &> /dev/null; then
+    if curl -sf "http://localhost:${ENVOY_ADMIN_PORT}/ready" &> /dev/null; then
         log_success "Envoy AI Gateway: READY (LIVE)"
         break
     fi
     sleep 2
 done
 
-log_info "3) Admin Web Frontend 헬스 확인 (http://localhost:80/)..."
+log_info "3) Admin Web Frontend 헬스 확인 (http://localhost:${FRONTEND_PORT}/)..."
 for i in {1..10}; do
-    if curl -sf -o /dev/null -w "%{http_code}" http://localhost:80/ | grep -q "200"; then
+    if curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${FRONTEND_PORT}/" | grep -q "200"; then
         log_success "Frontend Admin Portal: READY (HTTP 200)"
         break
     fi
@@ -385,14 +486,14 @@ echo -e "${GREEN}${BOLD}========================================================
 echo -e "${GREEN}${BOLD}🎉 AI Orchestrator Standalone 어플라이언스 설치 완료!${NC}"
 echo -e "${GREEN}${BOLD}================================================================${NC}"
 echo ""
-echo -e "  🌐 ${BOLD}어드민 웹 콘솔:${NC}       http://<호스트-IP>:80 (또는 http://localhost/)"
-echo -e "  ⚙️  ${BOLD}백엔드 REST API:${NC}      http://<호스트-IP>:8000"
-echo -e "  🚪 ${BOLD}Envoy AI Gateway:${NC}     http://<호스트-IP>:8080"
-echo -e "  📊 ${BOLD}Envoy 메트릭:${NC}         http://<호스트-IP>:9901/stats"
+echo -e "  🌐 ${BOLD}어드민 웹 콘솔:${NC}       http://<호스트-IP>:${FRONTEND_PORT}"
+echo -e "  ⚙️  ${BOLD}백엔드 REST API:${NC}      http://<호스트-IP>:${BACKEND_PORT}"
+echo -e "  🚪 ${BOLD}Envoy AI Gateway:${NC}     http://<호스트-IP>:${ENVOY_TRAFFIC_PORT}"
+echo -e "  📊 ${BOLD}Envoy 관리 콘솔:${NC}     http://<호스트-IP>:${ENVOY_ADMIN_PORT}/stats"
 echo ""
 echo -e "  🔐 ${BOLD}[초기 슈퍼관리자 접속 정보]${NC}"
-echo -e "     • 아이디:   ${CYAN}admin@aiorche.local${NC}"
-echo -e "     • 비밀번호: ${YELLOW}${ADMIN_PASSWORD}${NC}"
+echo -e "     • 아이디:   ${CYAN}${INITIAL_ADMIN_EMAIL}${NC} (또는 ${INITIAL_ADMIN_USERNAME})"
+echo -e "     • 비밀번호: ${YELLOW}${ADMIN_PASS}${NC}"
 echo ""
 echo -e "  🛠️  ${BOLD}[호스트 관리 명령어]${NC}"
 echo -e "     • 상태 조회: ${CYAN}aiorche-ctl status${NC}"
@@ -402,4 +503,3 @@ echo -e "     • 진단 검증: ${CYAN}aiorche-ctl verify${NC}"
 echo ""
 echo -e "${GREEN}================================================================${NC}"
 exit 0
-

@@ -76,19 +76,23 @@ else
     assert_fail ".env.template 파일이 없거나 동적 시크릿 플레이스홀더가 누락되었습니다."
 fi
 
-# Test 4: install.sh 쉘 구문 및 옵션 검증
+# Test 4: install.sh 쉘 구문, 옵션 및 install.conf 템플릿 검증
 echo -e "${BOLD}[Test 4/7] install.sh 스크립트 구문 및 Safety Guard 검증${NC}"
 INSTALL_SCRIPT="${ROOT_DIR}/deploy/standalone/install.sh"
-if [ -x "$INSTALL_SCRIPT" ]; then
+INSTALL_CONF_EXAMPLE="${ROOT_DIR}/deploy/install.conf.example"
+if [ ! -f "$INSTALL_CONF_EXAMPLE" ]; then
+    INSTALL_CONF_EXAMPLE="${ROOT_DIR}/deploy/standalone/install.conf.example"
+fi
+if [ -x "$INSTALL_SCRIPT" ] && [ -f "$INSTALL_CONF_EXAMPLE" ]; then
     bash -n "$INSTALL_SCRIPT" || assert_fail "install.sh 쉘 문법 에러 발견"
     HELP_OUTPUT=$(bash "$INSTALL_SCRIPT" --help)
-    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "admin-password"; then
-        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --admin-password) 검증 완료"
+    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "config"; then
+        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --config) 및 install.conf.example 템플릿 검증 완료"
     else
         assert_fail "install.sh 도움말 출력 검증 실패"
     fi
 else
-    assert_fail "install.sh 파일이 없거나 실행 권한(+x)이 없습니다."
+    assert_fail "install.sh 또는 install.conf.example 파일이 없거나 실행 권한이 없습니다."
 fi
 
 # Test 5: aiorche-ctl 호스트 제어 CLI 검증
@@ -121,13 +125,13 @@ else
     assert_fail "Vagrantfile 또는 provision.sh 파일이 누락되었습니다."
 fi
 
-# Test 7: 백엔드 및 전체 기존 회귀 테스트(86개) 무결성 확인
-echo -e "${BOLD}[Test 7/7] 백엔드 단위/통합 테스트 회귀 검증 (86/86 Tests)${NC}"
+# Test 7: 백엔드 및 전체 기존 회귀 테스트(102개) 무결성 확인
+echo -e "${BOLD}[Test 7/7] 백엔드 단위/통합 테스트 회귀 검증 (102/102 Tests)${NC}"
 cd "${ROOT_DIR}/backend"
 if command -v uv &>/dev/null; then
     TEST_RES=$(uv run pytest tests/ -q 2>&1)
     if echo "$TEST_RES" | grep -q "passed"; then
-        assert_pass "백엔드 핵심 제어 평면 86개 테스트 100% 무회귀 통과 확인"
+        assert_pass "백엔드 핵심 제어 평면 102개 테스트 100% 무회귀 통과 확인"
     else
         assert_fail "백엔드 테스트 실패:\n$TEST_RES"
     fi

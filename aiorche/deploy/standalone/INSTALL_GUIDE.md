@@ -72,19 +72,34 @@ sudo chcon -Rt svirt_sandbox_file_t /opt/aiorche/data 2>/dev/null || true
 
 사전 요구사항이 준비되었으면 프로젝트의 standalone 배포 디렉토리에서 설치를 진행합니다.
 
-### 2.1 대화형 설치
+### 2.1 환경설정 파일(install.conf)을 통한 선언적 무인 설치 (강력 권장)
+보안 정책상 명령행 인자에 비밀번호나 네트워크 IP를 노출하지 않고 파일 기반으로 안전하게 설치합니다:
 ```bash
 cd /path/to/aiorche
-sudo ./deploy/standalone/install.sh
+
+# 1. 템플릿 복사 및 현장 환경에 맞춰 설정 편집 (권한 600 적용)
+cp ./deploy/standalone/install.conf.example ./install.conf
+chmod 600 ./install.conf
+vi ./install.conf
+
+# 2. install.conf 기반 무인 설치 실행
+sudo ./deploy/standalone/install.sh --auto-approve
+# (또는 별도 경로의 설정 파일 지정 시)
+# sudo ./deploy/standalone/install.sh --config /root/prod-aiorche.conf --auto-approve
 ```
 
-### 2.2 무인 자동 설치 (권장)
+### 2.2 CLI 옵션 기반 무인 자동 설치
 ```bash
 # 슈퍼관리자 비밀번호를 직접 지정하여 무인 설치
 sudo ./deploy/standalone/install.sh --auto-approve --admin-password "MyStrongPass123!"
 
 # (또는) 비밀번호를 자동 무작위 생성하여 무인 설치
 sudo ./deploy/standalone/install.sh --auto-approve
+```
+
+### 2.3 대화형 설치
+```bash
+sudo ./deploy/standalone/install.sh
 ```
 
 #### 스크립트 내부 자동 수행 단계

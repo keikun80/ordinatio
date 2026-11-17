@@ -88,6 +88,8 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./07_appliance_and_packaging/PRE_09_phase5_lifecycle_and_hotfix_engine.md) | **어플라이언스 수명주기 제어 및 RSA-4096 긴급 패치 엔진**<br>- RSA-4096 서명 오프라인 패치 검증, 4단계 무중단 롤링 핫픽스 & 롤백 | **100% PASS** |
 | [PRE_40_standalone_offline_appliance_packaging_plan.md](./07_appliance_and_packaging/PRE_40_standalone_offline_appliance_packaging_plan.md) | **독립형 오프라인 어플라이언스 원클릭 패키징 및 구동 보고서**<br>- `make prod-build` ➔ 단일 tar.gz 번들 생성 ➔ 타깃 서버 `make up` 원클릭 기동 | **100% PASS** |
 | [PRE_45_standalone_appliance_release_engineering_plan.md](./07_appliance_and_packaging/PRE_45_standalone_appliance_release_engineering_plan.md) | **오프라인 어플라이언스 릴리즈 엔지니어링 계획서**<br>- 5단계 릴리즈 생명주기, 이중 체크섬, RSA-4096 서명, 고객사 전입 검증기 및 make release 자동화 | **구현 및 검증 완료** |
+| [RELEASE_NOTES_v1.0.2.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.2.md) | **v1.0.2 기능 고도화 및 환경설정 외부화 릴리즈 노트**<br>- 선언적 install.conf 분리, 브릿지 IP/타임아웃 외부화, Standalone 무인 설치 강화 | **v1.0.2 GA** |
+| [RELEASE_NOTES_v1.0.1.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.1.md) | **v1.0.1 신뢰성 및 핫픽스 릴리즈 노트**<br>- 120s 타임아웃 세분화, Docker 브릿지 업스트림, ALB 신뢰 프록시, PII 자동완성, 클린 모드 | **v1.0.1 GA** |
 | [RELEASE_NOTES_v1.0.0.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.0.md) | **v1.0.0 공식 릴리즈 노트**<br>- 5대 도커 이미지 번들, 3대 엔터프라이즈 OS 실증(100% PASS), 접속 정보 | **v1.0.0 GA** |
 | [OFFLINE_INSTALL_GUIDE.md](./07_appliance_and_packaging/OFFLINE_INSTALL_GUIDE.md) | **폐쇄망(Air-Gapped) 원클릭 오프라인 설치 및 운영 매뉴얼** | **배포 완료** |
 | [SECURITY_AUDIT_REPORT.md](./07_appliance_and_packaging/SECURITY_AUDIT_REPORT.md) | **엔터프라이즈 보안 감사 보고서 (공급망 서명, Non-root, WORM, Argon2id)** | **감사 통과** |

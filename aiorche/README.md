@@ -55,7 +55,7 @@ make run-frontend
 
 ### 3. 단계별 검증 및 관리 도구 (DoD Automated Verification & Management)
 ```bash
-# 전체 단위/통합 테스트 실행 (pytest 85개 테스트 100% 통과)
+# 전체 단위/통합 테스트 실행 (pytest 102개 테스트 100% 통과)
 make test
 
 # 초기 관리자 계정 대화형 생성 CLI
@@ -89,7 +89,7 @@ make verify-standalone-install # Phase 6: Standalone 설치 툴 및 Vagrant 검�
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
 | **시스템 프롬프트** | 동적 시스템 프롬프트 거버넌스 & L7 인라인 주입 | ✅ 완료 | `verify-phase-system-prompt.sh` 통과 |
-| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 3-Tier RBAC | ✅ 완료 | `make verify-auth-rbac` 통과 (94 Tests) |
+| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 동적 RBAC/PBAC | ✅ 완료 | `make test` 통과 (102 Tests) |
 | **Phase 6: Standalone** | RHEL 9 호환 Standalone 설치 툴(install.sh) & aiorche-ctl CLI | ✅ 완료 | `make verify-standalone-install` (7/7 PASS) |
 | **Phase 6: 현지화** | 15개 UI 컴포넌트 한글 리터럴 제거 & strings.js 일원화 | ✅ 완료 | `npm run build` (Vite Build PASS) |
 

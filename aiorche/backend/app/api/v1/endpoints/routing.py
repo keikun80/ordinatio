@@ -417,7 +417,9 @@ async def _execute_single_test_call(
     is_success = False
     chosen_url = f"{envoy_ingress}{target_path}"
 
-    client_timeout = httpx.Timeout(120.0, connect=10.0, read=120.0)
+    read_timeout = getattr(settings, 'GATEWAY_READ_TIMEOUT', 120.0)
+    connect_timeout = getattr(settings, 'GATEWAY_CONNECT_TIMEOUT', 10.0)
+    client_timeout = httpx.Timeout(read_timeout, connect=connect_timeout, read=read_timeout)
     async with httpx.AsyncClient(timeout=client_timeout) as client:
         for host in candidate_hosts:
             test_url = f"{host}{target_path}"

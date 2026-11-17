@@ -139,10 +139,10 @@ CREATE TABLE IF NOT EXISTS agent_router_policies (
 
 INSERT INTO agent_router_policies (policy_id, name, description, is_active, config)
 VALUES
-    ('QualityFirst', 'QualityFirst (품질 우선)', '복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 모델로 우선 분기하고 단순 질의는 경량 모델로 처리합니다.', TRUE, '{"reasoning_model": "", "fast_model": "", "enforce_reasoning_for_tools": true, "reasoning_cluster": "cluster_vllm_reasoning_72b", "fast_cluster": "cluster_vllm_fast_8b"}'::jsonb),
-    ('LeastCost', 'LeastCost (비용 최적화)', '테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.', TRUE, '{"budget_threshold_pct": 80.0, "economic_model": "", "standard_model": "", "economic_cluster": "cluster_vllm_fast_8b", "standard_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
-    ('LatencyOptimized', 'LatencyOptimized (지연시간 최적화)', '초저지연(TTFT) 보장을 위해 경량 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.', TRUE, '{"target_latency_ms": 200, "primary_fast_model": "", "allow_reasoning_override": true, "reasoning_model": "", "fast_cluster": "cluster_vllm_fast_8b", "reasoning_cluster": "cluster_vllm_reasoning_72b"}'::jsonb),
-    ('SelfHealingFallback', 'SelfHealingFallback (자가 치유 폴백)', '업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.', TRUE, '{"primary_fallback_model": "", "secondary_fallback_model": "", "max_retries": 2, "timeout_seconds": 5, "fallback_cluster": "cluster_vllm_inference_pool"}'::jsonb)
+    ('QualityFirst', 'QualityFirst (품질 우선)', '복잡한 알고리즘, 코딩 및 심층 추론 질문 시 최고 성능 모델로 우선 분기하고 단순 질의는 경량 모델로 처리합니다.', TRUE, '{"reasoning_model": "", "fast_model": "", "enforce_reasoning_for_tools": true, "reasoning_cluster": "", "fast_cluster": ""}'::jsonb),
+    ('LeastCost', 'LeastCost (비용 최적화)', '테넌트의 월간 예산 소진율이 임계치를 초과하면 강제로 경제형 모델로 다운티어링하여 클라우드/인프라 TCO를 방어합니다.', TRUE, '{"budget_threshold_pct": 80.0, "economic_model": "", "standard_model": "", "economic_cluster": "", "standard_cluster": ""}'::jsonb),
+    ('LatencyOptimized', 'LatencyOptimized (지연시간 최적화)', '초저지연(TTFT) 보장을 위해 경량 모델을 최우선 분기하며, 명시적 심층 추론 요청 시에만 선택적 예외를 허용합니다.', TRUE, '{"target_latency_ms": 200, "primary_fast_model": "", "allow_reasoning_override": true, "reasoning_model": "", "fast_cluster": "", "reasoning_cluster": ""}'::jsonb),
+    ('SelfHealingFallback', 'SelfHealingFallback (자가 치유 폴백)', '업스트림 GPU 서빙 노드의 5xx 오류 또는 헬스체크 타임아웃 발생 시 무중단으로 지정된 예비 모델로 자동 절체합니다.', TRUE, '{"primary_fallback_model": "", "secondary_fallback_model": "", "max_retries": 2, "timeout_seconds": 5, "fallback_cluster": ""}'::jsonb)
 ON CONFLICT (policy_id) DO NOTHING;
 
 

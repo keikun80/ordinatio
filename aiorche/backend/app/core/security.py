@@ -261,3 +261,57 @@ def mask_api_key(key: Optional[str]) -> Optional[str]:
     suffix = decrypted[-4:]
     return f"{prefix}...{suffix}"
 
+
+# -----------------------------------------------------------------------------
+# Reverse Proxy & AWS ELB Real Client IP Extraction
+# -----------------------------------------------------------------------------
+def is_ip_match(ip_str: str, cidr_or_ip: str) -> bool:
+    """Check if an IP matches a single IP or CIDR network string."""
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        if "/" in cidr_or_ip:
+            net = ipaddress.ip_network(cidr_or_ip, strict=False)
+            return ip_obj in net
+        else:
+            return ip_obj == ipaddress.ip_address(cidr_or_ip)
+    except ValueError:
+        return False
+
+def is_trusted_proxy_ip(peer_ip: str) -> bool:
+    """Check if the direct peer is a trusted reverse proxy (e.g. AWS ALB, local Nginx, or container)."""
+    if peer_ip in ("testclient", "localhost", "127.0.0.1", "::1"):
+        return True
+    trusted_list = [p.strip() for p in settings.TRUSTED_PROXIES.split(",") if p.strip()]
+    if "*" in trusted_list:
+        return True
+    for item in trusted_list:
+        if is_ip_match(peer_ip, item):
+            return True
+    return False
+
+def get_client_real_ip(request: Any) -> str:
+    """
+    Extract the real client IP address behind reverse proxies / AWS ALB.
+    Validates that the immediate peer is trusted before honoring X-Forwarded-For.
+    """
+    if not request:
+        return "127.0.0.1"
+    
+    peer_host = request.client.host if (request.client and request.client.host) else "127.0.0.1"
+    
+    if settings.BEHIND_PROXY and is_trusted_proxy_ip(peer_host):
+        # 1. Check X-Forwarded-For header (leftmost IP is the originating client)
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            hops = [h.strip() for h in xff.split(",") if h.strip()]
+            if hops:
+                return hops[0]
+        
+        # 2. Check X-Real-IP header as fallback
+        x_real_ip = request.headers.get("x-real-ip")
+        if x_real_ip and x_real_ip.strip():
+            return x_real_ip.strip()
+            
+    return "127.0.0.1" if peer_host == "testclient" else peer_host
+
+

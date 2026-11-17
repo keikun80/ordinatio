@@ -22,6 +22,7 @@ ADMIN_PASSWORD=""
 DATACENTER_NAME="온프레미스 주전산센터"
 CLUSTER_REGION="DC-1 서울"
 SKIP_BUILD=false
+SEED_DEMO_DATA=false
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # ------------------------------------------------------------------------------
@@ -68,6 +69,7 @@ usage() {
     echo "      --target-dir PATH    설치 대상 디렉토리 (기본값: /opt/aiorche)"
     echo "      --source-dir PATH    aiorche 소스 루트 디렉토리"
     echo "      --skip-build         컨테이너 이미지 빌드 단계 생략"
+    echo "      --seed-demo          데모/샘플 데이터(테넌트, 모델, 감사로그) 적재 (기본값: 클린 설치)"
     echo "  -h, --help               도움말 출력"
     echo ""
     exit 0
@@ -104,6 +106,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-build)
             SKIP_BUILD=true
+            shift
+            ;;
+        --seed-demo)
+            SEED_DEMO_DATA=true
             shift
             ;;
         -h|--help)
@@ -223,6 +229,7 @@ sed \
   -e "s/__DYNAMIC_WORM_KEY__/${DYN_WORM_KEY}/g" \
   -e "s|__DATACENTER_NAME__|${DATACENTER_NAME}|g" \
   -e "s|__CLUSTER_REGION__|${CLUSTER_REGION}|g" \
+  -e "s/SEED_DEMO_DATA=false/SEED_DEMO_DATA=${SEED_DEMO_DATA}/g" \
   "${SOURCE_DIR}/deploy/standalone/.env.template" > "${TARGET_DIR}/.env"
 
 chmod 600 "${TARGET_DIR}/.env"
@@ -288,7 +295,7 @@ fi
 
 log_info "초기 슈퍼관리자 계정 생성 (admin@aiorche.local)..."
 # 백엔드 컨테이너 1회 구동하여 init_admin 실행
-docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" run --rm --no-deps backend \
+docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" run --rm --no-deps -e SEED_DEMO_DATA="${SEED_DEMO_DATA}" backend \
     python -m app.scripts.init_admin \
     --username admin \
     --full-name "시스템 최고관리자" \

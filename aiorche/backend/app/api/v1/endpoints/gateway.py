@@ -28,6 +28,8 @@ from app.core.security import (
     validate_upstream_endpoint_url,
     SYSTEM_DIAGNOSTICS_KEY_ID,
     INTERNAL_DIAGNOSTICS_CIDRS,
+    is_trusted_proxy_ip,
+    get_client_real_ip,
 )
 from app.core.pii_engine import PiiEngine
 from app.models.audit_log import AuditLog
@@ -162,18 +164,22 @@ def _extract_client_ip(request: Optional[Request]) -> str:
     """
     Extract client IP safely (H-1):
     Only trust X-Forwarded-For when the immediate TCP peer is a trusted proxy
-    (loopback / container network / testclient), and take the rightmost hop
-    appended by Envoy (use_remote_address: true) to prevent XFF header spoofing.
+    (loopback / container network / testclient / AWS ALB CIDR), and take the rightmost hop
+    appended by Envoy (use_remote_address: true) or originating client IP.
     """
     if not request:
         return "127.0.0.1"
     peer_host = request.client.host if (request.client and request.client.host) else "127.0.0.1"
-    is_trusted_proxy = (peer_host == "testclient") or is_ip_allowed(peer_host, INTERNAL_DIAGNOSTICS_CIDRS)
+    is_trusted_proxy = (peer_host == "testclient") or is_trusted_proxy_ip(peer_host) or is_ip_allowed(peer_host, INTERNAL_DIAGNOSTICS_CIDRS)
     if is_trusted_proxy:
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             hops = [h.strip() for h in forwarded.split(",") if h.strip()]
             if hops:
+                # If behind Envoy, the rightmost is appended by Envoy. If direct from ALB, the leftmost is the client.
+                # When hops > 1 and rightmost is an internal envoy/alb proxy, use hops[0].
+                if len(hops) > 1 and is_trusted_proxy_ip(hops[-1]):
+                    return hops[0]
                 return hops[-1]
     return "127.0.0.1" if peer_host == "testclient" else peer_host
 

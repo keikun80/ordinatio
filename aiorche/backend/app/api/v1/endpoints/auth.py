@@ -19,7 +19,8 @@ from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,
-    hash_session_token
+    hash_session_token,
+    get_client_real_ip
 )
 from app.models.user import User, UserSession
 from app.models.role import Role
@@ -135,7 +136,7 @@ def login(
     session_token = secrets.token_urlsafe(32)
     session_token_hash = hash_session_token(session_token)
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_real_ip(request)
     user_agent = request.headers.get("user-agent", "")[:500]
 
     new_session = UserSession(

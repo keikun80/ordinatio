@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: true,
     watch: {
       usePolling: true,
       interval: 300
@@ -15,11 +16,13 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: proxyTarget,
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true
       },
       '/v1': {
         target: proxyTarget,
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true
       }
     }
   }

@@ -1,5 +1,5 @@
 // aiorche API Client Layer (Clean Architecture)
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:8000/api/v1');
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 function getAuthHeaders(extra = {}) {
   const token = localStorage.getItem('aiorche_token');
@@ -567,8 +567,8 @@ export const apiClient = {
   // --- Observability & Telemetry (Phase 3) ---
   getObservabilityWsUrl() {
     const isHttps = window.location.protocol === 'https:';
-    const host = window.location.hostname || 'localhost';
-    return `${isHttps ? 'wss' : 'ws'}://${host}:8000/api/v1/observability/ws`;
+    const host = window.location.host || 'localhost:5173';
+    return `${isHttps ? 'wss' : 'ws'}://${host}/api/v1/observability/ws`;
   },
 
   async getMetricsSummary() {

@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     ENVOY_ADMIN_URL: str = "http://localhost:9901"
     ENVOY_XDS_PORT: int = 18000
 
+    # Reverse Proxy & AWS ELB Configuration
+    BEHIND_PROXY: bool = True
+    TRUSTED_PROXIES: str = "127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,testclient"
+    ENVOY_XFF_NUM_TRUSTED_HOPS: int = 1
+    ENFORCE_SSL_REDIRECT: bool = False
+
     # Keycloak
     KEYCLOAK_SERVER_URL: str = "http://localhost:8080"
     KEYCLOAK_REALM: str = "aiorche"

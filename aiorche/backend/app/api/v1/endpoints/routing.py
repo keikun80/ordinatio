@@ -314,7 +314,12 @@ async def _execute_single_test_call(
     db: Session
 ) -> RouteTestCallResponse:
     envoy_ingress = settings.ENVOY_INGRESS_URL.rstrip('/')
-    candidate_hosts = ["http://envoy:8080", envoy_ingress]
+    candidate_hosts = list(dict.fromkeys([
+        "http://127.0.0.1:8080",
+        "http://localhost:8080",
+        envoy_ingress,
+        "http://envoy:8080"
+    ]))
 
     path_prefix = ""
     if policy.match_conditions and policy.match_conditions.get("path_prefix"):
@@ -412,7 +417,7 @@ async def _execute_single_test_call(
     is_success = False
     chosen_url = f"{envoy_ingress}{target_path}"
 
-    client_timeout = httpx.Timeout(45.0, connect=3.0)
+    client_timeout = httpx.Timeout(120.0, connect=10.0, read=120.0)
     async with httpx.AsyncClient(timeout=client_timeout) as client:
         for host in candidate_hosts:
             test_url = f"{host}{target_path}"
@@ -446,11 +451,17 @@ async def _execute_single_test_call(
                     applied_system_prompt=applied_prompt_name,
                     prompt_resolved_by=resolved_by
                 )
+            except httpx.ConnectTimeout:
+                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 시간 초과 (Connect Timeout)"
+                continue
             except httpx.ConnectError:
-                if not err_msg:
-                    err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
+                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
+                continue
+            except httpx.ReadTimeout:
+                err_msg = "게이트웨이 LLM 모델 추론 타임아웃 (120초 초과 - 업스트림 vLLM 응답 지연)"
+                break
             except httpx.TimeoutException:
-                err_msg = "게이트웨이 LLM 모델 추론 타임아웃 (45초 초과)"
+                err_msg = "게이트웨이 LLM 모델 응답 대기시간 초과 (타임아웃)"
                 break
             except Exception as e:
                 err_msg = str(e)

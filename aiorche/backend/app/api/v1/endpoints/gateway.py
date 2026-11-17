@@ -509,6 +509,7 @@ async def dispatch_chat_completion(
         candidate_urls.extend([
             f"http://ollama-qwen:{port}/v1/chat/completions",
             f"http://host.docker.internal:{port}/v1/chat/completions",
+            f"http://172.20.0.1:{port}/v1/chat/completions",
             f"http://172.17.0.1:{port}/v1/chat/completions",
             f"http://127.0.0.1:{port}/v1/chat/completions"
         ])

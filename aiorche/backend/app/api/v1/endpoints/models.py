@@ -60,8 +60,10 @@ async def probe_endpoint(
 
     if "127.0.0.1" in base_url:
         urls_to_try.extend([u.replace("127.0.0.1", "host.docker.internal") for u in list(urls_to_try) if "127.0.0.1" in u])
+        urls_to_try.extend([u.replace("127.0.0.1", "172.20.0.1") for u in list(urls_to_try) if "127.0.0.1" in u])
     elif "localhost" in base_url:
         urls_to_try.extend([u.replace("localhost", "host.docker.internal") for u in list(urls_to_try) if "localhost" in u])
+        urls_to_try.extend([u.replace("localhost", "172.20.0.1") for u in list(urls_to_try) if "localhost" in u])
 
     # Provider-specific health probe paths
     prov = (provider or "openai").lower()

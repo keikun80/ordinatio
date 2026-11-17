@@ -70,7 +70,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: backend
+                address: 172.20.0.1
                 port_value: 8000
 
   - name: vllm_fast_8b
@@ -84,7 +84,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: backend
+                address: 172.20.0.1
                 port_value: 8000
 
   - name: vllm_reasoning_72b
@@ -98,7 +98,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: backend
+                address: 172.20.0.1
                 port_value: 8000
 
   - name: vllm_inference_pool

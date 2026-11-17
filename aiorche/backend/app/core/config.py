@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
 
     # Envoy
-    ENVOY_INGRESS_URL: str = "http://localhost:8080"
+    ENVOY_INGRESS_URL: str = "http://127.0.0.1:8080"
     ENVOY_ADMIN_URL: str = "http://localhost:9901"
     ENVOY_XDS_PORT: int = 18000
 

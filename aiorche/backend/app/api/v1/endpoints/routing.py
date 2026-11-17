@@ -451,18 +451,15 @@ async def _execute_single_test_call(
                     applied_system_prompt=applied_prompt_name,
                     prompt_resolved_by=resolved_by
                 )
-            except httpx.ConnectTimeout:
-                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 시간 초과 (Connect Timeout)"
-                continue
-            except httpx.ConnectError:
-                err_msg = "Envoy L7 게이트웨이(Port 8080) 연결 불가 (Connection Refused)"
+            except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+                err_msg = f"게이트웨이 연결 실패 ({test_url}): {exc}"
                 continue
             except httpx.ReadTimeout:
-                err_msg = "게이트웨이 LLM 모델 추론 타임아웃 (120초 초과 - 업스트림 vLLM 응답 지연)"
+                err_msg = "게이트웨이 LLM 모델 추론 타임아웃 (120초 초과 - vLLM 처리 지연)"
                 break
-            except httpx.TimeoutException:
-                err_msg = "게이트웨이 LLM 모델 응답 대기시간 초과 (타임아웃)"
-                break
+            except httpx.TimeoutException as exc:
+                err_msg = f"요청 타임아웃: {exc}"
+                continue
             except Exception as e:
                 err_msg = str(e)
                 break

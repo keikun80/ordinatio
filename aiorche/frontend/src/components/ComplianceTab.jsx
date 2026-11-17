@@ -22,6 +22,45 @@ import { useAuth } from '../context/AuthContext';
 
 const PRESETS_STORAGE_KEY = 'aiorche_compliance_presets';
 
+// 식별 항목 유형별 기본 추천 정규식 패턴 및 표시 명칭 매핑
+const DEFAULT_ENTITY_REGEX_MAP = {
+  RRN: {
+    regex: '\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])-[1-4]\\d{6}',
+    name: '주민등록번호 마스킹',
+    action: 'MASK'
+  },
+  BANK_ACCOUNT: {
+    regex: '\\b\\d{3,6}-\\d{2,6}-\\d{3,6}\\b',
+    name: '은행 계좌번호 가명화',
+    action: 'HASH'
+  },
+  CREDIT_CARD: {
+    regex: '\\b\\d{4}-\\d{4}-\\d{4}-\\d{4}\\b',
+    name: '신용카드 번호 마스킹',
+    action: 'MASK'
+  },
+  EMPLOYEE_ID: {
+    regex: '\\bEMP-[A-Z]{2}\\d{5}\\b',
+    name: '사내 사번/행번 차단',
+    action: 'BLOCK'
+  },
+  PASSPORT: {
+    regex: '[A-Z]{1}\\d{8}',
+    name: '여권번호 마스킹',
+    action: 'MASK'
+  },
+  PHONE: {
+    regex: '01[016789]-\\d{3,4}-\\d{4}',
+    name: '휴대전화번호 마스킹',
+    action: 'MASK'
+  },
+  CUSTOM: {
+    regex: '',
+    name: '',
+    action: 'MASK'
+  }
+};
+
 export default function ComplianceTab({ onNotify }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
   const canWriteCompliance = isSuperAdmin || hasPermission('compliance:write');
@@ -254,6 +293,23 @@ export default function ComplianceTab({ onNotify }) {
       onNotify('ERROR', strings.compliance.alerts.ruleDeleteFailed(err.message));
       loadRules();
     }
+  };
+
+  // Open Add Rule Modal with initial default entity type preset
+  const handleOpenAddModal = () => {
+    if (!canWriteCompliance) return;
+    const initialType = 'RRN';
+    const preset = DEFAULT_ENTITY_REGEX_MAP[initialType];
+    setNewRule({
+      rule_id: 'pii-custom-' + Math.floor(Math.random() * 1000),
+      name: preset?.name || '',
+      entity_type: initialType,
+      regex_pattern: preset?.regex || '',
+      confidence_threshold: 0.85,
+      action: preset?.action || 'MASK',
+      is_active: true
+    });
+    setIsAddModalOpen(true);
   };
 
   // Add Rule
@@ -563,7 +619,7 @@ export default function ComplianceTab({ onNotify }) {
             <button
               className="btn btn-primary btn-sm"
               disabled={!canWriteCompliance}
-              onClick={() => canWriteCompliance && setIsAddModalOpen(true)}
+              onClick={handleOpenAddModal}
               style={{ opacity: canWriteCompliance ? 1 : 0.45, cursor: canWriteCompliance ? 'pointer' : 'not-allowed' }}
             >
               <Plus size={14} />
@@ -876,7 +932,17 @@ export default function ComplianceTab({ onNotify }) {
                 <select 
                   className="form-select"
                   value={newRule.entity_type}
-                  onChange={(e) => setNewRule({ ...newRule, entity_type: e.target.value })}
+                  onChange={(e) => {
+                    const selectedType = e.target.value;
+                    const matchedPreset = DEFAULT_ENTITY_REGEX_MAP[selectedType];
+                    setNewRule((prev) => ({
+                      ...prev,
+                      entity_type: selectedType,
+                      name: matchedPreset?.name && !prev.name ? matchedPreset.name : prev.name,
+                      regex_pattern: matchedPreset ? matchedPreset.regex : prev.regex_pattern,
+                      action: matchedPreset?.action || prev.action
+                    }));
+                  }}
                 >
                   <option value="RRN">{strings.compliance.addRuleModal.types.rrn}</option>
                   <option value="BANK_ACCOUNT">{strings.compliance.addRuleModal.types.bank}</option>

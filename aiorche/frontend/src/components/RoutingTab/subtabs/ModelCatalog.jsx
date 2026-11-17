@@ -22,11 +22,6 @@ export default function ModelCatalog({
 }) {
   return (
     <div className="subtab-content" style={{ animation: 'fadeIn 0.2s ease-in-out' }}>
-      {/* Upstream Clarification Notice */}
-      <div className="callout-notice" style={{ marginBottom: '14px' }}>
-        💡 <strong>{strings.common.notice}:</strong> {strings.routing.catalog.subtitle}
-      </div>
-
       {/* Model Catalog Table */}
       <div className="card" data-testid="rt-card-catalog" data-screen-id="SCR-RT-02">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -35,9 +30,6 @@ export default function ModelCatalog({
               <Cpu size={20} color="var(--accent-emerald)" />
               <span>{strings.routing.catalog.title}</span>
             </div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {strings.routing.catalog.subtitle}
-            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {/* 수동 타임아웃 조절 컨트롤러 */}

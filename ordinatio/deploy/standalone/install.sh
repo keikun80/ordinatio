@@ -21,6 +21,8 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # ------------------------------------------------------------------------------
 # Default Settings (Overridden by install.conf and then CLI flags)
 # ------------------------------------------------------------------------------
+ACTION="install"
+PURGE_DATA=false
 CONFIG_FILE=""
 TARGET_DIR="/opt/ordinatio"
 AUTO_APPROVE=false
@@ -92,12 +94,105 @@ EOF
     echo -e "${NC}"
 }
 
+do_uninstall() {
+    echo -e "${BOLD}================================================================${NC}"
+    echo -e "${BOLD}🗑️  Ordinatio Standalone Appliance 제거 (Uninstall)${NC}"
+    echo -e "${BOLD}================================================================${NC}"
+
+    if [[ $EUID -ne 0 ]]; then
+        log_error "제거 작업은 root 권한으로 실행되어야 합니다 (sudo $0 --uninstall)."
+        exit 1
+    fi
+
+    log_warn "설치 대상 경로: ${TARGET_DIR}"
+    if [ "$PURGE_DATA" = true ]; then
+        log_warn "⚠️  경고: --purge 옵션 활성화. 모든 데이터(DB, 감사로그, 설정)가 영구 삭제됩니다!"
+    else
+        log_info "데이터 보존 모드: 서비스 및 컨테이너만 제거되며, 데이터(${TARGET_DIR}/data)는 보존됩니다."
+    fi
+
+    if [ "$AUTO_APPROVE" = false ]; then
+        read -p "정말 Ordinatio 어플라이언스를 제거하시겠습니까? (y/N): " -r confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            log_info "제거 작업이 취소되었습니다."
+            exit 0
+        fi
+    fi
+
+    echo ""
+    # 1. Systemd 서비스 중지 및 비활성화
+    log_info "1. Systemd 서비스 중지 및 등록 해제 중..."
+    if systemctl is-active --quiet ordinatio.service 2>/dev/null; then
+        systemctl stop ordinatio.service 2>/dev/null || true
+    fi
+    if systemctl is-enabled --quiet ordinatio.service 2>/dev/null; then
+        systemctl disable ordinatio.service 2>/dev/null || true
+    fi
+    if [ -f /etc/systemd/system/ordinatio.service ]; then
+        rm -f /etc/systemd/system/ordinatio.service
+        systemctl daemon-reload
+        log_success "Systemd 서비스(/etc/systemd/system/ordinatio.service) 제거 완료."
+    fi
+
+    # 2. Docker Compose 및 컨테이너 정리
+    log_info "2. Docker 컨테이너 및 가상 네트워크 정리 중..."
+    if [ -f "${TARGET_DIR}/docker-compose.standalone.yml" ] && command -v docker &>/dev/null; then
+        if [ "$PURGE_DATA" = true ]; then
+            docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" down -v --remove-orphans 2>/dev/null || true
+        else
+            docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" down --remove-orphans 2>/dev/null || true
+        fi
+    fi
+
+    # 잔여 컨테이너 강제 정리
+    if command -v docker &>/dev/null; then
+        for c in ordinatio-backend ordinatio-frontend ordinatio-envoy ordinatio-postgres ordinatio-redis; do
+            if docker ps -a --format '{{.Names}}' | grep -q "^${c}$"; then
+                docker rm -f "$c" 2>/dev/null || true
+            fi
+        done
+    fi
+    log_success "컨테이너 및 가상 네트워크 정리 완료."
+
+    # 3. 호스트 관리 도구 링크 정리
+    log_info "3. 호스트 관리 도구(/usr/local/bin/ordinatio-ctl) 제거 중..."
+    if [ -L /usr/local/bin/ordinatio-ctl ] || [ -f /usr/local/bin/ordinatio-ctl ]; then
+        rm -f /usr/local/bin/ordinatio-ctl
+        log_success "ordinatio-ctl 링크 제거 완료."
+    fi
+
+    # 4. 파일 및 디렉토리 정리
+    log_info "4. 파일 및 디렉토리 정리 중..."
+    if [ "$PURGE_DATA" = true ]; then
+        if [ -d "${TARGET_DIR}" ]; then
+            rm -rf "${TARGET_DIR}"
+            log_success "설치 디렉토리 전체 영구 삭제 완료 (${TARGET_DIR})."
+        fi
+    else
+        if [ -d "${TARGET_DIR}" ]; then
+            rm -f "${TARGET_DIR}/docker-compose.standalone.yml" "${TARGET_DIR}/.env" "${TARGET_DIR}/.env.bak"
+            rm -rf "${TARGET_DIR}/deploy" "${TARGET_DIR}/bin" "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
+            log_success "서비스 런타임 파일 정리 완료."
+            log_info "📌 데이터 디렉토리는 안전하게 보존되었습니다: ${TARGET_DIR}/data"
+            log_info "   (데이터까지 완전히 삭제하려면: sudo rm -rf ${TARGET_DIR} 또는 --purge 옵션 사용)"
+        fi
+    fi
+
+    echo ""
+    echo -e "${GREEN}${BOLD}================================================================${NC}"
+    echo -e "${GREEN}${BOLD}🎉 Ordinatio 어플라이언스 제거가 완료되었습니다.${NC}"
+    echo -e "${GREEN}${BOLD}================================================================${NC}"
+    exit 0
+}
+
 usage() {
     echo -e "${BOLD}사용법:${NC} sudo $0 [OPTIONS]"
     echo ""
     echo "옵션:"
     echo "  -c, --config PATH        외부 환경설정 파일 지정 (지정하지 않을 시 ./install.conf 또는 install.conf.example 탐색)"
-    echo "  -y, --auto-approve       대화형 확인 프롬프트 생략 (무인 자동 설치)"
+    echo "  -y, --auto-approve       대화형 확인 프롬프트 생략 (무인 자동 설치/제거)"
+    echo "      --uninstall          Standalone 어플라이언스 서비스 중지 및 시스템 제거"
+    echo "      --purge              --uninstall 시 데이터 디렉토리(${TARGET_DIR}/data) 포함 전체 영구 삭제"
     echo "      --admin-password     슈퍼관리자 초기 비밀번호 지정 (미지정 시 무작위 생성)"
     echo "      --datacenter-name    데이터센터 명칭 지정 (기본값: 온프레미스 주전산센터)"
     echo "      --cluster-region     클러스터 리전/존 명칭 지정 (기본값: DC-1 서울)"
@@ -171,6 +266,14 @@ while [[ $# -gt 0 ]]; do
             AUTO_APPROVE=true
             shift
             ;;
+        --uninstall)
+            ACTION="uninstall"
+            shift
+            ;;
+        --purge)
+            PURGE_DATA=true
+            shift
+            ;;
         --admin-password)
             ADMIN_PASSWORD="$2"
             shift 2
@@ -225,6 +328,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# 언인스톨 모드 분기
+if [ "$ACTION" = "uninstall" ]; then
+    do_uninstall
+fi
 
 print_banner
 

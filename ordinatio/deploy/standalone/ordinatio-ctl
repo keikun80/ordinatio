@@ -39,6 +39,7 @@ usage() {
     echo "  verify            내장 헬스체크 및 엔드포인트 무결성 DoD 검증"
     echo "  reset-admin       슈퍼관리자(admin@ordinatio.local) 비밀번호 대화형 재설정"
     echo "  backup            PostgreSQL 데이터 및 WORM 감사 로그 암호화 백업 tar.gz 생성"
+    echo "  uninstall         어플라이언스 서비스 중단 및 시스템 제거 (--purge, -y 옵션 지원)"
     echo "  help              도움말 출력"
     echo ""
     exit 0
@@ -131,6 +132,41 @@ cmd_backup() {
     echo -e "${GREEN}[SUCCESS]${NC} 백업 아카이브 생성 완료 (보안권한 600 적용): ${BACKUP_DIR}/${BACKUP_NAME}"
 }
 
+cmd_uninstall() {
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}[ERROR]${NC} uninstall 명령어는 root 권한으로 실행되어야 합니다 (sudo ordinatio-ctl uninstall)."
+        exit 1
+    fi
+
+    # install.sh 또는 uninstall.sh 경로 탐색
+    INSTALL_SCRIPT=""
+    for candidate in \
+        "${TARGET_DIR}/deploy/standalone/install.sh" \
+        "/opt/ordinatio/deploy/standalone/install.sh" \
+        "$(dirname "$(readlink -f "$0")")/install.sh" \
+        "$(dirname "$(readlink -f "$0")")/../deploy/standalone/install.sh"; do
+        if [ -f "$candidate" ]; then
+            INSTALL_SCRIPT="$candidate"
+            break
+        fi
+    done
+
+    if [ -n "$INSTALL_SCRIPT" ]; then
+        exec bash "$INSTALL_SCRIPT" --uninstall --target-dir "$TARGET_DIR" "$@"
+    else
+        echo -e "${YELLOW}[WARN]${NC} install.sh를 찾을 수 없어 직접 기본 제거를 수행합니다..."
+        systemctl stop ordinatio.service 2>/dev/null || true
+        systemctl disable ordinatio.service 2>/dev/null || true
+        rm -f /etc/systemd/system/ordinatio.service
+        systemctl daemon-reload
+        if [ -f "$COMPOSE_FILE" ]; then
+            docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+        fi
+        rm -f /usr/local/bin/ordinatio-ctl
+        echo -e "${GREEN}[SUCCESS]${NC} Ordinatio 서비스 정지 및 등록 해제 완료."
+    fi
+}
+
 # ------------------------------------------------------------------------------
 # Main Dispatcher
 # ------------------------------------------------------------------------------
@@ -165,6 +201,9 @@ case "$COMMAND" in
         ;;
     backup)
         cmd_backup
+        ;;
+    uninstall)
+        cmd_uninstall "$@"
         ;;
     help|-h|--help)
         usage

@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="allow")
@@ -11,6 +11,16 @@ class Settings(BaseSettings):
     
     ENV: str = "development"
     DEBUG: bool = True
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            if v.lower() in ("release", "prod", "production", "false", "0", "no", "off"):
+                return False
+            if v.lower() in ("debug", "dev", "development", "true", "1", "yes", "on"):
+                return True
+        return v
     DATACENTER_NAME: str = "온프레미스 주전산센터"
     CLUSTER_REGION: str = "DC-1 서울"
     DEPLOY_MODE: str = "air-gap"

@@ -76,23 +76,25 @@ else
     assert_fail ".env.template 파일이 없거나 동적 시크릿 플레이스홀더가 누락되었습니다."
 fi
 
-# Test 4: install.sh 쉘 구문, 옵션 및 install.conf 템플릿 검증
-echo -e "${BOLD}[Test 4/7] install.sh 스크립트 구문 및 Safety Guard 검증${NC}"
+# Test 4: install.sh 쉘 구문, 옵션, uninstall 스크립트 및 install.conf 템플릿 검증
+echo -e "${BOLD}[Test 4/7] install.sh 및 uninstall.sh 스크립트 구문 및 Safety Guard 검증${NC}"
 INSTALL_SCRIPT="${ROOT_DIR}/deploy/standalone/install.sh"
+UNINSTALL_SCRIPT="${ROOT_DIR}/deploy/standalone/uninstall.sh"
 INSTALL_CONF_EXAMPLE="${ROOT_DIR}/deploy/install.conf.example"
 if [ ! -f "$INSTALL_CONF_EXAMPLE" ]; then
     INSTALL_CONF_EXAMPLE="${ROOT_DIR}/deploy/standalone/install.conf.example"
 fi
-if [ -x "$INSTALL_SCRIPT" ] && [ -f "$INSTALL_CONF_EXAMPLE" ]; then
+if [ -x "$INSTALL_SCRIPT" ] && [ -x "$UNINSTALL_SCRIPT" ] && [ -f "$INSTALL_CONF_EXAMPLE" ]; then
     bash -n "$INSTALL_SCRIPT" || assert_fail "install.sh 쉘 문법 에러 발견"
+    bash -n "$UNINSTALL_SCRIPT" || assert_fail "uninstall.sh 쉘 문법 에러 발견"
     HELP_OUTPUT=$(bash "$INSTALL_SCRIPT" --help)
-    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "config"; then
-        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --config) 및 install.conf.example 템플릿 검증 완료"
+    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "config" && echo "$HELP_OUTPUT" | grep -q "uninstall"; then
+        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --config, --uninstall, --purge), uninstall.sh 래퍼 및 install.conf.example 템플릿 검증 완료"
     else
         assert_fail "install.sh 도움말 출력 검증 실패"
     fi
 else
-    assert_fail "install.sh 또는 install.conf.example 파일이 없거나 실행 권한이 없습니다."
+    assert_fail "install.sh, uninstall.sh 또는 install.conf.example 파일이 없거나 실행 권한이 없습니다."
 fi
 
 # Test 5: ordinatio-ctl 호스트 제어 CLI 검증
@@ -101,8 +103,8 @@ CTL_SCRIPT="${ROOT_DIR}/deploy/standalone/ordinatio-ctl"
 if [ -x "$CTL_SCRIPT" ]; then
     bash -n "$CTL_SCRIPT" || assert_fail "ordinatio-ctl 쉘 문법 에러 발견"
     CTL_HELP=$(bash "$CTL_SCRIPT" help)
-    if echo "$CTL_HELP" | grep -q "status" && echo "$CTL_HELP" | grep -q "reset-admin" && echo "$CTL_HELP" | grep -q "backup"; then
-        assert_pass "ordinatio-ctl 쉘 구문 정상 및 8종 명령 인터페이스(status, start, stop, restart, logs, verify, reset-admin, backup) 확인"
+    if echo "$CTL_HELP" | grep -q "status" && echo "$CTL_HELP" | grep -q "reset-admin" && echo "$CTL_HELP" | grep -q "backup" && echo "$CTL_HELP" | grep -q "uninstall"; then
+        assert_pass "ordinatio-ctl 쉘 구문 정상 및 9종 명령 인터페이스(status, start, stop, restart, logs, verify, reset-admin, backup, uninstall) 확인"
     else
         assert_fail "ordinatio-ctl 명령 인터페이스 검증 실패"
     fi

@@ -192,3 +192,35 @@ vagrant ssh
   sudo chcon -Rt svirt_sandbox_file_t /opt/ordinatio/data
   ```
 
+---
+
+## 7. 어플라이언스 삭제 및 초기화 (Uninstall)
+
+어플라이언스를 호스트에서 제거하거나 초기화할 때는 아래 3가지 방법 중 하나를 사용할 수 있습니다:
+
+### 7.1 표준 삭제 (데이터 보존 모드)
+서비스 및 컨테이너, Systemd 유닛, 호스트 CLI 링크를 정리하되, 데이터베이스 및 감사 로그(`/opt/ordinatio/data`)는 보존합니다:
+```bash
+# 방법 1: 전용 언인스톨 스크립트 실행
+sudo ./deploy/standalone/uninstall.sh
+
+# 방법 2: install.sh 스크립트의 --uninstall 옵션 실행
+sudo ./deploy/standalone/install.sh --uninstall
+
+# 방법 3: ordinatio-ctl 제어 명령어 사용
+sudo ordinatio-ctl uninstall
+```
+
+### 7.2 완전 삭제 (Purge 모드 - 데이터 포함 영구 삭제)
+모든 서비스뿐만 아니라 데이터 디렉토리(`/opt/ordinatio/`) 및 도커 볼륨까지 영구적으로 완전 삭제합니다:
+```bash
+# 대화형 확인 프롬프트와 함께 완전 삭제
+sudo ./deploy/standalone/uninstall.sh --purge
+
+# 확인 프롬프트 생략 무인 완전 삭제
+sudo ./deploy/standalone/uninstall.sh --purge -y
+
+# 또는 ordinatio-ctl 사용
+sudo ordinatio-ctl uninstall --purge -y
+```
+

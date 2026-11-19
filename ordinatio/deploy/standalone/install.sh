@@ -413,6 +413,28 @@ echo -e "${BOLD}================================================================
 echo -e "${BOLD}📁 [Step 1] 어플라이언스 레이아웃 배치 & 동적 암호화 시크릿 생성${NC}"
 echo -e "${BOLD}================================================================${NC}"
 
+# 기존 잔여 데이터베이스 및 실행 중인 서비스 정리 검사
+if [ -d "${TARGET_DIR}/data/postgres" ] && [ "$(ls -A "${TARGET_DIR}/data/postgres" 2>/dev/null)" ]; then
+    echo ""
+    log_warn "기존 데이터베이스(${TARGET_DIR}/data/postgres)가 감지되었습니다."
+    log_warn "신규 설치 시 보안을 위해 새로운 암호화 키와 DB 시크릿이 독립 발급되므로, 기존 데이터가 남아있으면 패스워드 불일치 오류가 발생합니다."
+    
+    if [ "$AUTO_APPROVE" = false ]; then
+        read -p "기존 데이터를 초기화하고 클린 설치를 진행하시겠습니까? (y/N): " -r clean_confirm
+        if [[ ! "$clean_confirm" =~ ^[Yy]$ ]]; then
+            log_error "설치가 중단되었습니다."
+            log_error "기존 데이터를 보존하려면 현재 시스템을 유지하거나, 완전 삭제 후 재설치하려면: sudo $0 --uninstall --purge"
+            exit 1
+        fi
+    fi
+    log_info "기존 데이터베이스 및 볼륨을 초기화합니다..."
+    if [ -f "${TARGET_DIR}/docker-compose.standalone.yml" ] && command -v docker &>/dev/null; then
+        docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" down -v --remove-orphans 2>/dev/null || true
+    fi
+    rm -rf "${TARGET_DIR}/data/postgres"/* "${TARGET_DIR}/data/postgres"/.* 2>/dev/null || true
+    log_success "기존 데이터베이스 초기화 완료."
+fi
+
 # 디렉토리 트리 생성
 mkdir -p "${TARGET_DIR}/data/"{postgres,redis,logs,worm_audit}
 mkdir -p "${TARGET_DIR}/deploy/"{postgres,envoy}
@@ -424,6 +446,8 @@ log_info "설정 파일 및 DDL 복사 중..."
 cp "${SOURCE_DIR}/deploy/standalone/docker-compose.standalone.yml" "${TARGET_DIR}/docker-compose.standalone.yml"
 cp "${SOURCE_DIR}/deploy/postgres/init.sql" "${TARGET_DIR}/deploy/postgres/init.sql"
 cp "${SOURCE_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
+chmod -R 755 "${TARGET_DIR}/deploy"
+chmod 644 "${TARGET_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/postgres/init.sql" 2>/dev/null || true
 
 # Docker Bridge Gateway IP 치환 (Envoy upstream 클러스터 주소)
 if [ -n "$DOCKER_BRIDGE_GATEWAY_IP" ] && [ "$DOCKER_BRIDGE_GATEWAY_IP" != "172.20.0.1" ]; then
@@ -431,17 +455,17 @@ if [ -n "$DOCKER_BRIDGE_GATEWAY_IP" ] && [ "$DOCKER_BRIDGE_GATEWAY_IP" != "172.2
     sed -i "s/address: 172.20.0.1/address: ${DOCKER_BRIDGE_GATEWAY_IP}/g" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
 fi
 
-# 동적 암호화 시크릿 결정
-DYN_POSTGRES_PASS="${CUSTOM_POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
-DYN_SECRET_KEY="${CUSTOM_SECRET_KEY:-$(openssl rand -hex 32)}"
-DYN_PII_SALT="${CUSTOM_PII_SALT:-$(openssl rand -hex 32)}"
-DYN_WORM_KEY="${CUSTOM_WORM_KEY:-$(openssl rand -hex 32)}"
-
 if [ -f "${TARGET_DIR}/.env" ]; then
     log_warn "기존 .env 파일이 존재하여 백업을 생성합니다 (${TARGET_DIR}/.env.bak)."
     cp "${TARGET_DIR}/.env" "${TARGET_DIR}/.env.bak"
     chmod 600 "${TARGET_DIR}/.env.bak"
 fi
+
+# 동적 암호화 시크릿 결정 (신규 독립 발급)
+DYN_POSTGRES_PASS="${CUSTOM_POSTGRES_PASSWORD:-$(openssl rand -hex 16)}"
+DYN_SECRET_KEY="${CUSTOM_SECRET_KEY:-$(openssl rand -hex 32)}"
+DYN_PII_SALT="${CUSTOM_PII_SALT:-$(openssl rand -hex 32)}"
+DYN_WORM_KEY="${CUSTOM_WORM_KEY:-$(openssl rand -hex 32)}"
 
 # .env.template 기반 .env 생성
 sed \
@@ -542,6 +566,9 @@ if [ $COUNT -ge $MAX_RETRIES ]; then
     exit 1
 fi
 log_success "데이터베이스 정상 연결 확인."
+
+# 기존 데이터 볼륨과 신규 .env 간의 패스워드 불일치 방지 (로컬 소켓 기반 동기화)
+docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" exec -T postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '${DYN_POSTGRES_PASS}';" &> /dev/null || true
 
 # 슈퍼관리자 비밀번호 결정
 ADMIN_PASS="${ADMIN_PASSWORD:-${INITIAL_ADMIN_PASSWORD}}"

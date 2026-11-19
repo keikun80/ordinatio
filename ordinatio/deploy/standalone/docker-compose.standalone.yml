@@ -67,6 +67,7 @@ services:
     image: envoyproxy/envoy:v1.31.2
     container_name: ordinatio-envoy
     restart: always
+    user: "0:0"
     networks:
       - ordinatio-net
     volumes:

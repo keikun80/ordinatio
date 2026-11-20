@@ -361,3 +361,54 @@ def test_all_domains_pbac_enforcement(client: TestClient, super_admin_token: str
     assert client.delete("/api/v1/roles/r-dummy", headers=reader_headers).status_code == 403
 
 
+def test_custom_admin_can_access_users_roles_and_tenants(client: TestClient, super_admin_token: str, db_session: Session):
+    """
+    검증: 신규 어드민 역할(users:read/write, roles:manage 보유)을 가진 사용자가
+    governance:read를 명시적으로 부여받지 않더라도, 사용자 관리에 필수적인 /tenants 조회가
+    403 Forbidden 없이 정상 200 OK로 조회되는지 확인.
+    """
+    headers = {"Authorization": f"Bearer {super_admin_token}"}
+    db_session.query(User).filter(User.username == "custom-admin-tester").delete()
+    db_session.query(Role).filter(Role.name == "USER_ROLE_ADMIN").delete()
+    db_session.commit()
+
+    # 1. 새 커스텀 역할 생성 (users:read, users:write, roles:manage)
+    create_payload = {
+        "name": "USER_ROLE_ADMIN",
+        "display_name": "계정 및 권한 관리자",
+        "description": "사용자 및 역할 관리만 전담하는 커스텀 어드민",
+        "permissions": ["overview:read", "users:read", "users:write", "roles:manage"]
+    }
+    res_role = client.post("/api/v1/roles", json=create_payload, headers=headers)
+    assert res_role.status_code == 201
+
+    # 2. 사용자 생성
+    tenant = db_session.query(Tenant).first()
+    user_payload = {
+        "username": "custom-admin-tester",
+        "full_name": "커스텀 관리자",
+        "email": "custom-admin-tester@ordinatio.local",
+        "password": "Password123!",
+        "role": "USER_ROLE_ADMIN",
+        "tenant_id": tenant.tenant_id if tenant else None
+    }
+    res_user = client.post("/api/v1/users", json=user_payload, headers=headers)
+    assert res_user.status_code == 201
+
+    # 3. 로그인 및 토큰 획득
+    login_resp = client.post("/api/v1/auth/login", json={"username": "custom-admin-tester", "password": "Password123!"})
+    assert login_resp.status_code == 200
+    custom_token = login_resp.json()["access_token"]
+    custom_headers = {"Authorization": f"Bearer {custom_token}"}
+
+    # 4. UsersTab의 4개 필수 API 호출 검증
+    assert client.get("/api/v1/users", headers=custom_headers).status_code == 200
+    assert client.get("/api/v1/roles", headers=custom_headers).status_code == 200
+    assert client.get("/api/v1/roles/permissions", headers=custom_headers).status_code == 200
+    # 핵심: tenants도 users:read 권한에 의해 200 OK로 정상 조회되어야 함!
+    res_tenants = client.get("/api/v1/tenants", headers=custom_headers)
+    assert res_tenants.status_code == 200
+    assert isinstance(res_tenants.json(), list)
+
+
+

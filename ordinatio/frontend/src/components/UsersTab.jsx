@@ -87,21 +87,36 @@ export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [userList, tenantList, roleList, permList] = await Promise.all([
+      const [userResult, tenantResult, roleResult, permResult] = await Promise.allSettled([
         apiClient.getUsers(),
         apiClient.getTenants(),
         apiClient.getRoles(),
         apiClient.getRolePermissions()
       ]);
+
+      const userList = userResult.status === 'fulfilled' ? userResult.value : [];
+      const tenantList = tenantResult.status === 'fulfilled' ? tenantResult.value : [];
+      const roleList = roleResult.status === 'fulfilled' ? roleResult.value : [];
+      const permList = permResult.status === 'fulfilled' ? permResult.value : [];
+
       setUsers(userList || []);
       setTenants(tenantList || []);
       setRoles(roleList || []);
       setAvailablePermissions(permList || []);
+
       if (tenantList && tenantList.length > 0 && !newTenantId) {
         setNewTenantId(tenantList[0].tenant_id);
       }
       if (roleList && roleList.length > 0 && !newRole) {
         setNewRole(roleList[0].name);
+      }
+
+      // 비정상 실패가 발생한 경우에만 경고 알림 표시 (개별 실패 격리)
+      const failures = [];
+      if (userResult.status === 'rejected') failures.push(userResult.reason?.message || '사용자 목록');
+      if (roleResult.status === 'rejected') failures.push(roleResult.reason?.message || '역할 목록');
+      if (failures.length > 0 && onNotify) {
+        onNotify('warning', strings.users.alerts.loadFailed(failures.join(', ')));
       }
     } catch (err) {
       if (onNotify) onNotify('error', strings.users.alerts.loadFailed(err.message));

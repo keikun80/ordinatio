@@ -175,6 +175,52 @@ def require_permission(permission_code: str) -> Callable:
 
     return permission_checker
 
+def require_any_permission(*permission_codes: str) -> Callable:
+    """
+    Enforce fine-grained PBAC allowing access if the user possesses ANY of the given permission codes.
+    - SUPER_ADMIN: unrestricted access to all permissions.
+    - Custom / standard roles: check if '*' or any requested permission_code matches role.permissions.
+    - Supports automatic :write equivalence for :read permissions.
+    """
+    def permission_checker(
+        token: Optional[str] = Depends(extract_token_from_request),
+        db: Session = Depends(get_db)
+    ) -> User:
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="인증되지 않은 요청입니다. 로그인이 필요합니다.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        current_user = get_current_user(token=token, db=db)
+        if current_user.role == "SUPER_ADMIN":
+            return current_user
+
+        role = db.query(Role).filter(Role.name == current_user.role).first()
+        perms = role.permissions if role and role.permissions else []
+
+        if "*" in perms:
+            return current_user
+
+        for permission_code in permission_codes:
+            if permission_code in perms:
+                return current_user
+            if permission_code.endswith(":read"):
+                write_equiv = permission_code.replace(":read", ":write")
+                if write_equiv in perms:
+                    return current_user
+                if permission_code == "users:read" and "roles:manage" in perms:
+                    return current_user
+
+        codes_str = ", ".join(f"'{c}'" for c in permission_codes)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"접근 권한이 없습니다. (필요 권한 중 하나: [{codes_str}], 현재 역할: '{current_user.role}')"
+        )
+
+    return permission_checker
+
 def get_tenant_scope(current_user: User = Depends(get_current_user)) -> Optional[str]:
     """
     Returns tenant_id for scoped data access.

@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
 from app.schemas.tenant import TenantCreate, TenantResponse, TenantUpdate
-from app.api.deps import require_permission, get_tenant_scope
+from app.api.deps import require_permission, require_any_permission, get_tenant_scope
 
 router = APIRouter(prefix="/tenants", tags=["Multi-Tenant Governance"])
 
@@ -21,7 +21,7 @@ def _require_global_scope(tenant_scope: Optional[str]) -> None:
             detail="부서(테넌트) 생성·수정·삭제는 전사 관리자만 수행할 수 있습니다. (소속 부서 한정 권한)"
         )
 
-@router.get("", response_model=List[TenantResponse], dependencies=[Depends(require_permission("governance:read"))])
+@router.get("", response_model=List[TenantResponse], dependencies=[Depends(require_any_permission("governance:read", "users:read"))])
 def list_tenants(
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
@@ -99,7 +99,7 @@ def create_tenant(
         updated_at=tenant.updated_at
     )
 
-@router.get("/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(require_permission("governance:read"))])
+@router.get("/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(require_any_permission("governance:read", "users:read"))])
 def get_tenant(
     tenant_id: str,
     tenant_scope: Optional[str] = Depends(get_tenant_scope),

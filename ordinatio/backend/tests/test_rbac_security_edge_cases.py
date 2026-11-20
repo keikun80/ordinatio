@@ -246,3 +246,60 @@ def test_scenario_6_user_creation_with_empty_or_whitespace_tenant_id_sanitized(c
     # 클린업
     db_session.query(User).filter(User.username.in_(["sec-user-empty-tenant", "sec-user-space-tenant"])).delete()
     db_session.commit()
+
+
+def test_scenario_7_reset_user_password_by_admin(client: TestClient, setup_tenants_and_admin, db_session: Session):
+    """
+    [시나리오 7: 관리자에 의한 타 사용자 비밀번호 초기화 (POST /api/v1/users/{user_id}/reset-password)]
+    1. Super Admin이 타 사용자(B부서 사용자)의 비밀번호를 정상 초기화 (200 OK)
+    2. 변경된 비밀번호로 해당 사용자 로그인 성공 검증
+    3. 존재하지 않는 사용자 ID에 대해 404 Not Found 검증
+    4. 8자 미만 짧은 비밀번호에 대해 422 Unprocessable Entity 검증
+    5. A부서 관리자가 B부서 사용자의 비밀번호 초기화 시 403 Forbidden 차단 검증
+    6. A부서 관리자가 Super Admin의 비밀번호 초기화 시 403 Forbidden 차단 검증
+    """
+    login_sa = client.post("/api/v1/auth/login", json={"username": "sec-super-admin", "password": "SuperSecret123!"})
+    sa_headers = {"Authorization": f"Bearer {login_sa.json()['access_token']}"}
+
+    tb_user = setup_tenants_and_admin["tb"]
+    sa_user = setup_tenants_and_admin["sa"]
+
+    # 1. Super Admin이 tb_user 비밀번호를 초기화
+    reset_res = client.post(f"/api/v1/users/{tb_user.id}/reset-password", json={
+        "new_password": "NewResetPassword123!"
+    }, headers=sa_headers)
+    assert reset_res.status_code == 200, f"비밀번호 초기화 실패: {reset_res.status_code} - {reset_res.text}"
+
+    # 2. 변경된 비밀번호로 로그인 성공 확인
+    tb_login = client.post("/api/v1/auth/login", json={
+        "username": "sec-dept-b-user",
+        "password": "NewResetPassword123!"
+    })
+    assert tb_login.status_code == 200, "초기화된 새 비밀번호로 로그인이 되지 않음!"
+
+    # 3. 존재하지 않는 유저 ID는 404 Not Found
+    res_404 = client.post("/api/v1/users/non-existent-user-id/reset-password", json={
+        "new_password": "NewResetPassword123!"
+    }, headers=sa_headers)
+    assert res_404.status_code == 404
+
+    # 4. 8자 미만 비밀번호는 422
+    res_422 = client.post(f"/api/v1/users/{tb_user.id}/reset-password", json={
+        "new_password": "short"
+    }, headers=sa_headers)
+    assert res_422.status_code == 422
+
+    # 5. A부서 관리자가 타 부서(B부서) 사용자 비밀번호 초기화 시 403 차단
+    login_ta = client.post("/api/v1/auth/login", json={"username": "sec-dept-a-admin", "password": "DeptAdmin123!"})
+    ta_headers = {"Authorization": f"Bearer {login_ta.json()['access_token']}"}
+
+    res_cross = client.post(f"/api/v1/users/{tb_user.id}/reset-password", json={
+        "new_password": "CrossTenantHack123!"
+    }, headers=ta_headers)
+    assert res_cross.status_code == 403, f"타 부서 관리자의 비밀번호 초기화가 허용됨! ({res_cross.status_code})"
+
+    # 6. A부서 관리자가 Super Admin 비밀번호 초기화 시 403 차단
+    res_sa_block = client.post(f"/api/v1/users/{sa_user.id}/reset-password", json={
+        "new_password": "SuperAdminHack123!"
+    }, headers=ta_headers)
+    assert res_sa_block.status_code == 403, f"비-슈퍼관리자의 슈퍼관리자 비밀번호 초기화가 허용됨! ({res_sa_block.status_code})"

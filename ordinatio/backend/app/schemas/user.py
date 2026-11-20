@@ -71,3 +71,7 @@ class UserUpdateRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, description="최소 8자 이상의 새 비밀번호")

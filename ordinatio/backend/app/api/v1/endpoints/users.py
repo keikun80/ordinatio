@@ -20,6 +20,7 @@ from app.core.permissions import ALL_PERMISSION_CODES
 from app.schemas.user import (
     UserCreateRequest,
     UserUpdateRequest,
+    ResetPasswordRequest,
     UserResponse
 )
 from app.api.deps import require_roles, require_permission, get_current_user
@@ -251,3 +252,40 @@ def delete_user(
     db.delete(user)
     db.commit()
     return None
+
+@router.post("/{user_id}/reset-password", response_model=UserResponse, dependencies=[Depends(users_write_guard)])
+def reset_user_password(
+    user_id: str,
+    req: ResetPasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset target user password (Admin/Operator only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다."
+        )
+
+    # Protection Guard: Non-SUPER_ADMIN cannot reset a SUPER_ADMIN's password
+    if user.role == "SUPER_ADMIN" and current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전사 최고 관리자 계정의 비밀번호는 다른 최고 관리자만 재설정할 수 있습니다."
+        )
+
+    # Cross-Tenant Protection Guard: Non-SUPER_ADMIN can only reset passwords of users in their own tenant
+    if current_user.role != "SUPER_ADMIN" and current_user.tenant_id:
+        if user.tenant_id != current_user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="타 부서 사용자의 비밀번호는 재설정할 수 없습니다."
+            )
+
+    user.password_hash = hash_password(req.new_password)
+    user.failed_login_count = 0
+    user.locked_until = None
+    db.commit()
+    db.refresh(user)
+    return _to_user_response(user, db)

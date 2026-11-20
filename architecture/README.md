@@ -105,6 +105,7 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 - [PRE_22_make_commands_test_results.md](./testdocs/PRE_22_make_commands_test_results.md): 전체 Make 명령어 테스트 결과 보고서 (33/33 PASS)
 - [PRE_25_all_menus_integrated_test_scenario_and_monitoring_plan.md](./testdocs/PRE_25_all_menus_integrated_test_scenario_and_monitoring_plan.md): 8대 전 메뉴 통합 시나리오 자동 검증 계획서 (10/10 PASS)
 - [PRE_26_bifurcated_testing_strategy_local_vs_production.md](./PRE_26_bifurcated_testing_strategy_local_vs_production.md): 로컬 vs 실사용 환경 이원화 테스트 전략 및 품질 게이트 계획서 (신규 확정)
+- [PRE_27_multipass_based_unified_testing_architecture_and_migration_plan.md](./PRE_27_multipass_based_unified_testing_architecture_and_migration_plan.md): Multipass 기반 크로스 플랫폼(Win11/Mac) 통합 테스트베드 아키텍처 및 마이그레이션 계획서 (신규 확정)
 - [PRE_41_rocky_linux_vagrant_offline_installation_test_results.md](./testdocs/PRE_41_rocky_linux_vagrant_offline_installation_test_results.md): Rocky Linux 9 가상머신 오프라인 설치 실증 보고서
 - [PRE_42_ubuntu_24_vagrant_offline_installation_test_plan.md](./testdocs/PRE_42_ubuntu_24_vagrant_offline_installation_test_plan.md): Ubuntu 24.04 LTS 가상머신 오프라인 설치 계획서
 - [PRE_43_ubuntu_24_vagrant_offline_installation_test_results.md](./testdocs/PRE_43_ubuntu_24_vagrant_offline_installation_test_results.md): Ubuntu 24.04 LTS 가상머신 오프라인 설치 실증 보고서

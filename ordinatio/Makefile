@@ -1,5 +1,6 @@
 .PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down release init-admin \
 	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
+	mp-setup mp-standalone mp-k8s mp-clean \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -36,6 +37,12 @@ help:
 	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
 	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD (optional: CONFIG=test_config.json)"
 	@echo "  make verify-standalone-install - Run Standalone Installer & Vagrant Deployment DoD"
+	@echo ""
+	@echo "  [Multipass Cross-Platform VM Testbed (Win11/WSL2 & macOS)]"
+	@echo "  make mp-setup                  - Check and initialize Multipass host environment"
+	@echo "  make mp-standalone             - Run Standalone (systemctl + Docker) test in clean Multipass VM"
+	@echo "  make mp-k8s                    - Run Kubernetes (MicroK8s/K3s) deployment test in Multipass VM"
+	@echo "  make mp-clean                  - Teardown and purge all Multipass test instances"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
 	@echo "  make k8s-up                    - Deploy full stack to Kubernetes (alias of k8s-deploy)"
@@ -145,6 +152,18 @@ verify-rbac-scenarios:
 
 verify-standalone-install:
 	@bash scripts/verify-standalone-install.sh
+
+mp-setup:
+	@bash scripts/multipass/mp-setup.sh
+
+mp-standalone:
+	@bash scripts/multipass/mp-standalone.sh $(if $(CONFIG),--config $(CONFIG),)
+
+mp-k8s:
+	@bash scripts/multipass/mp-k8s.sh
+
+mp-clean:
+	@bash scripts/multipass/mp-teardown.sh
 
 init-admin:
 	@if docker ps --format '{{.Names}}' | grep -q '^ordinatio-backend$$'; then \

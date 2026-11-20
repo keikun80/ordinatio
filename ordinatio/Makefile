@@ -85,6 +85,7 @@ run-frontend:
 
 up:
 	@echo "==> Starting Development Stack (Live Source Mounts: Vite HMR + FastAPI --reload)..."
+	@if [ ! -f .env ]; then echo "==> Auto-creating .env from .env.example..."; cp .env.example .env; fi
 	@docker build -t ordinatio-backend ./backend
 	@docker build --target dev -t ordinatio-frontend ./frontend
 	@docker compose up -d

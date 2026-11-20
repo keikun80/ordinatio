@@ -82,17 +82,6 @@ export default function ModelCatalog({
               <RefreshCw size={14} className={isHealthCheckingAll ? 'spin' : ''} />
               <span>{isHealthCheckingAll ? strings.common.loading : strings.routing.catalog.healthCheckAll}</span>
             </button>
-            <button
-              className="btn btn-primary btn-sm"
-              data-testid="rt-catalog-btn-register"
-              data-function-id="FNC-RT-REGISTER-MODEL"
-              disabled={!canWriteRouting}
-              onClick={() => canWriteRouting && setShowNewModelModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed' }}
-            >
-              <Plus size={14} />
-              <span>{strings.routing.catalog.registerModel}</span>
-            </button>
           </div>
         </div>
 

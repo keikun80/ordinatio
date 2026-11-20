@@ -1086,13 +1086,41 @@ print(response.choices[0].message.content)`;
             {strings.routing.header.desc}
           </p>
         </div>
-        <div className="page-actions" style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={() => setShowNewRouteModal(true)}>
-            <GitFork size={15} /> <span>{strings.routing.header.btnNewRoute}</span>
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowNewModelModal(true)}>
-            <Plus size={15} /> <span>{strings.routing.header.btnRegisterModel}</span>
-          </button>
+        <div className="page-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {activeSubTab === 'routing' && (
+            <button 
+              className="btn btn-primary"
+              disabled={!canWriteRouting}
+              data-testid="rt-btn-new-route"
+              data-function-id="FNC-RT-CREATE-ROUTE"
+              onClick={() => canWriteRouting && setShowNewRouteModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed' }}
+            >
+              <GitFork size={15} /> <span>{strings.routing.header.btnNewRoute}</span>
+            </button>
+          )}
+          {activeSubTab === 'catalog' && (
+            <button 
+              className="btn btn-primary"
+              disabled={!canWriteRouting}
+              data-testid="rt-catalog-btn-register"
+              data-function-id="FNC-RT-REGISTER-MODEL"
+              onClick={() => canWriteRouting && setShowNewModelModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed' }}
+            >
+              <Plus size={15} /> <span>{strings.routing.header.btnRegisterModel}</span>
+            </button>
+          )}
+          {activeSubTab === 'dispatch' && (
+            <button
+              className="btn btn-secondary"
+              disabled={!canWriteRouting}
+              onClick={() => canWriteRouting && setShowPolicyModal(true)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed', color: 'var(--accent-purple)' }}
+            >
+              <Settings size={15} /> <span>{strings.routing.subtabs.agentPolicySettingsBtn}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1116,6 +1144,7 @@ print(response.choices[0].message.content)`;
             return (
               <button
                 key={tab.id}
+                data-testid={`com-subtab-routing-${tab.id}`}
                 onClick={() => setActiveSubTab(tab.id)}
                 style={{
                   display: 'flex',
@@ -1160,54 +1189,6 @@ print(response.choices[0].message.content)`;
               </button>
             );
           })}
-        </div>
-
-        {/* Subtab Contextual Quick Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '6px' }}>
-          {activeSubTab === 'routing' && (
-            <button 
-              className="btn btn-secondary btn-sm"
-              disabled={!canWriteRouting}
-              data-testid="rt-btn-new-route"
-              data-function-id="FNC-RT-CREATE-ROUTE"
-              onClick={() => canWriteRouting && setShowNewRouteModal(true)} 
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed' }}
-            >
-              <GitFork size={13} /> <span>{strings.routing.header.btnNewRoute}</span>
-            </button>
-          )}
-          {activeSubTab === 'catalog' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button 
-                className="btn btn-secondary btn-sm" 
-                onClick={() => handleCheckAllHealth()}
-                disabled={isHealthCheckingAll}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
-                title={strings.routing.catalog.healthCheckAll}
-              >
-                <RefreshCw size={13} className={isHealthCheckingAll ? 'spin' : ''} />
-                <span>{strings.routing.subtabs.healthCheckAllBtn}</span>
-              </button>
-              <button 
-                className="btn btn-primary btn-sm"
-                disabled={!canWriteRouting}
-                onClick={() => canWriteRouting && setShowNewModelModal(true)} 
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed' }}
-              >
-                <Plus size={13} /> <span>{strings.routing.header.btnRegisterModel}</span>
-              </button>
-            </div>
-          )}
-          {activeSubTab === 'dispatch' && (
-            <button
-              className="btn btn-secondary btn-sm"
-              disabled={!canWriteRouting}
-              onClick={() => canWriteRouting && setShowPolicyModal(true)} 
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', opacity: canWriteRouting ? 1 : 0.45, cursor: canWriteRouting ? 'pointer' : 'not-allowed', color: 'var(--accent-purple)' }}
-            >
-              <Settings size={13} /> <span>{strings.routing.subtabs.agentPolicySettingsBtn}</span>
-            </button>
-          )}
         </div>
       </div>
 

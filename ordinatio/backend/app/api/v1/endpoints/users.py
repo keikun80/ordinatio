@@ -78,9 +78,17 @@ def list_users(
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(users_write_guard)])
 def create_user(
     req: UserCreateRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new operator/user account with role and tenant mapping."""
+    # Privilege Escalation Guard: Only SUPER_ADMIN can assign SUPER_ADMIN role
+    if req.role == "SUPER_ADMIN" and current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전사 최고 관리자(SUPER_ADMIN) 역할은 최고 관리자만 생성하거나 부여할 수 있습니다."
+        )
+
     # Check duplicate username
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(
@@ -131,6 +139,7 @@ def create_user(
 def update_user(
     user_id: str,
     req: UserUpdateRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update user role, tenant binding, status, password, or reset lockout."""
@@ -140,6 +149,34 @@ def update_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다."
         )
+
+    # Privilege Escalation Guard: Non-SUPER_ADMIN cannot promote anyone to SUPER_ADMIN
+    if req.role == "SUPER_ADMIN" and current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전사 최고 관리자(SUPER_ADMIN) 역할은 최고 관리자만 부여할 수 있습니다."
+        )
+
+    # Protection Guard: Non-SUPER_ADMIN cannot modify SUPER_ADMIN accounts
+    if user.role == "SUPER_ADMIN" and current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전사 최고 관리자 계정은 다른 최고 관리자만 수정할 수 있습니다."
+        )
+
+    # Anti-Orphaned Lockout Guard: Cannot deactivate self if SUPER_ADMIN, and last active SUPER_ADMIN cannot be deactivated
+    if req.is_active is False and user.role == "SUPER_ADMIN":
+        if current_user.id == user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="현재 로그인 중인 본인 전사 최고 관리자(SUPER_ADMIN) 계정은 비활성화할 수 없습니다."
+            )
+        active_sa_count = db.query(User).filter(User.role == "SUPER_ADMIN", User.is_active == True).count()
+        if active_sa_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="시스템 내 유일한 활성 전사 최고 관리자(SUPER_ADMIN) 계정은 비활성화할 수 없습니다."
+            )
 
     if req.full_name is not None:
         user.full_name = req.full_name
@@ -193,6 +230,22 @@ def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다."
         )
+
+    # Protection Guard: Non-SUPER_ADMIN cannot delete a SUPER_ADMIN
+    if user.role == "SUPER_ADMIN" and current_user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전사 최고 관리자 계정은 다른 최고 관리자만 삭제할 수 있습니다."
+        )
+
+    # Anti-Orphaned Lockout Guard: The last active SUPER_ADMIN cannot be deleted
+    if user.role == "SUPER_ADMIN":
+        active_sa_count = db.query(User).filter(User.role == "SUPER_ADMIN", User.is_active == True).count()
+        if active_sa_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="시스템 내 유일한 전사 최고 관리자(SUPER_ADMIN) 계정은 삭제할 수 없습니다."
+            )
 
     db.delete(user)
     db.commit()

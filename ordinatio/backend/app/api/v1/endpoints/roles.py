@@ -99,6 +99,14 @@ def update_role(
             detail="해당 역할을 찾을 수 없습니다."
         )
 
+    # System Role Immutability Guard: Cannot alter or reduce core permissions of system built-in roles
+    if role.is_system:
+        if req.permissions is not None and (role.name == "SUPER_ADMIN" or not req.permissions):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"시스템 기본 역할({role.name})의 핵심 권한은 수정하거나 축소할 수 없습니다."
+            )
+
     if req.display_name is not None:
         role.display_name = req.display_name.strip()
     if req.description is not None:

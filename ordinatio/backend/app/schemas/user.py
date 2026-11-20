@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 class UserLoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=255, description="사용자 아이디 또는 이메일")
@@ -41,6 +41,14 @@ class UserCreateRequest(BaseModel):
     role: str = Field(default="VIEWER", description="SUPER_ADMIN, TENANT_ADMIN, VIEWER")
     tenant_id: Optional[str] = None
 
+    @field_validator("tenant_id", mode="before")
+    @classmethod
+    def sanitize_tenant_id(cls, v: Optional[str]) -> Optional[str]:
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            return v_stripped if v_stripped else None
+        return v
+
 
 class UserUpdateRequest(BaseModel):
     full_name: Optional[str] = None
@@ -50,6 +58,14 @@ class UserUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
     password: Optional[str] = None
     unlock: Optional[bool] = Field(default=None, description="계정 잠금 강제 해제 여부")
+
+    @field_validator("tenant_id", mode="before")
+    @classmethod
+    def sanitize_tenant_id(cls, v: Optional[str]) -> Optional[str]:
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            return v_stripped if v_stripped else None
+        return v
 
 
 class PasswordChangeRequest(BaseModel):

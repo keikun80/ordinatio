@@ -1444,6 +1444,7 @@ export const strings = {
       roleViewer: 'VIEWER (조회 전용)',
       roleSuperAdmin: 'SUPER_ADMIN (전사 최고관리자)',
       tenantLabel: '소속 테넌트 (부서)*',
+      noTenantSelect: '선택 안 함 (전사/무소속)',
       initPasswordLabel: '초기 비밀번호 (최소 8자)*',
       initPasswordPlaceholder: '비밀번호 입력',
       confirmPasswordLabel: '비밀번호 확인*',

@@ -152,7 +152,7 @@ export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
         full_name: newFullName.trim(),
         email: newEmail.trim(),
         role: newRole,
-        tenant_id: newRole === 'SUPER_ADMIN' ? null : newTenantId,
+        tenant_id: (newRole === 'SUPER_ADMIN' || !newTenantId?.trim()) ? null : newTenantId.trim(),
         password: newPassword
       });
 
@@ -226,7 +226,7 @@ export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
         full_name: editFullName.trim(),
         email: editEmail.trim(),
         role: editRole,
-        tenant_id: editRole === 'SUPER_ADMIN' ? '' : editTenantId
+        tenant_id: (editRole === 'SUPER_ADMIN' || !editTenantId?.trim()) ? null : editTenantId.trim()
       });
 
       if (onNotify) onNotify('success', strings.users.alerts.updatedSuccess(editUsername));
@@ -1137,6 +1137,7 @@ export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
                     onChange={(e) => setNewTenantId(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', opacity: newRole === 'SUPER_ADMIN' ? 0.5 : 1 }}
                   >
+                    <option value="">{strings.users.modal.noTenantSelect || '선택 안 함 (전사/무소속)'}</option>
                     {tenants.map((t) => (
                       <option key={t.tenant_id} value={t.tenant_id}>
                         {t.name} ({t.department_code || t.tenant_id})
@@ -1422,6 +1423,7 @@ export default function UsersTab({ onNotify, defaultSubTab = 'users' }) {
                     onChange={(e) => setEditTenantId(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '0.85rem', opacity: editRole === 'SUPER_ADMIN' ? 0.5 : 1 }}
                   >
+                    <option value="">{strings.users.modal.noTenantSelect || '선택 안 함 (전사/무소속)'}</option>
                     {tenants.map((t) => (
                       <option key={t.tenant_id} value={t.tenant_id}>
                         {t.name} ({t.department_code || t.tenant_id})

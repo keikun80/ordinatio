@@ -192,3 +192,57 @@ def test_scenario_5_cross_tenant_user_modification_blocked(client: TestClient, s
     # 2. 타 부서 사용자 삭제 시도
     res_del = client.delete(f"/api/v1/users/{tb_user_id}", headers=ta_headers)
     assert res_del.status_code == 403, f"A부서 관리자가 B부서 사용자의 계정 삭제에 성공함! (Status: {res_del.status_code})"
+
+
+def test_scenario_6_user_creation_with_empty_or_whitespace_tenant_id_sanitized(client: TestClient, setup_tenants_and_admin, db_session: Session):
+    """
+    [실패할 만한 시나리오 6: tenant_id가 빈 문자열('') 또는 공백일 때 ForeignKeyViolation 500 에러 방지 및 정규화]
+    프론트엔드 모달에서 부서 미선택 또는 전사 역할 생성 시 tenant_id="" 가 전달될 때
+    DB 외래키 제약조건(users_tenant_id_fkey) 위반 500 에러가 발생하지 않고,
+    None(NULL)으로 안전하게 정규화되어 201 Created로 사용자 생성이 완료되어야 함.
+    """
+    login_sa = client.post("/api/v1/auth/login", json={"username": "sec-super-admin", "password": "SuperSecret123!"})
+    sa_headers = {"Authorization": f"Bearer {login_sa.json()['access_token']}"}
+
+    # 1. tenant_id="" (빈 문자열)으로 사용자 생성
+    res_empty = client.post("/api/v1/users", json={
+        "username": "sec-user-empty-tenant",
+        "full_name": "무소속사용자1",
+        "email": "empty-tenant@ordinatio.local",
+        "role": "VIEWER",
+        "tenant_id": "",
+        "password": "Password123!"
+    }, headers=sa_headers)
+
+    assert res_empty.status_code == 201, f"tenant_id='' 전달 시 201이 아닌 에러 반환: {res_empty.status_code} - {res_empty.text}"
+    user_data = res_empty.json()
+    assert user_data["tenant_id"] is None, f"tenant_id가 None으로 정규화되지 않음: {user_data['tenant_id']}"
+
+    # 2. tenant_id="   " (공백 문자열)으로 사용자 생성
+    res_space = client.post("/api/v1/users", json={
+        "username": "sec-user-space-tenant",
+        "full_name": "무소속사용자2",
+        "email": "space-tenant@ordinatio.local",
+        "role": "VIEWER",
+        "tenant_id": "   ",
+        "password": "Password123!"
+    }, headers=sa_headers)
+
+    assert res_space.status_code == 201, f"tenant_id='   ' 전달 시 201이 아닌 에러 반환: {res_space.status_code} - {res_space.text}"
+    assert res_space.json()["tenant_id"] is None
+
+    # 3. 잘못된(존재하지 않는) 테넌트 ID 전달 시에는 400 Bad Request
+    res_invalid = client.post("/api/v1/users", json={
+        "username": "sec-user-invalid-tenant",
+        "full_name": "잘못된테넌트사용자",
+        "email": "invalid-tenant@ordinatio.local",
+        "role": "VIEWER",
+        "tenant_id": "non-existent-tenant-id",
+        "password": "Password123!"
+    }, headers=sa_headers)
+
+    assert res_invalid.status_code == 400, f"존재하지 않는 테넌트 ID인데 400이 아님: {res_invalid.status_code}"
+
+    # 클린업
+    db_session.query(User).filter(User.username.in_(["sec-user-empty-tenant", "sec-user-space-tenant"])).delete()
+    db_session.commit()

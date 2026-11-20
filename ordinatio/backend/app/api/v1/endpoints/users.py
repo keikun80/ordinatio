@@ -113,12 +113,13 @@ def create_user(
         )
 
     # Validate tenant if provided
-    if req.tenant_id:
-        tenant = db.query(Tenant).filter(Tenant.tenant_id == req.tenant_id).first()
+    tenant_id = req.tenant_id.strip() if (req.tenant_id and req.tenant_id.strip()) else None
+    if tenant_id:
+        tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
         if not tenant:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"존재하지 않는 부서(테넌트) ID입니다: '{req.tenant_id}'"
+                detail=f"존재하지 않는 부서(테넌트) ID입니다: '{tenant_id}'"
             )
 
     new_user = User(
@@ -127,7 +128,7 @@ def create_user(
         email=req.email,
         password_hash=hash_password(req.password),
         role=req.role,
-        tenant_id=req.tenant_id,
+        tenant_id=tenant_id,
         is_active=True
     )
     db.add(new_user)

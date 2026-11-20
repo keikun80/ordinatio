@@ -1,15 +1,15 @@
 # Ordinatio Phase 0 ~ 6 종합 구현 계획 및 테스트 결과 보고서 (Executive Engineering Report)
 
-**문서 번호**: ORDINATIO-ENG-REP-20261117  
+**문서 번호**: ORDINATIO-ENG-REP-20261120  
 **대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-11-17 (Phase 0~6: 시스템 프롬프트 거버넌스, 금융권 RBAC, Standalone 무인 설치기, strings.js 현지화, ALB 신뢰 프록시, 120s 타임아웃 완결)  
-**검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 102/102 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
+**작성 일자**: 2026-11-20 (최신 현행화: 백엔드 111/111 Tests PASS, 관리자 비밀번호 초기화 API, 테넌트 외래키 정규화, 모델등록 버튼 단일화, Envoy 8080 게이트웨이 포트 매핑, VPC 내부 DNS 10.10.0.2 연동, 로컬/실사용 이원화 테스트 전략 수립)  
+**검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 111/111 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
 
 ---
 
 ## 1. 종합 요약 및 엔지니어링 개요 (Executive Summary)
 
-본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`ordinatio/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, AWS ALB/Nginx 신뢰 프록시, Read 120s/Connect 10s 타임아웃 분리, 상용 인프라 표준화 Phase C/B/A)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
+본 문서는 `architecture/PRE_01_dashboard_engineering_plan.md`의 마스터 아키텍처 정의에 따라, 상용급 모노레포(`ordinatio/`)에 순차 구현 및 검증된 **Phase 0부터 Phase 6(공통 기반, L7 AI Gateway, 멀티 테넌시/가상키, 동적 xDS 라우팅, 관제 및 FinOps, PII 마스킹/WORM 포렌식, 에어갭 핫픽스 엔진, 동적 시스템 프롬프트 거버넌스, 금융권 RBAC 인증, Standalone 무인 설치 툴 & Vagrant 테스트베드, 종합 보안 하드닝, 프론트엔드 strings.js 100% 현지화, AWS ALB/Nginx 신뢰 프록시, VPC 내부 DNS 해석 보장, 관리자 비밀번호 초기화 API, 이원화 테스트 전략 PRE_26)**까지의 종합 구현 계획서(Implementation Plan)와 자동화 테스트 결과(Test Results)를 총괄 정리한 최종 보고서입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -45,16 +45,18 @@
 | **Phase 6: 현지화** | [PRE_35_frontend_ui_strings_implementation_and_test_results.md](./PRE_35_frontend_ui_strings_implementation_and_test_results.md) | 15개 UI 컴포넌트 한글 리터럴 100% 제거, strings.js 단일 진실 공급원 전면 일원화, Vite 빌드 통과 | `npm run build` | Vite Build PASS |
 | **Phase 6: 권한/그룹 편집** | [PRE_37_user_role_and_tenant_edit_engineering_plan.md](./PRE_37_user_role_and_tenant_edit_engineering_plan.md) | 사용자 관리 ✏️ [수정] 모달, Role 및 Tenant 변경 파이프라인, HTTP PATCH 정합화, 본인 강등 방지 | `npm run build` & `pytest` | 86/86 & Vite PASS |
 | **Phase 6: 동적 Role 관리** | [PRE_38_dynamic_role_management_engineering_plan_and_test_results.md](./PRE_38_dynamic_role_management_engineering_plan_and_test_results.md) | 커스텀 Role 추가/수정/삭제 REST API, 10대 도메인 17종 세부 권한 PBAC 전 엔드포인트/UI 적용, Vite 및 테스트 통과 | `npm run build` & `pytest` | 93/93 & Vite PASS |
-| **Phase 6: 보안 & 프록시** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | AWS ALB/Nginx 신뢰 프록시 헤더 검증, P0 보안 차단, Docker 브릿지 업스트림 연동 | `pytest` | **102 / 102 PASS** |
+| **Phase 6: 보안 & 프록시** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | AWS ALB/Nginx 신뢰 프록시 헤더 검증, P0 보안 차단, Docker 브릿지 업스트림 연동 | `pytest` | 102 / 102 PASS |
+| **Phase 6: 사용자 보안 강화** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 관리자 비밀번호 초기화(`POST /users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 단일화 | `pytest` | 111 / 111 PASS |
+| **Phase 6: 이원화 테스트 전략** | [PRE_26_bifurcated_testing_strategy_local_vs_production.md](../PRE_26_bifurcated_testing_strategy_local_vs_production.md) | 로컬 고속 계약 검증 vs 실환경 L3/L4 DNS & 포트 프로빙 이원화 전략 확립 및 Day-0 부트스트랩 가드 | `make up` & `verify` | **111 / 111 PASS** |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (102 / 102 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (111 / 111 백엔드 테스트 100% 통과)
 
 ```bash
 # 전체 테스트 실행 명령어
 cd ordinatio/backend && uv run pytest -v
-# 결과: 102 passed, 3 warnings in 78.95s (100% PASS)
+# 결과: 111 passed, 3 warnings in 83.61s (100% PASS)
 ```
 
 | 테스트 파일 | 테스트 케이스 명칭 | 검증 목적 및 동작 내용 | 상태 |

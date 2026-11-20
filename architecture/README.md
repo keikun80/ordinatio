@@ -14,7 +14,7 @@
 | :--- | :--- | :---: |
 | [PRE_00_comparison.md](./00_core_and_blueprint/PRE_00_comparison.md) | **사전 벤치마킹 및 비교 분석서**<br>- ordinatio vs LiteLLM vs Kong AI vs Envoy AI 4자 아키텍처 비교 | 완료 |
 | [PRE_01_dashboard_engineering_plan.md](./00_core_and_blueprint/PRE_01_dashboard_engineering_plan.md) | **마스터 엔지니어링 계획서 (Master Blueprint)**<br>- FURPS+ 요구공학, Clean Architecture, DDD, Phase 0~6 로드맵 | 최신 현행화 |
-| [PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md](./00_core_and_blueprint/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) | **Phase 0~6 종합 총괄 보고서 (Executive Master Report)**<br>- 전 모듈 아키텍처 총괄, ADR-01~17 의사결정 기록 및 무회귀 성과 | 최신 현행화 |
+| [PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md](./00_core_and_blueprint/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) | **Phase 0~6 종합 총괄 보고서 (Executive Master Report)**<br>- 전 모듈 아키텍처 총괄, ADR-01~18 의사결정 기록 및 무회귀 성과 | 최신 현행화 |
 | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md](./00_core_and_blueprint/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) | **Phase 0~6 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 런타임 구현율 100% 추적 및 상용 하드닝 완료 | 최신 현행화 |
 | [PRE_15_Develop_milestone.md](./00_core_and_blueprint/PRE_15_Develop_milestone.md) | **차세대 개발 마일스톤 (Milestone 6 ~ 8) 로드맵** | 최신 현행화 |
 | [PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md](./00_core_and_blueprint/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md) | **엔터프라이즈 상용화 개발 로드맵 (Phase 7 ~ 9)**<br>- DRM 라이선스, 셋업 마법사, Helm, 시맨틱 캐싱 등 14대 과제 로드맵 | 계획 완료 |

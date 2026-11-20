@@ -55,7 +55,7 @@ make run-frontend
 
 ### 3. 단계별 검증 및 관리 도구 (DoD Automated Verification & Management)
 ```bash
-# 전체 단위/통합 테스트 실행 (pytest 102개 테스트 100% 통과)
+# 전체 단위/통합 테스트 실행 (pytest 111개 테스트 100% 통과)
 make test
 
 # 초기 관리자 계정 대화형 생성 CLI
@@ -70,8 +70,9 @@ bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 �
 bash scripts/verify-phase4.sh   # Phase 4: PII 보안 거버넌스 및 WORM 감사 포렌식
 bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진
 bash scripts/verify-phase-system-prompt.sh # 시스템 프롬프트 거버넌스 & 동적 주입 엔진
-make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약, 93 Tests)
+make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약, 111 Tests)
 make verify-standalone-install # Phase 6: Standalone 설치 툴 및 Vagrant 검증 (7/7 PASS)
+make verify-all-menus # 8대 전 메뉴 통합 운영 E2E 시나리오 (10/10 PASS)
 ```
 
 ---
@@ -89,9 +90,10 @@ make verify-standalone-install # Phase 6: Standalone 설치 툴 및 Vagrant 검�
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
 | **시스템 프롬프트** | 동적 시스템 프롬프트 거버넌스 & L7 인라인 주입 | ✅ 완료 | `verify-phase-system-prompt.sh` 통과 |
-| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 동적 RBAC/PBAC | ✅ 완료 | `make test` 통과 (102 Tests) |
+| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 동적 RBAC/PBAC | ✅ 완료 | `make test` 통과 (111 Tests) |
 | **Phase 6: Standalone** | RHEL 9 호환 Standalone 설치 툴(install.sh) & ordinatio-ctl CLI | ✅ 완료 | `make verify-standalone-install` (7/7 PASS) |
 | **Phase 6: 현지화** | 15개 UI 컴포넌트 한글 리터럴 제거 & strings.js 일원화 | ✅ 완료 | `npm run build` (Vite Build PASS) |
+| **Phase 6: 이원화 테스트** | 로컬 고속 계약 검증 vs 실환경 L3/L4 네트워크 & 포트 프로빙 | ✅ 완료 | `PRE_26` 확립 (111 Tests PASS) |
 
 ---
 

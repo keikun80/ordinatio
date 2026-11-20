@@ -379,9 +379,9 @@ export default function ComplianceTab({ onNotify }) {
   });
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="scr-compliance-view" data-screen-id="SCR-CP-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="comp-header">
         <div className="page-title-wrap">
           <h1>{strings.compliance.headerTitle}</h1>
           <p>{strings.compliance.headerSubtitle}</p>
@@ -389,6 +389,8 @@ export default function ComplianceTab({ onNotify }) {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button 
             className="badge active" 
+            data-testid="comp-btn-verify-worm"
+            data-function-id="FNC-CP-VERIFY-WORM"
             style={{ 
               padding: '6px 12px', 
               fontSize: '0.82rem',
@@ -405,7 +407,12 @@ export default function ComplianceTab({ onNotify }) {
           >
             <Lock size={14} /> {strings.compliance.btnVerifyWorm}
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => { loadRules(); loadLogs(); loadStats(); }}>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            data-testid="comp-btn-refresh"
+            data-function-id="FNC-CP-REFRESH"
+            onClick={() => { loadRules(); loadLogs(); loadStats(); }}
+          >
             <RefreshCw size={14} />
           </button>
         </div>
@@ -413,28 +420,28 @@ export default function ComplianceTab({ onNotify }) {
 
       {/* Compliance Stats Cards */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '22px' }}>
-          <div className="card" style={{ padding: '14px 18px' }}>
+        <div data-testid="comp-card-kpi" data-screen-id="SCR-CP-02" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '22px' }}>
+          <div className="card" data-testid="comp-kpi-card-rules" style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.activeRules}</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#38bdf8', marginTop: '4px' }}>
+            <div className="kpi-value" data-testid="comp-kpi-val-rules" style={{ fontSize: '1.4rem', fontWeight: 700, color: '#38bdf8', marginTop: '4px' }}>
               {stats.active_rules} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>/ {stats.total_rules} {strings.common.active}</span>
             </div>
           </div>
-          <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="card" data-testid="comp-kpi-card-logs" style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.totalAuditLogs}</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7', marginTop: '4px' }}>
+            <div className="kpi-value" data-testid="comp-kpi-val-logs" style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7', marginTop: '4px' }}>
               {stats.total_audit_logs.toLocaleString()} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.countUnit}</span>
             </div>
           </div>
-          <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="card" data-testid="comp-kpi-card-masked" style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.totalMaskedEvents}</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>
+            <div className="kpi-value" data-testid="comp-kpi-val-masked" style={{ fontSize: '1.4rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>
               {stats.total_masked_events.toLocaleString()} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.countUnit}</span>
             </div>
           </div>
-          <div className="card" style={{ padding: '14px 18px' }}>
+          <div className="card" data-testid="comp-kpi-card-blocked" style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.totalBlocked}</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f43f5e', marginTop: '4px' }}>
+            <div className="kpi-value" data-testid="comp-kpi-val-blocked" style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f43f5e', marginTop: '4px' }}>
               {stats.total_blocked} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{strings.compliance.kpi.countUnit}</span>
             </div>
           </div>
@@ -442,7 +449,7 @@ export default function ComplianceTab({ onNotify }) {
       )}
 
       {/* Live PII Masking Simulator (Top Demo Feature) */}
-      <div className="card" style={{ marginBottom: '24px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+      <div className="card" data-testid="comp-card-simulator" data-screen-id="SCR-CP-03" style={{ marginBottom: '24px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
         <div className="card-header">
           <div className="card-title">
             <ShieldAlert size={20} color="#38bdf8" />
@@ -457,6 +464,8 @@ export default function ComplianceTab({ onNotify }) {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
+              data-testid="comp-btn-add-preset"
+              data-function-id="FNC-CP-ADD-PRESET"
               onClick={() => {
                 setNewPreset({ label: '', text: inputText || '' });
                 setIsAddPresetModalOpen(true);
@@ -467,10 +476,11 @@ export default function ComplianceTab({ onNotify }) {
               <span>{strings.compliance.simulator.btnAddPreset}</span>
             </button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div data-testid="comp-preset-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {presets.map((p, idx) => (
               <div 
                 key={idx}
+                data-testid={`comp-preset-item-${idx}`}
                 style={{ 
                   display: 'inline-flex', 
                   alignItems: 'center',
@@ -483,6 +493,7 @@ export default function ComplianceTab({ onNotify }) {
               >
                 <button
                   type="button"
+                  data-testid={`comp-btn-select-preset-${idx}`}
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -498,6 +509,7 @@ export default function ComplianceTab({ onNotify }) {
                 </button>
                 <button
                   type="button"
+                  data-testid={`comp-btn-delete-preset-${idx}`}
                   title={strings.compliance.simulator.btnDeletePresetTitle}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -527,6 +539,7 @@ export default function ComplianceTab({ onNotify }) {
           <label className="form-label">{strings.compliance.simulator.inputPromptLabel}</label>
           <textarea
             className="form-textarea"
+            data-testid="comp-textarea-input"
             rows={3}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -535,7 +548,13 @@ export default function ComplianceTab({ onNotify }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '18px' }}>
-          <button className="btn btn-primary" onClick={runPiiSimulation} disabled={isSimulating}>
+          <button 
+            className="btn btn-primary" 
+            data-testid="comp-btn-run-simulation" 
+            data-function-id="FNC-CP-RUN-SIM"
+            onClick={runPiiSimulation} 
+            disabled={isSimulating}
+          >
             <Play size={16} />
             <span>{isSimulating ? strings.compliance.simulator.btnSimulating : strings.compliance.simulator.btnSimulate}</span>
           </button>
@@ -543,20 +562,21 @@ export default function ComplianceTab({ onNotify }) {
 
         {/* Simulation Output Area */}
         {simulationResult && (
-          <div style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+          <div data-testid="comp-simulation-result-box" style={{ background: 'rgba(15, 23, 42, 0.8)', padding: '18px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: simulationResult.isBlocked ? '#f43f5e' : '#34d399' }}>
+              <div data-testid="comp-simulation-status" style={{ fontWeight: 600, fontSize: '0.9rem', color: simulationResult.isBlocked ? '#f43f5e' : '#34d399' }}>
                 {simulationResult.isBlocked ? strings.compliance.simulator.resultBlocked : strings.compliance.simulator.resultMasked}
               </div>
               <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                {strings.compliance.simulator.latencyLabel} <span style={{ color: '#38bdf8', fontWeight: 700 }}>{simulationResult.latencyMs.toFixed(3)} ms</span>
+                {strings.compliance.simulator.latencyLabel} <span data-testid="comp-simulation-latency" style={{ color: '#38bdf8', fontWeight: 700 }}>{simulationResult.latencyMs.toFixed(3)} ms</span>
                 {simulationResult.auditLogId && (
-                  <span style={{ marginLeft: '12px', color: '#a855f7' }}>WORM ID: {simulationResult.auditLogId}</span>
+                  <span data-testid="comp-simulation-worm-id" style={{ marginLeft: '12px', color: '#a855f7' }}>WORM ID: {simulationResult.auditLogId}</span>
                 )}
               </div>
             </div>
 
             <div 
+              data-testid="comp-simulation-masked-text"
               style={{ 
                 background: '#0a0e1a', 
                 padding: '14px', 
@@ -575,21 +595,22 @@ export default function ComplianceTab({ onNotify }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px', fontSize: '0.74rem', fontFamily: 'var(--font-mono)' }}>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '4px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>{strings.compliance.simulator.rawShaLabel}</span>
-                <span style={{ color: '#94a3b8' }}>{simulationResult.originalHash}</span>
+                <span data-testid="comp-simulation-original-hash" style={{ color: '#94a3b8' }}>{simulationResult.originalHash}</span>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '4px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>{strings.compliance.simulator.maskedShaLabel}</span>
-                <span style={{ color: '#38bdf8' }}>{simulationResult.maskedHash}</span>
+                <span data-testid="comp-simulation-masked-hash" style={{ color: '#38bdf8' }}>{simulationResult.maskedHash}</span>
               </div>
             </div>
 
             {simulationResult.detected.length > 0 && (
               <div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px' }}>{strings.compliance.simulator.detectionDetails}</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <div data-testid="comp-simulation-detected-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {simulationResult.detected.map((d, i) => (
                     <span 
                       key={i} 
+                      data-testid={`comp-simulation-detected-item-${i}`}
                       className={`badge ${d.action.includes(strings.compliance.auditLog.actionBlockedTag) || d.action.includes('BLOCK') ? 'danger' : 'active'}`}
                       style={{ padding: '5px 10px' }}
                     >
@@ -604,7 +625,7 @@ export default function ComplianceTab({ onNotify }) {
       </div>
 
       {/* PII Rules Management Table */}
-      <div className="card" style={{ marginBottom: '24px' }}>
+      <div className="card" data-testid="comp-card-rules" data-screen-id="SCR-CP-04" style={{ marginBottom: '24px' }}>
         <div className="card-header">
           <div className="card-title">
             <Sliders size={18} color="#06b6d4" />
@@ -612,12 +633,14 @@ export default function ComplianceTab({ onNotify }) {
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {!canWriteCompliance && (
-              <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+              <span className="badge warning" data-testid="comp-badge-readonly" style={{ fontSize: '0.78rem' }}>
                 {strings.virtualKeys.readOnlyBadge}
               </span>
             )}
             <button
               className="btn btn-primary btn-sm"
+              data-testid="comp-btn-open-add-rule"
+              data-function-id="FNC-CP-OPEN-ADD-RULE"
               disabled={!canWriteCompliance}
               onClick={handleOpenAddModal}
               style={{ opacity: canWriteCompliance ? 1 : 0.45, cursor: canWriteCompliance ? 'pointer' : 'not-allowed' }}
@@ -629,7 +652,7 @@ export default function ComplianceTab({ onNotify }) {
         </div>
 
         <div className="table-container">
-          <table className="data-table">
+          <table className="data-table" data-testid="comp-table-rules">
             <thead>
               <tr>
                 <th>Rule ID</th>
@@ -643,14 +666,15 @@ export default function ComplianceTab({ onNotify }) {
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.rule_id}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#94a3b8' }}>
+                <tr key={r.rule_id} data-testid={`comp-row-rule-${r.rule_id}`}>
+                  <td data-testid={`comp-cell-rule-id-${r.rule_id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#94a3b8' }}>
                     {r.rule_id}
                   </td>
                   <td style={{ fontWeight: 600, color: '#ffffff' }}>
                     <input 
                       type="text" 
                       className="form-input" 
+                      data-testid={`comp-input-rule-name-${r.rule_id}`}
                       disabled={!canWriteCompliance}
                       value={r.name} 
                       onChange={(e) => canWriteCompliance && setRules(rules.map(item => item.rule_id === r.rule_id ? { ...item, name: e.target.value } : item))}
@@ -661,6 +685,7 @@ export default function ComplianceTab({ onNotify }) {
                     <input 
                       type="text" 
                       className="form-input" 
+                      data-testid={`comp-input-rule-regex-${r.rule_id}`}
                       disabled={!canWriteCompliance}
                       value={r.regex_pattern} 
                       onChange={(e) => canWriteCompliance && setRules(rules.map(item => item.rule_id === r.rule_id ? { ...item, regex_pattern: e.target.value } : item))}
@@ -673,17 +698,19 @@ export default function ComplianceTab({ onNotify }) {
                         type="range" 
                         min="50" 
                         max="99" 
+                        data-testid={`comp-slider-rule-conf-${r.rule_id}`}
                         disabled={!canWriteCompliance}
                         value={Math.round(r.confidence_threshold * 100)} 
                         onChange={(e) => canWriteCompliance && setRules(rules.map(item => item.rule_id === r.rule_id ? { ...item, confidence_threshold: Number(e.target.value) / 100 } : item))}
                         style={{ width: '70px', cursor: canWriteCompliance ? 'pointer' : 'not-allowed' }}
                       />
-                      <span>{Math.round(r.confidence_threshold * 100)}%</span>
+                      <span data-testid={`comp-val-rule-conf-${r.rule_id}`}>{Math.round(r.confidence_threshold * 100)}%</span>
                     </div>
                   </td>
                   <td>
                     <select 
                       className="form-select"
+                      data-testid={`comp-select-rule-action-${r.rule_id}`}
                       disabled={!canWriteCompliance}
                       style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem', opacity: canWriteCompliance ? 1 : 0.65 }}
                       value={r.action}
@@ -700,6 +727,7 @@ export default function ComplianceTab({ onNotify }) {
                   <td>
                     <span 
                       className={`badge ${r.is_active ? 'active' : 'danger'}`} 
+                      data-testid={`comp-badge-rule-status-${r.rule_id}`}
                       style={{ cursor: canWriteCompliance ? 'pointer' : 'not-allowed', opacity: canWriteCompliance ? 1 : 0.65 }}
                       onClick={() => canWriteCompliance && setRules(rules.map(item => item.rule_id === r.rule_id ? { ...item, is_active: !item.is_active } : item))}
                     >
@@ -710,6 +738,8 @@ export default function ComplianceTab({ onNotify }) {
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button 
                         className="btn btn-secondary btn-sm"
+                        data-testid={`comp-btn-save-rule-${r.rule_id}`}
+                        data-function-id="FNC-CP-SAVE-RULE"
                         disabled={!canWriteCompliance}
                         onClick={() => canWriteCompliance && handleUpdateRule(r)}
                         style={{ padding: '4px 8px', opacity: canWriteCompliance ? 1 : 0.45, cursor: canWriteCompliance ? 'pointer' : 'not-allowed' }}
@@ -718,6 +748,8 @@ export default function ComplianceTab({ onNotify }) {
                       </button>
                       <button 
                         className="btn btn-secondary btn-sm"
+                        data-testid={`comp-btn-delete-rule-${r.rule_id}`}
+                        data-function-id="FNC-CP-DELETE-RULE"
                         disabled={!canWriteCompliance}
                         onClick={() => canWriteCompliance && setDeletingRule(r)}
                         style={{ padding: '4px 8px', color: '#f43f5e', opacity: canWriteCompliance ? 1 : 0.45, cursor: canWriteCompliance ? 'pointer' : 'not-allowed' }}
@@ -735,7 +767,7 @@ export default function ComplianceTab({ onNotify }) {
       </div>
 
       {/* Forensic Audit Log Viewer */}
-      <div className="card">
+      <div className="card" data-testid="comp-card-audit-logs" data-screen-id="SCR-CP-05">
         <div className="card-header">
           <div className="card-title">
             <FileText size={18} color="#a855f7" />
@@ -754,6 +786,7 @@ export default function ComplianceTab({ onNotify }) {
               <Search size={14} style={{ color: 'var(--text-muted)' }} />
               <input 
                 type="text" 
+                data-testid="comp-input-log-search"
                 placeholder={strings.compliance.auditLog.searchPlaceholder} 
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
@@ -769,6 +802,7 @@ export default function ComplianceTab({ onNotify }) {
               {logSearch && (
                 <button
                   type="button"
+                  data-testid="comp-btn-clear-search"
                   onClick={() => setLogSearch('')}
                   style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
                   title={strings.compliance.auditLog.clearSearchTitle}
@@ -779,6 +813,7 @@ export default function ComplianceTab({ onNotify }) {
             </div>
             <select 
               className="form-select" 
+              data-testid="comp-select-log-filter"
               style={{ width: 'auto', padding: '4px 8px', fontSize: '0.78rem' }}
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
@@ -790,6 +825,8 @@ export default function ComplianceTab({ onNotify }) {
             </select>
             <button 
               className="btn btn-secondary btn-sm"
+              data-testid="comp-btn-export-logs"
+              data-function-id="FNC-CP-EXPORT-LOGS"
               onClick={handleExportAuditLogs}
             >
               <Download size={14} />
@@ -799,7 +836,7 @@ export default function ComplianceTab({ onNotify }) {
         </div>
 
         <div className="table-container">
-          <table className="data-table">
+          <table className="data-table" data-testid="comp-table-audit-logs">
             <thead>
               <tr>
                 <th>{strings.compliance.auditLog.thKstTime}</th>
@@ -823,6 +860,7 @@ export default function ComplianceTab({ onNotify }) {
                       <button 
                         type="button" 
                         className="btn btn-secondary btn-sm"
+                        data-testid="comp-btn-reset-filter"
                         onClick={() => { setLogSearch(''); setActionFilter('ALL'); }}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}
                       >
@@ -834,21 +872,21 @@ export default function ComplianceTab({ onNotify }) {
                 </tr>
               ) : (
                 filteredLogs.map((log) => (
-                <tr key={log.log_id}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: '#94a3b8' }}>
+                <tr key={log.log_id} data-testid={`comp-row-log-${log.log_id}`}>
+                  <td data-testid={`comp-cell-log-time-${log.log_id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: '#94a3b8' }}>
                     {typeof log.timestamp === 'string' ? log.timestamp.replace('T', ' ').slice(0, 19) : log.timestamp}
                   </td>
-                  <td style={{ fontWeight: 600 }}>{log.requester_id}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#38bdf8' }}>
+                  <td data-testid={`comp-cell-log-user-${log.log_id}`} style={{ fontWeight: 600 }}>{log.requester_id}</td>
+                  <td data-testid={`comp-cell-log-key-${log.log_id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#38bdf8' }}>
                     {log.key_id || 'sk-ord-direct'}
                   </td>
                   <td>
-                    <span className="badge info" style={{ fontSize: '0.72rem' }}>
+                    <span className="badge info" data-testid={`comp-cell-log-model-${log.log_id}`} style={{ fontSize: '0.72rem' }}>
                       {log.model_id ? log.model_id.split('/')[1] || log.model_id : 'Default'}
                     </span>
                   </td>
                   <td>
-                    <span className={`badge ${log.is_blocked || log.action_taken === 'BLOCK' ? 'danger' : (log.pii_count > 0 ? 'active' : 'info')}`}>
+                    <span data-testid={`comp-badge-log-action-${log.log_id}`} className={`badge ${log.is_blocked || log.action_taken === 'BLOCK' ? 'danger' : (log.pii_count > 0 ? 'active' : 'info')}`}>
                       {log.action_taken} ({log.pii_count || 0}{strings.compliance.kpi.countUnit})
                     </span>
                   </td>
@@ -856,11 +894,11 @@ export default function ComplianceTab({ onNotify }) {
                     <div><span style={{ color: '#64748b' }}>orig:</span> {log.original_prompt_hash ? log.original_prompt_hash.slice(0, 18) + '...' : '-'}</div>
                     <div><span style={{ color: '#38bdf8' }}>mask:</span> {log.masked_payload_hash ? log.masked_payload_hash.slice(0, 18) + '...' : '-'}</div>
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#a855f7' }}>
+                  <td data-testid={`comp-cell-log-worm-${log.log_id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#a855f7' }}>
                     {log.worm_reference_id}
                   </td>
                   <td>
-                    <span className={`badge ${log.is_blocked ? 'danger' : 'active'}`}>
+                    <span data-testid={`comp-badge-log-status-${log.log_id}`} className={`badge ${log.is_blocked ? 'danger' : 'active'}`}>
                       {log.is_blocked ? strings.compliance.auditLog.statusBlockedDone : strings.compliance.auditLog.statusCompliant}
                     </span>
                   </td>
@@ -887,7 +925,7 @@ export default function ComplianceTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '480px', maxWidth: '95%', padding: '24px' }}>
+          <div className="card" data-testid="comp-modal-add-rule" data-screen-id="SCR-CP-M01" style={{ width: '480px', maxWidth: '95%', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={20} color="#38bdf8" />
@@ -895,6 +933,8 @@ export default function ComplianceTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="comp-modal-add-rule-btn-close"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setIsAddModalOpen(false)}
                 style={{ padding: '4px 6px' }}
               >
@@ -908,6 +948,7 @@ export default function ComplianceTab({ onNotify }) {
                 <input 
                   type="text" 
                   className="form-input" 
+                  data-testid="comp-modal-input-rule-id"
                   required
                   value={newRule.rule_id}
                   onChange={(e) => setNewRule({ ...newRule, rule_id: e.target.value })}
@@ -920,6 +961,7 @@ export default function ComplianceTab({ onNotify }) {
                 <input 
                   type="text" 
                   className="form-input" 
+                  data-testid="comp-modal-input-rule-name"
                   required
                   value={newRule.name}
                   onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
@@ -931,6 +973,7 @@ export default function ComplianceTab({ onNotify }) {
                 <label className="form-label">{strings.compliance.addRuleModal.entityTypeLabel}</label>
                 <select 
                   className="form-select"
+                  data-testid="comp-modal-select-rule-type"
                   value={newRule.entity_type}
                   onChange={(e) => {
                     const selectedType = e.target.value;
@@ -959,6 +1002,7 @@ export default function ComplianceTab({ onNotify }) {
                 <input 
                   type="text" 
                   className="form-input" 
+                  data-testid="comp-modal-input-rule-regex"
                   required
                   style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
                   value={newRule.regex_pattern}
@@ -972,6 +1016,7 @@ export default function ComplianceTab({ onNotify }) {
                   <label className="form-label">{strings.compliance.addRuleModal.actionLabel}</label>
                   <select 
                     className="form-select"
+                    data-testid="comp-modal-select-rule-action"
                     value={newRule.action}
                     onChange={(e) => setNewRule({ ...newRule, action: e.target.value })}
                   >
@@ -989,6 +1034,7 @@ export default function ComplianceTab({ onNotify }) {
                     min="0" 
                     max="1" 
                     className="form-input"
+                    data-testid="comp-modal-input-rule-conf"
                     value={newRule.confidence_threshold}
                     onChange={(e) => setNewRule({ ...newRule, confidence_threshold: parseFloat(e.target.value) })}
                   />
@@ -996,10 +1042,20 @@ export default function ComplianceTab({ onNotify }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsAddModalOpen(false)}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  data-testid="comp-modal-add-rule-btn-cancel"
+                  onClick={() => setIsAddModalOpen(false)}
+                >
                   {strings.common.cancel}
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  data-testid="comp-modal-add-rule-btn-submit"
+                  data-function-id="FNC-CP-SUBMIT-ADD-RULE"
+                >
                   {strings.compliance.addRuleModal.btnSubmit}
                 </button>
               </div>
@@ -1023,7 +1079,7 @@ export default function ComplianceTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '440px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
+          <div className="card" data-testid="comp-modal-delete-rule" data-screen-id="SCR-CP-M02" style={{ width: '440px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={20} color="#f43f5e" />
@@ -1031,6 +1087,8 @@ export default function ComplianceTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="comp-modal-delete-rule-btn-close"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setDeletingRule(null)}
                 style={{ padding: '4px 6px' }}
               >
@@ -1060,6 +1118,7 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-secondary" 
+                data-testid="comp-modal-delete-rule-btn-cancel"
                 onClick={() => setDeletingRule(null)}
               >
                 {strings.common.cancel}
@@ -1067,6 +1126,8 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-danger" 
+                data-testid="comp-modal-delete-rule-btn-confirm"
+                data-function-id="FNC-CP-CONFIRM-DELETE-RULE"
                 style={{ background: '#e11d48', borderColor: '#e11d48', color: '#fff' }}
                 onClick={() => confirmDeleteRule(deletingRule.rule_id)}
               >
@@ -1092,7 +1153,7 @@ export default function ComplianceTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '520px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+          <div className="card" data-testid="comp-modal-add-preset" data-screen-id="SCR-CP-M03" style={{ width: '520px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Plus size={20} color="#38bdf8" />
@@ -1100,6 +1161,8 @@ export default function ComplianceTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="comp-modal-add-preset-btn-close"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setIsAddPresetModalOpen(false)}
                 style={{ padding: '4px 6px' }}
               >
@@ -1113,6 +1176,7 @@ export default function ComplianceTab({ onNotify }) {
                 <input 
                   type="text" 
                   className="form-input" 
+                  data-testid="comp-modal-input-preset-label"
                   required
                   value={newPreset.label}
                   onChange={(e) => setNewPreset({ ...newPreset, label: e.target.value })}
@@ -1124,6 +1188,7 @@ export default function ComplianceTab({ onNotify }) {
                 <label className="form-label">{strings.compliance.addPresetModal.contentLabel}</label>
                 <textarea 
                   className="form-textarea" 
+                  data-testid="comp-modal-textarea-preset-text"
                   rows={4}
                   required
                   style={{ fontFamily: 'var(--font-sans)', fontSize: '0.9rem' }}
@@ -1134,10 +1199,20 @@ export default function ComplianceTab({ onNotify }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsAddPresetModalOpen(false)}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  data-testid="comp-modal-add-preset-btn-cancel"
+                  onClick={() => setIsAddPresetModalOpen(false)}
+                >
                   {strings.common.cancel}
                 </button>
-                <button type="submit" className="btn btn-primary">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  data-testid="comp-modal-add-preset-btn-submit"
+                  data-function-id="FNC-CP-SUBMIT-ADD-PRESET"
+                >
                   {strings.compliance.addPresetModal.btnSubmit}
                 </button>
               </div>
@@ -1161,7 +1236,7 @@ export default function ComplianceTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '440px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
+          <div className="card" data-testid="comp-modal-delete-preset" data-screen-id="SCR-CP-M04" style={{ width: '440px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(244, 63, 94, 0.4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={20} color="#f43f5e" />
@@ -1169,6 +1244,8 @@ export default function ComplianceTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="comp-modal-delete-preset-btn-close"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setDeletingPresetIndex(null)}
                 style={{ padding: '4px 6px' }}
               >
@@ -1198,6 +1275,7 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-secondary" 
+                data-testid="comp-modal-delete-preset-btn-cancel"
                 onClick={() => setDeletingPresetIndex(null)}
               >
                 {strings.common.cancel}
@@ -1205,6 +1283,8 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-danger" 
+                data-testid="comp-modal-delete-preset-btn-confirm"
+                data-function-id="FNC-CP-CONFIRM-DELETE-PRESET"
                 style={{ background: '#e11d48', borderColor: '#e11d48', color: '#fff' }}
                 onClick={() => handleDeletePreset(deletingPresetIndex)}
               >
@@ -1230,11 +1310,11 @@ export default function ComplianceTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '560px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+          <div className="card" data-testid="comp-modal-worm-verify" data-screen-id="SCR-CP-M05" style={{ width: '560px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
-                  <ShieldCheck size={20} />
+                  <CheckCircle2 size={20} />
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#10b981', fontWeight: 700 }}>{strings.compliance.wormModal.title}</h3>
@@ -1243,6 +1323,8 @@ export default function ComplianceTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="comp-modal-worm-btn-close-header"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setShowWormModal(false)}
                 style={{ padding: '4px 8px' }}
               >
@@ -1254,7 +1336,7 @@ export default function ComplianceTab({ onNotify }) {
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{strings.compliance.wormModal.storageStatus}</span>
-                  <span className="badge active" style={{ fontSize: '0.72rem' }}>{strings.compliance.wormModal.storageStatusActive}</span>
+                  <span className="badge active" data-testid="comp-modal-worm-badge-storage" style={{ fontSize: '0.72rem' }}>{strings.compliance.wormModal.storageStatusActive}</span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   {strings.compliance.wormModal.storageDesc}
@@ -1264,7 +1346,7 @@ export default function ComplianceTab({ onNotify }) {
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{strings.compliance.wormModal.hashChainStatus}</span>
-                  <span className="badge active" style={{ fontSize: '0.72rem' }}>SHA-256 Merkle Chain</span>
+                  <span className="badge active" data-testid="comp-modal-worm-badge-merkle" style={{ fontSize: '0.72rem' }}>SHA-256 Merkle Chain</span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   {strings.compliance.wormModal.hashChainDesc}
@@ -1274,13 +1356,13 @@ export default function ComplianceTab({ onNotify }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.compliance.wormModal.totalRecords}</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38bdf8', marginTop: '2px' }}>
+                  <div data-testid="comp-modal-worm-val-records" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38bdf8', marginTop: '2px' }}>
                     {(stats?.total_logs || auditLogs.length).toLocaleString()} {strings.compliance.kpi.countUnit}
                   </div>
                 </div>
                 <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.compliance.wormModal.tamperCount}</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#10b981', marginTop: '2px' }}>
+                  <div data-testid="comp-modal-worm-val-tamper" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#10b981', marginTop: '2px' }}>
                     {strings.compliance.wormModal.tamperZero}
                   </div>
                 </div>
@@ -1291,6 +1373,8 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-secondary" 
+                data-testid="comp-modal-worm-btn-close"
+                data-function-id="FNC-CP-MODAL-CLOSE"
                 onClick={() => setShowWormModal(false)}
               >
                 {strings.common.close}
@@ -1298,6 +1382,8 @@ export default function ComplianceTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-primary"
+                data-testid="comp-modal-worm-btn-reverify"
+                data-function-id="FNC-CP-REVERIFY-WORM"
                 disabled={isVerifyingWorm}
                 onClick={async () => {
                   setIsVerifyingWorm(true);

@@ -152,9 +152,9 @@ export default function PromptStudioTab({ onNotify }) {
   };
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="scr-prompt-studio-view" data-screen-id="SCR-PS-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="ps-header">
         <div className="page-title-wrap">
           <h1>{strings.promptStudio.title}</h1>
           <p>{strings.promptStudio.subtitle}</p>
@@ -163,7 +163,7 @@ export default function PromptStudioTab({ onNotify }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '22px' }}>
         {/* Controls Sidebar */}
-        <div className="card">
+        <div className="card" data-testid="ps-card-controls" data-screen-id="SCR-PS-02">
           <div className="card-header">
             <div className="card-title" style={{ fontSize: '0.95rem' }}>
               <Sliders size={18} color="#38bdf8" />
@@ -175,6 +175,7 @@ export default function PromptStudioTab({ onNotify }) {
             <label className="form-label">{strings.promptStudio.targetModelLabel(models.length)}</label>
             <select 
               className="form-select"
+              data-testid="ps-select-model"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
             >
@@ -189,10 +190,11 @@ export default function PromptStudioTab({ onNotify }) {
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <label className="form-label" style={{ margin: 0 }}>{strings.promptStudio.tempLabel}</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{temperature}</span>
+              <span data-testid="ps-val-temperature" style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{temperature}</span>
             </div>
             <input 
               type="range" 
+              data-testid="ps-slider-temperature"
               min="0" 
               max="1" 
               step="0.1" 
@@ -205,10 +207,11 @@ export default function PromptStudioTab({ onNotify }) {
           <div className="form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <label className="form-label" style={{ margin: 0 }}>{strings.promptStudio.maxTokensLabel}</label>
-              <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{maxTokens}</span>
+              <span data-testid="ps-val-max-tokens" style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 600 }}>{maxTokens}</span>
             </div>
             <input 
               type="range" 
+              data-testid="ps-slider-max-tokens"
               min="16" 
               max="2048" 
               step="16" 
@@ -232,7 +235,7 @@ export default function PromptStudioTab({ onNotify }) {
         {/* Playground Area */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Prompt Input Box */}
-          <div className="card">
+          <div className="card" data-testid="ps-card-input" data-screen-id="SCR-PS-03">
             <div className="card-header">
               <div className="card-title" style={{ fontSize: '0.95rem' }}>
                 <Sparkles size={18} color="#a855f7" />
@@ -240,12 +243,14 @@ export default function PromptStudioTab({ onNotify }) {
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {!canExecuteStudio && (
-                  <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+                  <span className="badge warning" data-testid="ps-badge-readonly" style={{ fontSize: '0.78rem' }}>
                     {strings.virtualKeys.readOnlyBadge}
                   </span>
                 )}
                 <button 
                   className="btn btn-primary btn-sm"
+                  data-testid="ps-btn-run"
+                  data-function-id="FNC-PS-RUN-INFERENCE"
                   onClick={() => canExecuteStudio && handleRunInference()}
                   disabled={isRunning || !canExecuteStudio}
                   style={{ opacity: canExecuteStudio ? 1 : 0.45, cursor: canExecuteStudio ? 'pointer' : 'not-allowed' }}
@@ -258,6 +263,7 @@ export default function PromptStudioTab({ onNotify }) {
 
             <textarea 
               className="form-textarea"
+              data-testid="ps-textarea-prompt"
               rows={4}
               disabled={!canExecuteStudio}
               value={prompt}
@@ -269,28 +275,28 @@ export default function PromptStudioTab({ onNotify }) {
 
           {/* Side-by-Side Payload & Output Inspector */}
           {output && (
-            <div className="card">
+            <div className="card" data-testid="ps-card-output" data-screen-id="SCR-PS-04">
               <div className="card-header">
                 <div className="card-title">
                   {output.error ? (
                     <>
                       <AlertTriangle size={18} color="#f59e0b" />
-                      <span style={{ color: '#f59e0b' }}>{strings.promptStudio.errorNoticeTitle}</span>
+                      <span data-testid="ps-output-status-error" style={{ color: '#f59e0b' }}>{strings.promptStudio.errorNoticeTitle}</span>
                     </>
                   ) : output.isBlocked ? (
                     <>
                       <AlertTriangle size={18} color="#f43f5e" />
-                      <span style={{ color: '#f43f5e' }}>{strings.promptStudio.blockedNoticeTitle}</span>
+                      <span data-testid="ps-output-status-blocked" style={{ color: '#f43f5e' }}>{strings.promptStudio.blockedNoticeTitle}</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 size={18} color="#34d399" />
-                      <span>{strings.promptStudio.successNoticeTitle}</span>
+                      <span data-testid="ps-output-status-success">{strings.promptStudio.successNoticeTitle}</span>
                     </>
                   )}
                 </div>
                 {output.stats && !output.isBlocked && !output.error && (
-                  <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
+                  <div data-testid="ps-output-stats" style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
                     <span>{strings.promptStudio.piiLatency} <strong style={{ color: '#38bdf8' }}>{output.stats.piiLatencyMs?.toFixed(2)}{strings.common.units.ms}</strong></span>
                     <span>{strings.promptStudio.ttft} <strong style={{ color: '#38bdf8' }}>{output.stats.ttftMs}{strings.common.units.ms}</strong></span>
                     <span>{strings.promptStudio.totalLatency} <strong style={{ color: '#a855f7' }}>{output.stats.totalLatencyMs}{strings.common.units.ms}</strong></span>
@@ -307,7 +313,7 @@ export default function PromptStudioTab({ onNotify }) {
 
               {/* Error Notice if Present */}
               {output.error && (
-                <div style={{ 
+                <div data-testid="ps-output-error-box" style={{ 
                   background: 'rgba(245, 158, 11, 0.1)', 
                   border: '1px solid rgba(245, 158, 11, 0.3)', 
                   borderRadius: '6px', 
@@ -331,20 +337,23 @@ export default function PromptStudioTab({ onNotify }) {
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
                     {strings.promptStudio.maskedPayloadTitle}
                   </div>
-                  <div style={{ 
-                    background: '#090d16', 
-                    padding: '12px', 
-                    borderRadius: '6px', 
-                    fontSize: '0.82rem', 
-                    fontFamily: 'var(--font-mono)', 
-                    color: output.isBlocked ? '#fb7185' : output.error ? '#fcd34d' : '#38bdf8', 
-                    minHeight: '90px',
-                    borderLeft: `3px solid ${output.isBlocked ? '#f43f5e' : output.error ? '#f59e0b' : '#38bdf8'}`
-                  }}>
+                  <div 
+                    data-testid="ps-output-masked-prompt"
+                    style={{ 
+                      background: '#090d16', 
+                      padding: '12px', 
+                      borderRadius: '6px', 
+                      fontSize: '0.82rem', 
+                      fontFamily: 'var(--font-mono)', 
+                      color: output.isBlocked ? '#fb7185' : output.error ? '#fcd34d' : '#38bdf8', 
+                      minHeight: '90px',
+                      borderLeft: `3px solid ${output.isBlocked ? '#f43f5e' : output.error ? '#f59e0b' : '#38bdf8'}`
+                    }}
+                  >
                     {output.maskedPrompt}
                   </div>
                   {output.maskedHash && (
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div data-testid="ps-output-masked-hash" style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Payload SHA: {output.maskedHash}
                     </div>
                   )}
@@ -354,11 +363,11 @@ export default function PromptStudioTab({ onNotify }) {
                   <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
                     {strings.promptStudio.rawPayloadTitle}
                   </div>
-                  <div style={{ background: '#090d16', padding: '12px', borderRadius: '6px', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minHeight: '90px' }}>
+                  <div data-testid="ps-output-raw-prompt" style={{ background: '#090d16', padding: '12px', borderRadius: '6px', fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', minHeight: '90px' }}>
                     {prompt}
                   </div>
                   {output.originalHash && (
-                    <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div data-testid="ps-output-raw-hash" style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Original SHA: {output.originalHash}
                     </div>
                   )}
@@ -371,7 +380,7 @@ export default function PromptStudioTab({ onNotify }) {
                   <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
                     {strings.promptStudio.completionOutputTitle}
                   </div>
-                  <div style={{ background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid var(--border-subtle)' }}>
+                  <div data-testid="ps-output-completion-response" style={{ background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', fontSize: '0.86rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.7', border: '1px solid var(--border-subtle)' }}>
                     {output.response}
                   </div>
                 </div>

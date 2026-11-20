@@ -47,17 +47,25 @@ export default function DevInspector({ isActive, onToggle }) {
         const functionId = target.getAttribute('data-function-id');
         const tagName = target.tagName.toLowerCase();
         const role = target.getAttribute('role') || target.getAttribute('type') || '';
+        const uniqueSelector = testId 
+          ? `[data-testid="${testId}"]` 
+          : screenId 
+            ? `[data-screen-id="${screenId}"]` 
+            : functionId 
+              ? `[data-function-id="${functionId}"]` 
+              : '';
 
         const rect = target.getBoundingClientRect();
         setTooltipPos({
-          x: Math.min(window.innerWidth - 320, Math.max(10, rect.left)),
-          y: rect.top > 120 ? rect.top - 90 : rect.bottom + 10,
+          x: Math.min(window.innerWidth - 340, Math.max(10, rect.left)),
+          y: rect.top > 130 ? rect.top - 105 : rect.bottom + 10,
         });
 
         setHoveredInfo({
           testId,
           screenId,
           functionId,
+          uniqueSelector,
           tagName,
           role,
         });
@@ -166,6 +174,13 @@ export default function DevInspector({ isActive, onToggle }) {
             </span>
             <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{strings.inspector.hoverTooltip}</span>
           </div>
+
+          {hoveredInfo.uniqueSelector && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', margin: '4px 0 2px 0', fontFamily: 'var(--font-mono)', background: 'rgba(0,0,0,0.4)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ color: '#34d399', fontWeight: 600 }}>Selector:</span>
+              <span style={{ color: '#f1f5f9' }}>{hoveredInfo.uniqueSelector}</span>
+            </div>
+          )}
 
           {hoveredInfo.screenId && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', margin: '2px 0' }}>

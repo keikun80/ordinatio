@@ -195,9 +195,9 @@ export default function OverviewTab({ onNavigateTab }) {
   }, []);
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="scr-overview-view" data-screen-id="SCR-OV-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="ov-header-section">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>{strings.overview.title}</h1>
@@ -224,6 +224,8 @@ export default function OverviewTab({ onNavigateTab }) {
                   console.error(e);
                 }
               }}
+              data-testid="ov-btn-stream-toggle"
+              data-function-id="FNC-OV-STREAM"
               className={`badge ${isLiveWs ? 'active' : 'info'}`}
               style={{
                 fontSize: '0.75rem',
@@ -247,7 +249,12 @@ export default function OverviewTab({ onNavigateTab }) {
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           {canAccessRouting && (
-            <button className="btn btn-secondary" onClick={() => onNavigateTab('routing')}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => onNavigateTab('routing')}
+              data-testid="ov-btn-nav-routing"
+              data-function-id="FNC-OV-NAV-ROUTING"
+            >
               <Cpu size={16} />
               <span>{strings.overview.btnRoutingConfig}</span>
             </button>
@@ -256,15 +263,15 @@ export default function OverviewTab({ onNavigateTab }) {
       </div>
 
       {/* 5대 운영 관제 KPI - Envoy L7 Gateway 실시간 통계 연동 (Real Data) */}
-      <div className="kpi-grid">
-        <div className="kpi-card" style={{ '--card-accent': '#3b82f6' }}>
+      <div className="kpi-grid" data-testid="ov-grid-kpis">
+        <div className="kpi-card" data-testid="ov-kpi-card-rps" style={{ '--card-accent': '#3b82f6' }}>
           <div className="kpi-header">
             <span>{strings.overview.kpi.rpsTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
-          <div className="kpi-value">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
+          <div className="kpi-value" data-testid="ov-kpi-value-rps">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Activity size={13} color="#3b82f6" /> {strings.overview.kpi.rpsSub}
@@ -273,14 +280,14 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--card-accent': '#06b6d4' }}>
+        <div className="kpi-card" data-testid="ov-kpi-card-tps" style={{ '--card-accent': '#06b6d4' }}>
           <div className="kpi-header">
             <span>{strings.overview.kpi.tpsTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
-          <div className="kpi-value">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
+          <div className="kpi-value" data-testid="ov-kpi-value-tps">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Zap size={13} color="#06b6d4" /> {strings.overview.kpi.tpsSub}
@@ -289,14 +296,14 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--card-accent': '#8b5cf6' }}>
+        <div className="kpi-card" data-testid="ov-kpi-card-ttft" style={{ '--card-accent': '#8b5cf6' }}>
           <div className="kpi-header">
             <span>{strings.overview.kpi.ttftTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
-          <div className="kpi-value">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
+          <div className="kpi-value" data-testid="ov-kpi-value-ttft">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Clock size={13} color="#8b5cf6" /> P95 Latency
@@ -305,14 +312,14 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--card-accent': Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981' }}>
+        <div className="kpi-card" data-testid="ov-kpi-card-error" style={{ '--card-accent': Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981' }}>
           <div className="kpi-header">
             <span>{strings.overview.kpi.errorTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981' }}></span> {strings.overview.kpi.envoyBadge}
             </span>
           </div>
-          <div className="kpi-value">{kpis.errorRate}%</div>
+          <div className="kpi-value" data-testid="ov-kpi-value-error">{kpis.errorRate}%</div>
           <div className="kpi-footer">
             <span className={`badge ${Number(kpis.errorRate) > 0 ? 'warning' : 'active'}`}>
               <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> {Number(kpis.errorRate) > 0 ? strings.overview.kpi.errorStatusWarn(kpis.errorRate) : strings.overview.kpi.normalStatus}
@@ -321,14 +328,14 @@ export default function OverviewTab({ onNavigateTab }) {
           </div>
         </div>
 
-        <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
+        <div className="kpi-card" data-testid="ov-kpi-card-cost" style={{ '--card-accent': '#f59e0b' }}>
           <div className="kpi-header">
             <span>{strings.overview.kpi.costTitle}</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }}></span> {strings.overview.kpi.dbBadge}
             </span>
           </div>
-          <div className="kpi-value" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
+          <div className="kpi-value" data-testid="ov-kpi-value-cost" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
           <div className="kpi-footer">
             <span style={{ color: '#f59e0b', fontWeight: 600 }}>{strings.overview.kpi.tenantRealtime}</span>
             <span className="kpi-badge-neutral">{strings.overview.kpi.krwCurrency}</span>
@@ -337,20 +344,21 @@ export default function OverviewTab({ onNavigateTab }) {
       </div>
 
       {/* LLM Serving Infrastructure Pool Section - 100% Real DB Models & Envoy Live Data */}
-      <div className="card" style={{ marginBottom: '24px' }}>
+      <div className="card" data-testid="ov-card-infra-pool" data-screen-id="SCR-OV-02" style={{ marginBottom: '24px' }}>
         <div className="card-header">
           <div className="card-title">
             <Server size={20} color="#38bdf8" />
             <span>{strings.overview.infraPool.title}</span>
           </div>
-          <span className="badge active">{strings.overview.infraPool.badge}</span>
+          <span className="badge active" data-testid="ov-badge-infra-pool">{strings.overview.infraPool.badge}</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: '16px' }} data-testid="ov-grid-pools">
           {clusterPools && clusterPools.length > 0 ? (
             clusterPools.map((pool) => (
               <div 
                 key={pool.id} 
+                data-testid={`ov-pool-item-${pool.id}`}
                 style={{
                   background: 'var(--bg-panel)',
                   borderRadius: 'var(--radius-md)',
@@ -371,10 +379,11 @@ export default function OverviewTab({ onNavigateTab }) {
                       marginRight: '8px'
                     }}
                     title={pool.name || pool.model}
+                    data-testid={`ov-pool-name-${pool.id}`}
                   >
                     {pool.name || pool.model}
                   </div>
-                  <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`} style={{ flexShrink: 0 }}>
+                  <span className={`badge ${pool.status === 'HEALTHY' ? 'active' : 'warn'}`} data-testid={`ov-pool-badge-${pool.id}`} style={{ flexShrink: 0 }}>
                     {pool.status === 'HEALTHY' ? strings.common.status.active : strings.common.status.needsAttention}
                   </span>
                 </div>
@@ -386,26 +395,26 @@ export default function OverviewTab({ onNavigateTab }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.assignedModel}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontSize: '0.76rem' }}>{pool.model}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8', fontSize: '0.76rem' }} data-testid={`ov-pool-model-${pool.id}`}>{pool.model}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.activeInstances}</span>
-                    <span style={{ fontWeight: 600, color: '#38bdf8' }}>{pool.pods} {strings.common.units.items}</span>
+                    <span style={{ fontWeight: 600, color: '#38bdf8' }} data-testid={`ov-pool-pods-${pool.id}`}>{pool.pods} {strings.common.units.items}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.queueDepth}</span>
-                    <span style={{ fontWeight: 700, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontWeight: 700, color: '#10b981', fontFamily: 'var(--font-mono)' }} data-testid={`ov-pool-queue-${pool.id}`}>
                       {pool.queueDepth} reqs
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>{strings.overview.infraPool.gpuOccupancy}</span>
                     {pool.gpuMemoryPercent !== null && pool.gpuMemoryPercent !== undefined ? (
-                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
+                      <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#38bdf8' }} data-testid={`ov-pool-gpu-${pool.id}`}>
                         {pool.gpuMemoryPercent}%
                       </span>
                     ) : (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px' }} data-testid={`ov-pool-gpu-na-${pool.id}`}>
                         {strings.overview.infraPool.remoteEndpointNA}
                       </span>
                     )}
@@ -447,16 +456,16 @@ export default function OverviewTab({ onNavigateTab }) {
       {/* Traffic & Alerts Grid - 100% Real Live Data */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
         {/* Model Traffic Breakdown */}
-        <div className="card">
+        <div className="card" data-testid="ov-card-traffic-share" data-screen-id="SCR-OV-03">
           <div className="card-header">
             <div className="card-title">
               <Activity size={18} color="#38bdf8" />
               <span>{strings.overview.trafficShare.title}</span>
             </div>
-            <span className="badge active" style={{ fontSize: '0.68rem' }}>{strings.overview.trafficShare.badge}</span>
+            <span className="badge active" data-testid="ov-badge-traffic-share" style={{ fontSize: '0.68rem' }}>{strings.overview.trafficShare.badge}</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} data-testid="ov-list-traffic-share">
             {modelTraffic && modelTraffic.filter((item) => item.total_requests > 0 || item.share_pct > 0).length > 0 ? (
               modelTraffic
                 .filter((item) => item.total_requests > 0 || item.share_pct > 0)
@@ -464,12 +473,12 @@ export default function OverviewTab({ onNavigateTab }) {
                   const palette = ['#38bdf8', '#06b6d4', '#818cf8', '#10b981', '#f59e0b', '#ec4899'];
                   const accent = palette[idx % palette.length];
                   return (
-                    <div key={item.model_id}>
+                    <div key={item.model_id} data-testid={`ov-traffic-item-${item.model_id}`}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '6px' }}>
-                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }} data-testid={`ov-traffic-name-${item.model_id}`}>
                           {item.name} <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({item.total_requests.toLocaleString()}{strings.common.units.count})</span>
                         </span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent }} data-testid={`ov-traffic-pct-${item.model_id}`}>
                           {item.share_pct}% ({item.rps} RPS)
                         </span>
                       </div>
@@ -487,7 +496,7 @@ export default function OverviewTab({ onNavigateTab }) {
                   );
                 })
             ) : (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }} data-testid="ov-traffic-no-data">
                 {strings.overview.trafficShare.noData}
               </div>
             )}
@@ -495,31 +504,36 @@ export default function OverviewTab({ onNavigateTab }) {
         </div>
 
         {/* Real-time Alerts */}
-        <div className="card">
+        <div className="card" data-testid="ov-card-system-alerts" data-screen-id="SCR-OV-04">
           <div className="card-header">
             <div className="card-title">
               <AlertTriangle size={18} color="#f59e0b" />
               <span>{strings.overview.systemAlerts.title}</span>
             </div>
             {canAccessCompliance && (
-              <button className="btn btn-secondary btn-sm" onClick={() => onNavigateTab('compliance')}>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => onNavigateTab('compliance')}
+                data-testid="ov-btn-view-all-alerts"
+                data-function-id="FNC-OV-VIEW-ALERTS"
+              >
                 <span>{strings.overview.systemAlerts.viewAll}</span>
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} data-testid="ov-list-system-alerts">
             {!latestAuditLog && clusterPools.length === 0 && !finOpsSummary ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }} data-testid="ov-alerts-empty">
                 {strings.overview.systemAlerts.noAlerts}
               </div>
             ) : (
               <>
                 {/* 1. Security & Compliance Log Alert */}
                 {latestAuditLog ? (
-                  <div style={{ padding: '10px 12px', background: latestAuditLog.action_taken === 'BLOCK' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', borderLeft: `3px solid ${latestAuditLog.action_taken === 'BLOCK' ? '#ef4444' : '#10b981'}`, borderRadius: '4px', fontSize: '0.82rem' }}>
+                  <div data-testid="ov-alert-security" style={{ padding: '10px 12px', background: latestAuditLog.action_taken === 'BLOCK' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', borderLeft: `3px solid ${latestAuditLog.action_taken === 'BLOCK' ? '#ef4444' : '#10b981'}`, borderRadius: '4px', fontSize: '0.82rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: latestAuditLog.action_taken === 'BLOCK' ? '#ef4444' : '#34d399' }}>
-                      <span>
+                      <span data-testid="ov-alert-security-title">
                         {strings.overview.systemAlerts.auditEventTitle(latestAuditLog.action_taken, latestAuditLog.model_id)}
                       </span>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -528,21 +542,21 @@ export default function OverviewTab({ onNavigateTab }) {
                           : strings.overview.systemAlerts.realTime}
                       </span>
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }} data-testid="ov-alert-security-desc">
                       {strings.overview.systemAlerts.auditEventDesc(latestAuditLog.requester_id, latestAuditLog.worm_storage_id, latestAuditLog.pii_detected_count)}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <div data-testid="ov-alert-security-none" style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     {strings.overview.systemAlerts.noSecurityAlerts}
                   </div>
                 )}
 
                 {/* 2. Serving Pool Health & Infrastructure Alert */}
                 {clusterPools.length > 0 ? (
-                  <div style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
+                  <div data-testid="ov-alert-infra" style={{ padding: '10px 12px', background: 'rgba(56, 189, 248, 0.08)', borderLeft: '3px solid #38bdf8', borderRadius: '4px', fontSize: '0.82rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#38bdf8' }}>
-                      <span>
+                      <span data-testid="ov-alert-infra-title">
                         {strings.overview.systemAlerts.infraDynamicTitle(
                           clusterPools.filter((p) => p.status === 'HEALTHY').length,
                           clusterPools.length
@@ -550,23 +564,23 @@ export default function OverviewTab({ onNavigateTab }) {
                       </span>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }} data-testid="ov-alert-infra-desc">
                       {strings.overview.systemAlerts.infraDynamicDesc(
                         clusterPools.map((p) => p.name || p.model).slice(0, 3).join(', ')
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <div data-testid="ov-alert-infra-none" style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     {strings.overview.systemAlerts.noInfraAlerts}
                   </div>
                 )}
 
                 {/* 3. FinOps & Tenant Budget Alert */}
                 {finOpsSummary ? (
-                  <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
+                  <div data-testid="ov-alert-finops" style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderRadius: '4px', fontSize: '0.82rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#f59e0b' }}>
-                      <span>
+                      <span data-testid="ov-alert-finops-title">
                         {strings.overview.systemAlerts.finopsDynamicTitle(
                           finOpsSummary.overall_burn_rate_pct,
                           (finOpsSummary.tenants || []).filter((t) => t.is_blocked).length
@@ -574,7 +588,7 @@ export default function OverviewTab({ onNavigateTab }) {
                       </span>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.overview.systemAlerts.realTime}</span>
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: '3px', fontSize: '0.78rem' }} data-testid="ov-alert-finops-desc">
                       {strings.overview.systemAlerts.finopsDynamicDesc(
                         finOpsSummary.total_spent_krw,
                         finOpsSummary.total_budget_krw,
@@ -583,7 +597,7 @@ export default function OverviewTab({ onNavigateTab }) {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  <div data-testid="ov-alert-finops-none" style={{ padding: '8px 12px', background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     {strings.overview.systemAlerts.noFinopsAlerts}
                   </div>
                 )}

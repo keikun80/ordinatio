@@ -85,14 +85,14 @@ export default function FinOpsTab({ onNotify }) {
   };
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="scr-finops-view" data-screen-id="SCR-FO-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="fo-header-section">
         <div className="page-title-wrap">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h1>{strings.finops.headerTitle}</h1>
             {finOpsData && (
-              <span className="badge active" style={{ fontSize: '0.75rem' }}>
+              <span className="badge active" data-testid="fo-badge-db-connected" style={{ fontSize: '0.75rem' }}>
                 {strings.finops.dbConnected(finOpsData.active_tenants_count)}
               </span>
             )}
@@ -101,11 +101,17 @@ export default function FinOpsTab({ onNotify }) {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {!canWriteFinops && (
-            <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+            <span className="badge warning" data-testid="fo-badge-readonly" style={{ fontSize: '0.78rem' }}>
               {strings.virtualKeys.readOnlyBadge}
             </span>
           )}
-          <button className="btn btn-secondary" onClick={fetchOverview} disabled={loading}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={fetchOverview} 
+            disabled={loading}
+            data-testid="fo-btn-refresh"
+            data-function-id="FNC-FO-REFRESH"
+          >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             <span>{strings.common.refresh}</span>
           </button>
@@ -113,6 +119,8 @@ export default function FinOpsTab({ onNotify }) {
             className="btn btn-primary"
             onClick={() => canWriteFinops && handleDownloadInvoice()}
             disabled={downloading || !canWriteFinops}
+            data-testid="fo-btn-export-csv"
+            data-function-id="FNC-FO-EXPORT-CSV"
             style={{ opacity: canWriteFinops ? 1 : 0.45, cursor: canWriteFinops ? 'pointer' : 'not-allowed' }}
           >
             <Download size={16} />
@@ -123,35 +131,35 @@ export default function FinOpsTab({ onNotify }) {
 
       {/* Aggregate FinOps Summary KPIs */}
       {finOpsData && (
-        <div className="kpi-grid" style={{ marginBottom: '22px' }}>
-          <div className="kpi-card" style={{ '--card-accent': '#38bdf8' }}>
+        <div className="kpi-grid" data-testid="fo-grid-kpis" style={{ marginBottom: '22px' }}>
+          <div className="kpi-card" data-testid="fo-kpi-card-budget" style={{ '--card-accent': '#38bdf8' }}>
             <div className="kpi-header">
               <span>{strings.finops.kpi.totalBudget}</span>
               <Coins size={18} color="#38bdf8" />
             </div>
-            <div className="kpi-value">₩ {Math.round(finOpsData.total_budget_krw).toLocaleString()}</div>
+            <div className="kpi-value" data-testid="fo-kpi-value-budget">₩ {Math.round(finOpsData.total_budget_krw).toLocaleString()}</div>
             <div className="kpi-footer">
               <span className="kpi-badge-neutral">{strings.finops.kpi.tenantsSum(finOpsData.active_tenants_count)}</span>
             </div>
           </div>
 
-          <div className="kpi-card" style={{ '--card-accent': '#a855f7' }}>
+          <div className="kpi-card" data-testid="fo-kpi-card-spent" style={{ '--card-accent': '#a855f7' }}>
             <div className="kpi-header">
               <span>{strings.finops.kpi.totalSpent}</span>
               <TrendingUp size={18} color="#a855f7" />
             </div>
-            <div className="kpi-value" style={{ color: '#c084fc' }}>₩ {Math.round(finOpsData.total_spent_krw).toLocaleString()}</div>
+            <div className="kpi-value" data-testid="fo-kpi-value-spent" style={{ color: '#c084fc' }}>₩ {Math.round(finOpsData.total_spent_krw).toLocaleString()}</div>
             <div className="kpi-footer">
               <span className="kpi-badge-neutral">{strings.finops.kpi.remaining(Math.round(finOpsData.total_remaining_krw).toLocaleString())}</span>
             </div>
           </div>
 
-          <div className="kpi-card" style={{ '--card-accent': finOpsData.overall_burn_rate_pct > 80 ? '#f59e0b' : '#10b981' }}>
+          <div className="kpi-card" data-testid="fo-kpi-card-burn-rate" style={{ '--card-accent': finOpsData.overall_burn_rate_pct > 80 ? '#f59e0b' : '#10b981' }}>
             <div className="kpi-header">
               <span>{strings.finops.kpi.burnRate}</span>
               <ActivityIcon size={18} color={finOpsData.overall_burn_rate_pct > 80 ? '#f59e0b' : '#10b981'} />
             </div>
-            <div className="kpi-value">{finOpsData.overall_burn_rate_pct}%</div>
+            <div className="kpi-value" data-testid="fo-kpi-value-burn-rate">{finOpsData.overall_burn_rate_pct}%</div>
             <div className="kpi-footer">
               <span className={finOpsData.overall_burn_rate_pct > 80 ? 'badge warning' : 'badge active'}>
                 {finOpsData.overall_burn_rate_pct > 80 ? strings.finops.kpi.attentionNeeded : strings.finops.kpi.budgetNormal}
@@ -159,12 +167,12 @@ export default function FinOpsTab({ onNotify }) {
             </div>
           </div>
 
-          <div className="kpi-card" style={{ '--card-accent': '#f59e0b' }}>
+          <div className="kpi-card" data-testid="fo-kpi-card-run-rate" style={{ '--card-accent': '#f59e0b' }}>
             <div className="kpi-header">
               <span>{strings.finops.kpi.runRate}</span>
               <TrendingUp size={18} color="#f59e0b" />
             </div>
-            <div className="kpi-value">₩ {Math.round(finOpsData.projected_month_end_krw).toLocaleString()}</div>
+            <div className="kpi-value" data-testid="fo-kpi-value-run-rate">₩ {Math.round(finOpsData.projected_month_end_krw).toLocaleString()}</div>
             <div className="kpi-footer">
               <span className="kpi-badge-neutral">{strings.finops.kpi.trendForecast}</span>
             </div>
@@ -173,7 +181,7 @@ export default function FinOpsTab({ onNotify }) {
       )}
 
       {/* Pricing Banner */}
-      <div className="card" style={{ marginBottom: '22px' }}>
+      <div className="card" data-testid="fo-card-pricing" data-screen-id="SCR-FO-02" style={{ marginBottom: '22px' }}>
         <div className="card-header">
           <div className="card-title">
             <Coins size={18} color="#f59e0b" />
@@ -181,6 +189,8 @@ export default function FinOpsTab({ onNotify }) {
           </div>
           <button 
             className="badge active"
+            data-testid="fo-btn-pricing-detail"
+            data-function-id="FNC-FO-PRICING-DETAIL"
             style={{
               cursor: 'pointer',
               display: 'inline-flex',
@@ -200,17 +210,17 @@ export default function FinOpsTab({ onNotify }) {
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
+          <div data-testid="fo-price-prompt" style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.promptToken}</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdInputPrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.promptDesc}</div>
           </div>
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
+          <div data-testid="fo-price-completion" style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.completionToken}</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdOutputPrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>/ 1k tok</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.completionDesc}</div>
           </div>
-          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
+          <div data-testid="fo-price-kv-cache" style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '14px', borderRadius: '8px' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.finops.pricingBanner.kvCacheToken}</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#5EF527', fontFamily: 'var(--font-mono)' }}>₩ {stdCachePrice.toFixed(2)} <span style={{ fontSize: '0.8rem', color: '#5EF527' }}>{strings.finops.pricingBanner.savingsDynamic(savingsPct)}</span></div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{strings.finops.pricingBanner.kvCacheDesc}</div>
@@ -219,7 +229,7 @@ export default function FinOpsTab({ onNotify }) {
       </div>
 
       {/* Department Budget Burn Status */}
-      <div className="card" style={{ marginBottom: '22px' }}>
+      <div className="card" data-testid="fo-card-tenants" data-screen-id="SCR-FO-03" style={{ marginBottom: '22px' }}>
         <div className="card-header">
           <div className="card-title">
             <TrendingUp size={18} color="#38bdf8" />
@@ -232,7 +242,7 @@ export default function FinOpsTab({ onNotify }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {tenants.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
+            <div data-testid="fo-tenants-empty" style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 {strings.finops.tenants.emptyTitle}
               </div>
@@ -249,6 +259,7 @@ export default function FinOpsTab({ onNotify }) {
             return (
               <div 
                 key={t.id} 
+                data-testid={`fo-tenant-card-${t.id}`}
                 style={{ 
                   background: isBlocked ? 'rgba(244, 63, 94, 0.06)' : isWarning ? 'rgba(245, 158, 11, 0.05)' : 'rgba(15, 23, 42, 0.5)', 
                   padding: '16px', 
@@ -258,17 +269,17 @@ export default function FinOpsTab({ onNotify }) {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff' }}>{t.name}</span>
+                    <span data-testid={`fo-tenant-name-${t.id}`} style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff' }}>{t.name}</span>
                     {isBlocked ? (
-                      <span className="badge danger">{strings.finops.tenants.statusBlocked}</span>
+                      <span className="badge danger" data-testid={`fo-tenant-badge-${t.id}`}>{strings.finops.tenants.statusBlocked}</span>
                     ) : isWarning ? (
-                      <span className="badge warning">{strings.finops.tenants.statusWarning}</span>
+                      <span className="badge warning" data-testid={`fo-tenant-badge-${t.id}`}>{strings.finops.tenants.statusWarning}</span>
                     ) : (
-                      <span className="badge active">{strings.finops.tenants.statusNormal}</span>
+                      <span className="badge active" data-testid={`fo-tenant-badge-${t.id}`}>{strings.finops.tenants.statusNormal}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ 
+                    <span data-testid={`fo-tenant-tokens-${t.id}`} style={{ 
                       fontSize: '0.78rem', 
                       background: 'rgba(56, 189, 248, 0.12)', 
                       border: '1px solid rgba(56, 189, 248, 0.3)', 
@@ -293,6 +304,7 @@ export default function FinOpsTab({ onNotify }) {
                 {/* Progress bar */}
                 <div style={{ width: '100%', height: '10px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
                   <div 
+                    data-testid={`fo-tenant-progress-${t.id}`}
                     style={{ 
                       width: `${percent}%`, 
                       height: '100%', 
@@ -313,6 +325,8 @@ export default function FinOpsTab({ onNotify }) {
                   {isBlocked && (
                     <button 
                       className="btn btn-secondary btn-sm"
+                      data-testid={`fo-btn-emergency-unblock-${t.id}`}
+                      data-function-id="FNC-FO-EMERGENCY-UNBLOCK"
                       disabled={!canWriteFinops}
                       onClick={() => canWriteFinops && handleEmergencyIncrease(t)}
                       style={{ opacity: canWriteFinops ? 1 : 0.45, cursor: canWriteFinops ? 'pointer' : 'not-allowed' }}
@@ -342,7 +356,7 @@ export default function FinOpsTab({ onNotify }) {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div className="card" style={{ width: '640px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+          <div className="card" data-testid="fo-modal-pricing" data-screen-id="SCR-FO-M01" style={{ width: '640px', maxWidth: '95%', padding: '24px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
@@ -355,6 +369,8 @@ export default function FinOpsTab({ onNotify }) {
               </div>
               <button 
                 className="btn btn-secondary btn-sm" 
+                data-testid="fo-modal-btn-close-header"
+                data-function-id="FNC-FO-MODAL-CLOSE"
                 onClick={() => setShowPricingModal(false)}
                 style={{ padding: '4px 8px' }}
               >
@@ -373,7 +389,7 @@ export default function FinOpsTab({ onNotify }) {
               </div>
 
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <table data-testid="fo-modal-table-pricing" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>
                       <th style={{ padding: '8px 10px' }}>{strings.finops.modal.colItem}</th>
@@ -423,6 +439,8 @@ export default function FinOpsTab({ onNotify }) {
               <button 
                 type="button" 
                 className="btn btn-secondary" 
+                data-testid="fo-modal-btn-close"
+                data-function-id="FNC-FO-MODAL-CLOSE"
                 onClick={() => setShowPricingModal(false)}
               >
                 {strings.common.close}

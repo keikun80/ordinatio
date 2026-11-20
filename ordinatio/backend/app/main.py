@@ -47,6 +47,14 @@ app.include_router(metrics.router)
 # 2. OpenAI 표준 L7 AI 게이트웨이 엔드포인트 (/v1/...)
 app.include_router(gateway.router, prefix="/v1", tags=["OpenAI L7 AI Gateway Ingress"])
 
+@app.get("/health", status_code=200, tags=["Health & Probes"])
+def health_root():
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION
+    }
+
 @app.get("/")
 def root():
     return {

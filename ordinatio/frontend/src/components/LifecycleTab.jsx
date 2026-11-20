@@ -79,20 +79,26 @@ export default function LifecycleTab({ onNotify }) {
   };
 
   return (
-    <div className="tab-pane">
+    <div className="tab-pane" data-testid="scr-lifecycle-view" data-screen-id="SCR-LC-01">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" data-testid="lc-header-section">
         <div className="page-title-wrap">
           <h1>{strings.lifecycle.headerTitle}</h1>
           <p>{strings.lifecycle.headerSubtitle}</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {!canWriteLifecycle && (
-            <span className="badge warning" style={{ fontSize: '0.78rem' }}>
+            <span className="badge warning" data-testid="lc-badge-readonly" style={{ fontSize: '0.78rem' }}>
               {strings.virtualKeys.readOnlyBadge}
             </span>
           )}
-          <button className="btn btn-secondary" onClick={handleRunDiagnostics} disabled={isRunningDiag}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleRunDiagnostics} 
+            disabled={isRunningDiag}
+            data-testid="lc-btn-run-diagnostics"
+            data-function-id="FNC-LC-RUN-DIAG"
+          >
             <Activity size={16} />
             <span>{isRunningDiag ? strings.lifecycle.diagnosticsRunning : strings.lifecycle.btnDiagnostics}</span>
           </button>
@@ -100,6 +106,8 @@ export default function LifecycleTab({ onNotify }) {
             className="btn btn-primary"
             disabled={!canWriteLifecycle}
             onClick={() => canWriteLifecycle && handleDownloadSupportBundle()}
+            data-testid="lc-btn-download-bundle"
+            data-function-id="FNC-LC-DL-BUNDLE"
             style={{ opacity: canWriteLifecycle ? 1 : 0.45, cursor: canWriteLifecycle ? 'pointer' : 'not-allowed' }}
           >
             <Download size={16} />
@@ -110,7 +118,7 @@ export default function LifecycleTab({ onNotify }) {
 
       {/* Diagnostics Result Card (if run) */}
       {diagResults && (
-        <div className="card" style={{ marginBottom: '22px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+        <div className="card" data-testid="lc-card-diagnostics" data-screen-id="SCR-LC-02" style={{ marginBottom: '22px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
           <div className="card-header" style={{ marginBottom: '10px' }}>
             <div className="card-title" style={{ color: '#34d399', fontSize: '0.95rem' }}>
               <CheckCircle2 size={18} />
@@ -119,17 +127,17 @@ export default function LifecycleTab({ onNotify }) {
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{strings.lifecycle.diag.subtitle}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '0.8rem' }}>
-            <div>PostgreSQL DB: <strong style={{ color: '#34d399' }}>{diagResults.postgres?.status} ({diagResults.postgres?.latency})</strong></div>
-            <div>{strings.lifecycle.diag.redis} <strong style={{ color: '#34d399' }}>{diagResults.redis?.status} ({diagResults.redis?.latency})</strong></div>
-            <div>{strings.lifecycle.diag.kafka} <strong style={{ color: '#34d399' }}>{diagResults.kafka?.status} ({diagResults.kafka?.latency})</strong></div>
-            <div>{strings.lifecycle.diag.vllm} <strong style={{ color: '#34d399' }}>{diagResults.vllmEks?.status} ({diagResults.vllmEks?.latency})</strong></div>
-            <div>{strings.lifecycle.diag.dcgm} <strong style={{ color: '#34d399' }}>{diagResults.dcgm?.status} ({diagResults.dcgm?.latency})</strong></div>
+            <div data-testid="lc-diag-postgres">PostgreSQL DB: <strong style={{ color: '#34d399' }}>{diagResults.postgres?.status} ({diagResults.postgres?.latency})</strong></div>
+            <div data-testid="lc-diag-redis">{strings.lifecycle.diag.redis} <strong style={{ color: '#34d399' }}>{diagResults.redis?.status} ({diagResults.redis?.latency})</strong></div>
+            <div data-testid="lc-diag-kafka">{strings.lifecycle.diag.kafka} <strong style={{ color: '#34d399' }}>{diagResults.kafka?.status} ({diagResults.kafka?.latency})</strong></div>
+            <div data-testid="lc-diag-vllm">{strings.lifecycle.diag.vllm} <strong style={{ color: '#34d399' }}>{diagResults.vllmEks?.status} ({diagResults.vllmEks?.latency})</strong></div>
+            <div data-testid="lc-diag-dcgm">{strings.lifecycle.diag.dcgm} <strong style={{ color: '#34d399' }}>{diagResults.dcgm?.status} ({diagResults.dcgm?.latency})</strong></div>
           </div>
         </div>
       )}
 
       {/* Component Version Matrix */}
-      <div className="card">
+      <div className="card" data-testid="lc-card-matrix" data-screen-id="SCR-LC-03">
         <div className="card-header">
           <div className="card-title">
             <PackageCheck size={18} color="#06b6d4" />
@@ -139,7 +147,7 @@ export default function LifecycleTab({ onNotify }) {
         </div>
 
         <div className="table-container">
-          <table className="data-table">
+          <table className="data-table" data-testid="lc-table-components">
             <thead>
               <tr>
                 <th>{strings.lifecycle.matrix.colName}</th>
@@ -150,28 +158,32 @@ export default function LifecycleTab({ onNotify }) {
               </tr>
             </thead>
             <tbody>
-              {components.map((c, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 600, color: '#ffffff' }}>{c.name}</td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{c.type}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#38bdf8' }}>{c.version}</td>
-                  <td>
-                    {c.status.includes(strings.lifecycle.matrix.statusWarningKeyword) ? (
-                      <span className="badge warning">🟡 {c.status}</span>
-                    ) : (
-                      <span className="badge active">🟢 {c.status}</span>
-                    )}
-                  </td>
-                  <td>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => onNotify('INFO', strings.lifecycle.alerts.metaChecked(c.name))}
-                    >
-                      {strings.lifecycle.matrix.btnDetails}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {components.map((c, i) => {
+                const compKey = c.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                return (
+                  <tr key={i} data-testid={`lc-row-component-${compKey}`}>
+                    <td style={{ fontWeight: 600, color: '#ffffff' }} data-testid={`lc-name-${compKey}`}>{c.name}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }} data-testid={`lc-role-${compKey}`}>{c.type}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#38bdf8' }} data-testid={`lc-version-${compKey}`}>{c.version}</td>
+                    <td>
+                      {c.status.includes(strings.lifecycle.matrix.statusWarningKeyword) ? (
+                        <span className="badge warning" data-testid={`lc-badge-status-${compKey}`}>🟡 {c.status}</span>
+                      ) : (
+                        <span className="badge active" data-testid={`lc-badge-status-${compKey}`}>🟢 {c.status}</span>
+                      )}
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-secondary btn-sm" 
+                        onClick={() => onNotify('INFO', strings.lifecycle.alerts.metaChecked(c.name))}
+                        data-testid={`lc-btn-details-${compKey}`}
+                      >
+                        {strings.lifecycle.matrix.btnDetails}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

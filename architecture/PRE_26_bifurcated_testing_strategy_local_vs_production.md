@@ -77,8 +77,10 @@ flowchart TD
 3. **L7 Envoy 게이트웨이 및 실제 토폴로지 검증**:
    - ELB 접속 시 웹 콘솔에서 항상 Envoy 인그레스 포트(`:8080`)로 안내되는지 확인
    - 가상키(`sk-ord-...`) 기반 L7 ext_proc, PII 마스킹, 토큰 미터링 실호출
-4. **8대 전 메뉴 통합 운영 E2E 시나리오**:
-   - `python3 scripts/verify_all_menus_integration_scenario.py`
+4. **8대 전 메뉴 통합 운영 E2E 시나리오 (무인 파일 설정 지원)**:
+   - `make verify-all-menus CONFIG=test_config.json`
+   - `python3 scripts/verify_all_menus_integration_scenario.py --config test_config.json`
+   - 외부 설정 파일(`test_config.json`)을 통해 실제 LLM 엔드포인트, 서빙 엔진, 모델 ID, 관리자 인증 정보를 주입하여 브라우저 없이 전 메뉴 무인 자동화 검증 완료.
 5. **컴플라이언스 및 오프라인 패치 서명 검증**:
    - RSA-4096 서명 오프라인 핫픽스 번들 검증 (`make verify-phase5`)
    - 외부 SaaS 호출 0건(에어갭 무결성) 검증

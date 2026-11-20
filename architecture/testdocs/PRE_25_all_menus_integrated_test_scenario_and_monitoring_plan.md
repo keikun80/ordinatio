@@ -284,18 +284,33 @@ flowchart TD
 
 ## 6. 자동화 테스트 스크립트 실행 및 DoD (Definition of Done)
 
-본 통합 시나리오는 자동화 스크립트 [`ordinatio/scripts/verify_all_menus_integration_scenario.py`](../ordinatio/scripts/verify_all_menus_integration_scenario.py) 및 Makefile 타깃(`make verify-all-menus`)을 통해 운영자 및 CI/CD 환경에서 원클릭으로 검증할 수 있습니다.
+본 통합 시나리오는 자동화 스크립트 [`ordinatio/scripts/verify_all_menus_integration_scenario.py`](../../ordinatio/scripts/verify_all_menus_integration_scenario.py) 및 Makefile 타깃(`make verify-all-menus`)을 통해 운영자 및 CI/CD 환경에서 원클릭으로 검증할 수 있습니다.
+
+특히 운영/실사용 환경에서 실제 LLM 엔드포인트나 모델 ID, 관리자 계정을 매번 수동 입력하지 않고 파일(`test_config.json`)을 통해 일괄 주입하여 무인 검증할 수 있습니다.
 
 ### 실행 명령
 ```bash
 cd ordinatio
+
+# 1. 기본 설정 또는 test_config.json 자동 감지 실행
 make verify-all-menus
-# 또는 직접 실행:
-python3 scripts/verify_all_menus_integration_scenario.py
+
+# 2. 특정 설정 파일을 지정하여 실행 (권장)
+make verify-all-menus CONFIG=test_config.json
+
+# 3. Python 스크립트 직접 실행
+python3 scripts/verify_all_menus_integration_scenario.py --config test_config.json
 ```
+
+### 무인 설정 파일 템플릿 (`test_config.json`)
+[`ordinatio/test_config.example.json`](../../ordinatio/test_config.example.json)을 복사하여 생성합니다:
+- `environment`: `base_url`, `envoy_url`, `admin_username`, `admin_password` (JWT 토큰 자동 발급)
+- `llm_target`: `model_id`, `endpoint_url`, `serving_engine`, `provider`, `auth_type`, `api_key` (모델 카탈로그 자동 동기화)
+- `test_scenario`: `tenant_id`, `route_name`, `test_prompt`, `pii_test_prompt`
 
 ### Definition of Done (DoD) 완료 기준
 - [x] Step 1 ~ Step 10 전 과정이 순차적으로 실행되어 100% PASS를 달성할 것.
+- [x] 외부 설정 파일(`test_config.json`) 기반으로 사용자 개입 없이 실제 LLM 엔드포인트 및 관리자 토큰 주입 검증이 완료될 것.
 - [x] 8대 모든 메뉴의 관련 REST 엔드포인트 및 Envoy L7 인그레스가 실시간 검증될 것.
 - [x] WORM 불변 감사 로그에 실제 테넌트, 키 ID, 마스킹 조치 기록이 남을 것.
 - [x] FinOps 대시보드에 부서별 토큰 소비량 및 USD 지출액이 실시간 가산될 것.

@@ -165,9 +165,9 @@ cd ordinatio/backend && uv run pytest -v
 
 ---
 
-## 4. 17대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-17 최신화)
+## 4. 19대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-19 최신화)
 
-에어갭 폐쇄망 최적화 및 단일 어플라이언스 자립성을 위해 채택된 17대 아키텍처 결정(ADR) 목록입니다:
+에어갭 폐쇄망 최적화 및 단일 어플라이언스 자립성을 위해 채택된 19대 아키텍처 결정(ADR) 목록입니다:
 
 - **ADR-01**: `go-control-plane` gRPC ADS 대신 **FastAPI REST RDS v3 (`discovery:routes`)** 채택.
 - **ADR-02**: K8s `InferencePool` CRD Watcher 대신 **DB 서빙 카탈로그 + WebSocket 실시간 텔레메트리** 채택.
@@ -186,9 +186,11 @@ cd ordinatio/backend && uv run pytest -v
 - **ADR-15**: 외부 Keycloak OIDC SSO 종속 대신 **에어갭 로컬 자립형 Argon2id + JWT 3-Tier RBAC** 채택.
 - **ADR-16**: 고정된 3대 시스템 역할 종속 대신 **DB 기반 동적 커스텀 Role 추가/수정/삭제 및 세부 권한(Permissions) 매트릭스 엔진** 채택.
 - **ADR-17**: Envoy xDS 다이나믹 클러스터(EDS/CDS)의 실시간 안정성 및 이종 LLM 프로토콜 변환 한계를 극복하기 위해 **Envoy L7 엣지 인그레스 + Control Plane Python 게이트웨이 파이프라인 결합 아키텍처** 채택.
+- **ADR-18**: 개발 생산성과 운영 정밀도 보장을 위한 **로컬 Docker Compose(Mocking) vs 실사용 온프레미스 K8s/Appliance 이원화 테스트 전략** 채택.
+- **ADR-19**: 웹 브라우저 없이 운영자가 실제 LLM 엔드포인트, 서빙 엔진, 모델 ID, 관리자 계정을 일괄 주입하여 8대 전 메뉴를 무인 검증할 수 있도록 **외부 설정 파일(`test_config.json`) 기반 통합 E2E 자동화 러너** 채택.
 
 ---
 
 ## 5. 결론 및 프로덕션 릴리즈 상태
 
-현재 시스템은 **Phase 0부터 Phase 6까지의 전체 필수 사양 및 Phase C/B/A 상용 하드닝이 100% 완료 및 무회귀 검증(102개 테스트 100% PASS, Standalone 7개 PASS, Vite 번들 최적화 빌드 PASS, 비권장 경고 0건, install.conf 외부화 및 v1.0.2 릴리즈 태깅 완료)**되었으며, 단일 호스트 폐쇄망 서버에 무인으로 설치되어 고객 자율 운영이 가능한 상용급 프로덕션 레디 어플라이언스입니다.
+현재 시스템은 **Phase 0부터 Phase 6까지의 전체 필수 사양 및 Phase C/B/A 상용 하드닝이 100% 완료 및 무회귀 검증(111개 단위/보안 테스트 100% PASS, 8대 전 메뉴 E2E 무인 통합 시나리오 10/10 PASS, Standalone 오프라인 7개 PASS, Vite 번들 최적화 빌드 PASS, 비권장 경고 0건, install.conf 외부화 및 v1.0.2 릴리즈 태깅 완료)**되었으며, 단일 호스트 폐쇄망 서버에 무인으로 설치되어 고객 자율 운영이 가능한 상용급 프로덕션 레디 어플라이언스입니다.

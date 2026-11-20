@@ -1005,21 +1005,24 @@ export default function RoutingTab({
   const availableModelsToAdd = models.filter(m => !currentWeights.some(w => w.model_id === m.id));
 
   // Gateway Connection URLs & Snippets (ELB / Reverse Proxy Auto-Detection)
-  // 프록시/ALB 배후 환경에서는 현재 사용자가 브라우저로 접속한 프록시 오리진(window.location.origin)을 최우선으로 사용하여
-  // 닫혀 있는 8080 포트 대신 프록시 표준 엔드포인트(80/443)로 안내합니다.
+  // 프론트엔드 포트(5137, 5173 등)로 웹 UI에 접속한 경우에도 실제 L7 트래픽 인그레스 포트인 Envoy(:8080)로 정확히 유도합니다.
   const browserOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080';
-  const isViteDevServer = typeof window !== 'undefined' && window.location.port === '5173';
+  const browserPort = typeof window !== 'undefined' ? window.location.port : '';
+  const browserHostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const browserProtocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
 
   let gatewayHost = import.meta.env.VITE_ENVOY_INGRESS_URL;
   if (!gatewayHost) {
     if (envoyIngressUrl && !envoyIngressUrl.includes('localhost') && !envoyIngressUrl.includes('127.0.0.1')) {
       gatewayHost = envoyIngressUrl;
-    } else if (isViteDevServer) {
-      // 로컬 개발 모드(Vite HMR :5173)에서만 로컬 Envoy 기본 포트(:8080) 제안
-      gatewayHost = `http://${window.location.hostname}:8080`;
-    } else {
-      // AWS ELB, Nginx 등 프로덕션/프록시 환경: 접속한 프록시 오리진(도메인/IP) 그대로 채택
+    } else if (browserPort === '5137' || browserPort === '5173' || (browserPort && browserPort !== '80' && browserPort !== '443' && browserPort !== '8080')) {
+      // 웹 UI 접근 포트(5137, 5173 등)와 Envoy L7 게이트웨이 포트(8080) 분리: 항상 Envoy 포트(:8080)로 매핑
+      gatewayHost = `${browserProtocol}//${browserHostname}:8080`;
+    } else if (browserPort === '8080') {
       gatewayHost = browserOrigin;
+    } else {
+      // 포트가 생략된 도메인 접속의 경우 기본 Envoy 포트(:8080) 지정
+      gatewayHost = `${browserProtocol}//${browserHostname}:8080`;
     }
   }
   const routePathPrefix = currentRoute.match_conditions?.path_prefix || `/v1/routes/${currentRoute.route_name}`;

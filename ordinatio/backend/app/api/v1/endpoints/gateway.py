@@ -558,7 +558,7 @@ async def dispatch_chat_completion(
                 else:
                     logger.warning(f"Upstream returned HTTP {res.status_code} for URL {url}: {res.text[:100]}")
             except Exception as e:
-                logger.warning(f"Failed connecting to upstream candidate URL {url}: {e}")
+                logger.warning(f"Failed connecting to upstream candidate URL {url}: {type(e).__name__}({e})")
                 continue
 
     latency_ms = round((time.perf_counter() - t0) * 1000, 2)

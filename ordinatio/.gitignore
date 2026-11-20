@@ -37,6 +37,7 @@ dist-ssr/
 # Environment
 .env
 .env.local
+test_config.json
 
 # Security / Release Private Keys
 *private*.pem

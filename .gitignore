@@ -27,6 +27,8 @@ yarn-error.log*
 # Environment
 .env
 .env.local
+test_config.json
+ordinatio/test_config.json
 
 # Logs
 *.log
@@ -34,9 +36,14 @@ yarn-error.log*
 # Vagrant
 .vagrant/
 
+# IDE
+.vscode/
+.idea/
+
 # Security / Release Private Keys
 *private*.pem
 *.key
 deploy/security/*private*.pem
+
 
 

@@ -34,7 +34,7 @@ help:
 	@echo "  make verify-phase4             - Run Phase 4 DoD verification (PII Masking & WORM Audit)"
 	@echo "  make verify-phase5             - Run Phase 5 DoD verification (Lifecycle & RSA-4096 Hotfix)"
 	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
-	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD"
+	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD (optional: CONFIG=test_config.json)"
 	@echo "  make verify-standalone-install - Run Standalone Installer & Vagrant Deployment DoD"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
@@ -135,7 +135,7 @@ verify-phase-system-prompt:
 	@bash scripts/verify-phase-system-prompt.sh
 
 verify-all-menus:
-	@bash scripts/verify-all-menus.sh
+	@bash scripts/verify-all-menus.sh $(if $(CONFIG),--config $(CONFIG),)
 
 verify-auth-rbac:
 	@bash scripts/verify-auth-rbac.sh

@@ -130,6 +130,48 @@ def init_db():
             db.commit()
             logger.info("Initialized database with AgentRouter 4-tier policy slots")
 
+        # 3.1 PII Rules (Financial Core Compliance Rules - Always initialized)
+        if db.query(PiiRule).count() == 0:
+            r1 = PiiRule(
+                rule_id="pii-rrn",
+                name="주민등록번호 마스킹",
+                entity_type="RRN",
+                regex_pattern=r"\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-[1-4]\d{6}",
+                confidence_threshold=0.99,
+                action="MASK",
+                is_active=True,
+            )
+            r2 = PiiRule(
+                rule_id="pii-account",
+                name="계좌번호 가명화(해싱)",
+                entity_type="BANK_ACCOUNT",
+                regex_pattern=r"\d{3,6}-\d{2,6}-\d{3,6}",
+                confidence_threshold=0.90,
+                action="HASH",
+                is_active=True,
+            )
+            r3 = PiiRule(
+                rule_id="pii-card",
+                name="신용카드 번호 마스킹",
+                entity_type="CREDIT_CARD",
+                regex_pattern=r"\b\d{4}-\d{4}-\d{4}-\d{4}\b",
+                confidence_threshold=0.95,
+                action="MASK",
+                is_active=True,
+            )
+            r4 = PiiRule(
+                rule_id="pii-employee",
+                name="사내 행번/사번 차단",
+                entity_type="EMPLOYEE_ID",
+                regex_pattern=r"\bEMP-[A-Z]{2}\d{5}\b",
+                confidence_threshold=0.85,
+                action="BLOCK",
+                is_active=True,
+            )
+            db.add_all([r1, r2, r3, r4])
+            db.commit()
+            logger.info("Initialized database with default PII rules")
+
         # 4. Demo / Sample Data Seeding (ONLY when explicitly enabled via SEED_DEMO_DATA=True)
         if not settings.SEED_DEMO_DATA:
             db.close()
@@ -284,48 +326,6 @@ def init_db():
             db.add_all([p1, p2, p3])
             db.commit()
             logger.info("Initialized database with default multi-routing policies")
-
-        # 4. PII Rules (Phase 4 Compliance)
-        if db.query(PiiRule).count() == 0:
-            r1 = PiiRule(
-                rule_id="pii-rrn",
-                name="주민등록번호 마스킹",
-                entity_type="RRN",
-                regex_pattern=r"\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-[1-4]\d{6}",
-                confidence_threshold=0.99,
-                action="MASK",
-                is_active=True,
-            )
-            r2 = PiiRule(
-                rule_id="pii-account",
-                name="계좌번호 가명화(해싱)",
-                entity_type="BANK_ACCOUNT",
-                regex_pattern=r"\b\d{3,6}-\d{2,6}-\d{3,6}\b",
-                confidence_threshold=0.90,
-                action="HASH",
-                is_active=True,
-            )
-            r3 = PiiRule(
-                rule_id="pii-card",
-                name="신용카드 번호 마스킹",
-                entity_type="CREDIT_CARD",
-                regex_pattern=r"\b\d{4}-\d{4}-\d{4}-\d{4}\b",
-                confidence_threshold=0.95,
-                action="MASK",
-                is_active=True,
-            )
-            r4 = PiiRule(
-                rule_id="pii-employee",
-                name="사내 행번/사번 차단",
-                entity_type="EMPLOYEE_ID",
-                regex_pattern=r"\bEMP-[A-Z]{2}\d{5}\b",
-                confidence_threshold=0.85,
-                action="BLOCK",
-                is_active=True,
-            )
-            db.add_all([r1, r2, r3, r4])
-            db.commit()
-            logger.info("Initialized database with default PII rules")
 
         # 5. Seed Audit Logs if empty
         if db.query(AuditLog).count() == 0:

@@ -106,7 +106,7 @@ sudo ./deploy/standalone/install.sh
 1. **[Safety Guard]**: Docker 데몬 구동 및 포트 충돌 비침습 검증
 2. **[Step 1]**: `/opt/ordinatio/` 레이아웃 생성 및 `openssl` 기반 32바이트 보안 시크릿(.env) 자동 주입
 3. **[Step 2]**: 오프라인 이미지 아카이브(`ordinatio-standalone-images.tar.gz`) 로드 또는 로컬 빌드
-3. **[Step 2]**: Docker Hub 공식 이미지 다운로드(`keikun808/ordinatio-backend:1.0.3`, `keikun808/ordinatio-frontend:1.0.3`), 오프라인 이미지 로드 또는 로컬 빌드
+3. **[Step 2]**: Docker Hub 공식 이미지 다운로드(`keikun808/ordinatio-backend:0.1.3`, `keikun808/ordinatio-frontend:0.1.3`), 오프라인 이미지 로드 또는 로컬 빌드
 4. **[Step 3]**: PostgreSQL/Redis 헬스 대기, DDL 마이그레이션, 슈퍼관리자(`admin@ordinatio.local`) 발급
 5. **[Step 4]**: `/etc/systemd/system/ordinatio.service` 등록, 자동 시작 활성화 및 엔드포인트 헬스 검증
 

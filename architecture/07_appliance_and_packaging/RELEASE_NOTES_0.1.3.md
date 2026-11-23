@@ -1,16 +1,16 @@
-# Ordinatio Release Notes - 1.0.3
+# Ordinatio Release Notes - 0.1.3
 
 **Release Date**: 2026-11-23  
 **Release Type**: Official Enterprise Release (100% Air-Gapped Clean Architecture)  
 **Target Architecture**: Air-Gapped On-Premise Appliance & Cloud-Adjacent Hybrid Appliance  
-**Git Tag**: `1.0.3`  
+**Git Tag**: `0.1.3`  
 **Quality Status**: **114 / 114 Backend Tests PASS (100%), Standalone 7 / 7 PASS, Frontend Vite Build PASS**
 
 ---
 
 ## 🌟 최신 릴리즈 요약 및 핵심 성과 (Release Highlights)
 
-본 1.0.3 릴리즈는 Ordinatio의 공식 상용급 릴리즈로서, 이전 모든 구버전(v1.0.0, v1.0.1, v1.0.2)의 개발 마일스톤과 안정화 패치를 통합하고, **가짜/모의 코드 완전 박멸, 소스코드 실구현 기반 테스트 스위트 100% 정합화(114 Tests PASS)**를 달성한 단일 통합 버전입니다.
+본 0.1.3 릴리즈는 Ordinatio의 공식 상용급 릴리즈로서, 이전 모든 구버전(v1.0.0, v1.0.1, v1.0.2)의 개발 마일스톤과 안정화 패치를 통합하고, **가짜/모의 코드 완전 박멸, 소스코드 실구현 기반 테스트 스위트 100% 정합화(114 Tests PASS)**를 달성한 단일 통합 버전입니다.
 
 ---
 
@@ -32,7 +32,7 @@
    - **시맨틱 캐시 실시간 적중률**: `SemanticCache`의 실제 적중률(`hit_rate_pct`)을 텔레메트리 허브와 실시간 연동.
    - **TokenRateLimiter 분산 슬라이딩 윈도우**: Redis Sorted Set 기반 슬라이딩 윈도우 및 장애 시 인메모리 무장애 폴백.
    - **Envoy xDS 실시간 동기화 & ACK 프로빙**: 동적 라우팅 배포 시 Envoy Admin 포트를 실시간 프로브하여 ACK 검증.
-   - **솔루션 버전 1.0.3 일원화**: 백엔드, 프론트엔드, 인스톨러, Docker 이미지 전반 버전 일치화.
+   - **솔루션 버전 0.1.3 일원화**: 백엔드, 프론트엔드, 인스톨러, Docker 이미지 전반 버전 일치화.
 
 4. **WORM 불변 감사 포렌식 & PII 보안 거버넌스**:
    - PostgreSQL INSERT-only WORM 불변 감사 로그 테이블 및 SHA-256 Merkle Hash-chain 무결성 전수 검증.
@@ -42,8 +42,8 @@
 5. **단일 어플라이언스 인스톨러 & 컨테이너 이미지**:
    - RHEL 9 / Rocky Linux 9 / Ubuntu 24.04 호환 단일 호스트 무인 설치 툴(`install.sh`).
    - 공식 Docker Hub 최신 프로덕션 이미지:
-     - `keikun808/ordinatio-backend:1.0.3` (`latest`)
-     - `keikun808/ordinatio-frontend:1.0.3` (`latest`)
+     - `keikun808/ordinatio-backend:0.1.3` (`latest`)
+     - `keikun808/ordinatio-frontend:0.1.3` (`latest`)
 
 ---
 

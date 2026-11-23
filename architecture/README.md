@@ -90,7 +90,7 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 | [PRE_09_phase5_lifecycle_and_hotfix_engine.md](./07_appliance_and_packaging/PRE_09_phase5_lifecycle_and_hotfix_engine.md) | **어플라이언스 수명주기 제어 및 RSA-4096 긴급 패치 엔진**<br>- RSA-4096 서명 오프라인 패치 검증, 4단계 무중단 롤링 핫픽스 & 롤백 | **100% PASS** |
 | [PRE_40_standalone_offline_appliance_packaging_plan.md](./07_appliance_and_packaging/PRE_40_standalone_offline_appliance_packaging_plan.md) | **독립형 오프라인 어플라이언스 원클릭 패키징 및 구동 보고서**<br>- `make prod-build` ➔ 단일 tar.gz 번들 생성 ➔ 타깃 서버 `make up` 원클릭 기동 | **100% PASS** |
 | [PRE_45_standalone_appliance_release_engineering_plan.md](./07_appliance_and_packaging/PRE_45_standalone_appliance_release_engineering_plan.md) | **오프라인 어플라이언스 릴리즈 엔지니어링 계획서**<br>- 5단계 릴리즈 생명주기, 이중 체크섬, RSA-4096 서명, 고객사 전입 검증기 및 make release 자동화 | **구현 및 검증 완료** |
-| [RELEASE_NOTES_1.0.3.md](./07_appliance_and_packaging/RELEASE_NOTES_1.0.3.md) | **Ordinatio 1.0.3 공식 상용 릴리즈 노트**<br>- 선언적 install.conf 무인 설치, 6대 실체화 기능, WORM 무결성 및 114 Tests 100% PASS | **1.0.3 GA (단일 공식 릴리즈)** |
+| [RELEASE_NOTES_0.1.3.md](./07_appliance_and_packaging/RELEASE_NOTES_0.1.3.md) | **Ordinatio 0.1.3 공식 상용 릴리즈 노트**<br>- 선언적 install.conf 무인 설치, 6대 실체화 기능, WORM 무결성 및 114 Tests 100% PASS | **0.1.3 GA (단일 공식 릴리즈)** |
 | [PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md) | **사용자 지정 DNS·오프라인 번들 우선/외부 레지스트리 fallback 및 114건 검증 증적 수치 정합화** | **100% PASS** |
 | [PRE_47_semantic_cache_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | **에어갭 로컬 시맨틱 캐시, 테넌트 격리 및 FinOps 절감 관측** | **100% PASS** |
 | [OFFLINE_INSTALL_GUIDE.md](./07_appliance_and_packaging/OFFLINE_INSTALL_GUIDE.md) | **폐쇄망(Air-Gapped) 원클릭 오프라인 설치 및 운영 매뉴얼** | **배포 완료** |
@@ -122,9 +122,9 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 
 | 삭제된 구버전 파일 | 대체 및 최신 흡수 문서 | 삭제 사유 |
 | :--- | :--- | :--- |
-| `RELEASE_NOTES_v1.0.0.md` | `RELEASE_NOTES_1.0.3.md` | 초기 v1.0.0 릴리즈 노트로 단일 공식 릴리즈 노트(1.0.3)로 통합 및 이전 버전 삭제 정책 적용 |
-| `RELEASE_NOTES_v1.0.1.md` | `RELEASE_NOTES_1.0.3.md` | v1.0.1 릴리즈 노트로 단일 공식 릴리즈 노트(1.0.3)로 통합 및 이전 버전 삭제 정책 적용 |
-| `RELEASE_NOTES_v1.0.2.md` | `RELEASE_NOTES_1.0.3.md` | v1.0.2 릴리즈 노트로 단일 공식 릴리즈 노트(1.0.3)로 통합 및 이전 버전 삭제 정책 적용 |
+| `RELEASE_NOTES_v1.0.0.md` | `RELEASE_NOTES_0.1.3.md` | 초기 v1.0.0 릴리즈 노트로 단일 공식 릴리즈 노트(0.1.3)로 통합 및 이전 버전 삭제 정책 적용 |
+| `RELEASE_NOTES_v1.0.1.md` | `RELEASE_NOTES_0.1.3.md` | v1.0.1 릴리즈 노트로 단일 공식 릴리즈 노트(0.1.3)로 통합 및 이전 버전 삭제 정책 적용 |
+| `RELEASE_NOTES_v1.0.2.md` | `RELEASE_NOTES_0.1.3.md` | v1.0.2 릴리즈 노트로 단일 공식 릴리즈 노트(0.1.3)로 통합 및 이전 버전 삭제 정책 적용 |
 | `PRE_02_phase0_foundations_and_ai_gateway.md` | `PRE_01`, `PRE_12`, `PRE_40` | 초기 기초 설계로 마스터 계획서 및 스탠드얼론 패키징에 완전 흡수 |
 | `PRE_03_phase1_tenant_and_virtual_keys.md` | `PRE_38`, `PRE_39` | 초기 3역할 사양으로 동적 Role CRUD 및 PBAC에 완전 대체 |
 | `PRE_04_phase2_model_catalog_and_routing_spec.md` | `PRE_24`, `PRE_29` | 정적 모델 라우팅 사양으로 동적 클러스터 및 커스텀 경로에 대체 |

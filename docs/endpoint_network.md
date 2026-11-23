@@ -36,7 +36,7 @@
   {
     "status": "UP",
     "service": "Ordinatio Standalone Appliance",
-    "version": "1.0.3",
+    "version": "0.1.3",
     "environment": "production"
   }
   ```

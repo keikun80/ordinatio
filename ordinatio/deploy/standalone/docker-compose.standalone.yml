@@ -85,7 +85,7 @@ services:
   # 4. Control Plane: FastAPI Backend
   # ----------------------------------------------------------------------------
   backend:
-    image: ${BACKEND_IMAGE:-keikun808/ordinatio-backend:0.1.3}
+    image: ${BACKEND_IMAGE:-keikun808/ordinatio-backend:0.1.4}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -127,7 +127,7 @@ services:
   # 5. Admin Console: React 18 + Vite Nginx Frontend
   # ----------------------------------------------------------------------------
   frontend:
-    image: ${FRONTEND_IMAGE:-keikun808/ordinatio-frontend:0.1.3}
+    image: ${FRONTEND_IMAGE:-keikun808/ordinatio-frontend:0.1.4}
     build:
       context: ./frontend
       dockerfile: Dockerfile

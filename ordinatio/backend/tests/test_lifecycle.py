@@ -15,7 +15,7 @@ def test_component_version_listing(client: TestClient):
     comp_names = [c["name"] for c in data["components"]]
     assert any("ext_proc" in n for n in comp_names)
     assert any("Envoy" in n for n in comp_names)
-    assert data["current_solution_version"] in [settings.VERSION, f"v{settings.VERSION}", "0.1.3"]
+    assert data["current_solution_version"] in [settings.VERSION, f"v{settings.VERSION}", "0.1.4"]
 
 
 def test_preflight_diagnostics(client: TestClient):

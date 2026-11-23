@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-INSTALLER_VERSION="0.1.3"
+INSTALLER_VERSION="0.1.4"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # ------------------------------------------------------------------------------
@@ -34,8 +34,8 @@ SKIP_PULL=false
 USE_LOCAL_BUILD=false
 SEED_DEMO_DATA=false
 
-BACKEND_IMAGE="keikun808/ordinatio-backend:0.1.3"
-FRONTEND_IMAGE="keikun808/ordinatio-frontend:0.1.3"
+BACKEND_IMAGE="keikun808/ordinatio-backend:0.1.4"
+FRONTEND_IMAGE="keikun808/ordinatio-frontend:0.1.4"
 
 INITIAL_ADMIN_USERNAME="admin"
 INITIAL_ADMIN_EMAIL="admin@ordinatio.local"
@@ -91,7 +91,7 @@ print_banner() {
  / ___ |_/ /   / /_/ / /  / /__/ / / /  __(__  ) /_/ /  / /_/ / 
 /_/  |_/___/   \____/_/   \___/_/ /_/\___/____/\__/_/   \__,_/  
                                                                 
-     Standalone Appliance Installer 0.1.3 (Enterprise Linux 9)
+     Standalone Appliance Installer 0.1.4 (Enterprise Linux 9)
 EOF
     echo -e "${NC}"
 }
@@ -200,8 +200,8 @@ usage() {
     echo "      --cluster-region     클러스터 리전/존 명칭 지정 (기본값: DC-1 서울)"
     echo "      --target-dir PATH    설치 대상 디렉토리 (기본값: /opt/ordinatio)"
     echo "      --source-dir PATH    ordinatio 소스 루트 디렉토리"
-    echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:0.1.3)"
-    echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:0.1.3)"
+    echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:0.1.4)"
+    echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:0.1.4)"
     echo "      --frontend-port PORT 프론트엔드 웹 포트 지정 (기본값: 5173)"
     echo "      --dns-server IP      컨테이너 DNS 서버 지정 (기본값: 8.8.8.8)"
     echo "      --skip-pull          컨테이너 이미지 다운로드(Pull) 단계 생략"

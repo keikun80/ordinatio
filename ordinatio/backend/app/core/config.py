@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     # Security & User Authentication (RBAC)
     SECRET_KEY: str = "orchestrator-in-airgap-rsa4096-secret-change-in-prod"

@@ -176,6 +176,45 @@ def test_gateway_agent_router_chat_completions(client: TestClient):
     assert res_heavy.headers["x-agent-route-tier"] == "reasoning_72b"
     assert res_heavy.headers["x-orche-upstream-cluster"] == "cluster_vllm_reasoning_72b"
 
+    # 3. Claude Code / Anthropic Structured Content Block List Test
+    payload_claude = {
+        "model": "agent-auto",
+        "system": [
+            {"type": "text", "text": "당신은 사내 금융 보안 어시스턴트입니다."}
+        ],
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "<system-reminder>\n규정을 준수하세요.\n</system-reminder>\n리눅스 프로세스 메모리 누수 분석 방법을 알려줘."
+                    }
+                ]
+            }
+        ]
+    }
+    res_claude = client.post(
+        "/v1/chat/completions",
+        json=payload_claude,
+        headers={"Authorization": "Bearer sk-ord-test-key-developer"}
+    )
+    assert res_claude.status_code == 200, f"Expected 200 but got {res_claude.status_code}: {res_claude.text}"
+    data_claude = res_claude.json()
+    # OpenAI 규격 검증
+    assert "choices" in data_claude
+    assert len(data_claude["choices"]) > 0
+    # Anthropic Claude 규격 검증 (Dual Compatibility)
+    assert data_claude["type"] == "message"
+    assert data_claude["role"] == "assistant"
+    assert isinstance(data_claude["content"], list)
+    assert data_claude["content"][0]["type"] == "text"
+    assert "text" in data_claude["content"][0]
+    assert data_claude["stop_reason"] == "end_turn"
+    assert "usage" in data_claude
+    assert "input_tokens" in data_claude["usage"]
+    assert "output_tokens" in data_claude["usage"]
+
 def test_routing_agent_router_status_and_simulate_apis(client: TestClient):
     # Status API
     status_res = client.get("/api/v1/routing/agent-router/status")

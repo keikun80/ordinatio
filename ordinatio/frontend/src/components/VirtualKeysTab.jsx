@@ -3,6 +3,7 @@ import { KeyRound, Plus, ShieldCheck, AlertCircle, Ban, Check, Copy, Sliders, Se
 import { apiClient } from '../api/client';
 import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
+import { copyToClipboard } from '../utils/clipboard';
 
 const LOCAL_STORAGE_KEY = 'ordinatio_virtual_keys_v1';
 const LOCAL_STORAGE_TENANTS_KEY = 'ordinatio_tenants_v1';
@@ -506,39 +507,14 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     }
   };
 
-  const handleCopySecret = () => {
+  const handleCopySecret = async () => {
     if (createdSecret && createdSecret.rawKey) {
       const text = createdSecret.rawKey;
-      const notifySuccess = () => {
+      const ok = await copyToClipboard(text);
+      if (ok) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
         onNotify('INFO', strings.virtualKeys.alerts.keyCopied);
-      };
-
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text)
-          .then(notifySuccess)
-          .catch(() => fallbackCopySecret(text));
-      } else {
-        fallbackCopySecret(text);
-      }
-
-      function fallbackCopySecret(str) {
-        try {
-          const textArea = document.createElement('textarea');
-          textArea.value = str;
-          textArea.style.position = 'fixed';
-          textArea.style.left = '-999999px';
-          textArea.style.top = '-999999px';
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          notifySuccess();
-        } catch (err) {
-          console.error('Fallback copy failed:', err);
-        }
       }
     }
   };

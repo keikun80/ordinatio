@@ -12,6 +12,7 @@ import {
   buildEndpointUrl, 
   extractDomainAndProvider 
 } from './constants';
+import { copyToClipboard } from '../../utils/clipboard';
 
 import RoutingStudio from './subtabs/RoutingStudio';
 import ModelCatalog from './subtabs/ModelCatalog';
@@ -558,11 +559,20 @@ export default function RoutingTab({
   };
 
   // Copy to clipboard helper
-  const handleCopy = (text, fieldKey) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldKey);
-    setTimeout(() => setCopiedField(null), 2000);
-    if (onNotify) onNotify('SUCCESS', strings.routing.alerts.copiedClipboard);
+  const handleCopy = async (text, fieldKey) => {
+    try {
+      const ok = await copyToClipboard(text);
+      if (ok) {
+        setCopiedField(fieldKey);
+        setTimeout(() => setCopiedField(null), 2000);
+        if (onNotify) onNotify('SUCCESS', strings.routing.alerts.copiedClipboard);
+      } else {
+        if (onNotify) onNotify('ERROR', '클립보드 복사에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('Clipboard copy error:', err);
+      if (onNotify) onNotify('ERROR', '클립보드 복사에 실패했습니다.');
+    }
   };
 
   // Test Route Call via Envoy Gateway (Single or All Models)

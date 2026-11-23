@@ -39,7 +39,8 @@ FRONTEND_IMAGE="keikun808/ordinatio-frontend:v1.0.2"
 
 INITIAL_ADMIN_USERNAME="admin"
 INITIAL_ADMIN_EMAIL="admin@ordinatio.local"
-FRONTEND_PORT=80
+INITIAL_ADMIN_PASSWORD=""
+FRONTEND_PORT=5173
 BACKEND_PORT=8000
 ENVOY_TRAFFIC_PORT=8080
 ENVOY_ADMIN_PORT=9901
@@ -200,6 +201,7 @@ usage() {
     echo "      --source-dir PATH    ordinatio 소스 루트 디렉토리"
     echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:v1.0.2)"
     echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:v1.0.2)"
+    echo "      --frontend-port PORT 프론트엔드 웹 포트 지정 (기본값: 5173)"
     echo "      --skip-pull          컨테이너 이미지 다운로드(Pull) 단계 생략"
     echo "      --skip-build         컨테이너 이미지 다운로드/빌드 단계 생략"
     echo "      --build              Docker Hub 대신 로컬 소스 빌드 강제"
@@ -300,6 +302,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --frontend-image)
             FRONTEND_IMAGE="$2"
+            shift 2
+            ;;
+        --frontend-port)
+            FRONTEND_PORT="$2"
             shift 2
             ;;
         --skip-pull)
@@ -437,7 +443,7 @@ fi
 
 # 디렉토리 트리 생성
 mkdir -p "${TARGET_DIR}/data/"{postgres,redis,logs,worm_audit}
-mkdir -p "${TARGET_DIR}/deploy/"{postgres,envoy}
+mkdir -p "${TARGET_DIR}/deploy/"{postgres,envoy,frontend}
 mkdir -p "${TARGET_DIR}/bin"
 chmod 700 "${TARGET_DIR}/data"
 
@@ -446,8 +452,13 @@ log_info "설정 파일 및 DDL 복사 중..."
 cp "${SOURCE_DIR}/deploy/standalone/docker-compose.standalone.yml" "${TARGET_DIR}/docker-compose.standalone.yml"
 cp "${SOURCE_DIR}/deploy/postgres/init.sql" "${TARGET_DIR}/deploy/postgres/init.sql"
 cp "${SOURCE_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
+if [ -f "${SOURCE_DIR}/deploy/frontend/default.conf" ]; then
+    cp "${SOURCE_DIR}/deploy/frontend/default.conf" "${TARGET_DIR}/deploy/frontend/default.conf"
+elif [ -f "${SOURCE_DIR}/frontend/nginx.conf" ]; then
+    cp "${SOURCE_DIR}/frontend/nginx.conf" "${TARGET_DIR}/deploy/frontend/default.conf"
+fi
 chmod -R 755 "${TARGET_DIR}/deploy"
-chmod 644 "${TARGET_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/postgres/init.sql" 2>/dev/null || true
+chmod 644 "${TARGET_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/postgres/init.sql" "${TARGET_DIR}/deploy/frontend/default.conf" 2>/dev/null || true
 
 # Docker Bridge Gateway IP 치환 (Envoy upstream 클러스터 주소)
 if [ -n "$DOCKER_BRIDGE_GATEWAY_IP" ] && [ "$DOCKER_BRIDGE_GATEWAY_IP" != "172.20.0.1" ]; then
@@ -571,7 +582,7 @@ log_success "데이터베이스 정상 연결 확인."
 docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" exec -T postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '${DYN_POSTGRES_PASS}';" &> /dev/null || true
 
 # 슈퍼관리자 비밀번호 결정
-ADMIN_PASS="${ADMIN_PASSWORD:-${INITIAL_ADMIN_PASSWORD}}"
+ADMIN_PASS="${ADMIN_PASSWORD:-${INITIAL_ADMIN_PASSWORD:-}}"
 if [ -z "$ADMIN_PASS" ]; then
     ADMIN_PASS="Orche!$(openssl rand -hex 6)"
 fi
@@ -632,9 +643,9 @@ log_info "서비스 엔드포인트 헬스 프로빙 대기 중..."
 sleep 5
 
 # 3대 핵심 헬스 검증
-log_info "1) Backend REST API 헬스 확인 (http://localhost:${BACKEND_PORT}/health)..."
+log_info "1) Backend REST API 헬스 확인 (http://localhost:${BACKEND_PORT}/api/v1/health)..."
 for i in {1..15}; do
-    if curl -sf "http://localhost:${BACKEND_PORT}/health" &> /dev/null; then
+    if curl -sf "http://localhost:${BACKEND_PORT}/api/v1/health" &> /dev/null || curl -sf "http://localhost:${BACKEND_PORT}/health" &> /dev/null; then
         log_success "Backend Control Plane: READY (HTTP 200)"
         break
     fi

@@ -74,9 +74,25 @@ def classify_prompt(
     for msg in messages:
         content = msg.get("content", "")
         if isinstance(content, str):
-            full_text_list.append(content)
+            text_val = content
+        elif isinstance(content, list):
+            texts = []
+            for item in content:
+                if isinstance(item, str):
+                    texts.append(item)
+                elif isinstance(item, dict):
+                    if item.get("type") == "text" and "text" in item:
+                        texts.append(str(item["text"]))
+                    elif "content" in item:
+                        texts.append(str(item["content"]))
+            text_val = "\n".join(texts)
+        else:
+            text_val = str(content) if content else ""
+
+        if text_val:
+            full_text_list.append(text_val)
             if msg.get("role") == "user":
-                user_text_list.append(content)
+                user_text_list.append(text_val)
 
     full_conversation = "\n".join(full_text_list)
     latest_user_prompt = "\n".join(user_text_list) if user_text_list else full_conversation

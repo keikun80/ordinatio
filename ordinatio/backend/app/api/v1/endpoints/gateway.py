@@ -2,7 +2,7 @@ import time
 import random
 import logging
 import ipaddress
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timezone
 
 from decimal import Decimal
@@ -53,15 +53,37 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # -----------------------------------------------------------------------------
-# Pydantic Schemas (OpenAI Chat Completions Compatible)
+# Pydantic Schemas (OpenAI Chat Completions & Anthropic Multi-modal Compatible)
 # -----------------------------------------------------------------------------
 class ChatMessage(BaseModel):
     role: str = Field(..., description="역할 (system, user, assistant)")
-    content: str = Field(..., description="메시지 내용")
+    content: Union[str, List[Union[Dict[str, Any], str]]] = Field(
+        ..., description="메시지 내용 (단일 문자열 또는 멀티모달/구조화 블록 배열)"
+    )
+
+    def get_text_content(self) -> str:
+        """단일 문자열 또는 블록 배열에서 순수 텍스트를 추출하는 헬퍼"""
+        if isinstance(self.content, str):
+            return self.content
+        if isinstance(self.content, list):
+            texts = []
+            for item in self.content:
+                if isinstance(item, str):
+                    texts.append(item)
+                elif isinstance(item, dict):
+                    if item.get("type") == "text" and "text" in item:
+                        texts.append(str(item["text"]))
+                    elif "content" in item:
+                        texts.append(str(item["content"]))
+            return "\n".join(texts)
+        return str(self.content) if self.content is not None else ""
 
 class ChatCompletionRequest(BaseModel):
     model: Optional[str] = Field(default=None, description="모델 ID 또는 라우트 식별자 (예: auto, agent-auto, financial-advisor-v1)")
-    messages: List[ChatMessage] = Field(..., description="대화 메시지 히스토리")
+    messages: List[ChatMessage] = Field(default_factory=list, description="대화 메시지 히스토리")
+    system: Optional[Union[str, List[Union[Dict[str, Any], str]]]] = Field(
+        default=None, description="Anthropic 규격 최상위 시스템 프롬프트 (있는 경우 messages 선두에 자동 합성)"
+    )
     temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=512, ge=1)
     stream: Optional[bool] = Field(default=False, description="스트리밍 여부")
@@ -318,11 +340,39 @@ async def dispatch_chat_completion(
 ) -> Dict[str, Any]:
     t0 = time.perf_counter()
 
+    # 0. Anthropic/OpenAI System Prompt 정규화 및 선두 통합
+    # vLLM/OpenAI 엄격 규칙: "System message must be at the beginning."
+    system_texts = []
+    if req.system:
+        if isinstance(req.system, str):
+            system_texts.append(req.system)
+        elif isinstance(req.system, list):
+            for item in req.system:
+                if isinstance(item, str):
+                    system_texts.append(item)
+                elif isinstance(item, dict) and item.get("type") == "text":
+                    system_texts.append(str(item.get("text", "")))
+
+    normalized_req_messages = []
+    for m in req.messages:
+        if m.role == "system":
+            sys_t = m.get_text_content()
+            if sys_t:
+                system_texts.append(sys_t)
+        else:
+            normalized_req_messages.append(m)
+
+    if system_texts:
+        combined_sys = "\n\n".join(filter(None, system_texts))
+        normalized_req_messages.insert(0, ChatMessage(role="system", content=combined_sys))
+
+    req.messages = normalized_req_messages
+
     # 1. PII Inspection & WORM Audit
     user_prompt = ""
     for msg in reversed(req.messages):
         if msg.role == "user":
-            user_prompt = msg.content
+            user_prompt = msg.get_text_content()
             break
 
     pii_engine = PiiEngine()
@@ -483,8 +533,20 @@ async def dispatch_chat_completion(
     upstream_messages = []
     for msg in req.messages:
         content = msg.content
-        if msg.role == "user" and msg.content == user_prompt:
-            content = masked_prompt
+        msg_text = msg.get_text_content()
+        if msg.role == "user" and msg_text == user_prompt:
+            if isinstance(content, str):
+                content = masked_prompt
+            elif isinstance(content, list):
+                new_blocks = []
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        b_text = b.get("text", "")
+                        masked_b_text = pii_engine.mask(b_text).masked_text if b_text else ""
+                        new_blocks.append({**b, "text": masked_b_text})
+                    else:
+                        new_blocks.append(b)
+                content = new_blocks
         upstream_messages.append({"role": msg.role, "content": content})
 
     upstream_payload = {
@@ -616,6 +678,34 @@ async def dispatch_chat_completion(
             "status": "LIVE_UPSTREAM",
             "finops": finops_metering
         }
+
+        # Anthropic Claude Code / SDK Dual-Compatibility
+        if isinstance(upstream_response_data, dict):
+            extracted_reply = ""
+            if "choices" in upstream_response_data and isinstance(upstream_response_data["choices"], list):
+                if upstream_response_data["choices"]:
+                    first_msg = upstream_response_data["choices"][0].get("message", {})
+                    extracted_reply = first_msg.get("content", "") or ""
+            elif "content" in upstream_response_data and isinstance(upstream_response_data["content"], str):
+                extracted_reply = upstream_response_data["content"]
+
+            if "type" not in upstream_response_data:
+                upstream_response_data["type"] = "message"
+            if "role" not in upstream_response_data:
+                upstream_response_data["role"] = "assistant"
+            if "content" not in upstream_response_data or isinstance(upstream_response_data.get("content"), str):
+                upstream_response_data["content"] = [{"type": "text", "text": str(extracted_reply)}]
+            if "stop_reason" not in upstream_response_data:
+                upstream_response_data["stop_reason"] = "end_turn"
+            if "stop_sequence" not in upstream_response_data:
+                upstream_response_data["stop_sequence"] = None
+            if "usage" in upstream_response_data and isinstance(upstream_response_data["usage"], dict):
+                u = upstream_response_data["usage"]
+                if "input_tokens" not in u:
+                    u["input_tokens"] = u.get("prompt_tokens", actual_prompt_toks)
+                if "output_tokens" not in u:
+                    u["output_tokens"] = u.get("completion_tokens", actual_compl_toks)
+
         return upstream_response_data
 
     # Developer unit-test simulation check (only for local unit-testing with explicit test key)
@@ -649,6 +739,7 @@ async def dispatch_chat_completion(
             "object": "chat.completion",
             "created": int(time.time()),
             "model": f"{route_name}:{selected_model_id}",
+            # OpenAI 호환 필드
             "choices": [
                 {
                     "index": 0,
@@ -659,10 +750,23 @@ async def dispatch_chat_completion(
                     "finish_reason": "stop"
                 }
             ],
+            # Anthropic Claude Code / SDK 호환 필드
+            "type": "message",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": sample_text
+                }
+            ],
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
             "usage": {
                 "prompt_tokens": sim_prompt_tokens,
                 "completion_tokens": sim_compl_tokens,
-                "total_tokens": sim_prompt_tokens + sim_compl_tokens
+                "total_tokens": sim_prompt_tokens + sim_compl_tokens,
+                "input_tokens": sim_prompt_tokens,
+                "output_tokens": sim_compl_tokens
             },
             "orche_metadata": {
                 "routed_by": "Envoy AI Gateway + AgentRouter",

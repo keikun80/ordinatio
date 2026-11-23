@@ -529,9 +529,11 @@ export default function AgentRouterBench({
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <button
+                data-testid="rt-testbench-btn-copy-url"
                 onClick={() => handleCopy(activeEndpointTab === 'header' ? `${gatewayHost}/v1/chat/completions` : `${gatewayHost}${routePathPrefix}`, 'endpoint')}
                 className="btn btn-secondary btn-sm"
                 style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title={strings.routing.dispatch.copyUrl}
               >
                 {copiedField === 'endpoint' ? <Check size={14} color="var(--accent-emerald)" /> : <Copy size={14} />}
                 <span>{copiedField === 'endpoint' ? strings.routing.dispatch.copiedUrl : strings.routing.dispatch.copyUrl}</span>

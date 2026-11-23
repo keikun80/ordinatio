@@ -19,6 +19,8 @@ if command -v multipass &>/dev/null; then
     MP_BIN="multipass"
 elif command -v multipass.exe &>/dev/null; then
     MP_BIN="multipass.exe"
+elif [ -f "/mnt/c/Program Files/Multipass/bin/multipass.exe" ]; then
+    MP_BIN="/mnt/c/Program Files/Multipass/bin/multipass.exe"
 fi
 
 check_multipass() {

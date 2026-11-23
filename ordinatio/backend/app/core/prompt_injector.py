@@ -77,7 +77,10 @@ def inject_system_prompt(
             # 기존 system 메시지 앞에 사내 표준 규정을 결합
             first_idx = existing_sys_indices[0]
             orig_content = new_messages[first_idx].get("content", "")
-            new_messages[first_idx]["content"] = f"{sys_content}\n\n{orig_content}"
+            if isinstance(orig_content, list):
+                new_messages[first_idx]["content"] = [{"type": "text", "text": f"{sys_content}\n\n"}] + list(orig_content)
+            else:
+                new_messages[first_idx]["content"] = f"{sys_content}\n\n{orig_content}"
         else:
             new_messages.insert(0, {"role": "system", "content": sys_content})
 

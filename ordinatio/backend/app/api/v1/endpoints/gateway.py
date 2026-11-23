@@ -93,6 +93,58 @@ class ChatCompletionRequest(BaseModel):
     stream: Optional[bool] = Field(default=False, description="스트리밍 여부")
     tools: Optional[List[Dict[str, Any]]] = Field(default=None, description="도구/함수 호출 스키마")
     functions: Optional[List[Dict[str, Any]]] = Field(default=None, description="레거시 함수 호출 스키마")
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(default=None, description="도구 선택 모드")
+
+# -----------------------------------------------------------------------------
+# Helper: Anthropic <-> OpenAI Tool Schema and Message Converters
+# -----------------------------------------------------------------------------
+def convert_anthropic_tools_to_openai(tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    if not tools:
+        return None
+    converted = []
+    for t in tools:
+        if not isinstance(t, dict):
+            continue
+        if t.get("type") == "function" and "function" in t:
+            converted.append(t)
+        elif "input_schema" in t:
+            converted.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name", ""),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object", "properties": {}})
+                }
+            })
+        elif "parameters" in t and "name" in t:
+            converted.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name", ""),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("parameters", {})
+                }
+            })
+        else:
+            converted.append(t)
+    return converted if converted else None
+
+def convert_anthropic_tool_choice_to_openai(tool_choice: Optional[Union[str, Dict[str, Any]]]) -> Optional[Union[str, Dict[str, Any]]]:
+    if not tool_choice:
+        return None
+    if isinstance(tool_choice, str):
+        return tool_choice
+    if isinstance(tool_choice, dict):
+        tc_type = tool_choice.get("type")
+        if tc_type == "auto":
+            return "auto"
+        elif tc_type == "any":
+            return "required"
+        elif tc_type == "tool" and "name" in tool_choice:
+            return {"type": "function", "function": {"name": tool_choice["name"]}}
+        elif tc_type == "function" and "function" in tool_choice:
+            return tool_choice
+    return tool_choice
 
 # -----------------------------------------------------------------------------
 # Helper: IP Address / CIDR Matcher
@@ -544,12 +596,15 @@ async def dispatch_chat_completion(
     affinity_mgr = SessionAffinityManager()
     affinity_headers = affinity_mgr.get_affinity_headers(session_id=session_id, prompt_prefix=user_prompt[:50])
 
-    # 4. Attempt Upstream Forwarding to vLLM
+    # 4. Attempt Upstream Forwarding to vLLM (Multi-Turn Anthropic <-> OpenAI Conversion)
     upstream_messages = []
     for msg in req.messages:
         content = msg.content
+        role = msg.role
         msg_text = msg.get_text_content()
-        if msg.role == "user" and msg_text == user_prompt:
+
+        # Apply PII masking to the active user prompt
+        if role == "user" and msg_text == user_prompt:
             if isinstance(content, str):
                 content = masked_prompt
             elif isinstance(content, list):
@@ -562,7 +617,57 @@ async def dispatch_chat_completion(
                     else:
                         new_blocks.append(b)
                 content = new_blocks
-        upstream_messages.append({"role": msg.role, "content": content})
+
+        # Convert Anthropic assistant tool_use blocks into OpenAI tool_calls
+        if isinstance(content, list) and role == "assistant":
+            text_parts = []
+            tool_calls = []
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                b_type = block.get("type")
+                if b_type == "text":
+                    text_parts.append(block.get("text", ""))
+                elif b_type == "tool_use":
+                    args = block.get("input", {})
+                    args_str = json.dumps(args, ensure_ascii=False) if isinstance(args, (dict, list)) else str(args)
+                    tool_calls.append({
+                        "id": block.get("id") or f"call_{uuid.uuid4().hex[:8]}",
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name", ""),
+                            "arguments": args_str
+                        }
+                    })
+            entry = {"role": "assistant", "content": "\n".join(text_parts) if text_parts else None}
+            if tool_calls:
+                entry["tool_calls"] = tool_calls
+            upstream_messages.append(entry)
+            continue
+
+        # Convert Anthropic user tool_result blocks into OpenAI role: "tool"
+        if isinstance(content, list) and role == "user":
+            has_tool_results = any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content)
+            if has_tool_results:
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        res_content = block.get("content", "")
+                        if isinstance(res_content, list):
+                            res_content = "\n".join(
+                                sub.get("text", "") for sub in res_content if isinstance(sub, dict) and "text" in sub
+                            )
+                        elif isinstance(res_content, (dict, list)):
+                            res_content = json.dumps(res_content, ensure_ascii=False)
+                        upstream_messages.append({
+                            "role": "tool",
+                            "tool_call_id": block.get("tool_use_id", ""),
+                            "content": str(res_content)
+                        })
+                    elif isinstance(block, dict) and block.get("type") == "text":
+                        upstream_messages.append({"role": "user", "content": block.get("text", "")})
+                continue
+
+        upstream_messages.append({"role": role, "content": content})
 
     is_anthropic_messages = (
         "/messages" in request.url.path
@@ -575,6 +680,9 @@ async def dispatch_chat_completion(
     is_streaming = wants_stream and model_supports_stream
 
     upstream_model_name = getattr(model_entry, 'alias', None) or selected_model_id
+    converted_tools = convert_anthropic_tools_to_openai(req.tools or req.functions)
+    converted_tool_choice = convert_anthropic_tool_choice_to_openai(req.tool_choice)
+
     upstream_payload = {
         "model": upstream_model_name,
         "messages": upstream_messages,
@@ -582,6 +690,10 @@ async def dispatch_chat_completion(
         "max_tokens": req.max_tokens,
         "stream": is_streaming
     }
+    if converted_tools:
+        upstream_payload["tools"] = converted_tools
+    if converted_tool_choice:
+        upstream_payload["tool_choice"] = converted_tool_choice
     prompt_toks = max(len(user_prompt) // 4 + 10, 5)
     compl_toks = 40
 
@@ -654,6 +766,12 @@ async def dispatch_chat_completion(
         elif auth_type_norm == "apikey":
             upstream_headers["apikey"] = raw_api_key
 
+    # Determine tenant attribution hint early
+    policy_tenant_code = None
+    if db_policy and db_policy.match_conditions and db_policy.match_conditions.get("tenant_codes"):
+        policy_tenant_code = db_policy.match_conditions["tenant_codes"][0]
+    target_tenant_hint = request.headers.get("x-orche-tenant") or policy_tenant_code
+
     # Developer unit-test simulation check (only for local unit-testing with explicit test key)
     is_strict = request.headers.get("x-strict-upstream") == "true"
     is_dev_test = raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"])
@@ -684,12 +802,10 @@ async def dispatch_chat_completion(
                                     }
                                     yield f"event: message_start\ndata: {json.dumps(msg_start, ensure_ascii=False)}\n\n"
 
-                                    block_start = {
-                                        "type": "content_block_start",
-                                        "index": 0,
-                                        "content_block": {"type": "text", "text": ""}
-                                    }
-                                    yield f"event: content_block_start\ndata: {json.dumps(block_start, ensure_ascii=False)}\n\n"
+                                    current_block_index = 0
+                                    text_block_open = False
+                                    active_tool_blocks = {}
+                                    finish_reason = None
 
                                     async for line in upstream_stream.aiter_lines():
                                         if not line:
@@ -702,25 +818,91 @@ async def dispatch_chat_completion(
                                                 chunk = json.loads(raw_data)
                                                 choices = chunk.get("choices", [])
                                                 if choices:
-                                                    delta = choices[0].get("delta", {})
+                                                    choice = choices[0]
+                                                    delta = choice.get("delta", {})
+                                                    if choice.get("finish_reason"):
+                                                        finish_reason = choice.get("finish_reason")
+
+                                                    # 1. Text or reasoning delta
                                                     text_delta = delta.get("content") or delta.get("reasoning") or delta.get("reasoning_content") or ""
                                                     if text_delta:
                                                         total_tokens += 1
+                                                        if not text_block_open:
+                                                            block_start = {
+                                                                "type": "content_block_start",
+                                                                "index": current_block_index,
+                                                                "content_block": {"type": "text", "text": ""}
+                                                            }
+                                                            yield f"event: content_block_start\ndata: {json.dumps(block_start, ensure_ascii=False)}\n\n"
+                                                            text_block_open = True
                                                         block_delta = {
                                                             "type": "content_block_delta",
-                                                            "index": 0,
+                                                            "index": current_block_index,
                                                             "delta": {"type": "text_delta", "text": text_delta}
                                                         }
                                                         yield f"event: content_block_delta\ndata: {json.dumps(block_delta, ensure_ascii=False)}\n\n"
+
+                                                    # 2. Tool calls delta
+                                                    tool_calls_delta = delta.get("tool_calls", [])
+                                                    if tool_calls_delta:
+                                                        if text_block_open:
+                                                            yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index}, ensure_ascii=False)}\n\n"
+                                                            text_block_open = False
+                                                            current_block_index += 1
+
+                                                        for tc in tool_calls_delta:
+                                                            tc_idx = tc.get("index", 0)
+                                                            if tc_idx not in active_tool_blocks:
+                                                                tool_id = tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}"
+                                                                tool_name = tc.get("function", {}).get("name") or "tool"
+                                                                active_tool_blocks[tc_idx] = {
+                                                                    "block_index": current_block_index,
+                                                                    "id": tool_id,
+                                                                    "name": tool_name
+                                                                }
+                                                                tb_start = {
+                                                                    "type": "content_block_start",
+                                                                    "index": current_block_index,
+                                                                    "content_block": {
+                                                                        "type": "tool_use",
+                                                                        "id": tool_id,
+                                                                        "name": tool_name,
+                                                                        "input": {}
+                                                                    }
+                                                                }
+                                                                yield f"event: content_block_start\ndata: {json.dumps(tb_start, ensure_ascii=False)}\n\n"
+                                                                current_block_index += 1
+
+                                                            arg_chunk = tc.get("function", {}).get("arguments", "")
+                                                            if arg_chunk:
+                                                                total_tokens += 1
+                                                                tb_delta = {
+                                                                    "type": "content_block_delta",
+                                                                    "index": active_tool_blocks[tc_idx]["block_index"],
+                                                                    "delta": {
+                                                                        "type": "input_json_delta",
+                                                                        "partial_json": arg_chunk
+                                                                    }
+                                                                }
+                                                                yield f"event: content_block_delta\ndata: {json.dumps(tb_delta, ensure_ascii=False)}\n\n"
                                             except Exception:
                                                 continue
 
-                                    block_stop = {"type": "content_block_stop", "index": 0}
-                                    yield f"event: content_block_stop\ndata: {json.dumps(block_stop, ensure_ascii=False)}\n\n"
+                                    # Close any open content blocks
+                                    if text_block_open:
+                                        yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': current_block_index}, ensure_ascii=False)}\n\n"
 
+                                    for tc_idx, tb_info in active_tool_blocks.items():
+                                        yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': tb_info['block_index']}, ensure_ascii=False)}\n\n"
+
+                                    if not text_block_open and not active_tool_blocks and current_block_index == 0:
+                                        yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': 0, 'content_block': {'type': 'text', 'text': ''}}, ensure_ascii=False)}\n\n"
+                                        yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': 0}, ensure_ascii=False)}\n\n"
+
+                                    stop_reason = "tool_use" if active_tool_blocks or finish_reason == "tool_calls" else "end_turn"
                                     msg_delta = {
                                         "type": "message_delta",
-                                        "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                                        "delta": {"stop_reason": stop_reason, "stop_sequence": None},
                                         "usage": {"output_tokens": max(total_tokens, 1)}
                                     }
                                     yield f"event: message_delta\ndata: {json.dumps(msg_delta, ensure_ascii=False)}\n\n"
@@ -880,10 +1062,12 @@ async def dispatch_chat_completion(
         # Anthropic Claude Code / SDK Dual-Compatibility
         if isinstance(upstream_response_data, dict):
             extracted_reply = ""
+            raw_tool_calls = []
             if "choices" in upstream_response_data and isinstance(upstream_response_data["choices"], list):
                 if upstream_response_data["choices"]:
                     first_msg = upstream_response_data["choices"][0].get("message", {})
                     extracted_reply = first_msg.get("content") or first_msg.get("reasoning") or first_msg.get("reasoning_content") or ""
+                    raw_tool_calls = first_msg.get("tool_calls") or []
             elif "content" in upstream_response_data and isinstance(upstream_response_data["content"], str):
                 extracted_reply = upstream_response_data["content"]
 
@@ -891,10 +1075,33 @@ async def dispatch_chat_completion(
                 upstream_response_data["type"] = "message"
             if "role" not in upstream_response_data:
                 upstream_response_data["role"] = "assistant"
-            if "content" not in upstream_response_data or isinstance(upstream_response_data.get("content"), str):
-                upstream_response_data["content"] = [{"type": "text", "text": str(extracted_reply)}]
-            if "stop_reason" not in upstream_response_data:
-                upstream_response_data["stop_reason"] = "end_turn"
+
+            if raw_tool_calls:
+                content_blocks = []
+                if extracted_reply:
+                    content_blocks.append({"type": "text", "text": str(extracted_reply)})
+                for tc in raw_tool_calls:
+                    fn = tc.get("function", {})
+                    tc_name = fn.get("name", "")
+                    tc_args = fn.get("arguments", "{}")
+                    try:
+                        parsed_args = json.loads(tc_args) if isinstance(tc_args, str) else tc_args
+                    except Exception:
+                        parsed_args = {}
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}",
+                        "name": tc_name,
+                        "input": parsed_args
+                    })
+                upstream_response_data["content"] = content_blocks
+                upstream_response_data["stop_reason"] = "tool_use"
+            else:
+                if "content" not in upstream_response_data or isinstance(upstream_response_data.get("content"), str):
+                    upstream_response_data["content"] = [{"type": "text", "text": str(extracted_reply)}]
+                if "stop_reason" not in upstream_response_data:
+                    upstream_response_data["stop_reason"] = "end_turn"
+
             if "stop_sequence" not in upstream_response_data:
                 upstream_response_data["stop_sequence"] = None
             if "usage" in upstream_response_data and isinstance(upstream_response_data["usage"], dict):

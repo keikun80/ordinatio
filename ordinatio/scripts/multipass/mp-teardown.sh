@@ -10,7 +10,7 @@ source "${SCRIPT_DIR}/mp-common.sh"
 
 echo -e "${BOLD}${YELLOW}🧹 [Multipass Teardown] Ordinatio 테스트 인스턴스 정리 및 회수...${NC}"
 
-INSTANCES=("ordinatio-standalone" "ordinatio-k8s" "ordinatio-airgap")
+INSTANCES=("ordinatio-standalone" "ordinatio-isolated-test" "ordinatio-k8s" "ordinatio-airgap")
 
 for inst in "${INSTANCES[@]}"; do
     if mp_cmd list 2>/dev/null | grep -q "^${inst}[[:space:]]"; then

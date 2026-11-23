@@ -83,13 +83,14 @@ flowchart TD
 ordinatio/
 ├── scripts/
 │   ├── multipass/
-│   │   ├── mp-common.sh        # 호스트 OS 감지, Multipass 실행자 래퍼, 에러 핸들러
-│   │   ├── mp-setup.sh         # Multipass 설치 상태 확인 및 브릿지/드라이버 점검
-│   │   ├── mp-standalone.sh    # 타입 A: Standalone VM 생성 -> install.sh -> systemctl 검증
-│   │   ├── mp-k8s.sh           # 타입 B: K8s VM 생성 -> MicroK8s 세팅 -> k8s-deploy 검증
-│   │   ├── mp-verify-all.sh    # 8대 전 메뉴 무인 E2E 통합 시나리오 VM 원격 실행
-│   │   ├── mp-airgap.sh        # 타입 C: 오프라인 에어갭 번들 무결성 검증
-│   │   └── mp-teardown.sh      # 테스트 VM 안전 회수 및 purge
+│   │   ├── mp-common.sh            # 호스트 OS 감지, Multipass 실행자 래퍼, 에러 핸들러
+│   │   ├── mp-setup.sh             # Multipass 설치 상태 확인 및 브릿지/드라이버 점검
+│   │   ├── mp-clean-install-test.sh # 완전 격리 VM 생성 -> 클린 install.sh -> systemctl -> 8대 전 메뉴 E2E 테스트 원스톱
+│   │   ├── mp-standalone.sh        # 타입 A: Standalone VM 클린 설치 및 E2E 테스트 래퍼
+│   │   ├── mp-k8s.sh               # 타입 B: K8s VM 생성 -> MicroK8s 세팅 -> k8s-deploy 검증
+│   │   ├── mp-verify-all.sh        # 8대 전 메뉴 무인 E2E 통합 시나리오 VM 원격 실행
+│   │   ├── mp-airgap.sh            # 타입 C: 오프라인 에어갭 번들 무결성 검증
+│   │   └── mp-teardown.sh          # 테스트 VM 안전 회수 및 purge
 ```
 
 ### 3.2 Makefile 타깃 표준화
@@ -97,7 +98,7 @@ ordinatio/
 # ==============================================================================
 # Multipass Unified Virtualization Testbed (Cross-Platform: Win11/WSL2 & macOS)
 # ==============================================================================
-.PHONY: mp-setup mp-standalone mp-k8s mp-verify-all mp-airgap mp-clean
+.PHONY: mp-setup mp-standalone mp-test mp-verify-all mp-k8s mp-clean
 
 mp-setup:
 	@bash scripts/multipass/mp-setup.sh
@@ -105,17 +106,18 @@ mp-setup:
 mp-standalone:
 	@bash scripts/multipass/mp-standalone.sh $(if $(CONFIG),--config $(CONFIG),)
 
-mp-k8s:
-	@bash scripts/multipass/mp-k8s.sh
+mp-test:
+	@bash scripts/multipass/mp-clean-install-test.sh $(if $(CONFIG),--config $(CONFIG),)
 
 mp-verify-all:
 	@bash scripts/multipass/mp-verify-all.sh $(if $(CONFIG),--config $(CONFIG),)
 
-mp-airgap:
-	@bash scripts/multipass/mp-airgap.sh
+mp-k8s:
+	@bash scripts/multipass/mp-k8s.sh
 
 mp-clean:
 	@bash scripts/multipass/mp-teardown.sh
+
 ```
 
 ---

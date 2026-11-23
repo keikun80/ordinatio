@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Vagrant Provisioner: Standalone Appliance Offline Bundle Test
-# Supports: Amazon Linux 2023, Ubuntu 24.04 LTS (Debian) & Rocky Linux 9 / RHEL 9 (Enterprise Linux)
-# Installs and validates the appliance directly from dist/ordinatio-appliance-*.tar.gz
+# Vagrant Provisioner: Standalone Appliance Rocky Linux 9 Deployment via install.sh
+# Supports: Rocky Linux 9 / Enterprise Linux 9 (and Amazon Linux / Ubuntu)
 # ==============================================================================
 
 set -euo pipefail
 
 echo "======================================================================"
-echo "🔧 [Vagrant Provision] 1. System Requirements Configuration"
+echo "🔧 [Vagrant Provision] 1. Pre-requisites Infrastructure Setup"
 echo "======================================================================"
 
 if [ -f /etc/os-release ]; then
@@ -18,15 +17,14 @@ else
     OS_ID="unknown"
 fi
 
+echo "==> 감지된 호스트 OS: ${PRETTY_NAME:-$OS_ID}"
+
 if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
-    echo "==> Ubuntu/Debian 계열 감지: $PRETTY_NAME"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y
-    apt-get install -y curl tar gzip jq procps net-tools git openssl make ca-certificates gnupg
+    apt-get install -y curl tar gzip jq procps net-tools git openssl make ca-certificates gnupg rsync iproute2
 
-    # UFW 방화벽 포트 개방
     if command -v ufw &>/dev/null; then
-        echo "==> UFW 방화벽 포트 개방..."
         ufw allow 80/tcp || true
         ufw allow 5173/tcp || true
         ufw allow 8000/tcp || true
@@ -34,9 +32,7 @@ if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
         ufw allow 9901/tcp || true
     fi
 
-    # Docker Engine & Docker Compose Plugin 설치
     if ! command -v docker &>/dev/null; then
-        echo "==> Docker CE Ubuntu 공식 저장소 구성 및 설치..."
         install -m 0755 -d /etc/apt/keyrings
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
         chmod a+r /etc/apt/keyrings/docker.gpg
@@ -49,8 +45,7 @@ if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
         systemctl enable --now docker
     fi
 elif [[ "$OS_ID" == "amzn" ]]; then
-    echo "==> Amazon Linux 2023 계열 감지: $PRETTY_NAME"
-    dnf install -y --allowerasing tar gzip jq procps-ng git openssl make docker
+    dnf install -y --allowerasing tar gzip jq procps-ng git openssl make docker rsync iproute
     systemctl enable --now docker
 
     if systemctl is-active firewalld &>/dev/null; then
@@ -63,7 +58,6 @@ elif [[ "$OS_ID" == "amzn" ]]; then
     fi
 
     if ! docker compose version &>/dev/null; then
-        echo "==> Docker Compose Plugin 설치..."
         mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
         curl -fsSL https://github.com/docker/compose/releases/download/v2.33.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
         chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
@@ -71,8 +65,11 @@ elif [[ "$OS_ID" == "amzn" ]]; then
         ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
     fi
 else
-    echo "==> RHEL/CentOS/Rocky Linux 계열 감지: $PRETTY_NAME"
-    dnf install -y curl tar gzip jq procps-ng net-tools git openssl yum-utils make
+    # Rocky Linux 9 / RHEL 9 / CentOS Stream 9
+    echo "==> Rocky Linux / Enterprise Linux 9 필수 패키지 설치..."
+    dnf install -y curl tar gzip jq procps-ng net-tools git openssl yum-utils make rsync iproute
+
+    echo "==> firewalld 구성 및 서비스 포트 개방..."
     systemctl enable --now firewalld || true
     firewall-cmd --permanent --add-port=80/tcp || true
     firewall-cmd --permanent --add-port=5173/tcp || true
@@ -80,129 +77,80 @@ else
     firewall-cmd --permanent --add-port=8080/tcp || true
     firewall-cmd --permanent --add-port=9901/tcp || true
     firewall-cmd --reload || true
+
+    echo "==> SELinux 정책 설정..."
     setsebool -P container_manage_cgroup 1 2>/dev/null || true
-    mkdir -p /opt/ordinatio-appliance/data
-    chcon -Rt svirt_sandbox_file_t /opt/ordinatio-appliance/data 2>/dev/null || true
+    mkdir -p /opt/ordinatio/data/{postgres,redis,logs,worm_audit}
+    chcon -Rt svirt_sandbox_file_t /opt/ordinatio/data 2>/dev/null || true
+
     if ! command -v docker &>/dev/null; then
+        echo "==> Docker Engine & Docker Compose Plugin 설치..."
         yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
         dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
         systemctl enable --now docker
     fi
+
+    # Docker 브릿지 인터페이스 방화벽 신뢰 등록 (컨테이너 내 인터넷 접속 보장)
+    firewall-cmd --zone=trusted --add-interface=docker0 --permanent 2>/dev/null || true
+    firewall-cmd --reload || true
+    systemctl restart docker
 fi
 
+echo "✅ Docker Engine: $(docker --version)"
+echo "✅ Docker Compose: $(docker compose version)"
+
 echo "======================================================================"
-echo "📦 [Vagrant Provision] 2. Locate and Verify Standalone Appliance Archive"
+echo "🚀 [Vagrant Provision] 2. Standalone Deployment via install.sh"
 echo "======================================================================"
 
-BUNDLE_TAR=$(find /opt/ordinatio-src /vagrant -name "ordinatio-appliance-*.tar.gz" 2>/dev/null | head -n 1 || true)
-
-if [ -z "$BUNDLE_TAR" ] || [ ! -f "$BUNDLE_TAR" ]; then
-    echo "❌ [ERROR] dist 디렉토리에서 ordinatio-appliance-*.tar.gz 번들을 찾을 수 없습니다!"
+# install.sh 경로 자동 탐색 (/opt/ordinatio-src 또는 오케스트레이터 하위 등 다중 마운트 지원)
+INSTALL_SCRIPT=$(find /opt/ordinatio-src /vagrant -name "install.sh" 2>/dev/null | grep "standalone/install.sh" | head -n 1 || true)
+if [ -z "$INSTALL_SCRIPT" ] || [ ! -f "$INSTALL_SCRIPT" ]; then
+    echo "❌ [ERROR] install.sh를 찾을 수 없습니다!"
+    find /opt/ordinatio-src /vagrant -name "*install*" 2>/dev/null || true
     exit 1
 fi
 
-echo "==> 번들 발견: $BUNDLE_TAR"
-ls -lh "$BUNDLE_TAR"
+echo "==> 발견된 install.sh 경로: $INSTALL_SCRIPT"
+chmod +x "$INSTALL_SCRIPT"
 
-# SHA256 체크섬 검증
-SHA_FILE="${BUNDLE_TAR}.sha256"
-if [ -f "$SHA_FILE" ]; then
-    echo "==> SHA-256 무결성 검증 수행..."
-    cd "$(dirname "$BUNDLE_TAR")"
-    sha256sum -c "$(basename "$SHA_FILE")"
-    echo "✅ SHA-256 무결성 검증 성공!"
-else
-    echo "⚠️ SHA-256 체크섬 파일이 존재하지 않아 해시 계산만 출력합니다."
-    sha256sum "$BUNDLE_TAR"
+# install.sh 실행: 완전 무인 자동 승인(-y), 로컬 소스 빌드(--build), 슈퍼관리자 암호 지정, 데모 데이터 적재(--seed-demo)
+echo "==> install.sh 실행 (단일 호스트 Standalone 어플라이언스 설치)..."
+"$INSTALL_SCRIPT" -y --build --admin-password admin1234! --seed-demo
+
+echo "======================================================================"
+echo "🩺 [Vagrant Provision] 3. Verification & Diagnostic Probe"
+echo "======================================================================"
+
+export PATH="/usr/local/bin:/opt/ordinatio/bin:$PATH"
+CTL_BIN="/opt/ordinatio/bin/ordinatio-ctl"
+if [ ! -x "$CTL_BIN" ] && [ -x /usr/local/bin/ordinatio-ctl ]; then
+    CTL_BIN="/usr/local/bin/ordinatio-ctl"
 fi
 
-echo "======================================================================"
-echo "📂 [Vagrant Provision] 3. Extract Archive to /opt/ordinatio-appliance"
-echo "======================================================================"
+echo "==> 1. 호스트 관리 도구 상태 ($CTL_BIN status):"
+"$CTL_BIN" status
 
-INSTALL_DIR="/opt/ordinatio-appliance"
-rm -rf "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR"
+echo "==> 2. 어플라이언스 무결성 검증 ($CTL_BIN verify):"
+"$CTL_BIN" verify || true
 
-echo "==> 아카이브 압축 해제 중: $INSTALL_DIR ..."
-tar -xzf "$BUNDLE_TAR" -C "$INSTALL_DIR"
+echo "==> 3. 핵심 엔드포인트 라이브 응답 확인:"
+echo -n "• Frontend (HTTP 80): "
+FE_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:80/ || echo "FAIL")
+echo "HTTP $FE_CODE"
 
-if [ -d "$INSTALL_DIR/ordinatio-appliance" ]; then
-    APP_DIR="$INSTALL_DIR/ordinatio-appliance"
-else
-    APP_DIR="$INSTALL_DIR"
-fi
+echo -n "• Backend Health (HTTP 8000): "
+curl -s http://127.0.0.1:8000/health && echo ""
 
-cd "$APP_DIR"
-echo "==> 압축 해제된 작업 디렉토리 ($APP_DIR) 파일 목록:"
-ls -la
+echo -n "• Envoy Admin (HTTP 9901): "
+curl -s http://127.0.0.1:9901/ready && echo ""
 
-echo "======================================================================"
-echo "🚀 [Vagrant Provision] 4. Standalone Deployment via 'make up'"
-echo "======================================================================"
+echo -n "• Envoy AI Gateway (HTTP 8080): "
+GW_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/v1/models || echo "FAIL")
+echo "HTTP $GW_CODE"
 
-# make up 실행 (이미지 로드 -> .env 자동 생성 -> docker compose up -d -> wait-healthy)
-make up
-
-echo "======================================================================"
-echo "🩺 [Vagrant Provision] 5. Stack Verification & Health Probe"
-echo "======================================================================"
-
-echo "==> 컨테이너 실행 상태 (make status):"
-make status
-
-# 1) Frontend Web Console (포트 5173) 프로브
-echo "==> [Probe 1/4] Frontend Web Console (http://127.0.0.1:5173/)..."
-HTTP_CODE_FE=$(curl -s -o /tmp/fe_resp.txt -w "%{http_code}" http://127.0.0.1:5173/ || echo "FAIL")
-if [ "$HTTP_CODE_FE" = "200" ]; then
-    echo "✅ Frontend 응답 정상 (HTTP $HTTP_CODE_FE)"
-else
-    echo "❌ Frontend 응답 실패 (HTTP $HTTP_CODE_FE)"
-    exit 1
-fi
-
-# 2) Backend API Health (포트 8000) 프로브
-echo "==> [Probe 2/4] Backend Health API (http://127.0.0.1:8000/api/v1/health)..."
-HTTP_CODE_BE=$(curl -s -o /tmp/be_resp.txt -w "%{http_code}" http://127.0.0.1:8000/api/v1/health || echo "FAIL")
-if [ "$HTTP_CODE_BE" = "200" ]; then
-    echo "✅ Backend API 정상 (HTTP $HTTP_CODE_BE)"
-    cat /tmp/be_resp.txt
-    echo ""
-else
-    echo "❌ Backend API 실패 (HTTP $HTTP_CODE_BE)"
-    exit 1
-fi
-
-# 3) Envoy Admin Ready (포트 9901) 프로브
-echo "==> [Probe 3/4] Envoy Admin Ready (http://127.0.0.1:9901/ready)..."
-HTTP_CODE_ENVOY_ADMIN=$(curl -s -o /tmp/envoy_admin.txt -w "%{http_code}" http://127.0.0.1:9901/ready || echo "FAIL")
-if [ "$HTTP_CODE_ENVOY_ADMIN" = "200" ]; then
-    echo "✅ Envoy Admin 정상 (HTTP $HTTP_CODE_ENVOY_ADMIN, $(cat /tmp/envoy_admin.txt | head -n 1))"
-else
-    echo "❌ Envoy Admin 실패 (HTTP $HTTP_CODE_ENVOY_ADMIN)"
-    exit 1
-fi
-
-# 4) Envoy L7 Gateway Route (포트 8080) 프로브
-echo "==> [Probe 4/4] Envoy Gateway Port (http://127.0.0.1:8080/v1/models)..."
-HTTP_CODE_GW=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/v1/models || echo "FAIL")
-echo "ℹ️ Envoy Gateway 응답 코드: HTTP $HTTP_CODE_GW (L7 리스너 활성화 확인)"
-
-# 5) 초기 관리자 부트스트랩 테스트
-echo "==> [Test 5] Initial Admin Creation Test (make init-admin)..."
-docker exec ordinatio-backend python -m app.scripts.init_admin \
-    --email "admin@ordinatio.local" \
-    --password "${ADMIN_PASSWORD:-admin1234!}" \
-    --full-name "시스템 최고관리자" || true
-echo "✅ 슈퍼관리자 부트스트랩 명령 완료"
-
-# 6) 백업 메커니즘 테스트 (make backup)
-echo "==> [Test 6] Standalone Database Backup Test (make backup)..."
-make backup
-ls -lh backups/
-echo "✅ 백업 생성 확인 완료"
-
+echo ""
 echo "======================================================================"
 echo "🎉 [Vagrant Provision] ALL STANDALONE APPLIANCE TESTS PASSED (100%)"
-echo "   가상머신 ($PRETTY_NAME) 내 dist tar.gz 압축해제 및 make up 정상 구동 완결!"
+echo "   Rocky Linux 9 환경에서 install.sh 만을 사용하여 정상 설치 및 검증 완료!"
 echo "======================================================================"

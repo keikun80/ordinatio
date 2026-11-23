@@ -6,21 +6,45 @@
 # Targets: Rocky Linux 9, AlmaLinux 9, RHEL 9, Oracle Linux 9, CentOS Stream 9
 # ==============================================================================
 
+# macOS Ruby 3.3 Socket.tcp connect_timeout 버그(모든 포트를 열려있다고 오판하는 결함) 몽키패치
+require "socket"
+begin
+  require "vagrant/util/is_port_open"
+  module Vagrant
+    module Util
+      module IsPortOpen
+        def is_port_open?(host, port)
+          begin
+            s = TCPSocket.new(host, port)
+            s.close
+            true
+          rescue Errno::ETIMEDOUT, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, \
+              Errno::ENETUNREACH, Errno::EACCES, Errno::ENOTCONN, Errno::EALREADY
+            false
+          end
+        end
+      end
+    end
+  end
+rescue LoadError
+  # Vagrant 로더 외부 환경 대비 예외 무시
+end
+
 Vagrant.configure("2") do |config|
-  # 가상머신 기본 베이스 박스 (Amazon Linux 2023 기본값, 환경변수 OS_DISTRO로 변경 가능)
-  # 예: OS_DISTRO=bento/ubuntu-24.04 vagrant up
-  config.vm.box = ENV['OS_DISTRO'] || ENV['EL_DISTRO'] || "bento/amazonlinux-2023"
+  # 가상머신 기본 베이스 박스 (Rocky Linux 9 기본값, 환경변수 OS_DISTRO/EL_DISTRO로 변경 가능)
+  # 예: OS_DISTRO=bento/rockylinux-9 vagrant up
+  config.vm.box = ENV['OS_DISTRO'] || ENV['EL_DISTRO'] || "bento/rockylinux-9"
   config.vm.hostname = "ordinatio-standalone"
 
   # 호스트 전용 고정 IP 네트워크
   config.vm.network "private_network", ip: "192.168.56.10"
 
-  # 호스트 브라우저 즉시 접근을 위한 포트 포워딩
-  config.vm.network "forwarded_port", guest: 5173, host: 5173, id: "frontend-ui", auto_correct: true
-  config.vm.network "forwarded_port", guest: 80, host: 8081, id: "dashboard", auto_correct: true
-  config.vm.network "forwarded_port", guest: 8000, host: 8000, id: "backend-api", auto_correct: true
-  config.vm.network "forwarded_port", guest: 8080, host: 8080, id: "envoy-gateway", auto_correct: true
-  config.vm.network "forwarded_port", guest: 9901, host: 9901, id: "envoy-admin", auto_correct: true
+  # 호스트 브라우저 즉시 접근을 위한 포트 포워딩 (기존 VM과의 충돌 방지를 위해 18xxx 대역 매핑)
+  config.vm.network "forwarded_port", guest: 5173, host: 15173, id: "frontend-ui", auto_correct: true
+  config.vm.network "forwarded_port", guest: 80, host: 18081, id: "dashboard", auto_correct: true
+  config.vm.network "forwarded_port", guest: 8000, host: 18000, id: "backend-api", auto_correct: true
+  config.vm.network "forwarded_port", guest: 8080, host: 18080, id: "envoy-gateway", auto_correct: true
+  config.vm.network "forwarded_port", guest: 9901, host: 19901, id: "envoy-admin", auto_correct: true
 
   # 프로젝트 소스 코드 공유 마운트
   config.vm.synced_folder "../..", "/opt/ordinatio-src", disabled: false

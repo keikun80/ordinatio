@@ -548,8 +548,13 @@ if [ -f "$OFFLINE_TAR" ]; then
 elif [ "$USE_LOCAL_BUILD" = true ]; then
     log_info "로컬 컨테이너 이미지 빌드 수행 중 (backend & frontend)..."
     mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
-    cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
-    cp -r "${SOURCE_DIR}/frontend"/* "${TARGET_DIR}/frontend/" || true
+    if command -v rsync &>/dev/null; then
+        rsync -a --delete --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude 'dist' --exclude '.git' "${SOURCE_DIR}/backend/" "${TARGET_DIR}/backend/"
+        rsync -a --delete --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' --exclude 'dist' --exclude '.git' "${SOURCE_DIR}/frontend/" "${TARGET_DIR}/frontend/"
+    else
+        cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
+        cp -r "${SOURCE_DIR}/frontend"/* "${TARGET_DIR}/frontend/" || true
+    fi
     
     docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" build
     log_success "컨테이너 이미지 빌드 완료."
@@ -651,9 +656,9 @@ systemctl daemon-reload
 systemctl enable ordinatio.service
 log_success "Systemd 서비스(ordinatio.service) 활성화 완료."
 
-# 전체 스택 기동
+# 전체 스택 기동 (신규 설치 및 재설치 환경 모두 대응)
 log_info "Standalone 5대 전 서비스 스택 기동 중..."
-systemctl start ordinatio.service
+systemctl restart ordinatio.service
 
 # 헬스 프로빙 대기
 log_info "서비스 엔드포인트 헬스 프로빙 대기 중..."

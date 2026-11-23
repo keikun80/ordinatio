@@ -1,6 +1,6 @@
 .PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down release init-admin \
 	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
-	mp-setup mp-standalone mp-k8s mp-clean \
+	mp-setup mp-standalone mp-test mp-verify-all mp-k8s mp-clean \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -40,7 +40,9 @@ help:
 	@echo ""
 	@echo "  [Multipass Cross-Platform VM Testbed (Win11/WSL2 & macOS)]"
 	@echo "  make mp-setup                  - Check and initialize Multipass host environment"
-	@echo "  make mp-standalone             - Run Standalone (systemctl + Docker) test in clean Multipass VM"
+	@echo "  make mp-standalone             - Clean install & E2E audit in isolated Multipass VM"
+	@echo "  make mp-test                   - Run full clean install & 8 menus E2E test in isolated Multipass VM (optional: CONFIG=test_config.json)"
+	@echo "  make mp-verify-all             - Run remote all-menus headless E2E verification in Multipass VM"
 	@echo "  make mp-k8s                    - Run Kubernetes (MicroK8s/K3s) deployment test in Multipass VM"
 	@echo "  make mp-clean                  - Teardown and purge all Multipass test instances"
 	@echo ""
@@ -158,6 +160,13 @@ mp-setup:
 
 mp-standalone:
 	@bash scripts/multipass/mp-standalone.sh $(if $(CONFIG),--config $(CONFIG),)
+
+mp-test:
+	@bash scripts/multipass/mp-clean-install-test.sh $(if $(CONFIG),--config $(CONFIG),)
+
+mp-verify-all:
+	@bash scripts/multipass/mp-verify-all.sh $(if $(CONFIG),--config $(CONFIG),)
+
 
 mp-k8s:
 	@bash scripts/multipass/mp-k8s.sh

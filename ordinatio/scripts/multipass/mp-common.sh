@@ -25,10 +25,12 @@ fi
 
 check_multipass() {
     if [ -z "$MP_BIN" ]; then
-        echo -e "${RED}❌ [ERROR] Multipass 실행 바이너리를 찾을 수 없습니다.${NC}"
-        echo -e "   • Windows 11: winget install Canonical.Multipass"
-        echo -e "   • macOS:      brew install --cask multipass"
-        echo -e "   • Linux:      sudo snap install multipass"
+        echo -e "${RED}❌ [ERROR] Canonical Multipass 실행 바이너리를 찾을 수 없습니다.${NC}"
+        echo -e "${YELLOW}👉 호스트 OS에 맞게 Multipass를 설치해 주십시오:${NC}"
+        echo -e "   • macOS:          brew install --cask multipass"
+        echo -e "   • Windows 11:     winget install Canonical.Multipass"
+        echo -e "   • Ubuntu / Linux: sudo snap install multipass"
+        echo -e "   • 공식 웹사이트:   https://multipass.run"
         exit 1
     fi
 }
@@ -36,4 +38,23 @@ check_multipass() {
 mp_cmd() {
     check_multipass
     "$MP_BIN" "$@"
+}
+
+resolve_mount_path() {
+    local target_path="$1"
+    if [[ "$MP_BIN" == *.exe ]] && command -v wslpath &>/dev/null; then
+        wslpath -w "$target_path"
+    else
+        echo "$target_path"
+    fi
+}
+
+clean_instance() {
+    local inst="$1"
+    if mp_cmd list 2>/dev/null | grep -q "^${inst}[[:space:]]"; then
+        echo -e "${YELLOW}  • 기존 인스턴스(${inst}) 정지 및 삭제...${NC}"
+        mp_cmd stop "${inst}" 2>/dev/null || true
+        mp_cmd delete "${inst}" 2>/dev/null || true
+        mp_cmd purge 2>/dev/null || true
+    fi
 }

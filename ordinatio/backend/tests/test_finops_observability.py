@@ -22,6 +22,21 @@ def test_observability_metrics_summary():
     assert "model_traffic_breakdown" in data
     assert data["uptime_seconds"] >= 0
 
+def test_observability_metrics_timeseries():
+    """Test REST API timeseries endpoint for Admin Overview cumulative graphs."""
+    res = client.get("/api/v1/observability/metrics/timeseries?window=1h&resolution=1m")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["window"] == "1h"
+    assert data["resolution"] == "1m"
+    assert "points" in data
+    assert len(data["points"]) >= 1
+    pt = data["points"][0]
+    assert "timestamp" in pt
+    assert "cumulative_requests" in pt
+    assert "cumulative_cost_krw" in pt
+    assert "p95_ttft_ms" in pt
+
 def test_observability_websocket_telemetry():
     """Test 1-second WebSocket telemetry streaming and ping-pong."""
     with client.websocket_connect("/api/v1/observability/ws") as ws:

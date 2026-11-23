@@ -59,3 +59,19 @@ class PromQLQueryRequest(BaseModel):
 class PromQLQueryResponse(BaseModel):
     status: str = "success"
     data: Dict[str, Any]
+
+class TimeseriesPoint(BaseModel):
+    timestamp: float
+    cumulative_requests: int = 0
+    cumulative_tokens: int = 0
+    p95_ttft_ms: float = 0.0
+    error_rate: float = 0.0
+    cumulative_errors: int = 0
+    cumulative_cost_krw: float = 0.0
+
+class ObservabilityTimeseriesResponse(BaseModel):
+    window: str = "1h"
+    resolution: str = "1m"
+    generated_at: datetime = Field(default_factory=get_utc_now)
+    points: List[TimeseriesPoint] = []
+

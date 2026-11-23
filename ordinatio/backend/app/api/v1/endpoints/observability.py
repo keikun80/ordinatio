@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.core.telemetry_hub import telemetry_hub
 from app.schemas.observability import (
     ObservabilitySummaryResponse,
+    ObservabilityTimeseriesResponse,
     PromQLQueryRequest,
     PromQLQueryResponse
 )
@@ -48,6 +49,20 @@ def get_observability_metrics_summary(db: Session = Depends(get_db)):
         compute_pools=telemetry.compute_pools,
         model_traffic_breakdown=telemetry.model_traffic_breakdown,
         uptime_seconds=round(uptime, 1)
+    )
+
+@router.get("/metrics/timeseries", response_model=ObservabilityTimeseriesResponse, dependencies=[Depends(require_permission("overview:read"))])
+def get_observability_metrics_timeseries(
+    window: str = "1h",
+    resolution: str = "1m",
+    db: Session = Depends(get_db)
+):
+    """Returns rolling time-series data points for the Admin Overview cumulative graphs."""
+    pts = telemetry_hub.get_timeseries_points(window=window, resolution=resolution)
+    return ObservabilityTimeseriesResponse(
+        window=window,
+        resolution=resolution,
+        points=pts
     )
 
 @router.post("/promql", response_model=PromQLQueryResponse, dependencies=[Depends(require_permission("overview:read"))])

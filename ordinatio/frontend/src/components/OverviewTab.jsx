@@ -15,6 +15,7 @@ import {
 import { apiClient } from '../api/client';
 import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
+import CumulativeSparkline from './common/CumulativeSparkline';
 
 export default function OverviewTab({ onNavigateTab }) {
   const { isSuperAdmin, hasPermission } = useAuth();
@@ -28,6 +29,13 @@ export default function OverviewTab({ onNavigateTab }) {
     errorRate: 0,
     dailyCost: 0,
     totalRequests: 0
+  });
+  const [historySeries, setHistorySeries] = useState({
+    requests: [],
+    tokens: [],
+    ttft: [],
+    errors: [],
+    cost: []
   });
   const [clusterPools, setClusterPools] = useState([]);
   const [modelTraffic, setModelTraffic] = useState([]);
@@ -61,8 +69,41 @@ export default function OverviewTab({ onNavigateTab }) {
     let reconnectTimeout = null;
     let isUnmounted = false;
 
+    const appendPoint = (p) => {
+      setHistorySeries((prev) => {
+        const MAX_LEN = 40;
+        const reqVal = p.totalRequests ?? (prev.requests[prev.requests.length - 1] ?? 0);
+        const tokVal = p.tps !== undefined ? p.tps : (prev.tokens[prev.tokens.length - 1] ?? 0);
+        const ttftVal = p.ttft ?? (prev.ttft[prev.ttft.length - 1] ?? 0);
+        const errVal = p.errorRate ?? (prev.errors[prev.errors.length - 1] ?? 0);
+        const costVal = p.dailyCost ?? (prev.cost[prev.cost.length - 1] ?? 0);
+        return {
+          requests: [...prev.requests, reqVal].slice(-MAX_LEN),
+          tokens: [...prev.tokens, tokVal].slice(-MAX_LEN),
+          ttft: [...prev.ttft, ttftVal].slice(-MAX_LEN),
+          errors: [...prev.errors, errVal].slice(-MAX_LEN),
+          cost: [...prev.cost, costVal].slice(-MAX_LEN)
+        };
+      });
+    };
+
     // 1. Initial immediate load from summary API + live Audit/FinOps context
     const loadInitialSummary = async () => {
+      try {
+        const tsData = await apiClient.getMetricsTimeseries('1h', '1m');
+        if (tsData && tsData.points && tsData.points.length > 0 && !isUnmounted) {
+          setHistorySeries({
+            requests: tsData.points.map((pt) => pt.cumulative_requests),
+            tokens: tsData.points.map((pt) => pt.cumulative_tokens),
+            ttft: tsData.points.map((pt) => pt.p95_ttft_ms),
+            errors: tsData.points.map((pt) => pt.cumulative_errors),
+            cost: tsData.points.map((pt) => pt.cumulative_cost_krw)
+          });
+        }
+      } catch (e) {
+        // Fallback: timeseries endpoint gracefully handled
+      }
+
       const summary = await apiClient.getMetricsSummary();
       if (summary && !isUnmounted) {
         setKpis((prev) => ({
@@ -74,6 +115,13 @@ export default function OverviewTab({ onNavigateTab }) {
           dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
           totalRequests: summary.total_requests ?? prev.totalRequests
         }));
+        appendPoint({
+          totalRequests: summary.total_requests,
+          tps: Math.round(summary.current_tps),
+          ttft: Math.round(summary.p95_ttft_ms),
+          errorRate: summary.error_rate,
+          dailyCost: summary.cumulative_cost_krw
+        });
         if (summary.compute_pools && summary.compute_pools.length > 0) {
           setClusterPools(mapComputePools(summary.compute_pools));
         }
@@ -129,6 +177,14 @@ export default function OverviewTab({ onNavigateTab }) {
                 totalRequests: packet.total_requests ?? prev.totalRequests
               }));
 
+              appendPoint({
+                totalRequests: packet.total_requests,
+                tps: Math.round(packet.tps),
+                ttft: Math.round(packet.ttft_ms),
+                errorRate: packet.error_rate_5xx,
+                dailyCost: Math.round(packet.cumulative_cost_krw || 0)
+              });
+
               if (packet.compute_pools && packet.compute_pools.length > 0) {
                 setClusterPools(mapComputePools(packet.compute_pools));
               }
@@ -181,6 +237,15 @@ export default function OverviewTab({ onNavigateTab }) {
             dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
             totalRequests: summary.total_requests ?? prev.totalRequests
           }));
+
+          appendPoint({
+            totalRequests: summary.total_requests,
+            tps: Math.round(summary.current_tps),
+            ttft: Math.round(summary.p95_ttft_ms),
+            errorRate: summary.error_rate,
+            dailyCost: summary.cumulative_cost_krw
+          });
+
           if (summary.compute_pools && summary.compute_pools.length > 0) {
             setClusterPools(mapComputePools(summary.compute_pools));
           }
@@ -221,6 +286,13 @@ export default function OverviewTab({ onNavigateTab }) {
                       dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
                       totalRequests: summary.total_requests ?? prev.totalRequests
                     }));
+                    appendPoint({
+                      totalRequests: summary.total_requests,
+                      tps: Math.round(summary.current_tps),
+                      ttft: Math.round(summary.p95_ttft_ms),
+                      errorRate: summary.error_rate,
+                      dailyCost: summary.cumulative_cost_krw
+                    });
                     if (summary.compute_pools?.length > 0) {
                       setClusterPools(mapComputePools(summary.compute_pools));
                     }
@@ -280,6 +352,7 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-rps">{kpis.rps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>RPS</span></div>
+          <CumulativeSparkline data={historySeries.requests} strokeColor="#3b82f6" height={36} unit="건" testId="ov-sparkline-rps" />
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Activity size={13} color="#3b82f6" /> {strings.overview.kpi.rpsSub}
@@ -296,6 +369,7 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-tps">{kpis.tps.toLocaleString()} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>TPS</span></div>
+          <CumulativeSparkline data={historySeries.tokens} strokeColor="#06b6d4" height={36} unit="TPS" testId="ov-sparkline-tps" />
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Zap size={13} color="#06b6d4" /> {strings.overview.kpi.tpsSub}
@@ -312,6 +386,7 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-ttft">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
+          <CumulativeSparkline data={historySeries.ttft} strokeColor="#8b5cf6" height={36} unit="ms" baseline={500} baselineLabel="SLA 500ms" testId="ov-sparkline-ttft" />
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Clock size={13} color="#8b5cf6" /> P95 Latency
@@ -328,6 +403,7 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-error">{kpis.errorRate}%</div>
+          <CumulativeSparkline data={historySeries.errors} strokeColor={Number(kpis.errorRate) > 0 ? '#f59e0b' : '#10b981'} height={36} unit="%" testId="ov-sparkline-error" />
           <div className="kpi-footer">
             <span className={`badge ${Number(kpis.errorRate) > 0 ? 'warning' : 'active'}`}>
               <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> {Number(kpis.errorRate) > 0 ? strings.overview.kpi.errorStatusWarn(kpis.errorRate) : strings.overview.kpi.normalStatus}
@@ -344,6 +420,7 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-cost" style={{ fontSize: '1.6rem' }}>₩ {(kpis.dailyCost).toLocaleString()}</div>
+          <CumulativeSparkline data={historySeries.cost} strokeColor="#f59e0b" height={36} unit="₩" testId="ov-sparkline-cost" />
           <div className="kpi-footer">
             <span style={{ color: '#f59e0b', fontWeight: 600 }}>{strings.overview.kpi.tenantRealtime}</span>
             <span className="kpi-badge-neutral">{strings.overview.kpi.krwCurrency}</span>

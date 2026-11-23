@@ -577,6 +577,15 @@ export const apiClient = {
     return await res.json();
   },
 
+  async getMetricsTimeseries(window = '1h', resolution = '1m') {
+    const url = new URL(`${API_BASE_URL}/observability/metrics/timeseries`);
+    if (window) url.searchParams.append('window', window);
+    if (resolution) url.searchParams.append('resolution', resolution);
+    const res = await authFetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
   // --- FinOps & Billing (Phase 3) ---
   async getFinOpsOverview() {
     const res = await authFetch(`${API_BASE_URL}/finops/overview`);

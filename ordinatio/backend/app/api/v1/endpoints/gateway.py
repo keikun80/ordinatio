@@ -310,6 +310,8 @@ def authenticate_gateway_key(
         raw_key = authorization.replace("Bearer ", "").strip()
     elif x_virtual_key:
         raw_key = x_virtual_key.strip()
+    elif request and request.headers.get("x-api-key"):
+        raw_key = request.headers.get("x-api-key").strip()
 
     if not raw_key:
         raise HTTPException(

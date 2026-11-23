@@ -26,7 +26,7 @@
 │     Phase 7: 상용 판매 기반 & 온보딩    │     Phase 8: 세일즈 킬러 & 인지 보안    │     Phase 9: 엔터프라이즈 인프라 융합    │
 │              [P0 / Sprint 1]          │              [P0 / Sprint 2]          │              [P1 / Sprint 3]           │
 ├───────────────────────────────────────┼───────────────────────────────────────┼────────────────────────────────────────┤
-│ • [GAP-01] 오프라인 DRM 라이선스 엔진 │ • [GAP-07] 에어갭 로컬 시맨틱 캐싱   │ • [GAP-05] 사내 LDAP/AD & TOTP MFA     │
+│ • [GAP-01] DRM: P3 Deferred Backlog  │ • GAP-07 시맨틱 캐시: 구현 완료      │ • [GAP-05] 사내 LDAP/AD & TOTP MFA     │
 │ • [GAP-02] 브라우저 최초 셋업 마법사 │ • [GAP-08] L7 프롬프트 탈옥 쉴드      │ • [GAP-06] 1-클릭 암호화 DB 백업 & DR  │
 │ • [GAP-03] 엔터프라이즈 Helm Chart    │ • [GAP-13] 가상키 사내 CIDR IP 차단   │ • [GAP-09] 화이트라벨링(OEM) 커스텀    │
 │ • [GAP-12] WORM DB 레벨 거부 트리거   │ • [GAP-04] 예산 웹훅 & SIEM Syslog    │ • [GAP-10] 부서별 월간 PDF/Excel 정산서│
@@ -39,23 +39,18 @@
 
 ## 3. 단계별 상세 개발 로드맵 (Phased Implementation Plan)
 
-### 3.1 Phase 7 (Sprint 1) [P0]: 상용 B2B 판매 기반 구축 및 무인 온보딩 (Commercial DRM & Onboarding)
-- **목표**: 유료 고객사 납품을 위한 오프라인 라이선스 DRM 검증, 브라우저 대화형 최초 셋업 마법사, K8s 엔터프라이즈 Helm 패키징 완료.
+### 3.1 Phase 7 (Sprint 1) [P0]: 상용 운영 기반 및 무인 온보딩
+- **목표**: 브라우저 대화형 최초 셋업 마법사, K8s 엔터프라이즈 Helm 패키징 및 WORM DB 보호를 완료한다. 오프라인 DRM은 P3 Deferred Backlog로 분리한다.
 - **기간**: Sprint 1 (2주)
 
 #### 세부 엔지니어링 작업 명세
-1. **[GAP-01] 오프라인 DRM 라이선스 엔진 (`backend/app/core/license_engine.py`)**:
-   - `ordinatio-license.lic` 파일 규격 정의 (페이로드 JSON + RSA-4096 / Ed25519 서명).
-   - CPU Processor ID + MAC Address + UUID 조합의 단방향 하드웨어 핑거프린트 바인딩 (`hardware_fingerprint.py`).
-   - L7 게이트웨이 `ext_proc` 및 백엔드 미들웨어에 허용 RPS(`max_rps`) 및 테넌트 수 초과 차단 인터셉터 탑재.
-   - 만료 후 14일 Grace Period 통제 및 대시보드 상단 갱신 경고 배너 렌더링.
-2. **[GAP-02] 브라우저 기반 최초 셋업 마법사 (`frontend/src/components/SetupWizard.jsx`)**:
+1. **[GAP-02] 브라우저 기반 최초 셋업 마법사 (`frontend/src/components/SetupWizard.jsx`)**:
    - 시스템 최초 기동 시 라이선스 및 슈퍼관리자가 없으면 `/setup`으로 자동 라우팅.
    - 3단계 위저드: Step 1 (라이선스 업로드 & 유효성 검증) ➔ Step 2 (슈퍼관리자 생성) ➔ Step 3 (5대 인프라 Preflight 진단) ➔ 관제 홈 진입.
-3. **[GAP-03] 엔터프라이즈 Helm Chart 및 오프라인 번들러 (`deploy/helm/ordinatio/`)**:
+2. **[GAP-03] 엔터프라이즈 Helm Chart 및 오프라인 번들러 (`deploy/helm/ordinatio/`)**:
    - `values.yaml` 매개변수화 (외장 PostgreSQL/Oracle 연동, HPA 오토스케일링, Non-Root Security Context).
    - `scripts/package-airgap-release.sh` 및 `load-images.sh` 원클릭 오프라인 이미지 번들링 스크립트 작성.
-4. **[GAP-12] WORM 감사 로그 PostgreSQL DB 레벨 UPDATE/DELETE 거부 트리거 (`deploy/postgres/init.sql`)**:
+3. **[GAP-12] WORM 감사 로그 PostgreSQL DB 레벨 UPDATE/DELETE 거부 트리거 (`deploy/postgres/init.sql`)**:
    - `audit_logs` 테이블에 `BEFORE UPDATE OR DELETE` 발생 시 `RAISE EXCEPTION`을 발생시키는 PostgreSQL Function/Trigger 등록.
    - DB 슈퍼유저의 강제 조작 시도 원천 차단.
 
@@ -67,24 +62,19 @@
 
 ---
 
-### 3.2 Phase 8 (Sprint 2) [P0]: 세일즈 킬러 피처 및 인지 보안 강화 (ROI & Security Guardrails)
-- **목표**: 고객사 B2B 세일즈 시 가시적 토큰 비용 절감(40~60%)을 입증하는 시맨틱 캐싱과 L7 프롬프트 탈옥 방어 쉴드, 사내 관제망(SIEM) 연동 구축.
+### 3.2 Phase 8 (Sprint 2) [P0]: 인지 보안 및 관제 연동
+- **목표**: L7 프롬프트 탈옥 방어 쉴드와 사내 관제망(SIEM) 연동을 구축한다. GAP-07 시맨틱 캐시는 구현 완료되어 운영 관측 대상으로 전환한다.
 - **기간**: Sprint 2 (2주)
 
 #### 세부 엔지니어링 작업 명세
-1. **[GAP-07] 에어갭 로컬 시맨틱 캐싱(Semantic Cache) 엔진 (`backend/app/core/semantic_cache.py`)**:
-   - 에어갭 온디바이스 로컬 임베딩 모델(bge-small-en-v1.5 / all-MiniLM-L6-v2, CPU 추론 <5ms) 탑재.
-   - Redis Vector Store(VSS) 또는 인메모리 HNSW 인덱스를 통한 코사인 유사도 검색.
-   - 유사도 임계치(기본값: `0.92`) 초과 시 LLM 서빙 호출을 바이패스하고 **10ms 이내 캐시 즉시 반환**.
-   - FinOps 관제 탭에 절감된 누적 토큰 수 및 절감 비용(₩) 실시간 시각화.
-2. **[GAP-08] L7 실시간 프롬프트 탈옥(Jailbreak) 및 인젝션 방어 쉴드 (`backend/app/core/jailbreak_shield.py`)**:
+1. **[GAP-08] L7 실시간 프롬프트 탈옥(Jailbreak) 및 인젝션 방어 쉴드 (`backend/app/core/jailbreak_shield.py`)**:
    - Envoy `ext_proc` gRPC 단계에서 인입 프롬프트를 실시간 분석.
    - "Ignore previous instructions", "DAN 모드 활성화", "시스템 프롬프트를 출력하라" 등 시스템 지침 탈취 시도 실시간 탐지.
    - Base64 인코딩, 유니코드 변조, Leetspeak 자동 정규화 후 매칭 ➔ 탐지 시 `HTTP 403` 차단 및 WORM 감사 적재.
-3. **[GAP-13] 가상 API Key 사내 CIDR IP 실시간 차단 인터셉터**:
+2. **[GAP-13] 가상 API Key 사내 CIDR IP 실시간 차단 인터셉터**:
    - L7 Envoy ext_proc 인그레스의 `x-forwarded-for` 및 클라이언트 소켓 IP를 가상키의 `allowed_ips`(CIDR)와 실시간 매칭.
    - 비인가 IP 인입 시 즉각 `HTTP 403` 거부.
-4. **[GAP-04] 예산 임계치 웹훅 & SIEM Syslog 디스패처 (`backend/app/core/alert_dispatcher.py`)**:
+3. **[GAP-04] 예산 임계치 웹훅 & SIEM Syslog 디스패처 (`backend/app/core/alert_dispatcher.py`)**:
    - 테넌트 예산 80%/100% 소진, 5회 비밀번호 오류 잠금, PII 차단 발생 시 비동기 웹훅 발송 (Microsoft Teams, Slack, 사내 SMTP).
    - RFC 5424 표준 포맷으로 사내 통합 보안 관제(Splunk, QRadar)에 UDP/TCP Syslog 실시간 스트리밍.
 
@@ -136,14 +126,15 @@
 | Phase | 신규 추가 테스트 대상 | 목표 테스트 수 | 회귀 검증 목표 |
 | :---: | :--- | :---: | :---: |
 | **현재 (Phase 0~6)** | 핵심 런타임, L7 Gateway, RBAC, Standalone, strings.js | **86개 PASS** | 100% PASS 유지 |
-| **Phase 7 (Sprint 1)** | 라이선스 서명/만료/위변조 차단, 셋업 마법사, DB WORM 트리거 | **+12개 (총 98개)** | 86개 기존 무회귀 |
-| **Phase 8 (Sprint 2)** | 시맨틱 캐시 유사도 매칭/절감액 산정, 탈옥 인젝션 차단, 웹훅 디스패치 | **+14개 (총 112개)** | 98개 기존 무회귀 |
+| **Phase 7 (Sprint 1)** | 셋업 마법사, Helm Chart, DB WORM 트리거 | 별도 산정 | 실행 시점 현재 Suite 무회귀 |
+| **Phase 8 (Sprint 2)** | 탈옥 인젝션 차단, 웹훅 디스패치, 구현 완료 시맨틱 캐시 운영 관측 | 별도 산정 | 실행 시점 현재 Suite 무회귀 |
 | **Phase 9 (Sprint 3)** | LDAP/TOTP MFA 인증, 암호화 백업/복원 RTO, PDF/Excel 리포트 생성 | **+12개 (총 124개)** | 112개 기존 무회귀 |
+| **Deferred Backlog (P3)** | 오프라인 DRM 라이선스 서명·만료·위변조 차단 | 후순위 산정 | Phase 7~9 및 운영 GAP 완료 후 착수 |
 
 ---
 
 ## 5. 결론 및 향후 실행 가이드
 
 1. **상용화 준비도**: 현재 Phase 0~6까지의 완성으로 고객사 단일 호스트 폐쇄망 서버에 즉시 설치 가능한 기술적 토대가 구축되었습니다.
-2. **차기 실행 제언**: 유료 고객사 라이선스 체결을 위한 **Phase 7 (Sprint 1: 오프라인 DRM 라이선스 엔진 + 셋업 마법사 + Helm Chart)**을 즉시 착수할 것을 권장합니다.
+2. **차기 실행 제언**: **Phase 7 (Sprint 1: 셋업 마법사 + Helm Chart + WORM DB 보호)**을 우선 착수합니다. 오프라인 DRM 라이선스 엔진은 모든 현재 상용화·운영 GAP을 완료한 뒤 검토하는 P3 Deferred Backlog입니다.
 

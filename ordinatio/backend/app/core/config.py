@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     GATEWAY_CONNECT_TIMEOUT: float = 10.0
     MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT: float = 3.0
 
+    # Air-gapped local semantic cache (no external embedding service)
+    SEMANTIC_CACHE_ENABLED: bool = True
+    SEMANTIC_CACHE_SIMILARITY_THRESHOLD: float = 0.92
+    SEMANTIC_CACHE_TTL_SECONDS: int = 3600
+    SEMANTIC_CACHE_MAX_CANDIDATES: int = 200
+
     # Reverse Proxy & AWS ELB Configuration
     BEHIND_PROXY: bool = True
     TRUSTED_PROXIES: str = "127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,testclient"

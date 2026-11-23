@@ -16,8 +16,14 @@ from app.schemas.finops import (
     ModelPricingInfo
 )
 from app.api.deps import require_permission
+from app.core.semantic_cache import semantic_cache
 
 router = APIRouter()
+
+@router.get("/semantic-cache", dependencies=[Depends(require_permission("finops:read"))])
+def get_semantic_cache_stats():
+    """Returns air-gapped semantic-cache hit and FinOps savings telemetry."""
+    return semantic_cache.stats()
 
 @router.get("/overview", response_model=FinOpsOverviewResponse, dependencies=[Depends(require_permission("finops:read"))])
 def get_finops_overview(db: Session = Depends(get_db)):

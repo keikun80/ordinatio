@@ -11,7 +11,7 @@ help:
 	@echo "  make setup                     - Initialize Python backend (uv) and Frontend dependencies"
 	@echo "  make up                        - Run local Development Docker Compose stack (Vite HMR + FastAPI --reload with live source mounts)"
 	@echo "  make down                      - Stop local Docker Compose stack"
-	@echo "  make test                      - Run backend pytest (93 tests) and frontend build verification"
+	@echo "  make test                      - Run current backend pytest suite and frontend build verification"
 	@echo "  make lint                      - Run backend and frontend code linting"
 	@echo "  make migrate                   - Run Alembic DB schema migrations (upgrade head)"
 	@echo "  make migrate-rollback          - Rollback last Alembic migration (downgrade -1)"

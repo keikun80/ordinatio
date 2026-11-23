@@ -584,6 +584,12 @@ export const apiClient = {
     return await res.json();
   },
 
+  async getSemanticCacheStats() {
+    const res = await authFetch(`${API_BASE_URL}/finops/semantic-cache`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
   async exportFinOpsInvoiceCsv(month = null) {
     const url = new URL(`${API_BASE_URL}/finops/invoices/export`);
     if (month) url.searchParams.append('month', month);

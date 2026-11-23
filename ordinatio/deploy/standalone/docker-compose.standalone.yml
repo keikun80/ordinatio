@@ -95,6 +95,8 @@ services:
       - ordinatio-net
     env_file:
       - .env
+    dns:
+      - ${DNS_SERVER:-8.8.8.8}
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ordinatio_db}
       REDIS_HOST: redis

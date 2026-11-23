@@ -48,6 +48,7 @@ REDIS_PORT=6379
 POSTGRES_PORT=5432
 
 DOCKER_BRIDGE_GATEWAY_IP="172.20.0.1"
+DNS_SERVER="8.8.8.8"
 BEHIND_PROXY=true
 TRUSTED_PROXIES="127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,testclient"
 ENVOY_XFF_NUM_TRUSTED_HOPS=1
@@ -202,6 +203,7 @@ usage() {
     echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:v1.0.2)"
     echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:v1.0.2)"
     echo "      --frontend-port PORT 프론트엔드 웹 포트 지정 (기본값: 5173)"
+    echo "      --dns-server IP      컨테이너 DNS 서버 지정 (기본값: 8.8.8.8)"
     echo "      --skip-pull          컨테이너 이미지 다운로드(Pull) 단계 생략"
     echo "      --skip-build         컨테이너 이미지 다운로드/빌드 단계 생략"
     echo "      --build              Docker Hub 대신 로컬 소스 빌드 강제"
@@ -308,6 +310,10 @@ while [[ $# -gt 0 ]]; do
             FRONTEND_PORT="$2"
             shift 2
             ;;
+        --dns-server)
+            DNS_SERVER="$2"
+            shift 2
+            ;;
         --skip-pull)
             SKIP_PULL=true
             shift
@@ -341,6 +347,13 @@ if [ "$ACTION" = "uninstall" ]; then
 fi
 
 print_banner
+
+if [ "$AUTO_APPROVE" = false ]; then
+    read -p "컨테이너 DNS 서버 [${DNS_SERVER}]: " -r requested_dns
+    if [ -n "$requested_dns" ]; then
+        DNS_SERVER="$requested_dns"
+    fi
+fi
 
 # ------------------------------------------------------------------------------
 # [Safety Guard] 호스트 사전 요구사항(System Requirements) 비침습 검증
@@ -402,6 +415,7 @@ log_info "백엔드 이미지 : ${BOLD}${BACKEND_IMAGE}${NC}"
 log_info "프론트 이미지 : ${BOLD}${FRONTEND_IMAGE}${NC}"
 log_info "데이터센터 식별: ${BOLD}${DATACENTER_NAME} (${CLUSTER_REGION})${NC}"
 log_info "도커 브릿지 IP: ${BOLD}${DOCKER_BRIDGE_GATEWAY_IP}${NC}"
+log_info "컨테이너 DNS  : ${BOLD}${DNS_SERVER}${NC}"
 
 if [ "$AUTO_APPROVE" = false ]; then
     read -p "Standalone 어플라이언스 설치를 시작하시겠습니까? (Y/n): " -r confirm
@@ -489,6 +503,7 @@ sed \
   -e "s/SEED_DEMO_DATA=false/SEED_DEMO_DATA=${SEED_DEMO_DATA}/g" \
   -e "s|__BACKEND_IMAGE__|${BACKEND_IMAGE}|g" \
   -e "s|__FRONTEND_IMAGE__|${FRONTEND_IMAGE}|g" \
+  -e "s|__DNS_SERVER__|${DNS_SERVER}|g" \
   -e "s/__INITIAL_ADMIN_USERNAME__/${INITIAL_ADMIN_USERNAME}/g" \
   -e "s/__INITIAL_ADMIN_EMAIL__/${INITIAL_ADMIN_EMAIL}/g" \
   -e "s/__BACKEND_PORT__/${BACKEND_PORT}/g" \
@@ -511,7 +526,7 @@ chmod 600 "${TARGET_DIR}/.env"
 log_success "Standalone 환경 설정(.env) 보안 권한 적용 완료."
 
 # ------------------------------------------------------------------------------
-# [Step 2] 컨테이너 이미지 프로비저닝 (Docker Hub / Load / Build)
+# [Step 2] 컨테이너 이미지 프로비저닝 (Offline Load / External Registry Pull)
 # ------------------------------------------------------------------------------
 echo ""
 echo -e "${BOLD}================================================================${NC}"
@@ -519,6 +534,13 @@ echo -e "${BOLD}📦 [Step 2] 컨테이너 이미지 프로비저닝${NC}"
 echo -e "${BOLD}================================================================${NC}"
 
 OFFLINE_TAR="${SOURCE_DIR}/ordinatio-standalone-images.tar.gz"
+RUNTIME_IMAGES=(
+    "${BACKEND_IMAGE}"
+    "${FRONTEND_IMAGE}"
+    "postgres:15-alpine"
+    "redis:7-alpine"
+    "envoyproxy/envoy:v1.31.2"
+)
 if [ -f "$OFFLINE_TAR" ]; then
     log_info "에어갭 오프라인 이미지 아카이브 로딩 중: ${OFFLINE_TAR}"
     docker load -i "$OFFLINE_TAR"
@@ -532,21 +554,16 @@ elif [ "$USE_LOCAL_BUILD" = true ]; then
     docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" build
     log_success "컨테이너 이미지 빌드 완료."
 elif [ "$SKIP_PULL" = false ] && [ "$SKIP_BUILD" = false ]; then
-    log_info "Docker Hub에서 컨테이너 이미지 다운로드(Pull) 중..."
-    log_info "  - Backend:  ${BACKEND_IMAGE}"
-    if ! docker pull "${BACKEND_IMAGE}"; then
-        log_warn "Docker Hub 다운로드 실패. 로컬 소스 빌드로 전환합니다..."
-        mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"
-        cp -r "${SOURCE_DIR}/backend"/* "${TARGET_DIR}/backend/" || true
-        cp -r "${SOURCE_DIR}/frontend"/* "${TARGET_DIR}/frontend/" || true
-        docker compose -f "${TARGET_DIR}/docker-compose.standalone.yml" build
-    fi
-    log_info "  - Frontend: ${FRONTEND_IMAGE}"
-    docker pull "${FRONTEND_IMAGE}" 2>/dev/null || true
-    
-    docker tag "${BACKEND_IMAGE}" ordinatio-backend:latest 2>/dev/null || true
-    docker tag "${FRONTEND_IMAGE}" ordinatio-frontend:latest 2>/dev/null || true
-    log_success "컨테이너 이미지 프로비저닝 완료."
+    log_info "오프라인 번들이 없어 외부 이미지 레지스트리에서 런타임 이미지 5종을 다운로드합니다..."
+    for image in "${RUNTIME_IMAGES[@]}"; do
+        log_info "  - Pull: ${image}"
+        if ! docker pull "${image}"; then
+            log_error "이미지 다운로드 실패: ${image}"
+            log_error "오프라인 환경에서는 ordinatio-standalone-images.tar.gz 번들을 제공하거나 --skip-pull을 사용하십시오."
+            exit 1
+        fi
+    done
+    log_success "외부 레지스트리 이미지 프로비저닝 완료."
 else
     log_info "이미지 다운로드 단계 생략 (--skip-pull / --skip-build)."
 fi

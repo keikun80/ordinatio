@@ -17,7 +17,7 @@
 | [PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md](./00_core_and_blueprint/PRE_12_PHASE_0_TO_6_COMPREHENSIVE_REPORT.md) | **Phase 0~6 종합 총괄 보고서 (Executive Master Report)**<br>- 전 모듈 아키텍처 총괄, ADR-01~18 의사결정 기록 및 무회귀 성과 | 최신 현행화 |
 | [PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md](./00_core_and_blueprint/PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) | **Phase 0~6 엔지니어링 갭 분석서 (Gap Analysis)**<br>- 마스터 설계서 대비 런타임 구현율 100% 추적 및 상용 하드닝 완료 | 최신 현행화 |
 | [PRE_15_Develop_milestone.md](./00_core_and_blueprint/PRE_15_Develop_milestone.md) | **차세대 개발 마일스톤 (Milestone 6 ~ 8) 로드맵** | 최신 현행화 |
-| [PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md](./00_core_and_blueprint/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md) | **엔터프라이즈 상용화 개발 로드맵 (Phase 7 ~ 9)**<br>- DRM 라이선스, 셋업 마법사, Helm, 시맨틱 캐싱 등 14대 과제 로드맵 | 계획 완료 |
+| [PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md](./00_core_and_blueprint/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md) | **엔터프라이즈 상용화 개발 로드맵 (Phase 7 ~ 9)**<br>- 셋업 마법사, Helm, 시맨틱 캐싱 등 14대 과제 로드맵; DRM은 P3 Deferred Backlog | 계획 완료 |
 
 ---
 
@@ -89,6 +89,8 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 | [PRE_40_standalone_offline_appliance_packaging_plan.md](./07_appliance_and_packaging/PRE_40_standalone_offline_appliance_packaging_plan.md) | **독립형 오프라인 어플라이언스 원클릭 패키징 및 구동 보고서**<br>- `make prod-build` ➔ 단일 tar.gz 번들 생성 ➔ 타깃 서버 `make up` 원클릭 기동 | **100% PASS** |
 | [PRE_45_standalone_appliance_release_engineering_plan.md](./07_appliance_and_packaging/PRE_45_standalone_appliance_release_engineering_plan.md) | **오프라인 어플라이언스 릴리즈 엔지니어링 계획서**<br>- 5단계 릴리즈 생명주기, 이중 체크섬, RSA-4096 서명, 고객사 전입 검증기 및 make release 자동화 | **구현 및 검증 완료** |
 | [RELEASE_NOTES_v1.0.2.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.2.md) | **v1.0.2 기능 고도화 및 환경설정 외부화 릴리즈 노트**<br>- 선언적 install.conf 분리, 브릿지 IP/타임아웃 외부화, Standalone 무인 설치 강화 | **v1.0.2 GA** |
+| [PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md) | **사용자 지정 DNS·오프라인 번들 우선/외부 레지스트리 fallback 및 114건 검증 증적 수치 정합화** | **100% PASS** |
+| [PRE_47_semantic_cache_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | **에어갭 로컬 시맨틱 캐시, 테넌트 격리 및 FinOps 절감 관측** | **100% PASS** |
 | [RELEASE_NOTES_v1.0.1.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.1.md) | **v1.0.1 신뢰성 및 핫픽스 릴리즈 노트**<br>- 120s 타임아웃 세분화, Docker 브릿지 업스트림, ALB 신뢰 프록시, PII 자동완성, 클린 모드 | **v1.0.1 GA** |
 | [RELEASE_NOTES_v1.0.0.md](./07_appliance_and_packaging/RELEASE_NOTES_v1.0.0.md) | **v1.0.0 공식 릴리즈 노트**<br>- 5대 도커 이미지 번들, 3대 엔터프라이즈 OS 실증(100% PASS), 접속 정보 | **v1.0.0 GA** |
 | [OFFLINE_INSTALL_GUIDE.md](./07_appliance_and_packaging/OFFLINE_INSTALL_GUIDE.md) | **폐쇄망(Air-Gapped) 원클릭 오프라인 설치 및 운영 매뉴얼** | **배포 완료** |

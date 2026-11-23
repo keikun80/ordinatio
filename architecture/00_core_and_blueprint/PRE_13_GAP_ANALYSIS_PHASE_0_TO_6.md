@@ -3,7 +3,7 @@
 **문서 번호**: ORDINATIO-GAP-ANALYSIS-20261120  
 **기준 문서**: `architecture/PRE_01_dashboard_engineering_plan.md`, `architecture/PRE_15_Develop_milestone.md`, `architecture/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md`, `architecture/PRE_26_bifurcated_testing_strategy_local_vs_production.md`  
 **분석 대상**: 상용급 모노레포(`ordinatio/`), 단일 어플라이언스 인스톨러(`install.sh`), 릴리즈 태그(`v1.0.2`), 이원화 테스트베드  
-**작성 일자**: 2026-11-20 (최신 현행화: 111 Tests PASS, 관리자 비밀번호 초기화, 테넌트 외래키 정규화, 모델등록 버튼 단일화, Envoy 8080 인그레스 자동 매핑, VPC 내부 DNS 10.10.0.2 연동, 이원화 테스트 전략 PRE_26 확립)  
+**작성 일자**: 2026-11-23 (최신 현행화: 114 Tests 100% PASS, 관리자 비밀번호 초기화, 테넌트 외래키 정규화, 모델등록 버튼 단일화, Envoy 8080 인그레스 자동 매핑, VPC 내부 DNS 10.10.0.2 연동, 이원화 테스트 전략 PRE_26 확립, GAP-07 로컬 시맨틱 캐시 구현 완료)  
 
 ---
 
@@ -13,10 +13,10 @@
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디)**
   - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, 에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, VPC 내부 DNS Resolver(`10.10.0.2:53`) 등록, 로컬/실사용 이원화 테스트 체계(`PRE_26`)**.
-- **자동화 테스트 검증율**: **111 / 111 백엔드 테스트 100% PASS** (`cd ordinatio/backend && uv run pytest -v`) + **7 / 7 Standalone 설치 검증 100% PASS** (`make verify-standalone-install`) + **Vite 프로덕션 빌드 PASS (번들 경량화 및 코드 스플리팅)**.
+- **자동화 테스트 검증율**: **114 / 114 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 게이트웨이 보안 키(진단 키) NoneType 결함 방어 및 업스트림 안정화를 통해 전체 회귀 테스트를 완전 완주함.
 - **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **19건** (ADR-01 ~ ADR-19 공식 최신화 완료).
 - **상용 고도화 및 하드닝 (Phase C/B/A)**: **100% 완료** (비루트 컨테이너, Alembic 마이그레이션, UTC 시간대 정합화, RoutingTab 모듈화, 비인가 차단 강화, Upstream API Key Fernet 암호화/마스킹, 401 세션 인터셉터).
-- **잔여 상용화 엔터프라이즈 과제 (GAP)**: 총 **14건** (유사도별 4대 도메인으로 체계적 재배치 완료).
+- **잔여 상용화·검증 거버넌스 과제 (GAP)**: 총 **13건** (제품 기능 12건 + 검증 증적 자동화 1건). GAP-07 로컬 시맨틱 캐싱 구현 완료.
 
 ---
 
@@ -108,14 +108,22 @@
 
 ---
 
-## 4. 미구현(GAP) 기능 상세 분석 및 유사도별 재배치 (GAP-01 ~ GAP-14)
+## 4. 미구현(GAP) 기능 상세 분석 및 유사도별 재배치 (잔여 GAP-01 ~ GAP-15)
 
 마스터 로드맵(`PRE_36`)에 정의된 잔여 상용화 과제 14종을 **업무 영역 및 유사도**에 따라 4대 도메인으로 체계적으로 재배치하였습니다:
+
+### 검증 증적 정합성 GAP 분석
+
+현재 `114`개 테스트를 단일 진실 공급원(SSOT)으로 전수 동기화 완료하였으며, Standalone 7/7 및 Vite 프로덕션 빌드와 함께 일치시켰다. 향후 릴리즈 파이프라인에서 테스트 실행 시 보고서 수치를 자동 주입하는 생성기(GAP-15)를 유지 관리한다.
+
+| GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
+| :---: | :--- | :---: | :--- | :---: |
+| **GAP-15** | 검증 증적·문서 수치 단일화 | Milestone 6 | `pytest --collect-only` 기반 현재 테스트 수 산출, 모든 `verify-phase*.sh` 하드코딩 안내 제거, 보고서/README에 생성 시각·명령·결과를 자동 삽입하는 증적 생성기를 구현 | **P1** |
 
 ### 도메인 1: 온보딩 & 라이선스 거버넌스 (Onboarding & Licensing)
 | GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
 | :---: | :--- | :---: | :--- | :---: |
-| **GAP-01** | 오프라인 DRM 라이선스 엔진 | Stage 1 | RSA-4096 서명 `.lic` 파싱, CPU/MAC/UUID 하드웨어 핑거프린트 바인딩, 허용 RPS/테넌트 통제 | **P0 (필수)** |
+| **GAP-01** | 오프라인 DRM 라이선스 엔진 | Deferred Backlog | RSA-4096 서명 `.lic` 파싱, CPU/MAC/UUID 하드웨어 핑거프린트 바인딩, 허용 RPS/테넌트 통제 | **P3 (최하위)** |
 | **GAP-02** | 브라우저 최초 셋업 마법사 | Stage 1 | 미설치 시 `/setup` 자동 리다이렉트 ➔ 3단계(라이선스, 슈퍼관리자, Preflight) 웹 UI 위저드 | **P1** |
 | **GAP-03** | 엔터프라이즈 Helm Chart & 번들러 | Stage 1 | `deploy/helm/ordinatio/` (K8s HPA, 외장 DB) 및 `package-airgap-release.sh` 이미지 패키징 | **P1** |
 
@@ -130,7 +138,6 @@
 ### 도메인 3: LLM 인텔리전스 & 고속 추론 최적화 (Intelligence & High Performance)
 | GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
 | :---: | :--- | :---: | :--- | :---: |
-| **GAP-07** | 에어갭 로컬 시맨틱 캐싱 엔진 | Stage 3 | 로컬 임베딩 모델(bge-small) + Redis Vector Store 코사인 유사도 검색 (비용 40~60% 절감) | **P0 (세일즈)** |
 | **GAP-14** | 비동기 대량 배치(Batch) 추론 큐 | Milestone 8 | OpenAI Batch API 호환 대량 문서/데이터셋 비동기 작업 큐 및 상태 조회 API | **P2** |
 
 ### 도메인 4: FinOps, 컴플라이언스 & 백업/DR (FinOps & Compliance Ops)
@@ -146,9 +153,9 @@
 
 ## 5. 결론 및 권장 엔지니어링 액션
 
-현재 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면은 100% 구축 및 무회귀 검증(102개 테스트 100% PASS, Standalone 7개 PASS, strings.js 현지화 100%, install.conf 외부화 및 v1.0.2 릴리즈 태깅 완료)**되어 상용 환경에 즉시 무인 설치 및 자율 운영이 가능한 상태입니다.
+현재 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면은 구축되어 있으며, 114개 백엔드 테스트(100% PASS)와 Standalone 7개 검증(100% PASS)을 모두 완주했습니다.** 게이트웨이 호출 및 시맨틱 캐시 연동 결함이 완전 해소되어 프로덕션 릴리즈 게이트를 통과했습니다.
 
 - **차기 엔지니어링 우선순위**:
-  1. **오프라인 DRM 라이선스 엔진 (`GAP-01`)**: 온프레미스 B2B 라이선스 키 검증 및 CPU/MAC 핑거프린트 바인딩 구현.
-  2. **에어갭 로컬 시맨틱 캐싱 엔진 (`GAP-07`)**: 로컬 bge-small 임베딩 모델과 벡터 캐시를 통한 토큰 비용 절감 구현.
-  3. **예산 임계치 웹훅 & SIEM 연동 (`GAP-04`)**: 금융권 전산망 보안 관제 센터와의 이벤트 연동 구현.
+  1. **예산 임계치 웹훅 & SIEM 연동 (`GAP-04`)**: 금융권 전산망 보안 관제 센터와의 이벤트 연동 구현.
+  2. **검증 증적·문서 수치 단일화 (`GAP-15`)**: 테스트 수·실행 시각·명령을 자동 산출하여 릴리즈 판정 근거를 단일화.
+  3. **오프라인 DRM 라이선스 엔진 (`GAP-01`)**: 모든 현재 상용화·운영 GAP 완료 후에만 착수하는 P3 Deferred Backlog.

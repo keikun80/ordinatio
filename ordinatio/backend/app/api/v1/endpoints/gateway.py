@@ -47,6 +47,7 @@ from app.core.agent_router import (
 )
 from app.core.token_limiter import token_rate_limiter
 from app.core.ext_proc_server import ext_processor, ExtProcRequest, ExtProcResponse
+from app.core.semantic_cache import semantic_cache
 
 logger = logging.getLogger(__name__)
 
@@ -556,6 +557,36 @@ async def dispatch_chat_completion(
         "max_tokens": req.max_tokens,
         "stream": False
     }
+    prompt_toks = max(len(user_prompt) // 4 + 10, 5)
+    compl_toks = 40
+
+    # Cache is scoped to a tenant/key and covers the whole normalized conversation.
+    # Tool calls and streaming are deliberately excluded to avoid caching side effects.
+    cacheable = not req.stream and not req.tools and not req.functions
+    cache_scope = (
+        matched_key.tenant_id
+        if (matched_key and matched_key.tenant_id)
+        else (f"key:{matched_key.key_id}" if matched_key else f"console:{key_id}")
+    )
+    semantic_hit = semantic_cache.lookup(cache_scope, selected_model_id, upstream_messages) if cacheable else None
+    if semantic_hit:
+        cached_response = semantic_hit.response
+        cached_usage = cached_response.get("usage", {}) if isinstance(cached_response, dict) else {}
+        saved_prompt_tokens = int(cached_usage.get("prompt_tokens", prompt_toks))
+        saved_completion_tokens = int(cached_usage.get("completion_tokens", compl_toks))
+        input_price = float(model_entry.input_price_per_1k) if model_entry else 0.80
+        output_price = float(model_entry.output_price_per_1k) if model_entry else 2.40
+        saved_cost = round((saved_prompt_tokens * input_price + saved_completion_tokens * output_price) / 1000.0, 2)
+        semantic_cache.record_savings(saved_prompt_tokens + saved_completion_tokens, saved_cost)
+        cached_response["orche_metadata"] = {
+            **cached_response.get("orche_metadata", {}),
+            "status": "SEMANTIC_CACHE_HIT",
+            "semantic_cache": {"hit": True, "similarity": semantic_hit.similarity, "saved_cost_krw": saved_cost},
+        }
+        if response:
+            response.headers["x-orche-semantic-cache"] = "HIT"
+            response.headers["x-orche-semantic-similarity"] = str(semantic_hit.similarity)
+        return cached_response
 
     # 3번 자동 정규화 조치 롤백: 사용자가 완성하여 저장한 target_endpoint URL을 직접 최우선 호출
     endpoint_clean = target_endpoint.rstrip('/')
@@ -635,10 +666,6 @@ async def dispatch_chat_completion(
         for hk, hv in affinity_headers.items():
             response.headers[hk] = hv
 
-    # Metrics extraction
-    prompt_toks = max(len(user_prompt) // 4 + 10, 5)
-    compl_toks = 40
-
     # Determine tenant attribution hint
     policy_tenant_code = None
     if db_policy and db_policy.match_conditions and db_policy.match_conditions.get("tenant_codes"):
@@ -678,6 +705,10 @@ async def dispatch_chat_completion(
             "status": "LIVE_UPSTREAM",
             "finops": finops_metering
         }
+        if cacheable:
+            semantic_cache.store(cache_scope, selected_model_id, upstream_messages, upstream_response_data)
+        if response:
+            response.headers["x-orche-semantic-cache"] = "MISS"
 
         # Anthropic Claude Code / SDK Dual-Compatibility
         if isinstance(upstream_response_data, dict):

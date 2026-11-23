@@ -54,8 +54,9 @@ if [ -f "$COMPOSE_FILE" ]; then
        grep -q "127.0.0.1:\${REDIS_PORT" "$COMPOSE_FILE" && \
        grep -q "ordinatio-envoy" "$COMPOSE_FILE" && \
        grep -q "ordinatio-backend" "$COMPOSE_FILE" && \
-       grep -q "ordinatio-frontend" "$COMPOSE_FILE"; then
-        assert_pass "docker-compose.standalone.yml 5대 서비스 및 루프백 격리 포트 바인딩 규격 준수 확인"
+       grep -q "ordinatio-frontend" "$COMPOSE_FILE" && \
+       grep -q 'DNS_SERVER:-8.8.8.8' "$COMPOSE_FILE"; then
+        assert_pass "docker-compose.standalone.yml 5대 서비스, 루프백 격리 포트 및 사용자 설정 DNS 규격 준수 확인"
     else
         assert_fail "docker-compose.standalone.yml 내부 서비스/네트워크 정의가 불완전합니다."
     fi
@@ -88,8 +89,8 @@ if [ -x "$INSTALL_SCRIPT" ] && [ -x "$UNINSTALL_SCRIPT" ] && [ -f "$INSTALL_CONF
     bash -n "$INSTALL_SCRIPT" || assert_fail "install.sh 쉘 문법 에러 발견"
     bash -n "$UNINSTALL_SCRIPT" || assert_fail "uninstall.sh 쉘 문법 에러 발견"
     HELP_OUTPUT=$(bash "$INSTALL_SCRIPT" --help)
-    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "config" && echo "$HELP_OUTPUT" | grep -q "uninstall"; then
-        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --config, --uninstall, --purge), uninstall.sh 래퍼 및 install.conf.example 템플릿 검증 완료"
+    if echo "$HELP_OUTPUT" | grep -q "auto-approve" && echo "$HELP_OUTPUT" | grep -q "config" && echo "$HELP_OUTPUT" | grep -q "uninstall" && echo "$HELP_OUTPUT" | grep -q "dns-server" && grep -q '^DNS_SERVER=' "$INSTALL_CONF_EXAMPLE"; then
+        assert_pass "install.sh 쉘 구문 정상 및 CLI 옵션(--auto-approve, --config, --dns-server, --uninstall, --purge), uninstall.sh 래퍼 및 install.conf.example DNS 템플릿 검증 완료"
     else
         assert_fail "install.sh 도움말 출력 검증 실패"
     fi
@@ -127,13 +128,13 @@ else
     assert_fail "Vagrantfile 또는 provision.sh 파일이 누락되었습니다."
 fi
 
-# Test 7: 백엔드 및 전체 기존 회귀 테스트(102개) 무결성 확인
-echo -e "${BOLD}[Test 7/7] 백엔드 단위/통합 테스트 회귀 검증 (102/102 Tests)${NC}"
+# Test 7: 백엔드 및 전체 현재 회귀 테스트 무결성 확인
+echo -e "${BOLD}[Test 7/7] 백엔드 단위/통합 테스트 회귀 검증 (현재 pytest Suite)${NC}"
 cd "${ROOT_DIR}/backend"
 if command -v uv &>/dev/null; then
     TEST_RES=$(uv run pytest tests/ -q 2>&1)
     if echo "$TEST_RES" | grep -q "passed"; then
-        assert_pass "백엔드 핵심 제어 평면 102개 테스트 100% 무회귀 통과 확인"
+        assert_pass "백엔드 핵심 제어 평면 현재 pytest Suite 무회귀 통과 확인"
     else
         assert_fail "백엔드 테스트 실패:\n$TEST_RES"
     fi

@@ -996,7 +996,9 @@ export const strings = {
       attentionNeeded: '주의 필요',
       budgetNormal: '예산 정상',
       runRate: '월말 예상 지출액 (Run Rate)',
-      trendForecast: '현재 추세 기반 예측'
+      trendForecast: '현재 추세 기반 예측',
+      semanticCache: '로컬 시맨틱 캐시 절감액',
+      semanticCacheDetail: (rate, tokens) => `적중률 ${Number(rate).toFixed(1)}% · 절감 ${Number(tokens).toLocaleString()} 토큰`
     },
     pricingBanner: {
       title: '모델 서빙 표준 계량 단가 기준 (Token Pricing Matrix)',

@@ -64,7 +64,7 @@ services:
       - ./backend/tests:/app/tests
     dns:
       - 10.10.0.2
-      - 8.8.8.8
+      - ${DNS_SERVER:-8.8.8.8}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"

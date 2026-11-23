@@ -2,8 +2,8 @@
 
 **문서 번호**: ORDINATIO-ENG-REP-20261120  
 **대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-11-20 (최신 현행화: 백엔드 111/111 Tests PASS, 관리자 비밀번호 초기화 API, 테넌트 외래키 정규화, 모델등록 버튼 단일화, Envoy 8080 게이트웨이 포트 매핑, VPC 내부 DNS 10.10.0.2 연동, 로컬/실사용 이원화 테스트 전략 수립)  
-**검증 상태**: **Phase 0~6 전 모듈 100% PASS (백엔드 111/111 Tests + Standalone 7/7 Tests + Vite Build PASS DoD 충족)**  
+**작성 일자**: 2026-11-23 (최신 현행화: 백엔드 114/114 Tests 100% PASS 완주, 에어갭 로컬 시맨틱 캐시 구현 및 FinOps 연동, DNS/레지스트리 정책 일관화, Standalone 무인 설치 7/7 PASS, 프론트엔드 Vite Build PASS)
+**검증 상태**: **백엔드 114/114 PASS (100%), Standalone 7/7 PASS (100%), 프론트엔드 Vite Build PASS, E2E 10/10 PASS 프로덕션 레디**
 
 ---
 
@@ -48,15 +48,18 @@
 | **Phase 6: 보안 & 프록시** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | AWS ALB/Nginx 신뢰 프록시 헤더 검증, P0 보안 차단, Docker 브릿지 업스트림 연동 | `pytest` | 102 / 102 PASS |
 | **Phase 6: 사용자 보안 강화** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 관리자 비밀번호 초기화(`POST /users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 단일화 | `pytest` | 111 / 111 PASS |
 | **Phase 6: 이원화 테스트 전략** | [PRE_26_bifurcated_testing_strategy_local_vs_production.md](../PRE_26_bifurcated_testing_strategy_local_vs_production.md) | 로컬 고속 계약 검증 vs 실환경 L3/L4 DNS & 포트 프로빙 이원화 전략 확립 및 Day-0 부트스트랩 가드 | `make up` & `verify` | **111 / 111 PASS** |
+| **Phase 6: 시맨틱 캐시** | [PRE_47_semantic_cache_implementation_and_test_results.md](../07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | 테넌트·모델 격리 로컬 시맨틱 캐시, Redis TTL/메모리 fallback, FinOps 절감 관측 | `test_semantic_cache.py` & `npm run build` | 단위 3/3 PASS, 전체 114/114 PASS & Vite Build PASS |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (111 / 111 백엔드 테스트 100% 통과)
+## 3. 전체 테스트 검증 매트릭스 (114 / 114 백엔드 테스트 100% PASS)
+
+> 검증 증적 수치는 114개 테스트 완주 기준으로 전수 동기화 완료되었다. 상세 분석은 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)를 참조한다.
 
 ```bash
 # 전체 테스트 실행 명령어
-cd ordinatio/backend && uv run pytest -v
-# 결과: 111 passed, 3 warnings in 83.61s (100% PASS)
+cd ordinatio/backend && uv run pytest tests/ -q
+# 결과: 114 passed in 114.79s (100% PASS)
 ```
 
 | 테스트 파일 | 테스트 케이스 명칭 | 검증 목적 및 동작 내용 | 상태 |
@@ -193,4 +196,4 @@ cd ordinatio/backend && uv run pytest -v
 
 ## 5. 결론 및 프로덕션 릴리즈 상태
 
-현재 시스템은 **Phase 0부터 Phase 6까지의 전체 필수 사양 및 Phase C/B/A 상용 하드닝이 100% 완료 및 무회귀 검증(111개 단위/보안 테스트 100% PASS, 8대 전 메뉴 E2E 무인 통합 시나리오 10/10 PASS, Standalone 오프라인 7개 PASS, Vite 번들 최적화 빌드 PASS, 비권장 경고 0건, install.conf 외부화 및 v1.0.2 릴리즈 태깅 완료)**되었으며, 단일 호스트 폐쇄망 서버에 무인으로 설치되어 고객 자율 운영이 가능한 상용급 프로덕션 레디 어플라이언스입니다.
+현재 시스템은 **Phase 0부터 Phase 6까지의 필수 사양 및 Phase C/B/A 상용 하드닝 구현을 갖추고 있다.** 전체 114개 단위/보안/통합 테스트 100% PASS, 8대 전 메뉴 E2E 10/10 PASS, Standalone 설치 검증 7/7 PASS 및 프론트엔드 Vite 프로덕션 빌드 성공을 달성하여 프로덕션 릴리즈 기준을 완전히 충족한다.

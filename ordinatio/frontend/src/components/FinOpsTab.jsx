@@ -9,6 +9,7 @@ export default function FinOpsTab({ onNotify }) {
   const canWriteFinops = isSuperAdmin || hasPermission('finops:write');
   const [tenants, setTenants] = useState([]);
   const [finOpsData, setFinOpsData] = useState(null);
+  const [semanticCacheStats, setSemanticCacheStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
@@ -30,7 +31,11 @@ export default function FinOpsTab({ onNotify }) {
   const fetchOverview = async () => {
     setLoading(true);
     try {
-      const data = await apiClient.getFinOpsOverview();
+      const [data, cacheStats] = await Promise.all([
+        apiClient.getFinOpsOverview(),
+        apiClient.getSemanticCacheStats().catch(() => null)
+      ]);
+      setSemanticCacheStats(cacheStats);
       if (data && Array.isArray(data.tenants)) {
         setFinOpsData(data);
         setTenants(data.tenants.map(t => ({
@@ -175,6 +180,16 @@ export default function FinOpsTab({ onNotify }) {
             <div className="kpi-value" data-testid="fo-kpi-value-run-rate">₩ {Math.round(finOpsData.projected_month_end_krw).toLocaleString()}</div>
             <div className="kpi-footer">
               <span className="kpi-badge-neutral">{strings.finops.kpi.trendForecast}</span>
+            </div>
+          </div>
+          <div className="kpi-card" data-testid="fo-kpi-card-semantic-cache" style={{ '--card-accent': '#5EF527' }}>
+            <div className="kpi-header">
+              <span>{strings.finops.kpi.semanticCache}</span>
+              <TrendingUp size={18} color="#5EF527" />
+            </div>
+            <div className="kpi-value">₩ {Math.round(semanticCacheStats?.saved_cost_krw || 0).toLocaleString()}</div>
+            <div className="kpi-footer">
+              <span className="kpi-badge-neutral">{strings.finops.kpi.semanticCacheDetail(semanticCacheStats?.hit_rate_pct || 0, semanticCacheStats?.saved_tokens || 0)}</span>
             </div>
           </div>
         </div>

@@ -7,11 +7,14 @@ from app.api.v1.endpoints import metrics, gateway
 
 from contextlib import asynccontextmanager
 from app.db.init_db import init_db
+from app.core.telemetry_hub import telemetry_hub
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    telemetry_hub.start_background_loop()
     yield
+    await telemetry_hub.stop()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

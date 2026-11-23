@@ -35,6 +35,7 @@ class TelemetryPacket(BaseModel):
     cache_hit_rate: float
     cumulative_cost_krw: float
     active_connections: int
+    total_requests: int = 0
     compute_pools: List[ComputePoolStatus]
     model_traffic_breakdown: List[ModelTrafficShare] = []
 
@@ -45,6 +46,8 @@ class ObservabilitySummaryResponse(BaseModel):
     error_rate: float
     cache_hit_rate: float
     total_tokens_today: int
+    cumulative_cost_krw: float = 0.0
+    total_requests: int = 0
     compute_pools: List[ComputePoolStatus]
     model_traffic_breakdown: List[ModelTrafficShare] = []
     uptime_seconds: float

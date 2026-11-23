@@ -179,7 +179,7 @@ class TelemetryHub:
 
     async def fetch_envoy_kpis(self) -> Dict[str, float]:
         """Fetch raw metrics from Envoy Admin API (:9901) and calculate live KPIs."""
-        admin_url = f"{settings.ENVOY_ADMIN_URL}/stats?format=json&filter=(http\\.ai_ingress|cluster\\.)"
+        admin_url = f"{settings.ENVOY_ADMIN_URL}/stats?format=json&histogram_buckets=cumulative&filter=(http\\.ai_ingress|cluster\\.)"
         now = time.time()
 
         raw_stats = {}
@@ -194,7 +194,7 @@ class TelemetryHub:
                         if "name" in item:
                             raw_stats[item["name"]] = item.get("value", 0)
                         elif "histograms" in item:
-                            histograms_list = item["histograms"].get("computed_quantiles", [])
+                            histograms_list.extend(item.get("histograms", []))
         except Exception as e:
             logger.warning(f"Could not connect to Envoy Admin at {admin_url}: {e}")
 
@@ -205,15 +205,24 @@ class TelemetryHub:
         rq_5xx = int(raw_stats.get("http.ai_ingress.downstream_rq_5xx", 0))
         tx_bytes = int(raw_stats.get("http.ai_ingress.downstream_cx_tx_bytes_total", 0))
 
-        # Extract P95 latency (ms)
+        # Extract P95 latency (ms) from buckets or computed quantiles
         p95_ttft = 0.0
         for h in histograms_list:
             if h.get("name") == "http.ai_ingress.downstream_rq_time":
-                vals = h.get("values", [])
-                if len(vals) > 5:
-                    p95_val = vals[5].get("cumulative")
-                    if p95_val is not None and not str(p95_val).lower() == "nan":
-                        p95_ttft = float(p95_val)
+                buckets = h.get("buckets", [])
+                if buckets:
+                    total_count = buckets[-1].get("cumulative", 0)
+                    if total_count > 0:
+                        target_p95 = total_count * 0.95
+                        for b in buckets:
+                            if b.get("cumulative", 0) >= target_p95:
+                                p95_ttft = float(b.get("upper_bound", 0.0))
+                                break
+                elif "computed_quantiles" in h:
+                    for q in h["computed_quantiles"]:
+                        if q.get("quantile") in [0.95, "0.95", 95]:
+                            p95_ttft = float(q.get("value", 0.0))
+                            break
 
         # Delta calculation
         if not self._has_baseline:
@@ -439,6 +448,7 @@ class TelemetryHub:
             cache_hit_rate=42.0 if envoy_kpis["rps"] > 0 else 0.0,
             cumulative_cost_krw=round(cumulative_cost, 0),
             active_connections=len(self.active_connections),
+            total_requests=envoy_kpis.get("rq_total", 0),
             compute_pools=pools,
             model_traffic_breakdown=traffic_breakdown
         )
@@ -455,6 +465,7 @@ class TelemetryHub:
         ttft = self._latest_telemetry.ttft_ms if self._latest_telemetry else 0.0
         err_rate = self._latest_telemetry.error_rate_5xx if self._latest_telemetry else 0.0
         active_conn = len(self.active_connections)
+        total_reqs = self._latest_telemetry.total_requests if self._latest_telemetry else int(self._last_raw_stats.get("http.ai_ingress.downstream_rq_total", 0))
 
         traffic_breakdown = self._get_real_model_traffic(rps)
 
@@ -467,6 +478,7 @@ class TelemetryHub:
             cache_hit_rate=42.0 if rps > 0 else 0.0,
             cumulative_cost_krw=round(cost, 0),
             active_connections=active_conn,
+            total_requests=total_reqs,
             compute_pools=pools,
             model_traffic_breakdown=traffic_breakdown
         )

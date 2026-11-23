@@ -26,7 +26,8 @@ export default function OverviewTab({ onNavigateTab }) {
     tps: 0,
     ttft: 0,
     errorRate: 0,
-    dailyCost: 0
+    dailyCost: 0,
+    totalRequests: 0
   });
   const [clusterPools, setClusterPools] = useState([]);
   const [modelTraffic, setModelTraffic] = useState([]);
@@ -70,6 +71,8 @@ export default function OverviewTab({ onNavigateTab }) {
           tps: Math.round(summary.current_tps),
           ttft: Math.round(summary.p95_ttft_ms),
           errorRate: summary.error_rate,
+          dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
+          totalRequests: summary.total_requests ?? prev.totalRequests
         }));
         if (summary.compute_pools && summary.compute_pools.length > 0) {
           setClusterPools(mapComputePools(summary.compute_pools));
@@ -123,6 +126,7 @@ export default function OverviewTab({ onNavigateTab }) {
                 ttft: Math.round(packet.ttft_ms),
                 errorRate: packet.error_rate_5xx,
                 dailyCost: Math.round(packet.cumulative_cost_krw || prev.dailyCost),
+                totalRequests: packet.total_requests ?? prev.totalRequests
               }));
 
               if (packet.compute_pools && packet.compute_pools.length > 0) {
@@ -174,6 +178,8 @@ export default function OverviewTab({ onNavigateTab }) {
             tps: Math.round(summary.current_tps),
             ttft: Math.round(summary.p95_ttft_ms),
             errorRate: summary.error_rate,
+            dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
+            totalRequests: summary.total_requests ?? prev.totalRequests
           }));
           if (summary.compute_pools && summary.compute_pools.length > 0) {
             setClusterPools(mapComputePools(summary.compute_pools));
@@ -212,6 +218,8 @@ export default function OverviewTab({ onNavigateTab }) {
                       tps: Math.round(summary.current_tps),
                       ttft: Math.round(summary.p95_ttft_ms),
                       errorRate: summary.error_rate,
+                      dailyCost: summary.cumulative_cost_krw !== undefined ? Math.round(summary.cumulative_cost_krw) : prev.dailyCost,
+                      totalRequests: summary.total_requests ?? prev.totalRequests
                     }));
                     if (summary.compute_pools?.length > 0) {
                       setClusterPools(mapComputePools(summary.compute_pools));
@@ -276,7 +284,7 @@ export default function OverviewTab({ onNavigateTab }) {
             <span className="kpi-badge-positive">
               <Activity size={13} color="#3b82f6" /> {strings.overview.kpi.rpsSub}
             </span>
-            <span className="kpi-badge-neutral">{strings.overview.kpi.liveMeasure}</span>
+            <span className="kpi-badge-neutral">{kpis.totalRequests > 0 ? `누적 ${kpis.totalRequests.toLocaleString()}건` : strings.overview.kpi.liveMeasure}</span>
           </div>
         </div>
 

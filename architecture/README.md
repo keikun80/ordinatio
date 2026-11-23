@@ -29,6 +29,7 @@ Envoy AI Gateway Ingress, AgentRouter 동적 클러스터 바인딩, 커스텀 �
 | [ADR_17_envoy_l7_ingress_and_python_gateway.md](./01_gateway_and_routing/ADR_17_envoy_l7_ingress_and_python_gateway.md) | **Envoy L7 AI Gateway Ingress 및 Python Control Plane 아키텍처 결정** | 채택 완료 |
 | [PRE_24_route_custom_path_finops_metering_and_tenant_mapping_report.md](./01_gateway_and_routing/PRE_24_route_custom_path_finops_metering_and_tenant_mapping_report.md) | **라우트 커스텀 경로 디스패치 & 테넌트 매핑**<br>- 동적 경로 디스패치(`/v1/{custom_path}`) 및 실시간 원자적 계량 연동 | **100% PASS** |
 | [PRE_29_agent_router_dynamic_cluster_configuration_report.md](./01_gateway_and_routing/PRE_29_agent_router_dynamic_cluster_configuration_report.md) | **AgentRouter 동적 클러스터 구성 및 하드코딩 제거 최신 보고서**<br>- 인텐트 분석 기반 4대 지능형 라우팅 및 동적 클러스터 수동 에디트(Manual Override) | **100% PASS** |
+| [PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md](./01_gateway_and_routing/PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md) | **Anthropic ↔ OpenAI 양방향 Tool Calling 변환 & Claude Code 에이전틱 루프 정지 결함 해결**<br>- 도구 정의 매핑, SSE 실시간 스트리밍 직렬화, 멀티턴 복원, x-api-key 인증 | **100% PASS** |
 
 ---
 

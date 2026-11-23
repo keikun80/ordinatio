@@ -191,6 +191,7 @@ cd ordinatio/backend && uv run pytest tests/ -q
 - **ADR-17**: Envoy xDS 다이나믹 클러스터(EDS/CDS)의 실시간 안정성 및 이종 LLM 프로토콜 변환 한계를 극복하기 위해 **Envoy L7 엣지 인그레스 + Control Plane Python 게이트웨이 파이프라인 결합 아키텍처** 채택.
 - **ADR-18**: 개발 생산성과 운영 정밀도 보장을 위한 **로컬 Docker Compose(Mocking) vs 실사용 온프레미스 K8s/Appliance 이원화 테스트 전략** 채택.
 - **ADR-19**: 웹 브라우저 없이 운영자가 실제 LLM 엔드포인트, 서빙 엔진, 모델 ID, 관리자 계정을 일괄 주입하여 8대 전 메뉴를 무인 검증할 수 있도록 **외부 설정 파일(`test_config.json`) 기반 통합 E2E 자동화 러너** 채택.
+- **ADR-20**: Claude Code 등 Anthropic 표준 에이전트 CLI 호환성을 위해 **Anthropic ↔ OpenAI 양방향 프로토콜 변환 및 실시간 SSE 도구 스트리밍 엔진** 채택 ([PRE-48](../01_gateway_and_routing/PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md)).
 
 ---
 

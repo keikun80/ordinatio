@@ -14,7 +14,7 @@
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디)**
   - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, 에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, VPC 내부 DNS Resolver(`10.10.0.2:53`) 등록, 로컬/실사용 이원화 테스트 체계(`PRE_26`)**.
 - **자동화 테스트 검증율**: **114 / 114 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 게이트웨이 보안 키(진단 키) NoneType 결함 방어 및 업스트림 안정화를 통해 전체 회귀 테스트를 완전 완주함.
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **19건** (ADR-01 ~ ADR-19 공식 최신화 완료).
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **20건** (ADR-01 ~ ADR-20 공식 최신화 완료).
 - **상용 고도화 및 하드닝 (Phase C/B/A)**: **100% 완료** (비루트 컨테이너, Alembic 마이그레이션, UTC 시간대 정합화, RoutingTab 모듈화, 비인가 차단 강화, Upstream API Key Fernet 암호화/마스킹, 401 세션 인터셉터).
 - **잔여 상용화·검증 거버넌스 과제 (GAP)**: 총 **13건** (제품 기능 12건 + 검증 증적 자동화 1건). GAP-07 로컬 시맨틱 캐싱 구현 완료.
 
@@ -49,6 +49,7 @@
 | | 드라이런(Dry-run) 사전 검증 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_dry_run_validation` |
 | | AgentRouter 4대 자율 라우팅 정책 & 수동 오버라이드 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_agent_router.py` (11종 테스트) |
 | | **Connect 10s / Read 120s 타임아웃 분리 및 폴백** | ✅ **구현 완료** | ✅ **테스트 완료** | `routing.py` vLLM 대용량 생성 완결 대기 |
+| | **Anthropic ↔ OpenAI 양방향 Tool Calling & 에이전틱 스트리밍** | ✅ **구현 완료** | ✅ **테스트 완료** | [PRE-48] Claude Code 에이전틱 루프 100% 호환 |
 | **Phase 3: 관측성 & FinOps** | 1초 WebSocket 텔레메트리 스트림 & 관제 홈 실데이터 연동 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_observability_websocket_telemetry` |
 | | 지표 요약 수명주기 디커플링 (Zero-Flicker) | ✅ **구현 완료** | ✅ **E2E 완료** | [ADR-09] 컴포넌트 마운트 분리 |
 | | FinOps 표준 토큰 계량 단가표 | ✅ **구현 완료** | ✅ **테스트 완료** | `test_finops_overview_and_pricing` |
@@ -105,6 +106,8 @@
     - *결정 사유*: 외부 UDP 53이 차단된 AWS VPC/에어갭 환경에서 도커 데몬 및 컨테이너가 VPC Resolver를 통해 업스트림 도메인을 안정적으로 해석하도록 보장하고, 웹 UI 접속 포트(5137/5173)가 API 엔드포인트 URL로 오인 노출되지 않도록 게이트웨이 포트(`8080`)로 강제 분리.
 19. **[ADR-19]** 브라우저 기반 수동 테스트 종속 ➔ **외부 설정 파일(`test_config.json`) 기반 무인 E2E 통합 자동화 러너 채택**  
     - *결정 사유*: 웹 브라우저 UI 없이도 운영자가 실제 운영 LLM 서빙 엔드포인트 URL, 모델 ID, 서빙 엔진, 관리자 인증 정보를 JSON 설정 파일로 손쉽게 주입하여 8대 전 메뉴의 수명주기(자가진단, 테넌트, 가상키, 라우팅, 프롬프트, PII, 인앱 추론, 게이트웨이 인그레스, WORM 감사, FinOps 과금, 핫픽스 검증)를 원클릭 무인 검증할 수 있도록 지원.
+20. **[ADR-20]** 클라이언트 단독 처리 불가 및 Envoy L7 조작 한계 ➔ **Anthropic ↔ OpenAI 양방향 프로토콜 변환 및 실시간 SSE 에이전틱 도구 스트리밍 엔진 채택**  
+    - *결정 사유*: Claude Code 등 Anthropic Messages 규격을 사용하는 에이전트 CLI와 온프레미스 vLLM(OpenAI 규격) 간의 도구 호출(`tools`), `tool_use`/`tool_calls` 스트리밍 청크 직렬화, 멀티턴 `tool_result` 문맥 복원을 게이트웨이가 전담하여 에이전틱 루프 정지 결함 완전 해소 ([PRE-48](../01_gateway_and_routing/PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md)).
 
 ---
 

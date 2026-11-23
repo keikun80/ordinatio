@@ -590,6 +590,8 @@ export const strings = {
       outputPriceLabel: '출력 단가 (₩/1k)',
       timeoutSecLabel: '타임아웃 (초)',
       timeoutSecPlaceholder: '기본: 3.0',
+      streamingSupportLabel: '실시간 스트리밍(SSE) 응답 활성화',
+      streamingSupportHint: 'Claude Code 등 대화형 CLI 클라이언트의 실시간 토큰 전송과 ELB 타임아웃 방지를 지원합니다.',
       statusLabel: '서비스 활성화 상태 (Status)',
       statusActive: '정상 서빙 활성화 (Active)',
       statusInactive: '비활성화 / 점검 모드 (Inactive)',

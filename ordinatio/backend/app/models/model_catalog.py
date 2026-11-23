@@ -18,5 +18,6 @@ class ModelCatalog(Base):
     auth_type = Column(String(32), nullable=True, default="none")  # 'none', 'apikey', 'bearer'
     provider = Column(String(32), nullable=True, default="openai")  # 'openai', 'deepseek', 'anthropic', 'gemini', 'cohere', 'custom'
     health_check_timeout = Column(Numeric(5, 2), default=3.0, nullable=True)  # Health check timeout in seconds
+    supports_streaming = Column(Boolean, default=True, nullable=False)  # Streaming (SSE) support flag
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Globe, Key, Lock, Eye, EyeOff, Edit3, Timer, CheckCircle2 } from 'lucide-react';
+import { Cpu, Globe, Key, Lock, Eye, EyeOff, Edit3, Timer, CheckCircle2, Zap } from 'lucide-react';
 import { strings } from '../../../constants/strings';
 import { LLM_PROVIDERS } from '../constants';
 
@@ -308,6 +308,29 @@ export function NewModelModal({
                 />
               </div>
             </div>
+
+            {/* 스트리밍(SSE) 활성화 옵션 */}
+            <div style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              background: 'rgba(15, 23, 42, 0.65)',
+              borderRadius: '6px',
+              border: '1px solid var(--border-subtle)'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                <input 
+                  type="checkbox"
+                  checked={newModelForm.supports_streaming !== false}
+                  onChange={(e) => setNewModelForm({...newModelForm, supports_streaming: e.target.checked})}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-cyan)' }}
+                />
+                <Zap size={14} color="var(--accent-cyan)" />
+                <span>{strings.routing.modals.streamingSupportLabel}</span>
+              </label>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', paddingLeft: '24px' }}>
+                {strings.routing.modals.streamingSupportHint}
+              </div>
+            </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>{strings.common.cancel}</button>
@@ -609,6 +632,29 @@ export function EditModelModal({
                 <option value="active">{strings.routing.modals.statusActive}</option>
                 <option value="inactive">{strings.routing.modals.statusInactive}</option>
               </select>
+            </div>
+
+            {/* 스트리밍(SSE) 활성화 옵션 */}
+            <div style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              background: 'rgba(15, 23, 42, 0.65)',
+              borderRadius: '6px',
+              border: '1px solid var(--border-subtle)'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                <input 
+                  type="checkbox"
+                  checked={editModelForm.supports_streaming !== false}
+                  onChange={(e) => setEditModelForm({...editModelForm, supports_streaming: e.target.checked})}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent-cyan)' }}
+                />
+                <Zap size={14} color="var(--accent-cyan)" />
+                <span>{strings.routing.modals.streamingSupportLabel}</span>
+              </label>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', paddingLeft: '24px' }}>
+                {strings.routing.modals.streamingSupportHint}
+              </div>
             </div>
           </div>
           <div className="modal-footer">

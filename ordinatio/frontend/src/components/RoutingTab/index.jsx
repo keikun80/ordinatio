@@ -221,7 +221,8 @@ export default function RoutingTab({
     output_price_per_1k: 2.4,
     health_check_timeout: 3.0,
     api_key: '',
-    auth_type: 'none' // 'none' | 'apikey' | 'bearer'
+    auth_type: 'none', // 'none' | 'apikey' | 'bearer'
+    supports_streaming: true
   });
 
   const handleNewModelProviderChange = (provId) => {
@@ -257,7 +258,8 @@ export default function RoutingTab({
     cache_discount_ratio: 0.25,
     api_key: '',
     auth_type: 'none',
-    is_active: true
+    is_active: true,
+    supports_streaming: true
   });
 
   const handleOpenEditModal = (model) => {
@@ -276,7 +278,8 @@ export default function RoutingTab({
       cache_discount_ratio: model.cache_discount_ratio !== undefined ? model.cache_discount_ratio : 0.25,
       api_key: model.apiKey || '',
       auth_type: model.authType || 'none',
-      is_active: model.active !== false
+      is_active: model.active !== false,
+      supports_streaming: model.supports_streaming !== false
     });
     setShowEditApiKey(false);
   };
@@ -314,7 +317,8 @@ export default function RoutingTab({
         cache_discount_ratio: Number(editModelForm.cache_discount_ratio || 0.25),
         is_active: editModelForm.is_active,
         api_key: editModelForm.api_key?.trim() || null,
-        auth_type: editModelForm.auth_type || 'none'
+        auth_type: editModelForm.auth_type || 'none',
+        supports_streaming: editModelForm.supports_streaming !== false
       });
 
       const updated = models.map(m => m.id === editingModel.id ? {
@@ -327,7 +331,8 @@ export default function RoutingTab({
         healthCheckTimeout: res.health_check_timeout !== undefined ? Number(res.health_check_timeout) : Number(editModelForm.health_check_timeout || 3.0),
         apiKey: res.api_key !== undefined ? res.api_key : editModelForm.api_key,
         authType: res.auth_type || editModelForm.auth_type || 'none',
-        active: res.is_active !== undefined ? res.is_active : editModelForm.is_active
+        active: res.is_active !== undefined ? res.is_active : editModelForm.is_active,
+        supports_streaming: res.supports_streaming !== undefined ? res.supports_streaming : (editModelForm.supports_streaming !== false)
       } : m);
 
       setModels(updated);
@@ -393,6 +398,7 @@ export default function RoutingTab({
             outputPricePer1k: m.output_price_per_1k,
             apiKey: m.api_key || '',
             authType: m.auth_type || 'none',
+            supports_streaming: m.supports_streaming !== false,
             waitingQueue: 0,
             active: m.is_active
           }));
@@ -915,7 +921,8 @@ export default function RoutingTab({
         cache_discount_ratio: 0.25,
         is_active: true,
         api_key: newModelForm.api_key?.trim() || null,
-        auth_type: newModelForm.auth_type || 'none'
+        auth_type: newModelForm.auth_type || 'none',
+        supports_streaming: newModelForm.supports_streaming !== false
       });
 
       const newEntry = {
@@ -928,6 +935,7 @@ export default function RoutingTab({
         outputPricePer1k: res.output_price_per_1k,
         apiKey: res.api_key || newModelForm.api_key,
         authType: res.auth_type || newModelForm.auth_type || 'none',
+        supports_streaming: res.supports_streaming !== undefined ? res.supports_streaming : (newModelForm.supports_streaming !== false),
         waitingQueue: 0,
         active: true
       };
@@ -948,6 +956,7 @@ export default function RoutingTab({
         outputPricePer1k: Number(newModelForm.output_price_per_1k),
         apiKey: newModelForm.api_key,
         authType: newModelForm.auth_type || 'none',
+        supports_streaming: newModelForm.supports_streaming !== false,
         waitingQueue: 0,
         active: true
       };

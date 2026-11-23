@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.core.pii_engine import PiiEngine, PiiEngineError, PiiBlockedError
+from app.core.worm_storage import WormStorage
 from app.schemas.compliance import (
     PiiRuleRead,
     PiiRuleCreate,
@@ -175,6 +176,20 @@ def simulate_pii_masking(payload: SimulateRequest, db: Session = Depends(get_db)
         for d in masking_result.detections
     ]
 
+    worm_ref = WormStorage.record_audit_log(
+        log_id=log_id,
+        requester_id=payload.requester_id,
+        key_id=payload.key_id,
+        model_id=payload.model_id,
+        original_prompt_hash=masking_result.original_hash,
+        masked_payload_hash=masking_result.masked_hash,
+        detections=detections_summary,
+        pii_count=masking_result.pii_count,
+        action_taken=action_taken,
+        latency_ms=masking_result.latency_ms,
+        is_blocked=masking_result.is_blocked,
+    )
+
     audit_entry = AuditLog(
         log_id=log_id,
         requester_id=payload.requester_id,
@@ -187,7 +202,7 @@ def simulate_pii_masking(payload: SimulateRequest, db: Session = Depends(get_db)
         action_taken=action_taken,
         latency_ms=masking_result.latency_ms,
         is_blocked=masking_result.is_blocked,
-        worm_reference_id=f"worm-s3-vault://audit/{log_id}.json",
+        worm_reference_id=worm_ref,
     )
     db.add(audit_entry)
     db.commit()
@@ -289,3 +304,14 @@ def get_compliance_stats(db: Session = Depends(get_db)):
         total_masked_events=total_masked_events,
         detections_by_type=detections_by_type,
     )
+
+
+# ==========================================
+# 5. WORM Storage & Merkle Hash Integrity Verification
+# ==========================================
+
+@router.get("/worm/verify", dependencies=[Depends(require_permission("compliance:read"))])
+def verify_worm_audit_chain():
+    """WORM 불변 스토리지 및 SHA-256 머클 해시 체인 무결성을 실시간 전수 검증합니다."""
+    return WormStorage.verify_integrity()
+

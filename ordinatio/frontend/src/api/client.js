@@ -46,7 +46,7 @@ export const apiClient = {
     } catch (err) {
       return {
         solution: 'Enterprise Ordinatio Appliance',
-        version: 'v1.2.0',
+        version: 'v1.0.2',
         mode: 'Air-Gapped Fallback'
       };
     }
@@ -700,76 +700,17 @@ export const apiClient = {
     return await res.json();
   },
 
+  async verifyWormIntegrity() {
+    const res = await authFetch(`${API_BASE_URL}/compliance/worm/verify`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
   // --- Lifecycle & Patch Management (Phase 5) ---
   async getLifecycleComponents() {
     const res = await authFetch(`${API_BASE_URL}/lifecycle/components`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
-  },
-
-  async verifyPatchBundle(patchData) {
-    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/verify`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(patchData)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: '서명 검증 실패' }));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
-  },
-
-  async runPatchDryRun(patchData) {
-    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/dry-run`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(patchData)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: '드라이런 검증 실패' }));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
-  },
-
-  async applyPatch(patchData) {
-    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/apply`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(patchData)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: '패치 배포 실패' }));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
-  },
-
-  async rollbackPatch(rollbackData) {
-    const res = await fetch(`${API_BASE_URL}/lifecycle/patches/rollback`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(rollbackData)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: '롤백 실패' }));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
-  },
-
-  async getPatchHistory(limit = 20) {
-    try {
-      const res = await fetch(`${API_BASE_URL}/lifecycle/patches/history?limit=${limit}`, {
-        headers: getAuthHeaders()
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      console.warn('API getPatchHistory offline:', err);
-      return [];
-    }
   },
 
   async runLifecyclePreflight() {

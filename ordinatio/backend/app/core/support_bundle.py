@@ -1,11 +1,19 @@
 import os
+import sys
 import json
 import zipfile
 import tempfile
 import logging
+import platform
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+from sqlalchemy import func
+
 from app.core.config import settings
+from app.db import session as db_session
+from app.models.audit_log import AuditLog
+from app.models.routing_policy import RoutingPolicy
+from app.core.patch_engine import PatchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +23,7 @@ os.makedirs(BUNDLE_STORAGE_DIR, exist_ok=True)
 
 class SupportBundleGenerator:
     """고객사의 프롬프트 원문 및 사용자 식별 정보(PII)를 100% 원천 배제(Zero-PII)하고,
-    시스템 진단 지표, 컴포넌트 버전, Envoy 라우팅 요약 및 감사 메타데이터만 
+    시스템 실측 진단 지표, 실제 호스트 메타데이터, Envoy 라우팅 정책 및 감사 통계만 
     안전하게 취합하여 벤더 기술지원용 ZIP 아카이브를 생성하는 엔진.
     """
 
@@ -32,7 +40,8 @@ class SupportBundleGenerator:
         bundle_filename = f"zero-pii-support-bundle-{now_utc.strftime('%Y%m%d')}.zip"
         zip_path = os.path.join(BUNDLE_STORAGE_DIR, f"{bundle_id}.zip")
 
-        # 1. Metadata
+        # 1. Metadata (실제 호스트 OS 및 런타임 환경)
+        os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
         metadata = {
             "bundle_id": bundle_id,
             "generated_at": now_utc.isoformat(),
@@ -41,53 +50,85 @@ class SupportBundleGenerator:
             "version": settings.VERSION,
             "environment": {
                 "mode": "Air-Gapped Customer-Managed",
-                "kubernetes_version": "v1.30.2",
-                "container_runtime": "containerd://1.7.15",
-                "os": "Linux / Rocky Linux 9.4 (Blue Onyx)"
+                "os": os_info,
+                "python_version": sys.version.split()[0],
+                "deploy_mode": settings.DEPLOY_MODE,
+                "cluster_region": settings.CLUSTER_REGION,
+                "datacenter_name": settings.DATACENTER_NAME
             },
             "security_clearance": "Zero-PII Certified by Presidio Compliance Engine"
         }
 
-        # 2. Sanitization Audit Report (PII 100% Excluded Certificate)
+        # 2. Sanitization Audit Report (실제 DB 감사 로그 기반 PII 배제 증적 통계)
+        total_logs = 0
+        masked_events = 0
+        blocked_events = 0
+        total_pii_detected = 0
+        try:
+            with db_session.SessionLocal() as db:
+                total_logs = db.query(AuditLog).count()
+                masked_events = db.query(AuditLog).filter(AuditLog.pii_count > 0).count()
+                blocked_events = db.query(AuditLog).filter(AuditLog.is_blocked == True).count()
+                total_pii_detected = db.query(func.coalesce(func.sum(AuditLog.pii_count), 0)).scalar() or 0
+        except Exception as e:
+            logger.warning(f"Failed to query audit statistics for support bundle: {e}")
+
         sanitization_report = {
-            "prompts_stripped": 1840,
-            "pii_masked_count": 94,
+            "prompts_stripped": int(total_logs),
+            "pii_masked_count": int(total_pii_detected),
+            "blocked_requests_count": int(blocked_events),
+            "masked_events_count": int(masked_events),
             "prompts_included": False,
             "user_pii_included": False,
-            "sanitizer_engine": "Presidio Zero-PII Excluder v2.2.354",
+            "sanitizer_engine": f"Presidio Zero-PII Excluder {settings.VERSION}",
             "certification": "본 기술지원 번들에는 프롬프트 원문, 사용자 식별정보, 가상키 비밀번호가 전혀 포함되어 있지 않음을 보증합니다."
         }
 
-        # 3. System Diagnostics
+        # 3. System Diagnostics (실측 Preflight 자가진단 연동)
+        preflight_data = PatchEngine.run_preflight()
         diagnostics = {
-            "preflight_status": "HEALTHY",
-            "components": {
-                "postgresql": {"status": "CONNECTED", "latency_ms": 0.8},
-                "redis": {"status": "CONNECTED", "latency_ms": 0.3},
-                "kafka": {"status": "CONNECTED", "latency_ms": 1.2},
-                "envoy_gateway": {"status": "HEALTHY", "active_listeners": 3},
-                "vllm_cluster": {"status": "OPERATIONAL", "nodes_ready": 12}
-            }
+            "preflight_status": preflight_data.get("status", "HEALTHY"),
+            "overall_health": preflight_data.get("overall_health", "100% 정상"),
+            "timestamp": now_utc.isoformat(),
+            "checks": preflight_data.get("checks", {})
         }
 
-        # 4. Routing & Components Summary
+        # 4. Routing & Components Summary (실제 DB 라우팅 정책 목록 추출)
+        active_routes_count = 0
+        routing_policies = []
+        try:
+            with db_session.SessionLocal() as db:
+                routes = db.query(RoutingPolicy).order_by(RoutingPolicy.priority.asc()).all()
+                active_routes_count = sum(1 for r in routes if r.is_active)
+                routing_policies = [
+                    {
+                        "name": r.route_name,
+                        "priority": r.priority,
+                        "status": "ACTIVE" if r.is_active else "INACTIVE",
+                        "load_balancing_strategy": r.load_balancing_strategy,
+                        "traffic_weights": r.traffic_weights or [],
+                        "xds_revision": r.xds_revision
+                    }
+                    for r in routes
+                ]
+        except Exception as e:
+            logger.warning(f"Failed to query routing policies for support bundle: {e}")
+
         routing_summary = {
-            "envoy_xds_version": "v3-REST",
-            "total_active_routes": 3,
-            "routing_policies": [
-                {"name": "financial-advisor-multi", "priority": 1, "status": "ACTIVE"},
-                {"name": "compliance-screening", "priority": 5, "status": "ACTIVE"}
-            ]
+            "envoy_ingress_url": settings.ENVOY_INGRESS_URL,
+            "total_routes": len(routing_policies),
+            "total_active_routes": active_routes_count,
+            "routing_policies": routing_policies
         }
 
-        # 5. Sanitized Log Sample
+        # 5. Sanitized Log Sample (실제 상태 요약 로그)
         log_now = now_utc.isoformat()
         sanitized_logs = (
-            f"[{log_now}] INFO  ordinatio.system: System preflight completed. All probes UP.\n"
-            f"[{log_now}] INFO  ordinatio.xds: RouteConfiguration revision 4 pushed to Envoy.\n"
-            f"[{log_now}] WARN  ordinatio.ext_proc: Memory spike detected in ext_proc (CVE-2026-0812 warning).\n"
-            f"[{log_now}] INFO  ordinatio.compliance: PII detection executed on session [ID: MASKED_SESSION]. Actions: MASK(1).\n"
-            f"[{log_now}] INFO  ordinatio.finops: Aggregated hourly usage. Zero over-budget events.\n"
+            f"[{log_now}] INFO  ordinatio.system: System diagnostics initiated by requester '{requester_id}'.\n"
+            f"[{log_now}] INFO  ordinatio.system: Preflight status: {diagnostics['preflight_status']} ({diagnostics['overall_health']}).\n"
+            f"[{log_now}] INFO  ordinatio.routing: Total registered routes: {len(routing_policies)} (Active: {active_routes_count}).\n"
+            f"[{log_now}] INFO  ordinatio.compliance: PII audit metrics verified. Total logs: {total_logs}, Total masked events: {masked_events}.\n"
+            f"[{log_now}] INFO  ordinatio.bundle: Zero-PII support bundle archive compiled successfully.\n"
         )
 
         # ZIP 아카이브 작성

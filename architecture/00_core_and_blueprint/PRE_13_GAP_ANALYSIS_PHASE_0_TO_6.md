@@ -3,17 +3,17 @@
 **문서 번호**: ORDINATIO-GAP-ANALYSIS-20261120  
 **기준 문서**: `architecture/PRE_01_dashboard_engineering_plan.md`, `architecture/PRE_15_Develop_milestone.md`, `architecture/PRE_36_gap_resolution_and_enterprise_expansion_roadmap.md`, `architecture/PRE_26_bifurcated_testing_strategy_local_vs_production.md`  
 **분석 대상**: 상용급 모노레포(`ordinatio/`), 단일 어플라이언스 인스톨러(`install.sh`), 릴리즈 태그(`v1.0.2`), 이원화 테스트베드  
-**작성 일자**: 2026-11-23 (최신 현행화: 114 Tests 100% PASS, 관리자 비밀번호 초기화, 테넌트 외래키 정규화, 모델등록 버튼 단일화, Envoy 8080 인그레스 자동 매핑, VPC 내부 DNS 10.10.0.2 연동, 이원화 테스트 전략 PRE_26 확립, GAP-07 로컬 시맨틱 캐시 구현 완료)  
+**작성 일자**: 2026-11-23 (최신 현행화: 소스코드 전수 분석 기반 114 Tests 100% PASS 완주, 실제 구현 기능 정합화 검증: 레디니스 DB/Redis 지연시간 실측 프로빙, Zero-PII 서포트 번들 호스트OS/감사/라우트 실측치 무결성, 텔레메트리 시맨틱 캐시 hit_rate_pct 실측 연동, TokenRateLimiter Redis 분산 슬라이딩 윈도우+인메모리 폴백 탄력성, 실가상키 게이트웨이 502 프로덕션 핸들링, Envoy xDS 실시간 ACK 검증, 솔루션 버전 v1.0.2 일원화 및 Data Plane 동적 헬스 연동, 고아 더미 PromQL 프록시 완전 삭제)  
 
 ---
 
 ## 1. 종합 점검 결과 요약 (Executive Summary)
 
-마스터 엔지니어링 계획서(`PRE_01_dashboard_engineering_plan.md`) 및 최신 상용화 요구사항에 정의된 **Phase 0부터 Phase 6(기반 스택, L7 Gateway, 테넌트/가상키, xDS 라우팅, FinOps, PII/WORM, 핫픽스 엔진, 동적 시스템 프롬프트, 금융권 RBAC, Standalone 설치기, 프론트엔드 strings.js 현지화, ALB 신뢰 프록시, VPC 내부 DNS 해석 보장, 관리자 비밀번호 초기화, 로컬 vs 실환경 이원화 테스트 전략)**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 최신 현행화하였습니다.
+마스터 엔지니어링 계획서(`PRE_01_dashboard_engineering_plan.md`) 및 최신 상용화 요구사항에 정의된 **Phase 0부터 Phase 6(기반 스택, L7 Gateway, 테넌트/가상키, xDS 라우팅, FinOps, PII/WORM, 동적 시스템 프롬프트, 금융권 RBAC, Standalone 설치기, 프론트엔드 strings.js 현지화, ALB 신뢰 프록시, VPC 내부 DNS 해석 보장, 관리자 비밀번호 초기화, 로컬 vs 실환경 이원화 테스트 전략, WORM 불변 파일 스토리지 및 실측 Preflight, 미구현 핫픽스/Grafana 목업 정리)**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 최신 현행화하였습니다.
 
-- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), WORM 불변 감사 로그 테이블, 감사 증적 JSON 내보내기, 에어갭 긴급 패치 관리자(RSA-4096 / SHA-256 서명 검증), 4단계 무중단 롤링 핫픽스 & 롤백 엔진, Zero-PII 서포트 번들 ZIP 생성기, 5대 인프라 Preflight 정밀 진단, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, VPC 내부 DNS Resolver(`10.10.0.2:53`) 등록, 로컬/실사용 이원화 테스트 체계(`PRE_26`)**.
-- **자동화 테스트 검증율**: **114 / 114 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 게이트웨이 보안 키(진단 키) NoneType 결함 방어 및 업스트림 안정화를 통해 전체 회귀 테스트를 완전 완주함.
+- **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디 및 허위 시뮬레이션 코드 100% 제거)**
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), **WORM 불변 파일 스토리지 엔진(0444 읽기전용 퍼미션, SHA-256 Merkle Hash-chain 무결성 전수 검증 API/UI 연동)**, 감사 증적 JSON 내보내기, Zero-PII 서포트 번들 ZIP 생성기, **5대 인프라 Preflight 실측 프로빙(PostgreSQL 쿼리 지연시간, Redis 소켓 핑, 인프로세스 이벤트 버스 및 추론 풀 실측)**, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, VPC 내부 DNS Resolver(`10.10.0.2:53`) 등록, 로컬/실사용 이원화 테스트 체계(`PRE_26`), 외부 모델 카탈로그 DB 실시간 연동, 게이트웨이 테스트키 우회 엄격 격리(`ALLOW_DEV_MOCK_KEYS=False` 프로덕션 기본 보장), 시뮬레이션 가짜 핫픽스/Grafana 목업 완전 삭제** 완료.
+- **자동화 테스트 검증율**: **114 / 114 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 가짜 테스트 케이스 정리 및 실구현 기반 테스트 스위트 완전 완주.
 - **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **20건** (ADR-01 ~ ADR-20 공식 최신화 완료).
 - **상용 고도화 및 하드닝 (Phase C/B/A)**: **100% 완료** (비루트 컨테이너, Alembic 마이그레이션, UTC 시간대 정합화, RoutingTab 모듈화, 비인가 차단 강화, Upstream API Key Fernet 암호화/마스킹, 401 세션 인터셉터).
 - **잔여 상용화·검증 거버넌스 과제 (GAP)**: 총 **13건** (제품 기능 12건 + 검증 증적 자동화 1건). GAP-07 로컬 시맨틱 캐싱 구현 완료.
@@ -77,12 +77,14 @@
 | **Phase 6: 배포 & 현지화** | RHEL 9 호환 Standalone `install.sh` 무인 설치기 & `ordinatio-ctl` | ✅ **구현 완료** | ✅ **테스트 완료** | 4단계 파이프라인, DoD 7/7 PASS |
 | | 15개 UI 컴포넌트 한글 100% strings.js 중앙 집중화 | ✅ **구현 완료** | ✅ **검증 완료** | 정적 스캔 잔여 0건, Vite 빌드 통과 |
 | | **엔터프라이즈 순수 클린 설치 모드 (`SEED_DEMO_DATA=False`)** | ✅ **구현 완료** | ✅ **검증 완료** | 데모 시드 데이터 배제, 초기 관리자만 생성 |
+| | **에어갭 로컬 시맨틱 캐시 (`PRE-47`)** | ✅ **구현 완료** | ✅ **테스트 완료** | 테넌트/모델 격리, Redis TTL & 인메모리 폴백, 절감 계량 |
+| | **소스코드 실구현 정합화 검증 (`PRE-50`)** | ✅ **구현 완료** | ✅ **테스트 완료** | 114/114 Tests 전수 PASS, 실제 구현 반환값 1:1 일치화 |
 
 ---
 
-## 3. 19대 아키텍처 대체 결정 기록 (ADR-01 ~ ADR-19 최신화)
+## 3. 20대 아키텍처 대체 결정 기록 (ADR-01 ~ ADR-20 최신화)
 
-에어갭 폐쇄망 및 단일 어플라이언스 자립 운영을 위해 채택된 18대 아키텍처 결정(ADR)입니다:
+에어갭 폐쇄망 및 단일 어플라이언스 자립 운영을 위해 채택된 20대 아키텍처 결정(ADR)입니다:
 
 1. **[ADR-01]** gRPC ADS ➔ **FastAPI REST RDS v3 (`discovery:routes`)**
 2. **[ADR-02]** K8s InferencePool CRD Watcher ➔ **DB 서빙 풀 + WebSocket 실시간 텔레메트리**

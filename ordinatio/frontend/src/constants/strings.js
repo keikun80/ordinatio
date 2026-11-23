@@ -110,7 +110,7 @@ export const strings = {
     superAdminRole: '전사 최고관리자',
     toggleSubmenuTooltip: '클릭하여 모델 & 라우팅 하위 메뉴 펼치기/접기',
     airgapMode: '에어갭 자체 운영 모드',
-    solutionCoreVersion: '솔루션 코어 v1.2.0 | Apache 2.0',
+    solutionCoreVersion: '솔루션 코어 v1.0.2 | Apache 2.0',
     solutionCoreVersionDynamic: (ver, lic) => `솔루션 코어 v${ver || '0.1.0'} | ${lic || 'Apache 2.0'}`,
     menus: {
       overview: '통합 관제 홈',
@@ -1548,41 +1548,5 @@ export const strings = {
     help: '화면 요소를 클릭하면 식별자(Screen ID, Function ID, data-testid)를 확인할 수 있습니다.',
     shortcutNotice: '단축키: Ctrl + Shift + D'
   },
-  modals: {
-    grafana: {
-      title: 'Grafana OSS 전문 관제 (Prometheus & DCGM Exporter)',
-      subtitle: 'Dashboards-as-Code 사전 탑재 3종 | Keycloak SSO 단일 로그인 인증됨',
-      timeRange: '최근 3시간 (15s 간격 스크랩)',
-      metricSourcePrefix: '📌 메트릭 출처:',
-      securityNotice: '🔒 Grafana Enterprise 보안 규정: 고객사 내부망 한정 접속 허용',
-      closeButton: '닫기',
-      openNewTab: 'Grafana 새 탭에서 열기',
-      alertNotice: '실제 배포 시: http://grafana.internal.customer.co.kr 로 새 창이 연결됩니다.',
-      tabs: {
-        gateway: '1. Envoy L7 Ingress Gateway',
-        vllm: '2. vLLM Serving & GPU Pods',
-        finops: '3. FinOps & Token Metering'
-      },
-      metrics: {
-        rps: '초당 요청 수 (PromQL: sum(rate(envoy_http_requests_total[1m])))',
-        latency: '엔드-투-엔드 지연 시간 (p99 / p95 / p50)',
-        piiOverhead: 'Presidio PII 마스킹 gRPC 오버헤드',
-        piiMargin: '목표치(< 5ms) 대비 75% 여유',
-        rateLimitBlock: 'Rate Limit 차단율 (TPM / RPM)',
-        redisStatus: 'Redis Cluster 카운터 정상 동작',
-        vllmQueue: 'vLLM 대기열 큐 (vllm:num_requests_waiting)',
-        podScaleStable: 'Pod 추가 확장 불필요 (안정권)',
-        kvCacheShare: 'KV-Cache 점유율 (vllm:gpu_cache_usage_factor)',
-        prefixCacheHit: 'Prefix Cache 적중률: 64.8% (비용 40% 절감)',
-        gpuUtilTemp: 'GPU 가동률 및 온도 (DCGM)',
-        powerUsage: '소비전력: 280W / 350W TDP (정상)',
-        tpot: '출력 토큰당 지연 시간 (TPOT)',
-        tpotSpeed: '초당 42.5 토큰 생성 속도 유지',
-        dailyTotalTokens: '금일 총 토큰 소비량',
-        tokenBreakdown: '입력 1.12억 / 출력 0.72억',
-        kvCacheSavings: 'KV-Cache Prefix 적중 절감액',
-        savingsDetail: '동일 프롬프트 재사용으로 75% 단가 적용'
-      }
-    }
-  }
+  modals: {}
 };

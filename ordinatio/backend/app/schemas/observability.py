@@ -53,12 +53,7 @@ class ObservabilitySummaryResponse(BaseModel):
     uptime_seconds: float
     generated_at: datetime = Field(default_factory=get_utc_now)
 
-class PromQLQueryRequest(BaseModel):
-    query: str = Field(..., json_schema_extra={"example": "sum(rate(ai_inference_requests_total[5m]))"})
 
-class PromQLQueryResponse(BaseModel):
-    status: str = "success"
-    data: Dict[str, Any]
 
 class TimeseriesPoint(BaseModel):
     timestamp: float

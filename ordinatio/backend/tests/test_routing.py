@@ -172,6 +172,8 @@ def test_canary_deployment_lifecycle():
     data = res.json()
     assert data["status"] == "success"
     assert data["envoy_ack"] is True
+    assert "message" in data
+    assert "Envoy AI Gateway에 xDS 라우팅 정책이 무중단 실시간 배포되었습니다" in data["message"]
     new_rev = data["xds_revision"]
     assert new_rev.startswith("xds-rev-")
 

@@ -7,6 +7,7 @@ from sqlalchemy import func
 from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
+from app.models.model_catalog import ModelCatalog
 from app.core.security import verify_virtual_key
 from app.schemas.external import (
     UsageReportRequest,
@@ -128,12 +129,31 @@ def get_my_key_info(
 
 @router.get("/models", response_model=List[ClientModelResponse])
 def get_my_allowed_models(
-    client_key: VirtualKey = Depends(authenticate_client_key)
+    client_key: VirtualKey = Depends(authenticate_client_key),
+    db: Session = Depends(get_db)
 ):
     """
-    [외부 클라이언트용] 본인 가상키로 호출 가능한 서빙 모델 목록 및 단가 카탈로그 조회
+    [외부 클라이언트용] 본인 가상키로 호출 가능한 서빙 모델 목록 및 단가 카탈로그 조회 (DB 실시간 연동)
     """
     allowed = client_key.allowed_models or []
+    query = db.query(ModelCatalog).filter(ModelCatalog.is_active == True)
+    if allowed:
+        query = query.filter(ModelCatalog.model_id.in_(allowed))
+    db_models = query.all()
+
+    if db_models:
+        return [
+            ClientModelResponse(
+                model_id=m.model_id,
+                alias=m.alias,
+                backend_infra=m.backend_infra,
+                input_price_per_1k=float(m.input_price_per_1k),
+                output_price_per_1k=float(m.output_price_per_1k)
+            )
+            for m in db_models
+        ]
+
+    # Fallback to CATALOG_MODELS only if DB has no model records
     if not allowed:
         return [ClientModelResponse(**m) for m in CATALOG_MODELS]
 

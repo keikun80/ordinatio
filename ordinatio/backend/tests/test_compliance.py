@@ -254,3 +254,20 @@ def test_compliance_stats():
     assert stats["total_audit_logs"] >= 2
     assert "RRN" in stats["detections_by_type"]
     assert "CREDIT_CARD" in stats["detections_by_type"]
+
+
+# =====================================================================
+# 5. WORM Storage Integrity Verification Tests
+# =====================================================================
+
+def test_compliance_worm_integrity_verification():
+    """WORM 불변 파일 스토리지 및 SHA-256 해시 체인 무결성 검증 테스트"""
+    res = client.get("/api/v1/compliance/worm/verify")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "VERIFIED"
+    assert data["total_records"] >= 1
+    assert data["tampered_records"] == 0
+    assert data["hash_chain_valid"] is True
+    assert "latest_hash" in data
+

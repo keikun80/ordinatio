@@ -104,6 +104,26 @@ def test_token_rate_limiter():
     assert not allowed3
     assert rem3 == 100
 
+def test_token_rate_limiter_redis_fallback_and_resilience():
+    """Test TokenRateLimiter graceful fallback to in-memory window when Redis fails or is unreachable."""
+    from unittest.mock import MagicMock
+    mock_redis = MagicMock()
+    mock_redis.pipeline.side_effect = Exception("Redis Cluster Unreachable")
+
+    limiter = TokenRateLimiter()
+    limiter._redis_client = mock_redis
+
+    # Despite Redis error, in-memory fallback smoothly allows tokens under limit
+    allowed, used, rem = limiter.check_and_consume("key-resilience", requested_tokens=250, tpm_limit=500)
+    assert allowed is True
+    assert used == 250
+    assert rem == 250
+
+    # Reaching limit in in-memory fallback
+    allowed2, used2, rem2 = limiter.check_and_consume("key-resilience", requested_tokens=300, tpm_limit=500)
+    assert allowed2 is False
+    assert rem2 == 250
+
 def test_session_affinity_manager():
     mgr = SessionAffinityManager(worker_slots=4)
     session_id = "session-wm-12345"
@@ -214,6 +234,43 @@ def test_gateway_agent_router_chat_completions(client: TestClient):
     assert "usage" in data_claude
     assert "input_tokens" in data_claude["usage"]
     assert "output_tokens" in data_claude["usage"]
+
+def test_gateway_chat_completions_with_registered_virtual_key(client: TestClient):
+    """Test full real pipeline: issue actual virtual key -> invoke gateway completions -> verify production 502 handling."""
+    # 1. Create a genuine virtual key in the database
+    create_res = client.post(
+        "/api/v1/virtual-keys",
+        json={
+            "name": "에이전트 라우터 실가상키 E2E 테스트",
+            "tenant_id": "dept-wm",
+            "allowed_models": ["agent-auto", "meta-llama/Llama-3.1-8B-Instruct"],
+            "rpm_limit": 600,
+            "tpm_limit": 600000
+        }
+    )
+    assert create_res.status_code == 201
+    created_key_data = create_res.json()
+    raw_key = created_key_data["raw_key"]
+
+    # 2. Invoke /v1/chat/completions using this real database-backed virtual key
+    # In test environment where upstream cluster (vllm-llama8b.ai-serving:8000) is unreachable,
+    # gateway strictly enforces production standard: HTTP 502 Bad Gateway with diagnostic details.
+    req_body = {
+        "model": "agent-auto",
+        "messages": [
+            {"role": "user", "content": "내부 감사 대상 계좌 110-123-456789 조회해줘."}
+        ]
+    }
+    gw_res = client.post(
+        "/v1/chat/completions",
+        json=req_body,
+        headers={"Authorization": f"Bearer {raw_key}"}
+    )
+    assert gw_res.status_code == 502
+    err_data = gw_res.json()["detail"]
+    assert "Upstream LLM Server Unreachable" in err_data["error"]
+    assert err_data["selected_model"] == "meta-llama/Llama-3.1-8B-Instruct"
+    assert "target_endpoint" in err_data
 
 def test_routing_agent_router_status_and_simulate_apis(client: TestClient):
     # Status API

@@ -2,7 +2,7 @@
 
 **문서 번호**: ORDINATIO-ENG-REP-20261120  
 **대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-11-23 (최신 현행화: 백엔드 114/114 Tests 100% PASS 완주, 에어갭 로컬 시맨틱 캐시 구현 및 FinOps 연동, DNS/레지스트리 정책 일관화, Standalone 무인 설치 7/7 PASS, 프론트엔드 Vite Build PASS)
+**작성 일자**: 2026-11-23 (최신 현행화: 소스코드 전수 분석 기반 백엔드 114/114 Tests 100% PASS 완주, 실제 구현 기능 정합화 검증: 레디니스 DB/Redis 지연시간 실측 프로빙, Zero-PII 서포트 번들 호스트OS/감사/라우트 실측치 무결성, 시맨틱 캐시 hit_rate_pct 실측 및 텔레메트리 연동, TokenRateLimiter Redis 분산 슬라이딩 윈도우+인메모리 폴백 탄력성, 실가상키 게이트웨이 502 프로덕션 핸들링, Envoy L7 xDS 실시간 ACK 검증, 솔루션 버전 v1.0.2 일원화 및 Data Plane 동적 헬스 연동, 고아 더미 PromQL 프록시 완전 삭제, WORM 불변 스토리지 & SHA-256 해시체인 무결성 검증, Standalone 무인 설치 7/7 PASS, 프론트엔드 Vite Build PASS)
 **검증 상태**: **백엔드 114/114 PASS (100%), Standalone 7/7 PASS (100%), 프론트엔드 Vite Build PASS, E2E 10/10 PASS 프로덕션 레디**
 
 ---
@@ -46,15 +46,16 @@
 | **Phase 6: 권한/그룹 편집** | [PRE_37_user_role_and_tenant_edit_engineering_plan.md](./PRE_37_user_role_and_tenant_edit_engineering_plan.md) | 사용자 관리 ✏️ [수정] 모달, Role 및 Tenant 변경 파이프라인, HTTP PATCH 정합화, 본인 강등 방지 | `npm run build` & `pytest` | 86/86 & Vite PASS |
 | **Phase 6: 동적 Role 관리** | [PRE_38_dynamic_role_management_engineering_plan_and_test_results.md](./PRE_38_dynamic_role_management_engineering_plan_and_test_results.md) | 커스텀 Role 추가/수정/삭제 REST API, 10대 도메인 17종 세부 권한 PBAC 전 엔드포인트/UI 적용, Vite 및 테스트 통과 | `npm run build` & `pytest` | 93/93 & Vite PASS |
 | **Phase 6: 보안 & 프록시** | [PRE_33_security_review_and_hardening_report.md](./PRE_33_security_review_and_hardening_report.md) | AWS ALB/Nginx 신뢰 프록시 헤더 검증, P0 보안 차단, Docker 브릿지 업스트림 연동 | `pytest` | 102 / 102 PASS |
-| **Phase 6: 사용자 보안 강화** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 관리자 비밀번호 초기화(`POST /users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 단일화 | `pytest` | 111 / 111 PASS |
-| **Phase 6: 이원화 테스트 전략** | [PRE_26_bifurcated_testing_strategy_local_vs_production.md](../PRE_26_bifurcated_testing_strategy_local_vs_production.md) | 로컬 고속 계약 검증 vs 실환경 L3/L4 DNS & 포트 프로빙 이원화 전략 확립 및 Day-0 부트스트랩 가드 | `make up` & `verify` | **111 / 111 PASS** |
+| **Phase 6: 사용자 보안 강화** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 관리자 비밀번호 초기화(`POST /users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 단일화 | `pytest` | 114 / 114 PASS |
+| **Phase 6: 이원화 테스트 전략** | [PRE_26_bifurcated_testing_strategy_local_vs_production.md](../PRE_26_bifurcated_testing_strategy_local_vs_production.md) | 로컬 고속 계약 검증 vs 실환경 L3/L4 DNS & 포트 프로빙 이원화 전략 확립 및 Day-0 부트스트랩 가드 | `make up` & `verify` | **114 / 114 PASS** |
 | **Phase 6: 시맨틱 캐시** | [PRE_47_semantic_cache_implementation_and_test_results.md](../07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | 테넌트·모델 격리 로컬 시맨틱 캐시, Redis TTL/메모리 fallback, FinOps 절감 관측 | `test_semantic_cache.py` & `npm run build` | 단위 3/3 PASS, 전체 114/114 PASS & Vite Build PASS |
+| **Phase 6: 실구현 테스트 정합화** | [PRE_50_source_code_analysis_and_test_suite_alignment_report.md](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md) | 소스코드 전수 분석 기반 실제 구현 검증 정합화: 레디니스 DB/Redis 실측, 서포트번들, 시맨틱캐시 hit_rate_pct, 토큰리미터 폴백, 실가상키 502 | `pytest` & `npm run build` | **114 / 114 PASS & Vite Build PASS** |
 
 ---
 
 ## 3. 전체 테스트 검증 매트릭스 (114 / 114 백엔드 테스트 100% PASS)
 
-> 검증 증적 수치는 114개 테스트 완주 기준으로 전수 동기화 완료되었다. 상세 분석은 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md)를 참조한다.
+> 검증 증적 수치는 114개 테스트 완주 기준으로 전수 동기화 완료되었다. 상세 분석은 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) 및 [`PRE_50`](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md)를 참조한다.
 
 ```bash
 # 전체 테스트 실행 명령어
@@ -66,7 +67,8 @@ cd ordinatio/backend && uv run pytest tests/ -q
 | :--- | :--- | :--- | :---: |
 | `test_health.py` | `test_root_endpoint` | 루트 엔드포인트 응답 및 OpenAPI 문서 경로 확인 | **PASSED** |
 | | `test_health_check` | Kubernetes Liveness 프로브 (`status: UP`) 검증 | **PASSED** |
-| | `test_readiness_check` | DB 및 캐시 연결 상태 기반 Kubernetes Readiness 확인 | **PASSED** |
+| | `test_readiness_check` | 실제 DB `SELECT 1` 쿼리 및 Redis 핑 기반 실측 지연시간 및 상태 검증 | **PASSED** |
+| | `test_readiness_check_failure_when_db_down` | DB 연결 유실 시 HTTP 503 및 `NOT_READY` / `DISCONNECTED` 반환 검증 | **PASSED** |
 | | `test_system_info` | 어플라이언스 버전 및 폐쇄망 라이선스 정보 반환 | **PASSED** |
 | | `test_virtual_key_generation_and_hashing` | `sk-ord-` 접두사 생성 및 Argon2id 솔트 해싱 무결성 | **PASSED** |
 | `test_virtual_keys.py` | `test_tenant_lifecycle` | 테넌트(부서) 목록 조회 및 신규 부서 등록 라이프사이클 | **PASSED** |
@@ -93,7 +95,6 @@ cd ordinatio/backend && uv run pytest tests/ -q
 | | `test_update_model_attributes` | 모델 메타데이터 및 서빙 속성 실시간 수정 검증 | **PASSED** |
 | `test_finops_observability.py` | `test_observability_metrics_summary` | 대시보드 관제용 실시간 지표 요약 REST API 검증 | **PASSED** |
 | | `test_observability_websocket_telemetry` | 1초 주기 WebSocket 스트림 연결, JSON 패킷 수신 및 ping-pong | **PASSED** |
-| | `test_observability_promql_proxy` | Grafana 및 커스텀 관제용 PromQL 프록시 질의 검증 | **PASSED** |
 | | `test_finops_overview_and_pricing` | 부서별 예산 소진율 집계 및 표준 토큰 단가표 계산 검증 | **PASSED** |
 | | `test_finops_csv_invoice_export` | 엑셀 호환 UTF-8 BOM(`\uFEFF`) 청구서 스트리밍 다운로드 무결성 | **PASSED** |
 | | `test_hard_cap_enforcement_blocks_traffic` | 예산 100% 소진 테넌트의 추론 요청에 대한 HTTP 429 차단 검증 | **PASSED** |

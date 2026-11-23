@@ -27,14 +27,44 @@ def test_readiness_check():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "READY"
+    assert data["database"] == "CONNECTED"
+    assert "database_latency_ms" in data
+    assert isinstance(data["database_latency_ms"], (int, float))
+    assert data["database_latency_ms"] >= 0.0
+    assert "redis" in data
+    assert data["redis"] in ["CONNECTED", "IN_MEMORY_FALLBACK"]
+    assert "redis_latency_ms" in data
     assert data["air_gapped"] is True
+
+def test_readiness_check_failure_when_db_down(monkeypatch):
+    """Test readiness check returns 503 and NOT_READY when DB connectivity fails."""
+    from unittest.mock import MagicMock
+    from app.db import session as db_session
+    mock_session = MagicMock()
+    mock_session.execute.side_effect = Exception("DB Connection Lost")
+    mock_ctx = MagicMock()
+    mock_ctx.__enter__.return_value = mock_session
+    mock_ctx.__exit__.return_value = None
+    monkeypatch.setattr(db_session, "SessionLocal", lambda: mock_ctx)
+
+    response = client.get("/api/v1/health/ready")
+    assert response.status_code == 503
+    data = response.json()
+    assert data["status"] == "NOT_READY"
+    assert data["database"] == "DISCONNECTED"
 
 def test_system_info():
     response = client.get("/api/v1/system/info")
     assert response.status_code == 200
     data = response.json()
     assert "Air-Gapped" in data["mode"]
-    assert "envoy" in data["components"]
+    assert "data_plane_healthy" in data
+    assert isinstance(data["data_plane_healthy"], bool)
+    components = data["components"]
+    assert "envoy" in components
+    assert "ext_proc" in components
+    assert "presidio" in components
+    assert "control_plane" in components
 
 def test_virtual_key_generation_and_hashing():
     key = generate_virtual_key()

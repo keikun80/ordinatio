@@ -35,6 +35,7 @@ from app.core.security import (
     get_client_real_ip,
 )
 from app.core.pii_engine import PiiEngine
+from app.core.worm_storage import WormStorage
 from app.models.audit_log import AuditLog
 from app.core.telemetry_hub import telemetry_hub
 
@@ -452,8 +453,23 @@ async def dispatch_chat_completion(
             }
             for d in detections
         ]
+        log_id = f"audit-{int(time.time()*1000)}"
+        worm_ref = WormStorage.record_audit_log(
+            log_id=log_id,
+            requester_id=matched_key.tenant_id if matched_key else "dev-client",
+            key_id=matched_key.key_id if matched_key else "sk-ord-test",
+            model_id=req.model or route_name,
+            original_prompt_hash=masking_res.original_hash,
+            masked_payload_hash=masking_res.masked_hash,
+            detections=detections_summary,
+            pii_count=masking_res.pii_count,
+            action_taken="BLOCK" if is_blocked else "MASK",
+            latency_ms=round((time.perf_counter() - t0) * 1000, 2),
+            is_blocked=is_blocked,
+        )
+
         audit_entry = AuditLog(
-            log_id=f"audit-{int(time.time()*1000)}",
+            log_id=log_id,
             requester_id=matched_key.tenant_id if matched_key else "dev-client",
             key_id=matched_key.key_id if matched_key else "sk-ord-test",
             model_id=req.model or route_name,
@@ -464,7 +480,7 @@ async def dispatch_chat_completion(
             action_taken="BLOCK" if is_blocked else "MASK",
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
             is_blocked=is_blocked,
-            worm_reference_id=f"worm-{time.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+            worm_reference_id=worm_ref
         )
         db.add(audit_entry)
         db.commit()
@@ -774,9 +790,9 @@ async def dispatch_chat_completion(
         policy_tenant_code = db_policy.match_conditions["tenant_codes"][0]
     target_tenant_hint = request.headers.get("x-orche-tenant") or policy_tenant_code
 
-    # Developer unit-test simulation check (only for local unit-testing with explicit test key)
+    # Developer unit-test simulation check (strictly isolated to local unit-testing when ALLOW_DEV_MOCK_KEYS=True)
     is_strict = request.headers.get("x-strict-upstream") == "true"
-    is_dev_test = raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"])
+    is_dev_test = bool(settings.ALLOW_DEV_MOCK_KEYS) and bool(raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"]))
 
     # 4.1 Real-time SSE Streaming Dispatch (Claude Code & Interactive CLI)
     if is_streaming:
@@ -1115,9 +1131,9 @@ async def dispatch_chat_completion(
 
         return upstream_response_data
 
-    # Developer unit-test simulation check (only for local unit-testing with explicit test key)
+    # Developer unit-test simulation check (strictly isolated to local unit-testing when ALLOW_DEV_MOCK_KEYS=True)
     is_strict = request.headers.get("x-strict-upstream") == "true"
-    is_dev_test = raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"])
+    is_dev_test = bool(settings.ALLOW_DEV_MOCK_KEYS) and bool(raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"]))
 
     if not is_strict and is_dev_test:
         tier_desc = "Fast 8B Tier (초저지연 경량 모델)" if routing_decision.tier == "fast_8b" else "Reasoning 72B Tier (심층 추론·코딩 모델)"

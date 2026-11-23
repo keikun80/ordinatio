@@ -32,6 +32,8 @@ ordinatio/test_config.json
 
 # Logs
 *.log
+data/
+*.tmp
 
 # Vagrant
 .vagrant/

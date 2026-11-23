@@ -10,6 +10,7 @@
 > 특히 Phase 2 모델 카탈로그 구현 시에는 후속 고도화 사양인 [`PRE_16`](./PRE_16_gateway_browser_test_troubleshooting_report.md)(45s 타임아웃), [`PRE_17`](./PRE_17_model_provider_options_and_url_builder_report.md)(6종 Provider & URL 조합기), [`PRE_18`](./PRE_18_model_health_check_timeout_report.md)(헬스 타임아웃 1.0~30s)을 사전 통합 모델링하고, Phase 5 완료 후 [`PRE_19`](./PRE_19_system_prompt_governance_and_dynamic_injection_plan.md)/[`PRE_20`](./PRE_20_phase_system_prompt_implementation_and_test_results.md)(시스템 프롬프트 거버넌스), [`PRE_26`](../PRE_26_bifurcated_testing_strategy_local_vs_production.md)(로컬 vs 실사용 환경 이원화 테스트 전략), [`PRE_27`](./PRE_27_auth_rbac_implementation_plan_and_test_results.md)(금융권 RBAC 및 비밀번호 초기화), [`PRE_31`](./PRE_31_rhel_compatible_vagrant_installer_plan.md)/[`PRE_32`](./PRE_32_standalone_installer_implementation_and_test_results.md)(Standalone 무인 설치기), [`PRE_34`](./PRE_34_frontend_ui_strings_localization_plan.md)/[`PRE_35`](./PRE_35_frontend_ui_strings_implementation_and_test_results.md)(strings.js 현지화)를 순서대로 진행해야 현재 프로덕션 시스템(114 Tests PASS, Standalone 7/7 PASS, v1.0.2)과 100% 동일하게 개발할 수 있습니다.
 > 또한 설치 네트워크·레지스트리 정책 및 검증 증적 수치 정합성은 [`PRE_46`](../07_appliance_and_packaging/PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md)를 기준으로 검토한다.
 > 에어갭 로컬 시맨틱 캐시의 구현 범위·격리 정책·검증 결과는 [`PRE_47`](../07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md)를 기준으로 한다.
+> 소스코드 전수 분석 기반 실제 구현 검증 및 테스트 스위트 전면 정합화 결과는 [`PRE_50`](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md)를 기준으로 한다.
 
 ---
 

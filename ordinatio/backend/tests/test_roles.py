@@ -352,7 +352,6 @@ def test_all_domains_pbac_enforcement(client: TestClient, super_admin_token: str
     assert client.post("/api/v1/compliance/rules", json={}, headers=reader_headers).status_code == 403
     assert client.delete("/api/v1/compliance/rules/pii-dummy", headers=reader_headers).status_code == 403
     # Lifecycle write
-    assert client.post("/api/v1/lifecycle/patches/apply", json={}, headers=reader_headers).status_code == 403
     assert client.post("/api/v1/lifecycle/support-bundle", json={}, headers=reader_headers).status_code == 403
     # Users write & Roles manage
     assert client.post("/api/v1/users", json={}, headers=reader_headers).status_code == 403

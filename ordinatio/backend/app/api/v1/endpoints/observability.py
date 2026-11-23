@@ -5,9 +5,7 @@ from app.db.session import get_db
 from app.core.telemetry_hub import telemetry_hub
 from app.schemas.observability import (
     ObservabilitySummaryResponse,
-    ObservabilityTimeseriesResponse,
-    PromQLQueryRequest,
-    PromQLQueryResponse
+    ObservabilityTimeseriesResponse
 )
 from app.api.deps import require_permission
 
@@ -65,20 +63,4 @@ def get_observability_metrics_timeseries(
         points=pts
     )
 
-@router.post("/promql", response_model=PromQLQueryResponse, dependencies=[Depends(require_permission("overview:read"))])
-def execute_promql_query(req: PromQLQueryRequest):
-    """Proxy/execute PromQL query for Grafana and custom charting."""
-    # Air-gapped safe query handler
-    now = time.time()
-    return PromQLQueryResponse(
-        status="success",
-        data={
-            "resultType": "vector",
-            "result": [
-                {
-                    "metric": {"__name__": req.query, "appliance": "ordinatio-airgap"},
-                    "value": [now, "142.5"]
-                }
-            ]
-        }
-    )
+

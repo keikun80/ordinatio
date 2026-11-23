@@ -1,4 +1,5 @@
 from app.core.semantic_cache import SemanticCache
+from app.core.telemetry_hub import _get_cache_hit_rate
 
 
 def test_semantic_cache_hits_for_equivalent_conversation_within_scope():
@@ -30,3 +31,38 @@ def test_semantic_cache_tracks_finops_savings():
 
     assert stats["saved_tokens"] == 150
     assert stats["saved_cost_krw"] == 2.75
+
+
+def test_semantic_cache_hit_rate_computation_and_telemetry_integration(monkeypatch):
+    """Test real-time calculation of hit_rate_pct = (hits / total_lookups) * 100 and integration with telemetry hub."""
+    test_cache = SemanticCache()
+    messages = [{"role": "user", "content": "실시간 캐시 히트율 테스트"}]
+    response = {"id": "chatcmpl-cache-test", "choices": [{"message": {"content": "성공"}}]}
+
+    # Initial state: 0 lookups -> 0.0%
+    assert test_cache.stats()["hit_rate_pct"] == 0.0
+    assert test_cache.stats()["hits"] == 0
+    assert test_cache.stats()["misses"] == 0
+
+    # 1 Miss
+    test_cache.lookup("tenant-hit", "model-hit", messages)
+    assert test_cache.stats()["misses"] == 1
+    assert test_cache.stats()["hits"] == 0
+    assert test_cache.stats()["hit_rate_pct"] == 0.0
+
+    # Store and 1 Hit -> 1 Hit, 1 Miss -> hit_rate_pct == 50.0%
+    test_cache.store("tenant-hit", "model-hit", messages, response)
+    hit = test_cache.lookup("tenant-hit", "model-hit", messages)
+    assert hit is not None
+
+    stats = test_cache.stats()
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+    assert stats["hit_rate_pct"] == 50.0
+
+    # Test telemetry hub helper integration
+    import app.core.semantic_cache as sc_mod
+    monkeypatch.setattr(sc_mod, "semantic_cache", test_cache)
+    live_hit_rate = _get_cache_hit_rate()
+    assert live_hit_rate == 50.0
+

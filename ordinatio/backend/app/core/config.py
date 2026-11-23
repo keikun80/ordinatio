@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     GATEWAY_CONNECT_TIMEOUT: float = 10.0
     MODEL_HEALTH_CHECK_DEFAULT_TIMEOUT: float = 3.0
 
+    # WORM Audit Storage
+    WORM_STORAGE_PATH: str = "/var/log/ordinatio/worm_audit"
+
     # Air-gapped local semantic cache (no external embedding service)
     SEMANTIC_CACHE_ENABLED: bool = True
     SEMANTIC_CACHE_SIMILARITY_THRESHOLD: float = 0.92

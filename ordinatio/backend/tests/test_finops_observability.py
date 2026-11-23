@@ -17,6 +17,10 @@ def test_observability_metrics_summary():
     assert "current_rps" in data
     assert "current_tps" in data
     assert "p95_ttft_ms" in data
+    assert "error_rate" in data
+    assert "cache_hit_rate" in data
+    assert isinstance(data["cache_hit_rate"], (int, float))
+    assert "total_tokens_today" in data
     assert "compute_pools" in data
     assert len(data["compute_pools"]) >= 1
     assert "model_traffic_breakdown" in data
@@ -45,6 +49,8 @@ def test_observability_websocket_telemetry():
         assert "rps" in packet
         assert "tps" in packet
         assert "ttft_ms" in packet
+        assert "cache_hit_rate" in packet
+        assert isinstance(packet["cache_hit_rate"], (int, float))
         assert "cumulative_cost_krw" in packet
         assert "compute_pools" in packet
         assert "model_traffic_breakdown" in packet
@@ -61,16 +67,7 @@ def test_observability_websocket_telemetry():
                 break
         assert received_pong is True
 
-def test_observability_promql_proxy():
-    """Test PromQL proxy query endpoint."""
-    res = client.post(
-        "/api/v1/observability/promql",
-        json={"query": "sum(rate(ai_inference_requests_total[5m]))"}
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "success"
-    assert "result" in data["data"]
+
 
 def test_finops_overview_and_pricing():
     """Test FinOps overview, tenant budgets, and token pricing matrix."""

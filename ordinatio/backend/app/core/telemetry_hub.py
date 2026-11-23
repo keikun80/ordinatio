@@ -20,6 +20,15 @@ from app.models.audit_log import AuditLog
 
 logger = logging.getLogger("telemetry_hub")
 
+def _get_cache_hit_rate() -> float:
+    """Fetch real-time semantic cache hit rate from SemanticCache stats."""
+    try:
+        from app.core.semantic_cache import semantic_cache
+        stats = semantic_cache.stats()
+        return float(stats.get("hit_rate_pct", 0.0))
+    except Exception:
+        return 0.0
+
 def _is_local_endpoint(url: Optional[str]) -> bool:
     """Check if the target endpoint is hosted locally on the appliance node."""
     if not url:
@@ -450,7 +459,7 @@ class TelemetryHub:
             tps=envoy_kpis["tps"],
             ttft_ms=envoy_kpis["ttft"],
             error_rate_5xx=envoy_kpis["error_rate"],
-            cache_hit_rate=42.0 if envoy_kpis["rps"] > 0 else 0.0,
+            cache_hit_rate=_get_cache_hit_rate(),
             cumulative_cost_krw=round(cumulative_cost, 0),
             active_connections=len(self.active_connections),
             total_requests=envoy_kpis.get("rq_total", 0),
@@ -527,7 +536,7 @@ class TelemetryHub:
             tps=tps,
             ttft_ms=ttft,
             error_rate_5xx=err_rate,
-            cache_hit_rate=42.0 if rps > 0 else 0.0,
+            cache_hit_rate=_get_cache_hit_rate(),
             cumulative_cost_krw=round(cost, 0),
             active_connections=active_conn,
             total_requests=total_reqs,

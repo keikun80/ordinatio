@@ -102,6 +102,7 @@ export default function ComplianceTab({ onNotify }) {
   const [stats, setStats] = useState(null);
   const [showWormModal, setShowWormModal] = useState(false);
   const [isVerifyingWorm, setIsVerifyingWorm] = useState(false);
+  const [wormVerifyData, setWormVerifyData] = useState(null);
 
   // Modal State for Adding Rule
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -1357,13 +1358,13 @@ export default function ComplianceTab({ onNotify }) {
                 <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.compliance.wormModal.totalRecords}</div>
                   <div data-testid="comp-modal-worm-val-records" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38bdf8', marginTop: '2px' }}>
-                    {(stats?.total_logs || auditLogs.length).toLocaleString()} {strings.compliance.kpi.countUnit}
+                    {wormVerifyData ? wormVerifyData.total_records.toLocaleString() : (stats?.total_logs || auditLogs.length).toLocaleString()} {strings.compliance.kpi.countUnit}
                   </div>
                 </div>
                 <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.compliance.wormModal.tamperCount}</div>
                   <div data-testid="comp-modal-worm-val-tamper" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#10b981', marginTop: '2px' }}>
-                    {strings.compliance.wormModal.tamperZero}
+                    {wormVerifyData ? `${wormVerifyData.tampered_records}건 (${wormVerifyData.status === 'VERIFIED' ? '무결성 100%' : '변조 감지'})` : strings.compliance.wormModal.tamperZero}
                   </div>
                 </div>
               </div>
@@ -1388,7 +1389,14 @@ export default function ComplianceTab({ onNotify }) {
                 onClick={async () => {
                   setIsVerifyingWorm(true);
                   try {
-                    await Promise.all([loadLogs(), loadStats()]);
+                    const [_, __, wormRes] = await Promise.all([
+                      loadLogs(),
+                      loadStats(),
+                      api.verifyWormIntegrity().catch(() => null)
+                    ]);
+                    if (wormRes) {
+                      setWormVerifyData(wormRes);
+                    }
                     if (onNotify) onNotify('SUCCESS', strings.compliance.alerts.wormVerified);
                   } finally {
                     setIsVerifyingWorm(false);

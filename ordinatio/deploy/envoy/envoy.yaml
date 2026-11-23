@@ -27,12 +27,14 @@ static_resources:
                   prefix: "/v1/routes"
                 route:
                   cluster: backend_service
-                  timeout: 120s
+                  timeout: 0s
+                  idle_timeout: 300s
               - match:
                   prefix: "/v1/chat/completions"
                 route:
                   cluster: backend_service
-                  timeout: 120s
+                  timeout: 0s
+                  idle_timeout: 300s
               - match:
                   prefix: "/v1/models"
                 route:
@@ -52,7 +54,8 @@ static_resources:
                   prefix: "/v1"
                 route:
                   cluster: backend_service
-                  timeout: 120s
+                  timeout: 0s
+                  idle_timeout: 300s
           http_filters:
           - name: envoy.filters.http.router
             typed_config:

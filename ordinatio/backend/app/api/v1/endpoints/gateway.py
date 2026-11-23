@@ -781,7 +781,7 @@ async def dispatch_chat_completion(
     # 4.1 Real-time SSE Streaming Dispatch (Claude Code & Interactive CLI)
     if is_streaming:
         async def stream_generator():
-            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=10.0)) as s_client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)) as s_client:
                 for target_url in candidate_urls:
                     try:
                         async with s_client.stream("POST", target_url, json=upstream_payload, headers=upstream_headers) as upstream_stream:

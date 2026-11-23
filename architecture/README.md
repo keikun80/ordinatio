@@ -34,11 +34,12 @@ Envoy AI Gateway Ingress, AgentRouter 동적 클러스터 바인딩, 커스텀 �
 ---
 
 ### 3. 02_observability_and_finops (실시간 관측성 및 예산 거버넌스)
-vLLM Prometheus `/metrics` 스크래핑, 인프라 토폴로지 자동 판별 및 실시간 WebSocket 텔레메트리를 다룹니다.
+vLLM Prometheus `/metrics` 스크래핑, 인프라 토폴로지 자동 판별 및 실시간 WebSocket 텔레메트리, 시계열 누적 그래프를 다룹니다.
 
 | 문서 파일 | 핵심 내용 및 범위 | 상태 |
 | :--- | :--- | :---: |
 | [PRE_30_remote_endpoint_telemetry_and_topology_resolution_report.md](./02_observability_and_finops/PRE_30_remote_endpoint_telemetry_and_topology_resolution_report.md) | **원격 URL 엔드포인트 텔레메트리 스크래핑 및 스마트 토폴로지 자동 식별**<br>- vLLM 실시간 스크래핑, 원격 블랙박스 graceful N/A 분기 및 k8s/Docker 판별 | **100% PASS** |
+| [PRE_49_overview_kpi_cumulative_graph_engineering_plan.md](./02_observability_and_finops/PRE_49_overview_kpi_cumulative_graph_engineering_plan.md) | **통합 운영 관제 대시보드 KPI 카드 누적 그래프(Cumulative Area Sparkline) 엔지니어링 계획서**<br>- 5대 카드별 누적 시계열 지표 정의, 100% Zero-Dependency SVG Area Sparkline 컴포넌트, 시계열 롤업 API 및 3단계 로드맵 | **계획 완료** |
 
 ---
 

@@ -16,7 +16,7 @@ class ComponentVersionInfo(BaseModel):
 
 class ComponentListResponse(BaseModel):
     components: List[ComponentVersionInfo]
-    current_solution_version: str = f"v{settings.VERSION}"
+    current_solution_version: str = settings.VERSION
 
 # --- Pre-flight Diagnostics Schemas ---
 class DiagnosticCheckItem(BaseModel):

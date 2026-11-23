@@ -45,8 +45,8 @@ POSTGRES_PORT=5432
 # ------------------------------------------------------------------------------
 # 5. 컨테이너 이미지 설정 (Docker Hub 레지스트리)
 # ------------------------------------------------------------------------------
-BACKEND_IMAGE="keikun808/ordinatio-backend:v1.0.2"
-FRONTEND_IMAGE="keikun808/ordinatio-frontend:v1.0.2"
+BACKEND_IMAGE="keikun808/ordinatio-backend:1.0.3"
+FRONTEND_IMAGE="keikun808/ordinatio-frontend:1.0.3"
 
 # ------------------------------------------------------------------------------
 # 6. 네트워크 토폴로지 & Docker 브릿지 게이트웨이

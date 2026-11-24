@@ -46,7 +46,7 @@ export const apiClient = {
     } catch (err) {
       return {
         solution: 'Enterprise Ordinatio Appliance',
-        version: '0.1.4',
+        version: '0.1.5',
         mode: 'Air-Gapped Fallback'
       };
     }

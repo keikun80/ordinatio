@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="allow")
 
     PROJECT_NAME: str = "Ordinatio Control Plane"
-    VERSION: str = "0.1.4"
+    VERSION: str = "0.1.5"
     API_V1_STR: str = "/api/v1"
     
     ENV: str = "development"

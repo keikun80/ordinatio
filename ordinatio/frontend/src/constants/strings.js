@@ -110,8 +110,8 @@ export const strings = {
     superAdminRole: '전사 최고관리자',
     toggleSubmenuTooltip: '클릭하여 모델 & 라우팅 하위 메뉴 펼치기/접기',
     airgapMode: '에어갭 자체 운영 모드',
-    solutionCoreVersion: '솔루션 코어 0.1.4 | Apache 2.0',
-    solutionCoreVersionDynamic: (ver, lic) => `솔루션 코어 ${ver || '0.1.4'} | ${lic || 'Apache 2.0'}`,
+    solutionCoreVersion: '솔루션 코어 0.1.5 | Apache 2.0',
+    solutionCoreVersionDynamic: (ver, lic) => `솔루션 코어 ${ver || '0.1.5'} | ${lic || 'Apache 2.0'}`,
     menus: {
       overview: '통합 관제 홈',
       modelRouting: '모델 & 라우팅',

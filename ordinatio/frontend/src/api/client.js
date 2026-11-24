@@ -711,6 +711,58 @@ export const apiClient = {
     return await res.json();
   },
 
+  async exportAuditLogs(params = {}) {
+    const url = buildUrl('/compliance/audit-logs/export');
+    if (params.requester_id) url.searchParams.append('requester_id', params.requester_id);
+    if (params.action_taken) url.searchParams.append('action_taken', params.action_taken);
+    if (params.is_blocked !== undefined && params.is_blocked !== null) {
+      url.searchParams.append('is_blocked', params.is_blocked);
+    }
+    const res = await authFetch(url.toString());
+    if (!res.ok) throw new Error(`WORM 감사 로그 내보내기 실패: HTTP ${res.status}`);
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `ordinatio_worm_forensics_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+    return true;
+  },
+
+  async getPiiPresets() {
+    const res = await authFetch(`${API_BASE_URL}/compliance/presets`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  async createPiiPreset(data) {
+    const res = await fetch(`${API_BASE_URL}/compliance/presets`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'PII 시뮬레이션 프리셋 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async deletePiiPreset(presetId) {
+    const res = await fetch(`${API_BASE_URL}/compliance/presets/${encodeURIComponent(presetId)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'PII 프리셋 삭제 실패');
+    }
+    return await res.json();
+  },
+
   // --- Lifecycle & Patch Management (Phase 5) ---
   async getLifecycleComponents() {
     const res = await authFetch(`${API_BASE_URL}/lifecycle/components`);

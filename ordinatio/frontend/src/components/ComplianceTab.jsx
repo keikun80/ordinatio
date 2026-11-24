@@ -152,10 +152,26 @@ export default function ComplianceTab({ onNotify }) {
     if (s) setStats(s);
   };
 
+  const loadPresets = async () => {
+    try {
+      const data = await api.getPiiPresets();
+      if (Array.isArray(data) && data.length > 0) {
+        setPresets(data);
+        localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(data));
+        if (!inputText) {
+          setInputText(data[0].text);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load presets from backend, using local:', err);
+    }
+  };
+
   useEffect(() => {
     loadRules();
     loadLogs();
     loadStats();
+    loadPresets();
     api.getModels().then(mList => {
       if (mList && mList.length > 0) {
         const active = mList.find(m => m.is_active) || mList[0];
@@ -233,23 +249,45 @@ export default function ComplianceTab({ onNotify }) {
     setSimulationResult(null);
   };
 
-  const handleAddPreset = (e) => {
+  const handleAddPreset = async (e) => {
     e.preventDefault();
     if (!newPreset.label.trim() || !newPreset.text.trim()) {
       onNotify('WARNING', strings.compliance.alerts.presetRequired);
       return;
     }
-    const updated = [...presets, { label: newPreset.label.trim(), text: newPreset.text.trim() }];
-    savePresets(updated);
-    setSelectedSample(updated.length - 1);
-    setInputText(newPreset.text.trim());
+    const labelTrimmed = newPreset.label.trim();
+    const textTrimmed = newPreset.text.trim();
+    try {
+      const created = await api.createPiiPreset({
+        label: labelTrimmed,
+        text: textTrimmed,
+        created_by: user?.username || 'admin'
+      });
+      const updated = [...presets, created];
+      savePresets(updated);
+      setSelectedSample(updated.length - 1);
+      setInputText(textTrimmed);
+    } catch (err) {
+      console.warn('Backend create preset failed, fallback to local:', err);
+      const updated = [...presets, { label: labelTrimmed, text: textTrimmed }];
+      savePresets(updated);
+      setSelectedSample(updated.length - 1);
+      setInputText(textTrimmed);
+    }
     setIsAddPresetModalOpen(false);
     setNewPreset({ label: '', text: '' });
-    onNotify('SUCCESS', strings.compliance.alerts.presetAdded(newPreset.label.trim()));
+    onNotify('SUCCESS', strings.compliance.alerts.presetAdded(labelTrimmed));
   };
 
-  const handleDeletePreset = (idx) => {
+  const handleDeletePreset = async (idx) => {
     const target = presets[idx];
+    if (target?.preset_id) {
+      try {
+        await api.deletePiiPreset(target.preset_id);
+      } catch (err) {
+        console.warn('Backend delete preset failed:', err);
+      }
+    }
     const updated = presets.filter((_, i) => i !== idx);
     savePresets(updated);
     setDeletingPresetIndex(null);
@@ -337,15 +375,26 @@ export default function ComplianceTab({ onNotify }) {
   };
 
   // Export Forensic Audit Report (JSON / CSV)
-  const handleExportAuditLogs = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `ordinatio_worm_forensics_${new Date().toISOString().slice(0, 10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    onNotify('SUCCESS', strings.compliance.alerts.reportDownloaded);
+  // Export WORM Audit Logs via Backend Streaming API
+  const handleExportAuditLogs = async () => {
+    try {
+      await api.exportAuditLogs({
+        requester_id: logSearch || undefined,
+        action_taken: actionFilter !== 'ALL' ? actionFilter : undefined
+      });
+      onNotify('SUCCESS', strings.compliance.alerts.reportDownloaded);
+    } catch (err) {
+      console.error('Audit export failed:', err);
+      // Client-side fallback if server streaming fails
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `ordinatio_worm_forensics_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      onNotify('SUCCESS', strings.compliance.alerts.reportDownloaded);
+    }
   };
 
   // Filtered Audit Logs with Full-Field Search

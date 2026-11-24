@@ -18,6 +18,7 @@ from sqlalchemy import desc, func
 from app.db.session import get_db
 from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
+from app.models.pii_preset import PiiPreset
 from app.core.pii_engine import PiiEngine, PiiEngineError, PiiBlockedError
 from app.core.worm_storage import WormStorage
 from app.schemas.compliance import (
@@ -29,6 +30,8 @@ from app.schemas.compliance import (
     PiiDetectionOut,
     AuditLogRead,
     ComplianceStats,
+    PiiPresetRead,
+    PiiPresetCreate,
 )
 from app.api.deps import require_permission
 
@@ -314,4 +317,128 @@ def get_compliance_stats(db: Session = Depends(get_db)):
 def verify_worm_audit_chain():
     """WORM 불변 스토리지 및 SHA-256 머클 해시 체인 무결성을 실시간 전수 검증합니다."""
     return WormStorage.verify_integrity()
+
+
+@router.get("/audit-logs/export", dependencies=[Depends(require_permission("compliance:read"))])
+def export_audit_logs(
+    requester_id: Optional[str] = Query(None, description="요청자 ID 필터"),
+    action_taken: Optional[str] = Query(None, description="조치 필터"),
+    is_blocked: Optional[bool] = Query(None, description="차단 여부 필터"),
+    limit: int = Query(1000, ge=1, le=5000),
+    db: Session = Depends(get_db)
+):
+    """WORM 감사 로그를 포렌식 JSON 형식으로 스트리밍 내보내기합니다."""
+    from fastapi.responses import JSONResponse
+    query = db.query(AuditLog)
+    if requester_id:
+        query = query.filter(AuditLog.requester_id.ilike(f"%{requester_id}%"))
+    if action_taken:
+        query = query.filter(AuditLog.action_taken == action_taken.upper())
+    if is_blocked is not None:
+        query = query.filter(AuditLog.is_blocked == is_blocked)
+
+    logs = query.order_by(desc(AuditLog.timestamp)).limit(limit).all()
+    export_data = [
+        {
+            "log_id": l.log_id,
+            "timestamp": l.timestamp.isoformat() if l.timestamp else None,
+            "requester_id": l.requester_id,
+            "key_id": l.key_id,
+            "model_id": l.model_id,
+            "original_prompt_hash": l.original_prompt_hash,
+            "masked_payload_hash": l.masked_payload_hash,
+            "pii_count": l.pii_count,
+            "action_taken": l.action_taken,
+            "latency_ms": float(l.latency_ms or 0),
+            "is_blocked": l.is_blocked,
+            "worm_reference_id": l.worm_reference_id,
+            "detections": json.loads(l.detections_json) if l.detections_json else []
+        }
+        for l in logs
+    ]
+    filename = f"ordinatio_worm_forensics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    return JSONResponse(
+        content=export_data,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+# ==========================================
+# 6. PII Presets Management (Database-backed)
+# ==========================================
+
+DEFAULT_PRESETS = [
+    {
+        "preset_id": "preset-rrn-sample",
+        "label": "주민등록번호 포함 대출 심사 요청",
+        "text": "홍길동 고객님의 신용대출 승인을 요청합니다. 주민등록번호는 880101-1234567 이며, 서울시 영등포구 여의도동 거주 중입니다.",
+        "created_by": "system"
+    },
+    {
+        "preset_id": "preset-bank-sample",
+        "label": "계좌번호 및 급여 이체 문의",
+        "text": "국민은행 123-456-789012 계좌로 이번 달 급여 4,500,000원을 이체 요청드립니다. 예금주: 김철수",
+        "created_by": "system"
+    },
+    {
+        "preset_id": "preset-card-sample",
+        "label": "신용카드 번호 결제 승인 요청",
+        "text": "기업카드 9410-1234-5678-9012 로 서버 인프라 비용 $1,250 결제 진행해 주세요.",
+        "created_by": "system"
+    },
+    {
+        "preset_id": "preset-emp-sample",
+        "label": "사번 포함 개발팀 계정 권한 신청 (BLOCK 대상)",
+        "text": "개발1팀 사번 EMP-2024-0012 직원의 프로덕션 DB 읽기 권한 상향을 요청합니다.",
+        "created_by": "system"
+    }
+]
+
+@router.get("/presets", response_model=List[PiiPresetRead], dependencies=[Depends(require_permission("compliance:read"))])
+def list_pii_presets(db: Session = Depends(get_db)):
+    """PII 검사 시뮬레이션 샘플 프리셋 목록을 조회합니다 (DB 미존재 시 기본 프리셋 시딩)."""
+    presets = db.query(PiiPreset).order_by(PiiPreset.created_at.asc()).all()
+    if not presets:
+        for p_def in DEFAULT_PRESETS:
+            preset = PiiPreset(
+                preset_id=p_def["preset_id"],
+                label=p_def["label"],
+                text=p_def["text"],
+                created_by=p_def["created_by"]
+            )
+            db.add(preset)
+        db.commit()
+        presets = db.query(PiiPreset).order_by(PiiPreset.created_at.asc()).all()
+    return presets
+
+
+@router.post("/presets", response_model=PiiPresetRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("compliance:write"))])
+def create_pii_preset(payload: PiiPresetCreate, db: Session = Depends(get_db)):
+    """신규 PII 검사 시뮬레이션 프리셋을 등록합니다."""
+    preset_id = f"preset-{uuid.uuid4().hex[:8]}"
+    new_preset = PiiPreset(
+        preset_id=preset_id,
+        label=payload.label.strip(),
+        text=payload.text.strip(),
+        created_by=payload.created_by or "admin"
+    )
+    db.add(new_preset)
+    db.commit()
+    db.refresh(new_preset)
+    return new_preset
+
+
+@router.delete("/presets/{preset_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("compliance:write"))])
+def delete_pii_preset(preset_id: str, db: Session = Depends(get_db)):
+    """PII 시뮬레이션 프리셋을 삭제합니다."""
+    preset = db.query(PiiPreset).filter(PiiPreset.preset_id == preset_id).first()
+    if not preset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"프리셋 '{preset_id}'을(를) 찾을 수 없습니다."
+        )
+    db.delete(preset)
+    db.commit()
+    return {"status": "success", "message": f"Preset '{preset_id}' deleted successfully."}
+
 

@@ -105,3 +105,22 @@ class ComplianceStats(BaseModel):
     total_blocked: int
     total_masked_events: int
     detections_by_type: dict
+
+
+# --- PII Preset Schemas ---
+
+class PiiPresetRead(BaseModel):
+    preset_id: str
+    label: str
+    text: str
+    created_by: str
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PiiPresetCreate(BaseModel):
+    label: str = Field(..., min_length=1, max_length=128)
+    text: str = Field(..., min_length=1)
+    created_by: Optional[str] = "admin"
+

@@ -271,3 +271,59 @@ def test_compliance_worm_integrity_verification():
     assert data["hash_chain_valid"] is True
     assert "latest_hash" in data
 
+
+# =====================================================================
+# 6. WORM Audit Logs Export & PII Presets Tests
+# =====================================================================
+
+def test_audit_logs_export_json():
+    """Verify that WORM audit logs can be streamed and exported as forensic JSON."""
+    res = client.get("/api/v1/compliance/audit-logs/export")
+    assert res.status_code == 200
+    assert "attachment; filename=" in res.headers.get("content-disposition", "")
+    data = res.json()
+    assert isinstance(data, list)
+    if len(data) > 0:
+        first = data[0]
+        assert "log_id" in first
+        assert "original_prompt_hash" in first
+        assert "masked_payload_hash" in first
+        assert "action_taken" in first
+
+
+def test_pii_presets_crud():
+    """Verify database-backed PII simulation presets listing, creation, and deletion."""
+    # 1. List default presets (seeded if empty)
+    list_res = client.get("/api/v1/compliance/presets")
+    assert list_res.status_code == 200
+    presets = list_res.json()
+    assert len(presets) >= 4
+    preset_labels = [p["label"] for p in presets]
+    assert any("주민등록번호" in lbl for lbl in preset_labels)
+
+    # 2. Create custom preset
+    new_preset_payload = {
+        "label": "테스트 커스텀 사번 프리셋",
+        "text": "사번 EMP-9999 직원의 보안 감사 질의입니다.",
+        "created_by": "tester"
+    }
+    create_res = client.post("/api/v1/compliance/presets", json=new_preset_payload)
+    assert create_res.status_code == 201
+    created_data = create_res.json()
+    assert created_data["label"] == new_preset_payload["label"]
+    assert created_data["text"] == new_preset_payload["text"]
+    preset_id = created_data["preset_id"]
+
+    # 3. Verify it appears in list
+    verify_list = client.get("/api/v1/compliance/presets")
+    assert any(p["preset_id"] == preset_id for p in verify_list.json())
+
+    # 4. Delete custom preset
+    del_res = client.delete(f"/api/v1/compliance/presets/{preset_id}")
+    assert del_res.status_code == 200
+
+    # 5. Verify deletion
+    after_list = client.get("/api/v1/compliance/presets")
+    assert not any(p["preset_id"] == preset_id for p in after_list.json())
+
+

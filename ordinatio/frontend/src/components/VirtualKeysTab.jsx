@@ -273,17 +273,18 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       } else {
         await apiClient.updateVirtualKey(keyId, { is_active: true });
       }
+
+      const updatedKeys = keys.map((k) => (k.keyId === keyId ? { ...k, status: nextStatus } : k));
+      saveKeys(updatedKeys);
+
+      if (nextStatus === 'BLOCKED') {
+        onNotify('INFO', strings.virtualKeys.alerts.keyRevoked(targetKey.name, keyId));
+      } else {
+        onNotify('SUCCESS', strings.virtualKeys.alerts.keyReactivated(targetKey.name, keyId));
+      }
     } catch (err) {
-      console.warn('Backend status update offline, saving to persistent local storage:', err);
-    }
-
-    const updatedKeys = keys.map((k) => (k.keyId === keyId ? { ...k, status: nextStatus } : k));
-    saveKeys(updatedKeys);
-
-    if (nextStatus === 'BLOCKED') {
-      onNotify('INFO', strings.virtualKeys.alerts.keyRevoked(targetKey.name, keyId));
-    } else {
-      onNotify('SUCCESS', strings.virtualKeys.alerts.keyReactivated(targetKey.name, keyId));
+      console.error('Backend status update failed:', err);
+      onNotify('ERROR', `가상키 상태 변경 실패: ${err.message || '서버 응답 없음'}`);
     }
   };
 

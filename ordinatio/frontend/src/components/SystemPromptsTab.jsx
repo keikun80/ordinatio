@@ -172,28 +172,12 @@ export default function SystemPromptsTab({ onNotify }) {
       return;
     }
 
-    // Determine target name
-    let targetName = null;
-    if (formTargetType === 'ROUTE') {
-      const r = routes.find((x) => x.route_name === formTargetId);
-      targetName = r ? r.route_name : formTargetId;
-    } else if (formTargetType === 'VIRTUAL_KEY') {
-      const k = virtualKeys.find((x) => (x.key_id || x.keyId) === formTargetId);
-      targetName = k ? `${k.name} (${k.key_id || k.keyId})` : formTargetId;
-    } else if (formTargetType === 'TENANT') {
-      const t = tenants.find((x) => (x.tenant_id || x.id) === formTargetId);
-      targetName = t ? `${t.name} (${t.department_code || t.code})` : formTargetId;
-    } else {
-      targetName = strings.systemPrompts.table.globalTarget;
-    }
-
     const payload = {
       name: formName.trim(),
       description: formDesc.trim() || null,
       content: formContent.trim(),
       target_type: formTargetType,
       target_id: formTargetType === 'GLOBAL' ? null : formTargetId,
-      target_name: targetName,
       injection_mode: formInjectionMode,
       is_active: formIsActive
     };

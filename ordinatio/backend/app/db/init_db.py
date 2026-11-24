@@ -53,7 +53,7 @@ def init_db():
                 display_name="전사 최고관리자",
                 description="전사 플랫폼, 전 부서 테넌트, 모델 라우팅 및 보안 정책 총괄 최고 관리자",
                 is_system=True,
-                permissions=ALL_PERMISSION_CODES
+                permissions=["*"] + ALL_PERMISSION_CODES
             )
             tenant_admin_role = Role(
                 name="TENANT_ADMIN",
@@ -78,6 +78,15 @@ def init_db():
             db.add_all([super_admin_role, tenant_admin_role, viewer_role])
             db.commit()
             logger.info("Initialized database with default system roles (SUPER_ADMIN, TENANT_ADMIN, VIEWER)")
+        else:
+            # Ensure SUPER_ADMIN role has wildcard '*' permission in PostgreSQL
+            existing_sa = db.query(Role).filter(Role.name == "SUPER_ADMIN").first()
+            if existing_sa:
+                perms = list(existing_sa.permissions or [])
+                if "*" not in perms:
+                    existing_sa.permissions = ["*"] + [p for p in ALL_PERMISSION_CODES if p in perms]
+                    db.commit()
+                    logger.info("Synchronized SUPER_ADMIN role wildcard '*' permission in database")
 
         # 1.1 Initial Super Admin Account Bootstrap (Ensures admin can log in after make up)
         from app.core.security import hash_password
@@ -172,7 +181,25 @@ def init_db():
                 action="BLOCK",
                 is_active=True,
             )
-            db.add_all([r1, r2, r3, r4])
+            r5 = PiiRule(
+                rule_id="pii-passport",
+                name="여권번호 마스킹",
+                entity_type="PASSPORT",
+                regex_pattern=r"\b[A-Z]\d{8}\b",
+                confidence_threshold=0.95,
+                action="MASK",
+                is_active=True,
+            )
+            r6 = PiiRule(
+                rule_id="pii-phone",
+                name="휴대전화번호 마스킹",
+                entity_type="PHONE",
+                regex_pattern=r"\b01[016789]-\d{3,4}-\d{4}\b",
+                confidence_threshold=0.95,
+                action="MASK",
+                is_active=True,
+            )
+            db.add_all([r1, r2, r3, r4, r5, r6])
             db.commit()
             logger.info("Initialized database with default PII rules")
 

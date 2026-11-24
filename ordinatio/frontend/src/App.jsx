@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
 import DevInspector from './components/DevInspector';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { EntityProvider } from './context/EntityContext';
 import { CheckCircle2, AlertTriangle, Info, X, Loader2 } from 'lucide-react';
 import { strings } from './constants/strings';
 
@@ -212,7 +213,9 @@ function Dashboard() {
 export default function App() {
   return (
     <AuthProvider>
-      <Dashboard />
+      <EntityProvider>
+        <Dashboard />
+      </EntityProvider>
     </AuthProvider>
   );
 }

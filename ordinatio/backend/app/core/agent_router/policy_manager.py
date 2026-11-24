@@ -60,100 +60,99 @@ DEFAULT_POLICIES_CONFIG: List[Dict[str, Any]] = [
 ]
 
 class AgentRouterPolicyManager:
-    """Manages CRUD and in-memory dynamic state for AgentRouter policies."""
-
-    _cached_policies: Dict[str, Dict[str, Any]] = {}
+    """Manages CRUD for AgentRouter policies with PostgreSQL as the Single Source of Truth."""
 
     @classmethod
     def get_all_policies(cls, db: Optional[Session] = None) -> List[Dict[str, Any]]:
-        """Fetch all policies from DB or fallback to memory/default seed."""
+        """Fetch all policies directly from DB (or using a scoped session if db is None)."""
         if db is not None:
-            try:
-                from app.models.model_catalog import ModelCatalog
-                catalog_models = db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()
-                active_catalog_ids = [m.model_id for m in catalog_models]
+            return cls._fetch_from_db(db)
 
-                db_rows = db.query(AgentRouterPolicyModel).all()
-                if db_rows:
-                    result = []
-                    is_dirty = False
-                    for row in db_rows:
-                        cfg = dict(row.config or {})
-                        # Dynamically sanitize stale legacy meta-llama seed models
-                        def is_stale_or_empty(val: Optional[str]) -> bool:
-                            return not val or "meta-llama" in str(val)
+        from app.db.session import SessionLocal
+        with SessionLocal() as session:
+            return cls._fetch_from_db(session)
 
-                        if active_catalog_ids:
-                            default_reasoning = active_catalog_ids[0]
-                            default_fast = active_catalog_ids[-1]
+    @classmethod
+    def _fetch_from_db(cls, db: Session) -> List[Dict[str, Any]]:
+        try:
+            from app.models.model_catalog import ModelCatalog
+            catalog_models = db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()
+            active_catalog_ids = [m.model_id for m in catalog_models]
 
-                            if row.policy_id == "QualityFirst":
-                                if is_stale_or_empty(cfg.get("reasoning_model")):
-                                    cfg["reasoning_model"] = default_reasoning
-                                    is_dirty = True
-                                if is_stale_or_empty(cfg.get("fast_model")):
-                                    cfg["fast_model"] = default_fast
-                                    is_dirty = True
-                            elif row.policy_id == "LeastCost":
-                                if is_stale_or_empty(cfg.get("standard_model")):
-                                    cfg["standard_model"] = default_reasoning
-                                    is_dirty = True
-                                if is_stale_or_empty(cfg.get("economic_model")):
-                                    cfg["economic_model"] = default_fast
-                                    is_dirty = True
-                            elif row.policy_id == "LatencyOptimized":
-                                if is_stale_or_empty(cfg.get("reasoning_model")):
-                                    cfg["reasoning_model"] = default_reasoning
-                                    is_dirty = True
-                                if is_stale_or_empty(cfg.get("primary_fast_model")):
-                                    cfg["primary_fast_model"] = default_fast
-                                    is_dirty = True
-                            elif row.policy_id == "SelfHealingFallback":
-                                if is_stale_or_empty(cfg.get("primary_fallback_model")):
-                                    cfg["primary_fallback_model"] = default_fast
-                                    is_dirty = True
-                                if is_stale_or_empty(cfg.get("secondary_fallback_model")):
-                                    cfg["secondary_fallback_model"] = default_reasoning
-                                    is_dirty = True
+            db_rows = db.query(AgentRouterPolicyModel).all()
+            if db_rows:
+                result = []
+                is_dirty = False
+                for row in db_rows:
+                    cfg = dict(row.config or {})
+                    def is_stale_or_empty(val: Optional[str]) -> bool:
+                        return not val or "meta-llama" in str(val)
 
-                            if is_dirty:
-                                row.config = cfg
+                    if active_catalog_ids:
+                        default_reasoning = active_catalog_ids[0]
+                        default_fast = active_catalog_ids[-1]
 
-                        item = {
-                            "policy_id": row.policy_id,
-                            "name": row.name,
-                            "description": row.description,
-                            "is_active": row.is_active,
-                            "config": cfg,
-                            "updated_at": row.updated_at
-                        }
-                        result.append(item)
-                        cls._cached_policies[row.policy_id] = copy.deepcopy(item)
+                        if row.policy_id == "QualityFirst":
+                            if is_stale_or_empty(cfg.get("reasoning_model")):
+                                cfg["reasoning_model"] = default_reasoning
+                                is_dirty = True
+                            if is_stale_or_empty(cfg.get("fast_model")):
+                                cfg["fast_model"] = default_fast
+                                is_dirty = True
+                        elif row.policy_id == "LeastCost":
+                            if is_stale_or_empty(cfg.get("standard_model")):
+                                cfg["standard_model"] = default_reasoning
+                                is_dirty = True
+                            if is_stale_or_empty(cfg.get("economic_model")):
+                                cfg["economic_model"] = default_fast
+                                is_dirty = True
+                        elif row.policy_id == "LatencyOptimized":
+                            if is_stale_or_empty(cfg.get("reasoning_model")):
+                                cfg["reasoning_model"] = default_reasoning
+                                is_dirty = True
+                            if is_stale_or_empty(cfg.get("primary_fast_model")):
+                                cfg["primary_fast_model"] = default_fast
+                                is_dirty = True
+                        elif row.policy_id == "SelfHealingFallback":
+                            if is_stale_or_empty(cfg.get("primary_fallback_model")):
+                                cfg["primary_fallback_model"] = default_fast
+                                is_dirty = True
+                            if is_stale_or_empty(cfg.get("secondary_fallback_model")):
+                                cfg["secondary_fallback_model"] = default_reasoning
+                                is_dirty = True
 
-                    if is_dirty:
-                        try:
-                            db.commit()
-                        except Exception:
-                            db.rollback()
+                        if is_dirty:
+                            row.config = cfg
 
-                    return result
-            except Exception:
-                pass
+                    item = {
+                        "policy_id": row.policy_id,
+                        "name": row.name,
+                        "description": row.description,
+                        "is_active": row.is_active,
+                        "config": cfg,
+                        "updated_at": row.updated_at
+                    }
+                    result.append(item)
 
-        if not cls._cached_policies:
-            for p in DEFAULT_POLICIES_CONFIG:
-                cls._cached_policies[p["policy_id"]] = copy.deepcopy(p)
+                if is_dirty:
+                    try:
+                        db.commit()
+                    except Exception:
+                        db.rollback()
 
-        return list(cls._cached_policies.values())
+                return result
+        except Exception:
+            pass
+
+        return copy.deepcopy(DEFAULT_POLICIES_CONFIG)
 
     @classmethod
     def get_policy(cls, policy_id: str, db: Optional[Session] = None) -> Dict[str, Any]:
-        """Fetch a specific policy by policy_id."""
+        """Fetch a specific policy by policy_id directly from DB."""
         policies = cls.get_all_policies(db)
         for p in policies:
             if p["policy_id"].lower() == policy_id.lower():
                 return p
-        # Default fallback
         for p in DEFAULT_POLICIES_CONFIG:
             if p["policy_id"].lower() == policy_id.lower():
                 return copy.deepcopy(p)
@@ -161,36 +160,43 @@ class AgentRouterPolicyManager:
 
     @classmethod
     def update_policies(cls, updated_list: List[Dict[str, Any]], db: Optional[Session] = None) -> List[Dict[str, Any]]:
-        """Update policy configurations in DB and update in-memory cache."""
+        """Update policy configurations directly in PostgreSQL."""
+        if db is not None:
+            return cls._update_in_db(updated_list, db)
+
+        from app.db.session import SessionLocal
+        with SessionLocal() as session:
+            return cls._update_in_db(updated_list, session)
+
+    @classmethod
+    def _update_in_db(cls, updated_list: List[Dict[str, Any]], db: Session) -> List[Dict[str, Any]]:
         for item in updated_list:
             pid = item.get("policy_id")
             if not pid:
                 continue
-            cls._cached_policies[pid] = copy.deepcopy(item)
 
-            if db is not None:
-                try:
-                    db_row = db.query(AgentRouterPolicyModel).filter(AgentRouterPolicyModel.policy_id == pid).first()
-                    if db_row:
-                        if "name" in item:
-                            db_row.name = item["name"]
-                        if "description" in item:
-                            db_row.description = item["description"]
-                        if "is_active" in item:
-                            db_row.is_active = item["is_active"]
-                        if "config" in item:
-                            db_row.config = item["config"]
-                    else:
-                        new_row = AgentRouterPolicyModel(
-                            policy_id=pid,
-                            name=item.get("name", pid),
-                            description=item.get("description", ""),
-                            is_active=item.get("is_active", True),
-                            config=item.get("config", {})
-                        )
-                        db.add(new_row)
-                    db.commit()
-                except Exception:
-                    db.rollback()
+            try:
+                db_row = db.query(AgentRouterPolicyModel).filter(AgentRouterPolicyModel.policy_id == pid).first()
+                if db_row:
+                    if "name" in item:
+                        db_row.name = item["name"]
+                    if "description" in item:
+                        db_row.description = item["description"]
+                    if "is_active" in item:
+                        db_row.is_active = item["is_active"]
+                    if "config" in item:
+                        db_row.config = item["config"]
+                else:
+                    new_row = AgentRouterPolicyModel(
+                        policy_id=pid,
+                        name=item.get("name", pid),
+                        description=item.get("description", ""),
+                        is_active=item.get("is_active", True),
+                        config=item.get("config", {})
+                    )
+                    db.add(new_row)
+                db.commit()
+            except Exception:
+                db.rollback()
 
         return cls.get_all_policies(db)

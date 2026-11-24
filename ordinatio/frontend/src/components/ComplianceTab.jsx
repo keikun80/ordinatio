@@ -64,6 +64,7 @@ export default function ComplianceTab({ onNotify }) {
   const canWriteCompliance = isSuperAdmin || hasPermission('compliance:write');
   const [rules, setRules] = useState([]);
   const [loadingRules, setLoadingRules] = useState(true);
+  const [ruleTemplates, setRuleTemplates] = useState({});
 
   // Dynamic Presets State (Single Source of Truth: PostgreSQL)
   const [presets, setPresets] = useState([]);
@@ -102,11 +103,17 @@ export default function ComplianceTab({ onNotify }) {
   // Load Data on Mount
   const loadRules = async () => {
     setLoadingRules(true);
-    const data = await api.getPiiRules();
+    const [data, tmpls] = await Promise.all([
+      api.getPiiRules(),
+      api.getRuleTemplates().catch(() => ({}))
+    ]);
     if (data && data.length > 0) {
       setRules(data);
     } else {
       setRules([]);
+    }
+    if (tmpls) {
+      setRuleTemplates(tmpls);
     }
     setLoadingRules(false);
   };
@@ -305,11 +312,12 @@ export default function ComplianceTab({ onNotify }) {
     if (!canWriteCompliance) return;
     const initialType = 'RRN';
     const preset = DEFAULT_ENTITY_REGEX_MAP[initialType];
+    const backendRegex = ruleTemplates[initialType];
     setNewRule({
       rule_id: 'pii-custom-' + Math.floor(Math.random() * 1000),
       name: preset?.name || '',
       entity_type: initialType,
-      regex_pattern: preset?.regex || '',
+      regex_pattern: backendRegex || preset?.regex || '',
       confidence_threshold: 0.85,
       action: preset?.action || 'MASK',
       is_active: true
@@ -994,11 +1002,12 @@ export default function ComplianceTab({ onNotify }) {
                   onChange={(e) => {
                     const selectedType = e.target.value;
                     const matchedPreset = DEFAULT_ENTITY_REGEX_MAP[selectedType];
+                    const backendRegex = ruleTemplates[selectedType];
                     setNewRule((prev) => ({
                       ...prev,
                       entity_type: selectedType,
                       name: matchedPreset?.name && !prev.name ? matchedPreset.name : prev.name,
-                      regex_pattern: matchedPreset ? matchedPreset.regex : prev.regex_pattern,
+                      regex_pattern: backendRegex || (matchedPreset ? matchedPreset.regex : prev.regex_pattern),
                       action: matchedPreset?.action || prev.action
                     }));
                   }}

@@ -245,43 +245,10 @@ def get_engine_with_db_rules(db_session) -> PiiEngine:
     return PiiEngine(rules=rules)
 
 
-# --- Default rules (에어갭 폴백 / 테스트용) ---
-DEFAULT_RULES = [
-    PiiRuleConfig(
-        rule_id="pii-rrn",
-        name="주민등록번호",
-        entity_type="RRN",
-        regex_pattern=r"\d{2}([0]\d|[1][0-2])\d{2}-[1-4]\d{6}",
-        confidence_threshold=0.95,
-        action="MASK",
-    ),
-    PiiRuleConfig(
-        rule_id="pii-account",
-        name="은행 계좌번호",
-        entity_type="BANK_ACCOUNT",
-        regex_pattern=r"(\d{3,6}-\d{2,6}-\d{3,6})",
-        confidence_threshold=0.85,
-        action="HASH",
-    ),
-    PiiRuleConfig(
-        rule_id="pii-card",
-        name="신용카드 번호",
-        entity_type="CREDIT_CARD",
-        regex_pattern=r"\d{4}-\d{4}-\d{4}-\d{4}",
-        confidence_threshold=0.90,
-        action="MASK",
-    ),
-    PiiRuleConfig(
-        rule_id="pii-employee",
-        name="사내 행번/사번",
-        entity_type="EMPLOYEE_ID",
-        regex_pattern=r"EMP-[A-Z]{2}\d{5}",
-        confidence_threshold=0.80,
-        action="BLOCK",
-    ),
-]
-
-
-def get_default_engine() -> PiiEngine:
-    """기본 폴백 PII 엔진 (DB 연결 없이 동작)"""
-    return PiiEngine(rules=DEFAULT_RULES)
+def get_default_engine(db_session=None) -> PiiEngine:
+    """PostgreSQL DB 기반 PII 엔진 반환 (DB 세션 전달 권장, 미전달 시 임시 세션 사용)"""
+    if db_session is not None:
+        return get_engine_with_db_rules(db_session)
+    from app.db.session import SessionLocal
+    with SessionLocal() as db:
+        return get_engine_with_db_rules(db)

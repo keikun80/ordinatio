@@ -102,9 +102,7 @@ export default function PromptStudioTab({ onNotify }) {
       const inTokens = usage.prompt_tokens || Math.round(effectivePrompt.length / 4);
       const outTokens = usage.completion_tokens || Math.round(assistantMsg.length / 4);
       const modelObj = models.find((m) => m.id === (meta.selected_model || selectedModel)) || models.find((m) => m.id === selectedModel);
-      const inPrice = modelObj?.inputPricePer1k ?? 0.80;
-      const outPrice = modelObj?.outputPricePer1k ?? 2.40;
-      const dynamicCostKrw = Number((((inTokens / 1000) * inPrice) + ((outTokens / 1000) * outPrice)).toFixed(4));
+      const dynamicCostKrw = meta.cost_krw ?? (meta.finops?.cost_krw ?? 0);
 
       setOutput({
         isBlocked: false,

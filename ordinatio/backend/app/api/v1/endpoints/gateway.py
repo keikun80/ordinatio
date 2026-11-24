@@ -304,8 +304,6 @@ def _try_authenticate_console_jwt(token: str, db: Session) -> bool:
     ).first()
     if not session:
         return False
-    if user.role == "SUPER_ADMIN":
-        return True
     role = db.query(Role).filter(Role.name == user.role).first()
     perms = role.permissions if (role and role.permissions) else []
     if "*" in perms or "prompt_studio:execute" in perms or "routing:write" in perms:
@@ -494,7 +492,7 @@ async def dispatch_chat_completion(
             model_id=req.model or route_name,
             original_prompt_hash=masking_res.original_hash,
             masked_payload_hash=masking_res.masked_hash,
-            detections_json=str(detections_summary),
+            detections_json=json.dumps(detections_summary, ensure_ascii=False),
             pii_count=masking_res.pii_count,
             action_taken="BLOCK" if is_blocked else "MASK",
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
@@ -591,7 +589,8 @@ async def dispatch_chat_completion(
         classification=classification,
         policy=selected_policy_type,
         tenant_budget_spent_ratio=tenant_budget_ratio,
-        explicit_model_request=explicit_model
+        explicit_model_request=explicit_model,
+        db=db
     )
 
     selected_model_id = routing_decision.selected_model
@@ -1140,6 +1139,7 @@ async def dispatch_chat_completion(
             "reasons": routing_decision.reasons,
             "pii_filtered": len(detections) > 0,
             "status": "LIVE_UPSTREAM",
+            "cost_krw": finops_metering.get("cost_krw", 0.0),
             "finops": finops_metering
         }
         if cacheable:
@@ -1276,6 +1276,7 @@ async def dispatch_chat_completion(
                 "pii_filtered": len(detections) > 0,
                 "status": "SIMULATED_TEST",
                 "note": "개발자 단위 테스트 모드",
+                "cost_krw": finops_metering.get("cost_krw", 0.0),
                 "finops": finops_metering
             }
         }
@@ -1372,20 +1373,6 @@ def list_available_models(db: Session = Depends(get_db)):
         "created": now_ts,
         "owned_by": "AgentRouter (Autonomous Dispatch)",
         "type": "agent_router"
-    })
-    data.append({
-        "id": DEFAULT_FAST_MODEL,
-        "object": "model",
-        "created": now_ts,
-        "owned_by": "Envoy AI Gateway (Fast 8B Tier)",
-        "type": "fast_tier"
-    })
-    data.append({
-        "id": DEFAULT_REASONING_MODEL,
-        "object": "model",
-        "created": now_ts,
-        "owned_by": "Envoy AI Gateway (Reasoning 72B Tier)",
-        "type": "reasoning_tier"
     })
 
     for r in routes:

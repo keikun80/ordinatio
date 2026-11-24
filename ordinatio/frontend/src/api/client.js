@@ -632,6 +632,12 @@ export const apiClient = {
     return await res.json();
   },
 
+  async getRuleTemplates() {
+    const res = await authFetch(`${API_BASE_URL}/compliance/rule-templates`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
   async createPiiRule(ruleData) {
     const res = await fetch(`${API_BASE_URL}/compliance/rules`, {
       method: 'POST',

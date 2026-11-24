@@ -62,6 +62,17 @@ def list_pii_rules(
     return rules
 
 
+@router.get("/rule-templates", dependencies=[Depends(require_permission("compliance:read"))])
+def get_rule_templates(db: Session = Depends(get_db)):
+    """DB pii_rules 테이블 기반 정규식 템플릿 맵을 반환합니다. (SSOT)"""
+    rules = db.query(PiiRule).filter(PiiRule.is_active == True).all()
+    templates = {}
+    for r in rules:
+        if r.entity_type not in templates:
+            templates[r.entity_type] = r.regex_pattern
+    return templates
+
+
 @router.post("/rules", response_model=PiiRuleRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("compliance:write"))])
 def create_pii_rule(payload: PiiRuleCreate, db: Session = Depends(get_db)):
     """신규 PII 마스킹 규칙을 등록합니다."""
@@ -337,6 +348,18 @@ def export_audit_logs(
     if is_blocked is not None:
         query = query.filter(AuditLog.is_blocked == is_blocked)
 
+    def _parse_detections(val):
+        if not val:
+            return []
+        try:
+            return json.loads(val)
+        except Exception:
+            import ast
+            try:
+                return ast.literal_eval(val)
+            except Exception:
+                return []
+
     logs = query.order_by(desc(AuditLog.timestamp)).limit(limit).all()
     export_data = [
         {
@@ -352,7 +375,7 @@ def export_audit_logs(
             "latency_ms": float(l.latency_ms or 0),
             "is_blocked": l.is_blocked,
             "worm_reference_id": l.worm_reference_id,
-            "detections": json.loads(l.detections_json) if l.detections_json else []
+            "detections": _parse_detections(l.detections_json)
         }
         for l in logs
     ]

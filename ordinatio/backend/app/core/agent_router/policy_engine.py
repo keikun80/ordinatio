@@ -67,7 +67,8 @@ class AgentRouter:
         policy: Optional[RoutingPolicyType] = None,
         tenant_budget_spent_ratio: float = 0.0,
         explicit_model_request: Optional[str] = None,
-        policy_config: Optional[Dict[str, Any]] = None
+        policy_config: Optional[Dict[str, Any]] = None,
+        db: Optional[Any] = None
     ) -> RoutingDecision:
         from app.core.agent_router.policy_manager import AgentRouterPolicyManager
 
@@ -76,7 +77,7 @@ class AgentRouter:
         if policy_config is not None:
             cfg = policy_config
         else:
-            policy_item = AgentRouterPolicyManager.get_policy(active_policy.value)
+            policy_item = AgentRouterPolicyManager.get_policy(active_policy.value, db=db)
             cfg = policy_item.get("config", {})
 
         # If client explicitly asked for a concrete known model other than 'auto' or 'agent-auto', respect it

@@ -152,9 +152,6 @@ def require_permission(permission_code: str) -> Callable:
             )
 
         current_user = get_current_user(token=token, db=db)
-        if current_user.role == "SUPER_ADMIN":
-            return current_user
-
         role = db.query(Role).filter(Role.name == current_user.role).first()
         perms = role.permissions if role and role.permissions else []
 
@@ -194,9 +191,6 @@ def require_any_permission(*permission_codes: str) -> Callable:
             )
 
         current_user = get_current_user(token=token, db=db)
-        if current_user.role == "SUPER_ADMIN":
-            return current_user
-
         role = db.query(Role).filter(Role.name == current_user.role).first()
         perms = role.permissions if role and role.permissions else []
 

@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CheckCircle2, AlertTriangle, Info, X, Loader2 } from 'lucide-react';
 import { strings } from './constants/strings';
 
-const OverviewTab = lazy(() => import('./components/OverviewTab'));
 const RoutingTab = lazy(() => import('./components/RoutingTab'));
 const VirtualKeysTab = lazy(() => import('./components/VirtualKeysTab'));
 const FinOpsTab = lazy(() => import('./components/FinOpsTab'));
@@ -18,7 +17,6 @@ const UsersTab = lazy(() => import('./components/UsersTab'));
 
 function Dashboard() {
   const { user, isAuthenticated, isLoading, isSuperAdmin, hasPermission } = useAuth();
-  const canAccessOverview = isSuperAdmin || hasPermission('overview:read');
   const canAccessRouting = isSuperAdmin || hasPermission('routing:read');
   const canAccessGovernance = isSuperAdmin || hasPermission('governance:read');
   const canAccessPrompts = isSuperAdmin || hasPermission('prompts:read');
@@ -27,7 +25,7 @@ function Dashboard() {
   const canAccessStudio = isSuperAdmin || hasPermission('prompt_studio:execute');
   const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
   const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('routing');
   const [routingSubTab, setRoutingSubTab] = useState('routing');
   const [toasts, setToasts] = useState([]);
   const [isInspectorActive, setIsInspectorActive] = useState(false);
@@ -39,7 +37,6 @@ function Dashboard() {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     const tabPermMap = [
-      { id: 'overview', ok: canAccessOverview },
       { id: 'routing', ok: canAccessRouting },
       { id: 'virtual-keys', ok: canAccessGovernance },
       { id: 'system-prompts', ok: canAccessPrompts },
@@ -137,12 +134,6 @@ function Dashboard() {
               <span>{strings.common.loading}</span>
             </div>
           }>
-            {activeTab === 'overview' && canAccessOverview && (
-              <OverviewTab 
-                onNavigateTab={(tab) => setActiveTab(tab)}
-              />
-            )}
-
             {activeTab === 'routing' && canAccessRouting && (
               <RoutingTab 
                 activeSubTab={routingSubTab}

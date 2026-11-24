@@ -68,9 +68,6 @@ export default function Sidebar({
   };
 
   const navItems = [
-    ...(isSuperAdmin || hasPermission('overview:read') ? [
-      { id: 'overview', label: strings.nav.menus.overview, icon: LayoutDashboard }
-    ] : []),
     ...(isSuperAdmin || hasPermission('routing:read') ? [
       { 
         id: 'routing', 

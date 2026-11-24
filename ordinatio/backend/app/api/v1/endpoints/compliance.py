@@ -64,12 +64,17 @@ def list_pii_rules(
 
 @router.get("/rule-templates", dependencies=[Depends(require_permission("compliance:read"))])
 def get_rule_templates(db: Session = Depends(get_db)):
-    """DB pii_rules 테이블 기반 정규식 템플릿 맵을 반환합니다. (SSOT)"""
+    """DB pii_rules 테이블 기반 정규식 및 기본 메타데이터 템플릿 맵을 반환합니다. (SSOT)"""
     rules = db.query(PiiRule).filter(PiiRule.is_active == True).all()
     templates = {}
     for r in rules:
         if r.entity_type not in templates:
-            templates[r.entity_type] = r.regex_pattern
+            templates[r.entity_type] = {
+                "regex": r.regex_pattern,
+                "name": r.name,
+                "action": r.action,
+                "confidence": float(r.confidence_threshold)
+            }
     return templates
 
 
@@ -387,52 +392,13 @@ def export_audit_logs(
 
 
 # ==========================================
-# 6. PII Presets Management (Database-backed)
+# 6. PII Presets Management (Database-backed SSOT)
 # ==========================================
-
-DEFAULT_PRESETS = [
-    {
-        "preset_id": "preset-rrn-sample",
-        "label": "주민등록번호 포함 대출 심사 요청",
-        "text": "홍길동 고객님의 신용대출 승인을 요청합니다. 주민등록번호는 880101-1234567 이며, 서울시 영등포구 여의도동 거주 중입니다.",
-        "created_by": "system"
-    },
-    {
-        "preset_id": "preset-bank-sample",
-        "label": "계좌번호 및 급여 이체 문의",
-        "text": "국민은행 123-456-789012 계좌로 이번 달 급여 4,500,000원을 이체 요청드립니다. 예금주: 김철수",
-        "created_by": "system"
-    },
-    {
-        "preset_id": "preset-card-sample",
-        "label": "신용카드 번호 결제 승인 요청",
-        "text": "기업카드 9410-1234-5678-9012 로 서버 인프라 비용 $1,250 결제 진행해 주세요.",
-        "created_by": "system"
-    },
-    {
-        "preset_id": "preset-emp-sample",
-        "label": "사번 포함 개발팀 계정 권한 신청 (BLOCK 대상)",
-        "text": "개발1팀 사번 EMP-2024-0012 직원의 프로덕션 DB 읽기 권한 상향을 요청합니다.",
-        "created_by": "system"
-    }
-]
 
 @router.get("/presets", response_model=List[PiiPresetRead], dependencies=[Depends(require_permission("compliance:read"))])
 def list_pii_presets(db: Session = Depends(get_db)):
-    """PII 검사 시뮬레이션 샘플 프리셋 목록을 조회합니다 (DB 미존재 시 기본 프리셋 시딩)."""
-    presets = db.query(PiiPreset).order_by(PiiPreset.created_at.asc()).all()
-    if not presets:
-        for p_def in DEFAULT_PRESETS:
-            preset = PiiPreset(
-                preset_id=p_def["preset_id"],
-                label=p_def["label"],
-                text=p_def["text"],
-                created_by=p_def["created_by"]
-            )
-            db.add(preset)
-        db.commit()
-        presets = db.query(PiiPreset).order_by(PiiPreset.created_at.asc()).all()
-    return presets
+    """PII 검사 시뮬레이션 샘플 프리셋 목록을 PostgreSQL에서 직접 조회합니다."""
+    return db.query(PiiPreset).order_by(PiiPreset.created_at.asc()).all()
 
 
 @router.post("/presets", response_model=PiiPresetRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("compliance:write"))])

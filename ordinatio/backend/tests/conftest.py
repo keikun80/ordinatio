@@ -325,6 +325,36 @@ def seed_data():
     from app.core.security import ensure_system_diagnostics_key
     ensure_system_diagnostics_key(db)
 
+    # Seed PiiPreset if empty
+    from app.models.pii_preset import PiiPreset
+    if db.query(PiiPreset).count() == 0:
+        db.add_all([
+            PiiPreset(
+                preset_id="preset-rrn-sample",
+                label="주민등록번호 포함 대출 심사 요청",
+                text="홍길동 고객님의 신용대출 승인을 요청합니다. 주민등록번호는 880101-1234567 이며, 서울시 영등포구 여의도동 거주 중입니다.",
+                created_by="system"
+            ),
+            PiiPreset(
+                preset_id="preset-bank-sample",
+                label="계좌번호 및 급여 이체 문의",
+                text="국민은행 123-456-789012 계좌로 이번 달 급여 4,500,000원을 이체 요청드립니다. 예금주: 김철수",
+                created_by="system"
+            ),
+            PiiPreset(
+                preset_id="preset-card-sample",
+                label="신용카드 번호 결제 승인 요청",
+                text="기업카드 9410-1234-5678-9012 로 서버 인프라 비용 $1,250 결제 진행해 주세요.",
+                created_by="system"
+            ),
+            PiiPreset(
+                preset_id="preset-emp-sample",
+                label="사번 포함 개발팀 계정 권한 신청 (BLOCK 대상)",
+                text="개발1팀 사번 EMP-2024-0012 직원의 프로덕션 DB 읽기 권한 상향을 요청합니다.",
+                created_by="system"
+            )
+        ])
+
     # Seed System Prompts if empty
     if not db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-global-guardrail").first():
         db.add_all([

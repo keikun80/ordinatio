@@ -584,11 +584,9 @@ from app.core.agent_router import (
     AgentRouter,
     classify_prompt,
     RoutingPolicyType,
-    DEFAULT_FAST_MODEL,
-    DEFAULT_REASONING_MODEL,
-    DEFAULT_FALLBACK_MODEL,
     derive_cluster_name
 )
+from app.models.model_catalog import ModelCatalog
 from app.core.agent_router.policy_manager import AgentRouterPolicyManager
 from app.schemas.routing import (
     AgentRouterPolicyItem,
@@ -610,13 +608,17 @@ def get_agent_router_status(db: Session = Depends(get_db)):
     qf_cfg = policy_dict.get("QualityFirst", {})
     sh_cfg = policy_dict.get("SelfHealingFallback", {})
 
-    fast_model = qf_cfg.get("fast_model") or DEFAULT_FAST_MODEL
+    active_models = [m.model_id for m in db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()]
+    first_catalog_model = active_models[0] if active_models else "meta-llama/Llama-3.1-70B-Instruct"
+    last_catalog_model = active_models[-1] if active_models else "meta-llama/Llama-3.1-8B-Instruct"
+
+    fast_model = qf_cfg.get("fast_model") or last_catalog_model
     fast_cluster = qf_cfg.get("fast_cluster") or derive_cluster_name(fast_model, "cluster_vllm_fast_8b")
 
-    reasoning_model = qf_cfg.get("reasoning_model") or DEFAULT_REASONING_MODEL
+    reasoning_model = qf_cfg.get("reasoning_model") or first_catalog_model
     reasoning_cluster = qf_cfg.get("reasoning_cluster") or derive_cluster_name(reasoning_model, "cluster_vllm_reasoning_72b")
 
-    fallback_model = sh_cfg.get("primary_fallback_model") or DEFAULT_FALLBACK_MODEL
+    fallback_model = sh_cfg.get("primary_fallback_model") or fast_model
     fallback_cluster = sh_cfg.get("fallback_cluster") or derive_cluster_name(fallback_model, "cluster_vllm_inference_pool")
 
     return {

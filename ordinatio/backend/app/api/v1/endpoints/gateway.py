@@ -45,9 +45,7 @@ from app.core.agent_router import (
     classify_prompt,
     ComplexityLevel,
     RoutingPolicyType,
-    SessionAffinityManager,
-    DEFAULT_FAST_MODEL,
-    DEFAULT_REASONING_MODEL
+    SessionAffinityManager
 )
 from app.core.token_limiter import token_rate_limiter
 from app.core.ext_proc_server import ext_processor, ExtProcRequest, ExtProcResponse

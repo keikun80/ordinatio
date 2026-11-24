@@ -24,7 +24,7 @@ class RoutingDecision(BaseModel):
     fallback_model: Optional[str] = None
     fallback_cluster: Optional[str] = None
 
-# Default standard model mappings for air-gapped deployments
+# Fallback model mappings when no active models exist in PostgreSQL
 DEFAULT_FAST_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 DEFAULT_REASONING_MODEL = "meta-llama/Llama-3.1-70B-Instruct"
 DEFAULT_FALLBACK_MODEL = "qwen2.5:14b"
@@ -52,9 +52,9 @@ class AgentRouter:
     def __init__(
         self,
         default_policy: RoutingPolicyType = RoutingPolicyType.QUALITY_FIRST,
-        fast_model: str = DEFAULT_FAST_MODEL,
-        reasoning_model: str = DEFAULT_REASONING_MODEL,
-        fallback_model: str = DEFAULT_FALLBACK_MODEL
+        fast_model: Optional[str] = None,
+        reasoning_model: Optional[str] = None,
+        fallback_model: Optional[str] = None
     ):
         self.default_policy = default_policy
         self.fast_model = fast_model
@@ -80,6 +80,29 @@ class AgentRouter:
             policy_item = AgentRouterPolicyManager.get_policy(active_policy.value, db=db)
             cfg = policy_item.get("config", {})
 
+        # Dynamically resolve fast/reasoning/fallback from PostgreSQL model_catalogs if not provided
+        def_fast = self.fast_model
+        def_reasoning = self.reasoning_model
+        def_fallback = self.fallback_model
+
+        if (not def_fast or not def_reasoning or not def_fallback) and db is not None:
+            try:
+                from app.models.model_catalog import ModelCatalog
+                active_cats = [m.model_id for m in db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()]
+                if active_cats:
+                    if not def_reasoning:
+                        def_reasoning = active_cats[0]
+                    if not def_fast:
+                        def_fast = active_cats[-1]
+                    if not def_fallback:
+                        def_fallback = active_cats[-1]
+            except Exception:
+                pass
+
+        def_fast = def_fast or DEFAULT_FAST_MODEL
+        def_reasoning = def_reasoning or DEFAULT_REASONING_MODEL
+        def_fallback = def_fallback or DEFAULT_FALLBACK_MODEL
+
         # If client explicitly asked for a concrete known model other than 'auto' or 'agent-auto', respect it
         if explicit_model_request and explicit_model_request not in ["auto", "agent-auto", "default", None]:
             is_heavy = any(k in explicit_model_request.lower() for k in ["70b", "72b", "r1", "reason", "large"])
@@ -103,11 +126,11 @@ class AgentRouter:
         # 1. LeastCost Policy (Budget-Aware)
         if active_policy == RoutingPolicyType.LEAST_COST:
             threshold_ratio = float(cfg.get("budget_threshold_pct", 80.0)) / 100.0
-            economic_model = cfg.get("economic_model", self.fast_model)
-            standard_model = cfg.get("standard_model", self.reasoning_model)
+            economic_model = cfg.get("economic_model", def_fast)
+            standard_model = cfg.get("standard_model", def_reasoning)
             economic_cluster = cfg.get("economic_cluster") or cfg.get("fast_cluster") or derive_cluster_name(economic_model)
             standard_cluster = cfg.get("standard_cluster") or cfg.get("reasoning_cluster") or derive_cluster_name(standard_model)
-            fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(self.fallback_model)
+            fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(def_fallback)
 
             # If tenant budget spent ratio >= threshold, force downgrade to economic model
             if tenant_budget_spent_ratio >= threshold_ratio:
@@ -120,7 +143,7 @@ class AgentRouter:
                     tier="fast_8b",
                     estimated_tokens=classification.estimated_tokens,
                     reasons=reasons,
-                    fallback_model=self.fallback_model,
+                    fallback_model=def_fallback,
                     fallback_cluster=fallback_cluster
                 )
             
@@ -146,18 +169,18 @@ class AgentRouter:
                     tier="fast_8b",
                     estimated_tokens=classification.estimated_tokens,
                     reasons=reasons,
-                    fallback_model=self.fallback_model,
+                    fallback_model=def_fallback,
                     fallback_cluster=fallback_cluster
                 )
 
         # 2. LatencyOptimized Policy
         if active_policy == RoutingPolicyType.LATENCY_OPTIMIZED:
-            primary_fast_model = cfg.get("primary_fast_model", self.fast_model)
+            primary_fast_model = cfg.get("primary_fast_model", def_fast)
             allow_reasoning = cfg.get("allow_reasoning_override", True)
-            reasoning_model = cfg.get("reasoning_model", self.reasoning_model)
+            reasoning_model = cfg.get("reasoning_model", def_reasoning)
             fast_cluster = cfg.get("fast_cluster") or derive_cluster_name(primary_fast_model)
             reasoning_cluster = cfg.get("reasoning_cluster") or derive_cluster_name(reasoning_model)
-            fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(self.fallback_model)
+            fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(def_fallback)
             target_latency = cfg.get("target_latency_ms", 200)
 
             # Prioritize low-latency fast model unless prompt strictly demands heavy reasoning AND override allowed
@@ -184,14 +207,14 @@ class AgentRouter:
                     tier="fast_8b",
                     estimated_tokens=classification.estimated_tokens,
                     reasons=reasons,
-                    fallback_model=self.fallback_model,
+                    fallback_model=def_fallback,
                     fallback_cluster=fallback_cluster
                 )
 
         # 3. SelfHealingFallback Policy
         if active_policy == RoutingPolicyType.SELF_HEALING_FALLBACK:
-            primary_fallback = cfg.get("primary_fallback_model", self.fallback_model)
-            secondary_fallback = cfg.get("secondary_fallback_model", "Solar-10.7B-Financial")
+            primary_fallback = cfg.get("primary_fallback_model", def_fallback)
+            secondary_fallback = cfg.get("secondary_fallback_model", def_fast)
             fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(primary_fallback)
             secondary_cluster = cfg.get("secondary_fallback_cluster") or derive_cluster_name(secondary_fallback)
 
@@ -209,11 +232,11 @@ class AgentRouter:
             )
 
         # 4. QualityFirst Policy (Default)
-        q_reasoning_model = cfg.get("reasoning_model", self.reasoning_model)
-        q_fast_model = cfg.get("fast_model", self.fast_model)
+        q_reasoning_model = cfg.get("reasoning_model", def_reasoning)
+        q_fast_model = cfg.get("fast_model", def_fast)
         q_reasoning_cluster = cfg.get("reasoning_cluster") or derive_cluster_name(q_reasoning_model)
         q_fast_cluster = cfg.get("fast_cluster") or derive_cluster_name(q_fast_model)
-        fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(self.fallback_model)
+        fallback_cluster = cfg.get("fallback_cluster") or derive_cluster_name(def_fallback)
 
         if classification.complexity in [ComplexityLevel.REASONING_HEAVY, ComplexityLevel.AGENT_WORKFLOW]:
             reasons.append(f"QualityFirst: detected heavy reasoning/tool calling, routing to Reasoning Tier ({q_reasoning_model})")
@@ -238,7 +261,7 @@ class AgentRouter:
                 tier="fast_8b",
                 estimated_tokens=classification.estimated_tokens,
                 reasons=reasons,
-                fallback_model=self.fallback_model,
+                fallback_model=def_fallback,
                 fallback_cluster=fallback_cluster
             )
 

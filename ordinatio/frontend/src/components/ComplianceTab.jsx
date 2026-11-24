@@ -20,45 +20,6 @@ import { api } from '../api/client';
 import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
 
-// 식별 항목 유형별 기본 추천 정규식 패턴 및 표시 명칭 매핑
-const DEFAULT_ENTITY_REGEX_MAP = {
-  RRN: {
-    regex: '\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])-[1-4]\\d{6}',
-    name: '주민등록번호 마스킹',
-    action: 'MASK'
-  },
-  BANK_ACCOUNT: {
-    regex: '\\b\\d{3,6}-\\d{2,6}-\\d{3,6}\\b',
-    name: '은행 계좌번호 가명화',
-    action: 'HASH'
-  },
-  CREDIT_CARD: {
-    regex: '\\b\\d{4}-\\d{4}-\\d{4}-\\d{4}\\b',
-    name: '신용카드 번호 마스킹',
-    action: 'MASK'
-  },
-  EMPLOYEE_ID: {
-    regex: '\\bEMP-[A-Z]{2}\\d{5}\\b',
-    name: '사내 사번/행번 차단',
-    action: 'BLOCK'
-  },
-  PASSPORT: {
-    regex: '[A-Z]{1}\\d{8}',
-    name: '여권번호 마스킹',
-    action: 'MASK'
-  },
-  PHONE: {
-    regex: '01[016789]-\\d{3,4}-\\d{4}',
-    name: '휴대전화번호 마스킹',
-    action: 'MASK'
-  },
-  CUSTOM: {
-    regex: '',
-    name: '',
-    action: 'MASK'
-  }
-};
-
 export default function ComplianceTab({ onNotify }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
   const canWriteCompliance = isSuperAdmin || hasPermission('compliance:write');
@@ -311,15 +272,14 @@ export default function ComplianceTab({ onNotify }) {
   const handleOpenAddModal = () => {
     if (!canWriteCompliance) return;
     const initialType = 'RRN';
-    const preset = DEFAULT_ENTITY_REGEX_MAP[initialType];
-    const backendRegex = ruleTemplates[initialType];
+    const tmpl = ruleTemplates[initialType] || {};
     setNewRule({
       rule_id: 'pii-custom-' + Math.floor(Math.random() * 1000),
-      name: preset?.name || '',
+      name: tmpl.name || '',
       entity_type: initialType,
-      regex_pattern: backendRegex || preset?.regex || '',
-      confidence_threshold: 0.85,
-      action: preset?.action || 'MASK',
+      regex_pattern: tmpl.regex || '',
+      confidence_threshold: tmpl.confidence || 0.85,
+      action: tmpl.action || 'MASK',
       is_active: true
     });
     setIsAddModalOpen(true);
@@ -1001,14 +961,14 @@ export default function ComplianceTab({ onNotify }) {
                   value={newRule.entity_type}
                   onChange={(e) => {
                     const selectedType = e.target.value;
-                    const matchedPreset = DEFAULT_ENTITY_REGEX_MAP[selectedType];
-                    const backendRegex = ruleTemplates[selectedType];
+                    const tmpl = ruleTemplates[selectedType] || {};
                     setNewRule((prev) => ({
                       ...prev,
                       entity_type: selectedType,
-                      name: matchedPreset?.name && !prev.name ? matchedPreset.name : prev.name,
-                      regex_pattern: backendRegex || (matchedPreset ? matchedPreset.regex : prev.regex_pattern),
-                      action: matchedPreset?.action || prev.action
+                      name: tmpl.name || prev.name,
+                      regex_pattern: tmpl.regex || prev.regex_pattern,
+                      action: tmpl.action || prev.action,
+                      confidence_threshold: tmpl.confidence || prev.confidence_threshold
                     }));
                   }}
                 >

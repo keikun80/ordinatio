@@ -148,3 +148,24 @@ def get_today_total_tokens(db: Session) -> int:
     except Exception as e:
         logger.warning(f"Failed to query daily token total from DB: {e}")
         return 0
+
+
+def get_today_total_cost(db: Session) -> float:
+    """Retrieve actual cumulative inference cost (KRW) incurred today from PostgreSQL DailyTokenLedger."""
+    now_utc = datetime.now(timezone.utc)
+    today = now_utc.date()
+    try:
+        total = db.query(func.sum(DailyTokenLedger.cost_krw)).filter(DailyTokenLedger.date == today).scalar()
+        if total is not None:
+            return float(total)
+    except Exception as e:
+        logger.warning(f"Failed to query daily total cost from DailyTokenLedger: {e}")
+
+    # Fallback to sum of spent_budget_krw from Tenant table if daily ledger has no records yet
+    try:
+        from app.models.tenant import Tenant
+        tenant_total = db.query(func.sum(Tenant.spent_budget_krw)).scalar()
+        return float(tenant_total) if tenant_total is not None else 0.0
+    except Exception as e:
+        logger.warning(f"Fallback tenant cost query failed: {e}")
+        return 0.0

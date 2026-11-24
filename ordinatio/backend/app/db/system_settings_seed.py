@@ -147,6 +147,17 @@ DEFAULT_SYSTEM_SETTINGS: List[Dict[str, Any]] = [
             "max_candidates": 200,
             "enabled": True
         }
+    },
+    {
+        "key": "sla_settings",
+        "category": "sla",
+        "description": "운영 SLA 기준 임계치 (TTFT 응답 지연, 에러율 등)",
+        "value": {
+            "p95_ttft_ms_threshold": 500,
+            "error_rate_pct_threshold": 1.0,
+            "max_sparkline_points": 40,
+            "stream_poll_interval_ms": 2000
+        }
     }
 ]
 

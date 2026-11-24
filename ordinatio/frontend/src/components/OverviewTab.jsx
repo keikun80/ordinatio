@@ -43,6 +43,11 @@ export default function OverviewTab({ onNavigateTab }) {
   const [finOpsSummary, setFinOpsSummary] = useState(null);
   const [isLiveWs, setIsLiveWs] = useState(false);
   const isLiveWsRef = useRef(false);
+  const [slaSettings, setSlaSettings] = useState({
+    p95_ttft_ms_threshold: 500,
+    max_sparkline_points: 40,
+    stream_poll_interval_ms: 2000
+  });
 
   // Helper to map backend ComputePoolStatus to UI
   const mapComputePools = (pools) => {
@@ -71,7 +76,7 @@ export default function OverviewTab({ onNavigateTab }) {
 
     const appendPoint = (p) => {
       setHistorySeries((prev) => {
-        const MAX_LEN = 40;
+        const MAX_LEN = slaSettings.max_sparkline_points || 40;
         const reqVal = p.totalRequests ?? (prev.requests[prev.requests.length - 1] ?? 0);
         const tokVal = p.tps !== undefined ? p.tps : (prev.tokens[prev.tokens.length - 1] ?? 0);
         const ttftVal = p.ttft ?? (prev.ttft[prev.ttft.length - 1] ?? 0);
@@ -89,6 +94,15 @@ export default function OverviewTab({ onNavigateTab }) {
 
     // 1. Initial immediate load from summary API + live Audit/FinOps context
     const loadInitialSummary = async () => {
+      try {
+        const publicSettings = await apiClient.getPublicSettings().catch(() => ({}));
+        if (publicSettings && publicSettings.sla_settings) {
+          setSlaSettings(prev => ({ ...prev, ...publicSettings.sla_settings }));
+        }
+      } catch (e) {
+        // SLA settings fallback to defaults
+      }
+
       try {
         const tsData = await apiClient.getMetricsTimeseries('1h', '1m');
         if (tsData && tsData.points && tsData.points.length > 0 && !isUnmounted) {
@@ -386,7 +400,15 @@ export default function OverviewTab({ onNavigateTab }) {
             </span>
           </div>
           <div className="kpi-value" data-testid="ov-kpi-value-ttft">{kpis.ttft} <span style={{ fontSize: '1rem', color: 'var(--color-text-muted)' }}>ms</span></div>
-          <CumulativeSparkline data={historySeries.ttft} strokeColor="#8b5cf6" height={36} unit="ms" baseline={500} baselineLabel="SLA 500ms" testId="ov-sparkline-ttft" />
+          <CumulativeSparkline 
+            data={historySeries.ttft} 
+            strokeColor="#8b5cf6" 
+            height={36} 
+            unit="ms" 
+            baseline={slaSettings.p95_ttft_ms_threshold || 500} 
+            baselineLabel={`SLA ${slaSettings.p95_ttft_ms_threshold || 500}ms`} 
+            testId="ov-sparkline-ttft" 
+          />
           <div className="kpi-footer">
             <span className="kpi-badge-positive">
               <Clock size={13} color="#8b5cf6" /> P95 Latency

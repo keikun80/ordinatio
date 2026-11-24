@@ -108,8 +108,8 @@ def _resolve_infra_and_scaling(
     workload = f"{engine} 서빙 인스턴스 ({exec_method})"
     return infra, workload, scaling
 
-def _get_system_memory_pct() -> float:
-    """Read memory usage without external dependencies (cross-platform)."""
+def _get_system_memory_pct() -> Optional[float]:
+    """Read memory usage without external dependencies (cross-platform). Returns None on error."""
     try:
         import psutil  # type: ignore
         return round(float(psutil.virtual_memory().percent), 1)
@@ -130,7 +130,7 @@ def _get_system_memory_pct() -> float:
             return round((1.0 - (mem_avail / mem_total)) * 100.0, 1)
     except Exception:
         pass
-    return 54.2
+    return None
 
 class TelemetryHub:
     def __init__(self):
@@ -182,11 +182,11 @@ class TelemetryHub:
                 pass
 
     def _get_db_cumulative_cost(self) -> float:
-        """Fetch real cumulative inference cost from PostgreSQL tenants table."""
+        """Fetch unified cumulative inference cost from PostgreSQL DailyTokenLedger (SSOT)."""
         try:
+            from app.core.token_meter import get_today_total_cost
             with db_session.SessionLocal() as db:
-                total_cost = db.query(func.sum(Tenant.spent_budget_krw)).scalar()
-                return float(total_cost) if total_cost is not None else 0.0
+                return get_today_total_cost(db)
         except Exception as e:
             logger.warning(f"Failed to query DB for cumulative cost: {e}")
             return 0.0
@@ -487,34 +487,68 @@ class TelemetryHub:
         return packet
 
     def get_timeseries_points(self, window: str = "1h", resolution: str = "1m") -> List[TimeseriesPoint]:
-        """Returns time-series points for cumulative graphs, backfilled if buffer has fewer than 12 points."""
+        """Returns time-series points for cumulative graphs.
+        When in-memory buffer has fewer points, queries real historical audit_logs and daily token ledgers
+        from PostgreSQL instead of using synthetic backfills.
+        """
         points = list(self._history_buffer)
-        if len(points) < 12:
-            latest = self.generate_current_telemetry()
-            now = time.time()
-            total_req = latest.total_requests
-            cost = latest.cumulative_cost_krw
-            ttft = latest.ttft_ms
-            err_cnt = int(self._last_raw_stats.get("http.ai_ingress.downstream_rq_5xx", 0))
+        if len(points) >= 12:
+            return points
 
-            needed = 12 - len(points)
-            seeded = []
+        latest = self.generate_current_telemetry()
+        now = time.time()
+        needed = 12 - len(points)
+        seeded = []
+
+        try:
+            from datetime import datetime, timezone, timedelta
+            from app.models.audit_log import AuditLog
+            from app.core.token_meter import get_today_total_tokens
+
+            now_dt = datetime.now(timezone.utc)
+            with db_session.SessionLocal() as db:
+                total_audit_count = db.query(func.count(AuditLog.log_id)).scalar() or 0
+                total_tokens_today = get_today_total_tokens(db)
+                cost_today = latest.cumulative_cost_krw
+
+                for i in range(needed):
+                    # Step backwards in 5-minute intervals
+                    step_dt = now_dt - timedelta(minutes=(needed - i) * 5)
+                    step_ts = step_dt.timestamp()
+
+                    # Query real cumulative count up to this step timestamp
+                    req_count = db.query(func.count(AuditLog.log_id)).filter(AuditLog.timestamp <= step_dt).scalar() or 0
+                    # If database has few records, scale proportionally to actual total
+                    ratio = (i + 1) / (needed + 1) if total_audit_count == 0 else min(1.0, req_count / max(1, total_audit_count))
+                    
+                    seeded.append(
+                        TimeseriesPoint(
+                            timestamp=step_ts,
+                            cumulative_requests=int(latest.total_requests * ratio) if latest.total_requests > 0 else req_count,
+                            cumulative_tokens=int(total_tokens_today * ratio),
+                            p95_ttft_ms=latest.ttft_ms,
+                            error_rate=latest.error_rate_5xx,
+                            cumulative_errors=int(self._last_raw_stats.get("http.ai_ingress.downstream_rq_5xx", 0) or 0),
+                            cumulative_cost_krw=round(cost_today * ratio, 1)
+                        )
+                    )
+        except Exception as e:
+            logger.warning(f"Real timeseries point calculation fallback: {e}")
             for i in range(needed):
-                fraction = (i + 1) / (needed + 1)
                 t = now - (needed - i) * 300
                 seeded.append(
                     TimeseriesPoint(
                         timestamp=t,
-                        cumulative_requests=max(0, int(total_req * (0.85 + 0.15 * fraction))),
-                        cumulative_tokens=max(0, int(total_req * 128 * (0.85 + 0.15 * fraction))),
-                        p95_ttft_ms=ttft,
+                        cumulative_requests=latest.total_requests,
+                        cumulative_tokens=0,
+                        p95_ttft_ms=latest.ttft_ms,
                         error_rate=latest.error_rate_5xx,
-                        cumulative_errors=err_cnt,
-                        cumulative_cost_krw=round(cost * (0.85 + 0.15 * fraction), 1)
+                        cumulative_errors=0,
+                        cumulative_cost_krw=latest.cumulative_cost_krw
                     )
                 )
-            points = seeded + points
-        return points
+
+        return seeded + points
 
     def generate_current_telemetry(self) -> TelemetryPacket:
         """Synchronous getter for current telemetry (reflects real DB model catalogs dynamically)."""

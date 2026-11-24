@@ -1,6 +1,11 @@
 // ordinatio API Client Layer (Clean Architecture)
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
+function buildUrl(path) {
+  const base = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://localhost';
+  return new URL(`${API_BASE_URL}${path}`, base);
+}
+
 function getAuthHeaders(extra = {}) {
   const token = localStorage.getItem('ordinatio_token');
   const headers = { ...extra };
@@ -133,7 +138,7 @@ export const apiClient = {
 
   // --- Virtual Key Lifecycle (Phase 1) ---
   async getVirtualKeys(params = {}) {
-    const url = new URL(`${API_BASE_URL}/virtual-keys`);
+    const url = buildUrl('/virtual-keys');
     if (params.tenant_id && params.tenant_id !== 'ALL') {
       url.searchParams.append('tenant_id', params.tenant_id);
     }
@@ -578,7 +583,7 @@ export const apiClient = {
   },
 
   async getMetricsTimeseries(window = '1h', resolution = '1m') {
-    const url = new URL(`${API_BASE_URL}/observability/metrics/timeseries`);
+    const url = buildUrl('/observability/metrics/timeseries');
     if (window) url.searchParams.append('window', window);
     if (resolution) url.searchParams.append('resolution', resolution);
     const res = await authFetch(url.toString());
@@ -600,7 +605,7 @@ export const apiClient = {
   },
 
   async exportFinOpsInvoiceCsv(month = null) {
-    const url = new URL(`${API_BASE_URL}/finops/invoices/export`);
+    const url = buildUrl('/finops/invoices/export');
     if (month) url.searchParams.append('month', month);
     const res = await fetch(url.toString(), {
       headers: getAuthHeaders()
@@ -620,7 +625,7 @@ export const apiClient = {
 
   // --- Compliance & PII Governance (Phase 4) ---
   async getPiiRules(activeOnly = false) {
-    const url = new URL(`${API_BASE_URL}/compliance/rules`);
+    const url = buildUrl('/compliance/rules');
     if (activeOnly) url.searchParams.append('active_only', 'true');
     const res = await authFetch(url.toString());
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -679,7 +684,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(params = {}) {
-    const url = new URL(`${API_BASE_URL}/compliance/audit-logs`);
+    const url = buildUrl('/compliance/audit-logs');
     if (params.requester_id) url.searchParams.append('requester_id', params.requester_id);
     if (params.key_id) url.searchParams.append('key_id', params.key_id);
     if (params.action_taken) url.searchParams.append('action_taken', params.action_taken);
@@ -741,7 +746,7 @@ export const apiClient = {
   // --- System Prompt Governance (Phase 1~4) ---
   async getSystemPrompts(params = {}) {
     try {
-      const url = new URL(`${API_BASE_URL}/system-prompts`);
+      const url = buildUrl('/system-prompts');
       if (params.target_type) url.searchParams.append('target_type', params.target_type);
       if (params.is_active !== undefined) url.searchParams.append('is_active', params.is_active);
       if (params.search) url.searchParams.append('search', params.search);

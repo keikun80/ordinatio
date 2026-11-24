@@ -86,7 +86,7 @@ class AgentRouterPolicyManager:
                 for row in db_rows:
                     cfg = dict(row.config or {})
                     def is_stale_or_empty(val: Optional[str]) -> bool:
-                        return not val or "meta-llama" in str(val)
+                        return not val
 
                     if active_catalog_ids:
                         default_reasoning = active_catalog_ids[0]
@@ -141,10 +141,11 @@ class AgentRouterPolicyManager:
                         db.rollback()
 
                 return result
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to fetch AgentRouter policies from DB: {e}")
 
-        return copy.deepcopy(DEFAULT_POLICIES_CONFIG)
+        return []
 
     @classmethod
     def get_policy(cls, policy_id: str, db: Optional[Session] = None) -> Dict[str, Any]:
@@ -153,10 +154,7 @@ class AgentRouterPolicyManager:
         for p in policies:
             if p["policy_id"].lower() == policy_id.lower():
                 return p
-        for p in DEFAULT_POLICIES_CONFIG:
-            if p["policy_id"].lower() == policy_id.lower():
-                return copy.deepcopy(p)
-        return copy.deepcopy(DEFAULT_POLICIES_CONFIG[0])
+        return {"policy_id": policy_id, "name": policy_id, "is_active": True, "config": {}}
 
     @classmethod
     def update_policies(cls, updated_list: List[Dict[str, Any]], db: Optional[Session] = None) -> List[Dict[str, Any]]:

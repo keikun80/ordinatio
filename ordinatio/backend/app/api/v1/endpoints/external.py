@@ -21,31 +21,6 @@ from app.api.deps import require_permission
 
 router = APIRouter(prefix="/external", tags=["External Application Integration"])
 
-# Standard serving models catalog
-CATALOG_MODELS = [
-    {
-        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
-        "alias": "Llama-3.1-8B (General/NLP)",
-        "backend_infra": "On-Prem K8s (vLLM)",
-        "input_price_per_1k": 0.80,
-        "output_price_per_1k": 2.40
-    },
-    {
-        "model_id": "Qwen/Qwen2.5-72B-Instruct",
-        "alias": "Qwen-2.5-72B (Complex Reasoning)",
-        "backend_infra": "Bare-Metal GPU (vLLM)",
-        "input_price_per_1k": 2.50,
-        "output_price_per_1k": 7.50
-    },
-    {
-        "model_id": "upstage/SOLAR-10.7B-Instruct",
-        "alias": "SOLAR-10.7B (Finance Spec)",
-        "backend_infra": "Private VM (vLLM)",
-        "input_price_per_1k": 1.20,
-        "output_price_per_1k": 3.60
-    }
-]
-
 def authenticate_client_key(
     authorization: Optional[str] = Header(None),
     x_virtual_key: Optional[str] = Header(None),
@@ -141,25 +116,15 @@ def get_my_allowed_models(
         query = query.filter(ModelCatalog.model_id.in_(allowed))
     db_models = query.all()
 
-    if db_models:
-        return [
-            ClientModelResponse(
-                model_id=m.model_id,
-                alias=m.alias,
-                backend_infra=m.backend_infra,
-                input_price_per_1k=float(m.input_price_per_1k),
-                output_price_per_1k=float(m.output_price_per_1k)
-            )
-            for m in db_models
-        ]
-
-    # Fallback to CATALOG_MODELS only if DB has no model records
-    if not allowed:
-        return [ClientModelResponse(**m) for m in CATALOG_MODELS]
-
     return [
-        ClientModelResponse(**m) for m in CATALOG_MODELS
-        if m["model_id"] in allowed
+        ClientModelResponse(
+            model_id=m.model_id,
+            alias=m.alias,
+            backend_infra=m.backend_infra,
+            input_price_per_1k=float(m.input_price_per_1k),
+            output_price_per_1k=float(m.output_price_per_1k)
+        )
+        for m in db_models
     ]
 
 # -----------------------------------------------------------------------------

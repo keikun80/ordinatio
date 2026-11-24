@@ -404,7 +404,7 @@ def seed_data():
                 display_name="전사 최고관리자",
                 description="전사 플랫폼, 전 부서 테넌트, 모델 라우팅 및 보안 정책 총괄 최고 관리자",
                 is_system=True,
-                permissions=ALL_PERMISSION_CODES
+                permissions=["*"] + ALL_PERMISSION_CODES
             ),
             Role(
                 name="TENANT_ADMIN",
@@ -427,6 +427,19 @@ def seed_data():
                 ]
             )
         ])
+
+    # Seed AgentRouter Policies if empty
+    from app.models.agent_router_policy import AgentRouterPolicyModel
+    from app.core.agent_router.policy_manager import DEFAULT_POLICIES_CONFIG
+    if db.query(AgentRouterPolicyModel).count() == 0:
+        for p in DEFAULT_POLICIES_CONFIG:
+            db.add(AgentRouterPolicyModel(
+                policy_id=p["policy_id"],
+                name=p["name"],
+                description=p["description"],
+                is_active=p["is_active"],
+                config=p["config"]
+            ))
 
     db.commit()
     db.close()

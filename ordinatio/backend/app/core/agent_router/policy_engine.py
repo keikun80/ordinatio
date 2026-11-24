@@ -80,28 +80,10 @@ class AgentRouter:
             policy_item = AgentRouterPolicyManager.get_policy(active_policy.value, db=db)
             cfg = policy_item.get("config", {})
 
-        # Dynamically resolve fast/reasoning/fallback from PostgreSQL model_catalogs if not provided
-        def_fast = self.fast_model
-        def_reasoning = self.reasoning_model
-        def_fallback = self.fallback_model
-
-        if (not def_fast or not def_reasoning or not def_fallback) and db is not None:
-            try:
-                from app.models.model_catalog import ModelCatalog
-                active_cats = [m.model_id for m in db.query(ModelCatalog).filter(ModelCatalog.is_active == True).all()]
-                if active_cats:
-                    if not def_reasoning:
-                        def_reasoning = active_cats[0]
-                    if not def_fast:
-                        def_fast = active_cats[-1]
-                    if not def_fallback:
-                        def_fallback = active_cats[-1]
-            except Exception:
-                pass
-
-        def_fast = def_fast or DEFAULT_FAST_MODEL
-        def_reasoning = def_reasoning or DEFAULT_REASONING_MODEL
-        def_fallback = def_fallback or DEFAULT_FALLBACK_MODEL
+        # Prioritize explicit parameters, then policy config, then defaults
+        def_fast = self.fast_model or cfg.get("fast_model") or cfg.get("economic_model") or cfg.get("primary_fast_model") or DEFAULT_FAST_MODEL
+        def_reasoning = self.reasoning_model or cfg.get("reasoning_model") or cfg.get("standard_model") or DEFAULT_REASONING_MODEL
+        def_fallback = self.fallback_model or cfg.get("primary_fallback_model") or DEFAULT_FALLBACK_MODEL
 
         # If client explicitly asked for a concrete known model other than 'auto' or 'agent-auto', respect it
         if explicit_model_request and explicit_model_request not in ["auto", "agent-auto", "default", None]:

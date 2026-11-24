@@ -204,3 +204,60 @@ def test_remote_endpoint_metrics_and_na_fallback():
     db.commit()
     db.close()
 
+
+def test_today_total_tokens_metering_and_accumulation():
+    """Verify that actual prompt and completion tokens are measured and accumulated into total_tokens_today."""
+    from datetime import datetime, timezone
+    from app.core.token_meter import record_daily_tokens, get_today_total_tokens
+    from app.models.daily_token_ledger import DailyTokenLedger
+
+    db = TestSessionLocal()
+    initial_total = get_today_total_tokens(db)
+
+    # 1. Simulate gateway recording tokens for an inference call (350 prompt + 650 completion = 1000 tokens)
+    updated_total = record_daily_tokens(
+        db=db,
+        tenant_id="dept-ai-lab",
+        model_id="meta-llama/Llama-3.1-8B-Instruct",
+        prompt_tokens=350,
+        completion_tokens=650,
+        cost_krw=1.84
+    )
+    assert updated_total == initial_total + 1000
+
+    # 2. Verify via Observability summary REST endpoint
+    summary_res = client.get("/api/v1/observability/metrics/summary")
+    assert summary_res.status_code == 200
+    data = summary_res.json()
+    assert data["total_tokens_today"] == updated_total
+
+    # 3. Verify persistent DailyTokenLedger table in database
+    today = datetime.now(timezone.utc).date()
+    ledger_row = db.query(DailyTokenLedger).filter(
+        DailyTokenLedger.date == today,
+        DailyTokenLedger.tenant_id == "dept-ai-lab",
+        DailyTokenLedger.model_id == "meta-llama/Llama-3.1-8B-Instruct"
+    ).first()
+    assert ledger_row is not None
+    assert ledger_row.prompt_tokens >= 350
+    assert ledger_row.completion_tokens >= 650
+    assert ledger_row.total_tokens >= 1000
+    assert ledger_row.request_count >= 1
+
+    # 4. Record second inference request (200 prompt + 300 completion = 500 tokens)
+    updated_total_2 = record_daily_tokens(
+        db=db,
+        tenant_id="dept-ai-lab",
+        model_id="meta-llama/Llama-3.1-8B-Instruct",
+        prompt_tokens=200,
+        completion_tokens=300,
+        cost_krw=0.88
+    )
+    assert updated_total_2 == updated_total + 500
+
+    # 5. Verify summary reflects cumulative actual tokens
+    summary_res_2 = client.get("/api/v1/observability/metrics/summary")
+    assert summary_res_2.json()["total_tokens_today"] == updated_total_2
+    db.close()
+
+

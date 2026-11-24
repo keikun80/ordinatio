@@ -230,6 +230,20 @@ def record_token_and_cost_metering(
         logger.warning(f"FinOps metering commit failed: {e}")
         db.rollback()
 
+    # Record daily cumulative tokens & persistent ledger
+    try:
+        from app.core.token_meter import record_daily_tokens
+        record_daily_tokens(
+            db=db,
+            tenant_id=target_tenant.tenant_id if target_tenant else (target_key.tenant_id if target_key else None),
+            model_id=model_entry.model_id if model_entry else None,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cost_krw=cost_krw
+        )
+    except Exception as e:
+        logger.warning(f"Daily token recording failed: {e}")
+
     return {
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,

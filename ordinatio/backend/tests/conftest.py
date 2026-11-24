@@ -49,6 +49,7 @@ from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.system_prompt import SystemPrompt
+from app.models.daily_token_ledger import DailyTokenLedger
 from app.models.user import User, UserSession
 from app.models.role import Role
 from app.core.permissions import ALL_PERMISSION_CODES

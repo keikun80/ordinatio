@@ -8,6 +8,7 @@ from app.schemas.observability import (
     ObservabilityTimeseriesResponse
 )
 from app.api.deps import require_permission
+from app.core.token_meter import get_today_total_tokens
 
 router = APIRouter()
 
@@ -34,6 +35,7 @@ def get_observability_metrics_summary(db: Session = Depends(get_db)):
     """Returns real-time aggregated metrics summary for the Admin Overview dashboard."""
     telemetry = telemetry_hub.generate_current_telemetry()
     uptime = time.time() - telemetry_hub._start_time
+    daily_tokens = get_today_total_tokens(db)
 
     return ObservabilitySummaryResponse(
         current_rps=telemetry.rps,
@@ -41,7 +43,7 @@ def get_observability_metrics_summary(db: Session = Depends(get_db)):
         p95_ttft_ms=telemetry.ttft_ms,
         error_rate=telemetry.error_rate_5xx,
         cache_hit_rate=telemetry.cache_hit_rate,
-        total_tokens_today=int(telemetry.tps * 3600 * 2.4),
+        total_tokens_today=daily_tokens,
         cumulative_cost_krw=telemetry.cumulative_cost_krw,
         total_requests=getattr(telemetry, "total_requests", 0),
         compute_pools=telemetry.compute_pools,

@@ -29,6 +29,27 @@ DEFAULT_FAST_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 DEFAULT_REASONING_MODEL = "meta-llama/Llama-3.1-70B-Instruct"
 DEFAULT_FALLBACK_MODEL = "qwen2.5:14b"
 
+def get_default_models_and_clusters(db: Optional[Any] = None) -> tuple:
+    """Fetch default fast, reasoning, fallback models and clusters from PostgreSQL SSOT."""
+    fast_m = DEFAULT_FAST_MODEL
+    reas_m = DEFAULT_REASONING_MODEL
+    fall_m = DEFAULT_FALLBACK_MODEL
+    clusters = dict(DEFAULT_CLUSTERS)
+
+    if db is not None:
+        try:
+            from app.models.system_setting import SystemSetting
+            setting = db.query(SystemSetting).filter(SystemSetting.key == "router_default_models").first()
+            if setting and isinstance(setting.value, dict):
+                fast_m = setting.value.get("fast_model") or fast_m
+                reas_m = setting.value.get("reasoning_model") or reas_m
+                fall_m = setting.value.get("fallback_model") or fall_m
+                if "clusters" in setting.value and isinstance(setting.value["clusters"], dict):
+                    clusters.update(setting.value["clusters"])
+        except Exception:
+            pass
+    return fast_m, reas_m, fall_m, clusters
+
 def derive_cluster_name(model_name: Optional[str], default_fallback: str = "cluster_default") -> str:
     """Dynamically derives an Envoy cluster name from model name when not explicitly configured."""
     if not model_name:
@@ -80,10 +101,11 @@ class AgentRouter:
             policy_item = AgentRouterPolicyManager.get_policy(active_policy.value, db=db)
             cfg = policy_item.get("config", {})
 
-        # Prioritize explicit parameters, then policy config, then defaults
-        def_fast = self.fast_model or cfg.get("fast_model") or cfg.get("economic_model") or cfg.get("primary_fast_model") or DEFAULT_FAST_MODEL
-        def_reasoning = self.reasoning_model or cfg.get("reasoning_model") or cfg.get("standard_model") or DEFAULT_REASONING_MODEL
-        def_fallback = self.fallback_model or cfg.get("primary_fallback_model") or DEFAULT_FALLBACK_MODEL
+        # Prioritize explicit parameters, then policy config, then DB/system defaults
+        sys_fast, sys_reas, sys_fall, sys_clusters = get_default_models_and_clusters(db)
+        def_fast = self.fast_model or cfg.get("fast_model") or cfg.get("economic_model") or cfg.get("primary_fast_model") or sys_fast
+        def_reasoning = self.reasoning_model or cfg.get("reasoning_model") or cfg.get("standard_model") or sys_reas
+        def_fallback = self.fallback_model or cfg.get("primary_fallback_model") or sys_fall
 
         # If client explicitly asked for a concrete known model other than 'auto' or 'agent-auto', respect it
         if explicit_model_request and explicit_model_request not in ["auto", "agent-auto", "default", None]:

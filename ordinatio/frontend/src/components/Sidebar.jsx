@@ -13,7 +13,8 @@ import {
   Compass,
   ScrollText,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
@@ -28,6 +29,7 @@ export default function Sidebar({
   const { isSuperAdmin, hasPermission } = useAuth();
   const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
   const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
+  const canAccessSettings = isSuperAdmin || hasPermission('system:read') || hasPermission('system:write');
   const [isRoutingExpanded, setIsRoutingExpanded] = useState(true);
   const [systemInfo, setSystemInfo] = useState(null);
 
@@ -100,6 +102,9 @@ export default function Sidebar({
     ] : []),
     ...(canAccessRoles ? [
       { id: 'roles', label: strings.nav.menus.roles, icon: ShieldCheck }
+    ] : []),
+    ...(canAccessSettings ? [
+      { id: 'settings', label: '시스템 설정', icon: Sliders }
     ] : [])
   ];
 

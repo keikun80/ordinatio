@@ -1010,6 +1010,76 @@ export const apiClient = {
     return await res.json();
   },
 
+  // --- System Settings (Business Domain SSOT) ---
+  async getSystemSettings(category) {
+    const url = buildUrl('/system-settings');
+    if (category) {
+      url.searchParams.append('category', category);
+    }
+    const res = await authFetch(url.toString());
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '설정 목록 조회 실패' }));
+      throw new Error(err.detail || '설정 목록 조회 실패');
+    }
+    return await res.json();
+  },
+
+  async getPublicSettings() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/system-settings/public`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      return {};
+    }
+  },
+
+  async getSystemSetting(key) {
+    const res = await authFetch(`${API_BASE_URL}/system-settings/${key}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '설정 조회 실패' }));
+      throw new Error(err.detail || '설정 조회 실패');
+    }
+    return await res.json();
+  },
+
+  async createSystemSetting(settingData) {
+    const res = await authFetch(`${API_BASE_URL}/system-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settingData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '설정 생성 실패' }));
+      throw new Error(err.detail || '설정 생성 실패');
+    }
+    return await res.json();
+  },
+
+  async updateSystemSetting(key, settingData) {
+    const res = await authFetch(`${API_BASE_URL}/system-settings/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settingData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '설정 수정 실패' }));
+      throw new Error(err.detail || '설정 수정 실패');
+    }
+    return await res.json();
+  },
+
+  async deleteSystemSetting(key) {
+    const res = await authFetch(`${API_BASE_URL}/system-settings/${key}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '설정 삭제 실패' }));
+      throw new Error(err.detail || '설정 삭제 실패');
+    }
+    return true;
+  },
+
   // --- Role & Dynamic RBAC Governance ---
   async getRoles() {
     const token = localStorage.getItem('ordinatio_token');

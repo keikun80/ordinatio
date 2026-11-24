@@ -56,9 +56,10 @@ export default function SystemPromptsTab({ onNotify }) {
   const [simClientSysMsg, setSimClientSysMsg] = useState('');
   const [simResult, setSimResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [templates, setTemplates] = useState([]);
 
-  // Quick Templates
-  const TEMPLATES = [
+  // Default Quick Templates Fallback
+  const DEFAULT_TEMPLATES = [
     {
       label: strings.systemPrompts.presets.guardrailLabel,
       name: strings.systemPrompts.presets.guardrailName,
@@ -86,12 +87,19 @@ export default function SystemPromptsTab({ onNotify }) {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [promptList, routeList, keyList, tenantList] = await Promise.all([
+      const [promptList, routeList, keyList, tenantList, publicSettings] = await Promise.all([
         apiClient.getSystemPrompts(),
         apiClient.getRoutes(),
         apiClient.getVirtualKeys(),
-        apiClient.getTenants()
+        apiClient.getTenants(),
+        apiClient.getPublicSettings().catch(() => ({}))
       ]);
+
+      if (publicSettings && Array.isArray(publicSettings.prompt_templates) && publicSettings.prompt_templates.length > 0) {
+        setTemplates(publicSettings.prompt_templates);
+      } else {
+        setTemplates(DEFAULT_TEMPLATES);
+      }
 
       setPrompts(Array.isArray(promptList) ? promptList : []);
       setRoutes(Array.isArray(routeList) ? routeList : []);
@@ -580,7 +588,7 @@ export default function SystemPromptsTab({ onNotify }) {
                       <span>{strings.systemPrompts.quickTemplatesLabel}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {TEMPLATES.map((tpl, i) => (
+                      {templates.map((tpl, i) => (
                         <button
                           key={i}
                           type="button"

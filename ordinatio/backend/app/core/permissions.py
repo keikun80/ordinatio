@@ -112,6 +112,19 @@ AVAILABLE_PERMISSIONS: List[Dict[str, str]] = [
         "name": "역할 및 권한 관리",
         "category": "계정 관리",
         "description": "신규 역할 추가, 역할 표시명/설명 수정, 세부 권한 매트릭스 편집 및 삭제"
+    },
+    # 11. 시스템 설정 관리 (System Settings)
+    {
+        "code": "system:read",
+        "name": "시스템 설정 조회",
+        "category": "시스템 설정",
+        "description": "운영 도메인 변수, 라우터 기본 모델, LLM 공급자, 프롬프트 템플릿 등 전역 설정 열람"
+    },
+    {
+        "code": "system:write",
+        "name": "시스템 설정 관리",
+        "category": "시스템 설정",
+        "description": "전역 운영 변수, LLM 공급자 프리셋, 분류기 키워드 및 시스템 프롬프트 템플릿 수정"
     }
 ]
 

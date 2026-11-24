@@ -15,6 +15,7 @@ from app.models.user import User, UserSession
 from app.models.role import Role
 from app.core.permissions import ALL_PERMISSION_CODES
 from app.core.config import settings
+from app.db.system_settings_seed import seed_system_settings
 
 logger = logging.getLogger(__name__)
 
@@ -539,6 +540,9 @@ def init_db():
             db.add_all([super_admin_role, tenant_admin_role, viewer_role])
             db.commit()
             logger.info("Initialized database with default system roles (SUPER_ADMIN, TENANT_ADMIN, VIEWER)")
+
+        # 11. Seed System Settings (PostgreSQL SSOT)
+        seed_system_settings(db)
 
         db.close()
     except Exception as e:

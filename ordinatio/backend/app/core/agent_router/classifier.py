@@ -44,10 +44,25 @@ def estimate_tokens(text: str) -> int:
     # Balanced heuristic: 1 token ≈ 3.5 characters for mixed Ko/En
     return max(len(words), int(char_count / 3.5))
 
+def get_classification_patterns(db: Optional[Any] = None) -> tuple:
+    """Fetch classification keywords and patterns from PostgreSQL SSOT if available."""
+    if db is not None:
+        try:
+            from app.models.system_setting import SystemSetting
+            setting = db.query(SystemSetting).filter(SystemSetting.key == "classification_rules").first()
+            if setting and isinstance(setting.value, dict):
+                r_keywords = setting.value.get("reasoning_keywords", REASONING_KEYWORDS)
+                c_patterns = setting.value.get("coding_patterns", CODING_PATTERNS)
+                return r_keywords, c_patterns
+        except Exception:
+            pass
+    return REASONING_KEYWORDS, CODING_PATTERNS
+
 def classify_prompt(
     messages: List[Dict[str, Any]],
     tools: Optional[List[Dict[str, Any]]] = None,
-    functions: Optional[List[Dict[str, Any]]] = None
+    functions: Optional[List[Dict[str, Any]]] = None,
+    db: Optional[Any] = None
 ) -> ClassificationResult:
     """
     Analyzes conversation messages and determines prompt complexity and suggested upstream tier.
@@ -55,6 +70,7 @@ def classify_prompt(
     """
     reasons = []
     has_tools = bool(tools or functions)
+    reasoning_keywords, coding_patterns = get_classification_patterns(db)
 
     # 1. Check for explicit tool-calling or agent workflows
     if has_tools:
@@ -100,7 +116,7 @@ def classify_prompt(
 
     # 3. Check for coding intent
     is_coding = False
-    for pattern in CODING_PATTERNS:
+    for pattern in coding_patterns:
         if re.search(pattern, latest_user_prompt, re.IGNORECASE):
             is_coding = True
             reasons.append(f"Coding/Technical pattern matched: {pattern[:25]}...")
@@ -108,7 +124,7 @@ def classify_prompt(
 
     # 4. Check for deep reasoning / math / analysis intent
     is_reasoning = False
-    for pattern in REASONING_KEYWORDS:
+    for pattern in reasoning_keywords:
         if re.search(pattern, latest_user_prompt, re.IGNORECASE):
             is_reasoning = True
             reasons.append(f"Analytical reasoning keyword matched: {pattern[:25]}...")

@@ -16,6 +16,7 @@ const ComplianceTab = lazy(() => import('./components/ComplianceTab'));
 const PromptStudioTab = lazy(() => import('./components/PromptStudioTab'));
 const SystemPromptsTab = lazy(() => import('./components/SystemPromptsTab'));
 const UsersTab = lazy(() => import('./components/UsersTab'));
+const SystemSettingsTab = lazy(() => import('./components/SystemSettingsTab'));
 
 function Dashboard() {
   const { user, isAuthenticated, isLoading, isSuperAdmin, hasPermission } = useAuth();
@@ -28,6 +29,7 @@ function Dashboard() {
   const canAccessStudio = isSuperAdmin || hasPermission('prompt_studio:execute');
   const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
   const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
+  const canAccessSettings = isSuperAdmin || hasPermission('system:read') || hasPermission('system:write');
   const [activeTab, setActiveTab] = useState('overview');
   const [routingSubTab, setRoutingSubTab] = useState('routing');
   const [toasts, setToasts] = useState([]);
@@ -48,7 +50,8 @@ function Dashboard() {
       { id: 'compliance', ok: canAccessCompliance },
       { id: 'prompt-studio', ok: canAccessStudio },
       { id: 'users', ok: canAccessUsers },
-      { id: 'roles', ok: canAccessRoles }
+      { id: 'roles', ok: canAccessRoles },
+      { id: 'settings', ok: canAccessSettings }
     ];
     const currentEntry = tabPermMap.find((t) => t.id === activeTab);
     if (!currentEntry || !currentEntry.ok) {
@@ -177,6 +180,10 @@ function Dashboard() {
                 defaultSubTab={activeTab === 'roles' ? 'roles' : 'users'}
                 onNotify={addToast} 
               />
+            )}
+
+            {activeTab === 'settings' && canAccessSettings && (
+              <SystemSettingsTab onNotify={addToast} />
             )}
           </Suspense>
         </main>

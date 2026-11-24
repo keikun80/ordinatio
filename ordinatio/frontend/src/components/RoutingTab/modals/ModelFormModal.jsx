@@ -28,23 +28,39 @@ export function NewModelModal({
         <form onSubmit={handleCreateModel}>
           <div className="modal-body">
             <div className="form-group">
+              <label className="form-label">{strings.routing.modals.modelNameLabel}</label>
+              <input 
+                className="form-input" 
+                placeholder={strings.routing.modals.modelNamePlaceholder} 
+                value={newModelForm.name || ''}
+                onChange={(e) => setNewModelForm({...newModelForm, name: e.target.value})}
+              />
+            </div>
+            <div className="form-group">
               <label className="form-label">{strings.routing.modals.modelIdLabel}</label>
               <input 
                 className="form-input" 
                 placeholder={strings.routing.modals.modelIdPlaceholder} 
                 value={newModelForm.model_id}
-                onChange={(e) => setNewModelForm({...newModelForm, model_id: e.target.value})}
+                onChange={(e) => setNewModelForm({
+                  ...newModelForm, 
+                  model_id: e.target.value,
+                  // alias가 비어있거나 model_id와 같았던 경우 자동 동기화
+                  alias: (!newModelForm.alias || newModelForm.alias === newModelForm.model_id) ? e.target.value : newModelForm.alias
+                })}
                 required
               />
             </div>
             <div className="form-group">
-              <label className="form-label">{strings.routing.modals.modelAliasLabel}</label>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{strings.routing.modals.modelAliasLabel}</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.routing.modals.modelAliasHint}</span>
+              </label>
               <input 
                 className="form-input" 
                 placeholder={strings.routing.modals.modelAliasPlaceholder} 
-                value={newModelForm.alias}
+                value={newModelForm.alias || ''}
                 onChange={(e) => setNewModelForm({...newModelForm, alias: e.target.value})}
-                required
               />
             </div>
             {/* Provider 규격 선택 세그먼트 */}
@@ -382,15 +398,28 @@ export function EditModelModal({
               />
             </div>
 
+            {/* Model Name */}
+            <div className="form-group">
+              <label className="form-label">{strings.routing.modals.modelNameLabel}</label>
+              <input 
+                className="form-input" 
+                placeholder={strings.routing.modals.modelNamePlaceholder} 
+                value={editModelForm.name || ''}
+                onChange={(e) => setEditModelForm({...editModelForm, name: e.target.value})}
+              />
+            </div>
+
             {/* Route Alias */}
             <div className="form-group">
-              <label className="form-label">{strings.routing.modals.modelAliasLabel}</label>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{strings.routing.modals.modelAliasLabel}</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{strings.routing.modals.modelAliasHint}</span>
+              </label>
               <input 
                 className="form-input" 
                 placeholder={strings.routing.modals.modelAliasPlaceholder} 
-                value={editModelForm.alias}
+                value={editModelForm.alias || ''}
                 onChange={(e) => setEditModelForm({...editModelForm, alias: e.target.value})}
-                required
               />
             </div>
 

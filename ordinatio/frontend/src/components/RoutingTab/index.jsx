@@ -213,6 +213,7 @@ export default function RoutingTab({
   const [showApiKey, setShowApiKey] = useState(false);
   const [newModelForm, setNewModelForm] = useState({
     model_id: '',
+    name: '',
     alias: '',
     provider: 'openai',
     base_domain: LLM_PROVIDERS[0].defaultDomain,
@@ -248,6 +249,7 @@ export default function RoutingTab({
   const [showEditApiKey, setShowEditApiKey] = useState(false);
   const [editModelForm, setEditModelForm] = useState({
     model_id: '',
+    name: '',
     alias: '',
     provider: 'openai',
     base_domain: '',
@@ -268,6 +270,7 @@ export default function RoutingTab({
     const activeProvider = model.provider || provider || 'openai';
     setEditModelForm({
       model_id: model.id,
+      name: model.name || model.id || '',
       alias: model.alias || '',
       provider: activeProvider,
       base_domain: domain || model.endpoint || '',
@@ -308,7 +311,8 @@ export default function RoutingTab({
 
     try {
       const res = await apiClient.updateModel(editingModel.id, {
-        alias: editModelForm.alias,
+        name: editModelForm.name?.trim() || editingModel.id,
+        alias: editModelForm.alias?.trim() || editingModel.id,
         target_endpoint: editModelForm.target_endpoint,
         provider: editModelForm.provider,
         input_price_per_1k: Number(editModelForm.input_price_per_1k),
@@ -323,6 +327,7 @@ export default function RoutingTab({
 
       const updated = models.map(m => m.id === editingModel.id ? {
         ...m,
+        name: res.name || editModelForm.name || m.name,
         alias: res.alias || editModelForm.alias,
         endpoint: res.target_endpoint || editModelForm.target_endpoint,
         provider: res.provider || editModelForm.provider || 'openai',
@@ -343,6 +348,7 @@ export default function RoutingTab({
       console.warn('Update model via API failed, updating locally:', err);
       const updated = models.map(m => m.id === editingModel.id ? {
         ...m,
+        name: editModelForm.name || m.name,
         alias: editModelForm.alias,
         endpoint: editModelForm.target_endpoint,
         provider: editModelForm.provider || 'openai',
@@ -911,8 +917,9 @@ export default function RoutingTab({
     e.preventDefault();
     try {
       const res = await apiClient.createModel({
-        model_id: newModelForm.model_id,
-        alias: newModelForm.alias,
+        model_id: newModelForm.model_id.trim(),
+        name: (newModelForm.name?.trim()) || newModelForm.model_id.trim(),
+        alias: (newModelForm.alias?.trim()) || newModelForm.model_id.trim(),
         target_endpoint: newModelForm.target_endpoint,
         provider: newModelForm.provider || 'openai',
         input_price_per_1k: Number(newModelForm.input_price_per_1k),
@@ -927,7 +934,8 @@ export default function RoutingTab({
 
       const newEntry = {
         id: res.model_id,
-        alias: res.alias,
+        name: res.name || res.model_id,
+        alias: res.alias || res.model_id,
         endpoint: res.target_endpoint,
         provider: res.provider || newModelForm.provider || 'openai',
         healthCheckTimeout: res.health_check_timeout !== undefined ? Number(res.health_check_timeout) : Number(newModelForm.health_check_timeout || 3.0),
@@ -948,7 +956,8 @@ export default function RoutingTab({
     } catch (err) {
       const fallbackEntry = {
         id: newModelForm.model_id,
-        alias: newModelForm.alias,
+        name: newModelForm.name || newModelForm.model_id,
+        alias: newModelForm.alias || newModelForm.model_id,
         endpoint: newModelForm.target_endpoint,
         provider: newModelForm.provider || 'openai',
         healthCheckTimeout: Number(newModelForm.health_check_timeout || 3.0),

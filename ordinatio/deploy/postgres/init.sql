@@ -38,7 +38,8 @@ CREATE INDEX IF NOT EXISTS idx_virtual_keys_prefix ON virtual_keys(key_prefix);
 -- 3. 서빙 모델 카탈로그
 CREATE TABLE IF NOT EXISTS model_catalogs (
     model_id VARCHAR(128) PRIMARY KEY,
-    alias VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(128),
+    alias VARCHAR(64) UNIQUE,
     backend_infra VARCHAR(32) NOT NULL DEFAULT 'On-Prem K8s',
     serving_engine VARCHAR(32) NOT NULL DEFAULT 'vLLM',
     execution_method VARCHAR(32) NOT NULL DEFAULT 'k8s',

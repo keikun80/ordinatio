@@ -147,7 +147,8 @@ async def check_all_models_health(
         )
         return ModelHealthCheckResult(
             model_id=m.model_id,
-            alias=m.alias,
+            name=m.name or m.model_id,
+            alias=m.alias or m.model_id,
             serving_engine=m.serving_engine or "vLLM",
             execution_method=m.execution_method or "k8s",
             target_endpoint=m.target_endpoint,
@@ -188,7 +189,8 @@ async def check_single_model_health(
     )
     return ModelHealthCheckResult(
         model_id=model.model_id,
-        alias=model.alias,
+        name=model.name or model.model_id,
+        alias=model.alias or model.model_id,
         serving_engine=model.serving_engine or "vLLM",
         execution_method=model.execution_method or "k8s",
         target_endpoint=model.target_endpoint,
@@ -225,14 +227,21 @@ def create_model(model_in: ModelCatalogCreate, db: Session = Depends(get_db)):
             detail=f"Model '{model_in.model_id}' already exists in catalog."
         )
     
-    alias_exist = db.query(ModelCatalog).filter(ModelCatalog.alias == model_in.alias).first()
+    alias_val = model_in.alias.strip() if model_in.alias else model_in.model_id.strip()
+    alias_exist = db.query(ModelCatalog).filter(
+        ModelCatalog.alias == alias_val,
+        ModelCatalog.model_id != model_in.model_id
+    ).first()
     if alias_exist:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Alias '{model_in.alias}' already used by another model."
+            detail=f"Alias '{alias_val}' already used by another model."
         )
 
     model_dict = model_in.model_dump()
+    model_dict["alias"] = alias_val
+    if not model_dict.get("name"):
+        model_dict["name"] = model_in.model_id
     if model_dict.get("api_key"):
         model_dict["api_key"] = encrypt_upstream_key(model_dict["api_key"])
 

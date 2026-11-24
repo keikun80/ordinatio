@@ -26,6 +26,8 @@ def init_db():
         try:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE virtual_keys ALTER COLUMN tenant_id DROP NOT NULL;"))
+                conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS name VARCHAR(128);"))
+                conn.execute(text("ALTER TABLE model_catalogs ALTER COLUMN alias DROP NOT NULL;"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS serving_engine VARCHAR(32) DEFAULT 'vLLM';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS execution_method VARCHAR(32) DEFAULT 'k8s';"))
                 conn.execute(text("ALTER TABLE model_catalogs ADD COLUMN IF NOT EXISTS api_key TEXT;"))

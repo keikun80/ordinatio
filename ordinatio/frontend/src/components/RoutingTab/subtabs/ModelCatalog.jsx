@@ -116,8 +116,11 @@ export default function ModelCatalog({
                   return (
                     <tr key={m.id}>
                     <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.id}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.id}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>id: {m.id}</div>
+                      {m.alias && m.alias !== m.id && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>alias: {m.alias}</div>
+                      )}
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                       {(() => {

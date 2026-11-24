@@ -16,7 +16,8 @@ class ExecutionMethodEnum(str, Enum):
 
 class ModelCatalogBase(BaseModel):
     model_id: str = Field(..., json_schema_extra={"example": "meta-llama/Llama-3.1-8B-Instruct"})
-    alias: str = Field(..., json_schema_extra={"example": "financial-advisor-v1"})
+    name: Optional[str] = Field(default=None, description="표시용 모델 이름 (Model Name)", json_schema_extra={"example": "Llama 3.1 8B Instruct"})
+    alias: Optional[str] = Field(default=None, description="라우트 가상 별칭 (생략 시 model_id와 동일하게 자동 설정)", json_schema_extra={"example": "llama-3.1-8b"})
     serving_engine: str = Field(default="vLLM", json_schema_extra={"example": "vLLM"})
     execution_method: str = Field(default="k8s", json_schema_extra={"example": "k8s"})
     backend_infra: str = Field(default="On-Prem K8s", json_schema_extra={"example": "On-Prem K8s"})
@@ -35,6 +36,7 @@ class ModelCatalogCreate(ModelCatalogBase):
     pass
 
 class ModelCatalogUpdate(BaseModel):
+    name: Optional[str] = None
     alias: Optional[str] = None
     serving_engine: Optional[str] = None
     execution_method: Optional[str] = None
@@ -56,7 +58,8 @@ class ModelCatalogResponse(ModelCatalogBase):
 
 class ModelHealthCheckResult(BaseModel):
     model_id: str
-    alias: str
+    name: Optional[str] = None
+    alias: Optional[str] = None
     serving_engine: str
     execution_method: str
     target_endpoint: str

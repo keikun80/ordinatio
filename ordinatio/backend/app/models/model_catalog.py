@@ -5,7 +5,8 @@ class ModelCatalog(Base):
     __tablename__ = "model_catalogs"
 
     model_id = Column(String(128), primary_key=True, index=True)
-    alias = Column(String(64), unique=True, nullable=False)
+    name = Column(String(128), nullable=True)  # Display model name (e.g. 'Qwen 36B Instruct')
+    alias = Column(String(64), unique=True, nullable=True)
     backend_infra = Column(String(32), nullable=False)  # Legacy/Composite (e.g. 'On-Prem K8s')
     serving_engine = Column(String(32), nullable=False, default="vLLM")  # 'vLLM', 'Ollama', 'SGLang', 'Triton'
     execution_method = Column(String(32), nullable=False, default="k8s")  # 'k8s', 'docker-compose', 'direct'

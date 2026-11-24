@@ -697,7 +697,7 @@ async def dispatch_chat_completion(
     model_supports_stream = getattr(model_entry, "supports_streaming", True) if model_entry else True
     is_streaming = wants_stream and model_supports_stream
 
-    upstream_model_name = getattr(model_entry, 'alias', None) or selected_model_id
+    upstream_model_name = getattr(model_entry, 'model_id', None) or getattr(model_entry, 'alias', None) or selected_model_id
     converted_tools = convert_anthropic_tools_to_openai(req.tools or req.functions)
     converted_tool_choice = convert_anthropic_tool_choice_to_openai(req.tool_choice)
 

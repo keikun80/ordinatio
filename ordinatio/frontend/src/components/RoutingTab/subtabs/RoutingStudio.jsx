@@ -45,7 +45,6 @@ export default function RoutingStudio({
                 value={currentRoute.route_name}
                 onChange={(e) => {
                   setSelectedRouteName(e.target.value);
-                  localStorage.setItem('ordinatio_selected_route', e.target.value);
                 }}
                 style={{
                   minWidth: '260px',

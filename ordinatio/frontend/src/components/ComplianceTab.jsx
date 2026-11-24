@@ -20,8 +20,6 @@ import { api } from '../api/client';
 import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
 
-const PRESETS_STORAGE_KEY = 'ordinatio_compliance_presets';
-
 // 식별 항목 유형별 기본 추천 정규식 패턴 및 표시 명칭 매핑
 const DEFAULT_ENTITY_REGEX_MAP = {
   RRN: {
@@ -67,30 +65,10 @@ export default function ComplianceTab({ onNotify }) {
   const [rules, setRules] = useState([]);
   const [loadingRules, setLoadingRules] = useState(true);
 
-  // Dynamic Presets State
-  const [presets, setPresets] = useState(() => {
-    try {
-      const saved = localStorage.getItem(PRESETS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to parse presets from localStorage', e);
-    }
-    return [];
-  });
+  // Dynamic Presets State (Single Source of Truth: PostgreSQL)
+  const [presets, setPresets] = useState([]);
   const [selectedSample, setSelectedSample] = useState(0);
-  const [inputText, setInputText] = useState(() => {
-    try {
-      const saved = localStorage.getItem(PRESETS_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0]?.text || '';
-      }
-    } catch (e) {}
-    return '';
-  });
+  const [inputText, setInputText] = useState('');
   const [isAddPresetModalOpen, setIsAddPresetModalOpen] = useState(false);
   const [newPreset, setNewPreset] = useState({ label: '', text: '' });
   const [deletingPresetIndex, setDeletingPresetIndex] = useState(null);
@@ -157,13 +135,12 @@ export default function ComplianceTab({ onNotify }) {
       const data = await api.getPiiPresets();
       if (Array.isArray(data) && data.length > 0) {
         setPresets(data);
-        localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(data));
         if (!inputText) {
           setInputText(data[0].text);
         }
       }
     } catch (err) {
-      console.warn('Failed to load presets from backend, using local:', err);
+      console.error('Failed to load presets from backend:', err);
     }
   };
 
@@ -232,15 +209,6 @@ export default function ComplianceTab({ onNotify }) {
     }
   };
 
-  const savePresets = (newPresets) => {
-    setPresets(newPresets);
-    try {
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
-    } catch (e) {
-      console.error('Failed to save presets to localStorage', e);
-    }
-  };
-
   const handleSelectSample = (idx) => {
     setSelectedSample(idx);
     if (presets[idx]) {
@@ -264,19 +232,16 @@ export default function ComplianceTab({ onNotify }) {
         created_by: user?.username || 'admin'
       });
       const updated = [...presets, created];
-      savePresets(updated);
+      setPresets(updated);
       setSelectedSample(updated.length - 1);
       setInputText(textTrimmed);
+      setIsAddPresetModalOpen(false);
+      setNewPreset({ label: '', text: '' });
+      onNotify('SUCCESS', strings.compliance.alerts.presetAdded(labelTrimmed));
     } catch (err) {
-      console.warn('Backend create preset failed, fallback to local:', err);
-      const updated = [...presets, { label: labelTrimmed, text: textTrimmed }];
-      savePresets(updated);
-      setSelectedSample(updated.length - 1);
-      setInputText(textTrimmed);
+      console.error('Backend create preset failed:', err);
+      onNotify('ERROR', `프리셋 저장 실패: ${err.message || '서버 오류'}`);
     }
-    setIsAddPresetModalOpen(false);
-    setNewPreset({ label: '', text: '' });
-    onNotify('SUCCESS', strings.compliance.alerts.presetAdded(labelTrimmed));
   };
 
   const handleDeletePreset = async (idx) => {
@@ -284,20 +249,21 @@ export default function ComplianceTab({ onNotify }) {
     if (target?.preset_id) {
       try {
         await api.deletePiiPreset(target.preset_id);
+        const updated = presets.filter((_, i) => i !== idx);
+        setPresets(updated);
+        setDeletingPresetIndex(null);
+        if (selectedSample === idx) {
+          setSelectedSample(0);
+          setInputText(updated[0]?.text || '');
+        } else if (selectedSample > idx) {
+          setSelectedSample(prev => prev - 1);
+        }
+        onNotify('INFO', strings.compliance.alerts.presetDeleted(target?.label || ''));
       } catch (err) {
-        console.warn('Backend delete preset failed:', err);
+        console.error('Backend delete preset failed:', err);
+        onNotify('ERROR', `프리셋 삭제 실패: ${err.message || '서버 오류'}`);
       }
     }
-    const updated = presets.filter((_, i) => i !== idx);
-    savePresets(updated);
-    setDeletingPresetIndex(null);
-    if (selectedSample === idx) {
-      setSelectedSample(0);
-      setInputText(updated[0]?.text || '');
-    } else if (selectedSample > idx) {
-      setSelectedSample(prev => prev - 1);
-    }
-    onNotify('INFO', strings.compliance.alerts.presetDeleted(target?.label || ''));
   };
 
   // Rule Update

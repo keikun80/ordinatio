@@ -5,39 +5,14 @@ import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
 import { copyToClipboard } from '../utils/clipboard';
 
-const LOCAL_STORAGE_KEY = 'ordinatio_virtual_keys_v1';
-const LOCAL_STORAGE_TENANTS_KEY = 'ordinatio_tenants_v1';
-
 export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   const auth = useAuth?.() || {};
   const isSuperAdmin = auth.isSuperAdmin || auth.user?.role === 'SUPER_ADMIN';
   const hasPermission = auth.hasPermission || (() => true);
   const canWriteGovernance = isSuperAdmin || hasPermission('governance:write');
 
-  // Initialize state with localStorage if available, else empty array
-  const [keys, setKeys] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Failed to parse saved keys:', e);
-    }
-    return [];
-  });
-
-  const [tenants, setTenants] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_TENANTS_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Failed to parse saved tenants:', e);
-    }
-    return [];
-  });
+  const [keys, setKeys] = useState([]);
+  const [tenants, setTenants] = useState([]);
 
   const [selectedDept, setSelectedDept] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,27 +55,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-  // Helper to persist keys to state & localStorage
-  const saveKeys = (newKeys) => {
-    setKeys(newKeys);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newKeys));
-    } catch (e) {
-      console.warn('Failed to save keys to localStorage:', e);
-    }
-  };
-
-  // Helper to persist tenants to state & localStorage
-  const saveTenants = (newTenants) => {
-    setTenants(newTenants);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_TENANTS_KEY, JSON.stringify(newTenants));
-    } catch (e) {
-      console.warn('Failed to save tenants to localStorage:', e);
-    }
-  };
-
-  // Load live data from Backend API (and sync to localStorage)
+  // Load live data from Backend API (Single Source of Truth: PostgreSQL)
   useEffect(() => {
     async function loadData() {
       try {
@@ -115,7 +70,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
             spent: Number(t.spent_budget_krw || 0),
             hardCap: t.is_hard_cap_enabled
           }));
-          saveTenants(mappedTenants);
+          setTenants(mappedTenants);
           if (mappedTenants.length > 0) {
             setNewKeyDept(mappedTenants[0].id);
             setNewTenantBudget(mappedTenants[0].budget || 10000000);
@@ -145,7 +100,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
               keyPrefix: k.key_prefix
             };
           });
-          saveKeys(mappedKeys);
+          setKeys(mappedKeys);
         }
 
         const liveModels = await apiClient.getModels();
@@ -159,13 +114,14 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
           setNewKeyModels(mappedModels.map((m) => m.id));
         }
       } catch (err) {
-        console.warn('Backend API offline, keeping persisted local data:', err);
+        console.error('Failed to load governance data from backend:', err);
+        if (onNotify) onNotify('ERROR', `데이터 로드 실패: ${err.message || '서버 응답 없음'}`);
       }
     }
     loadData();
   }, []);
 
-  // Open Create Key Modal with live model catalog refresh & local storage fallback
+  // Open Create Key Modal with live model catalog refresh
   const handleOpenCreateModal = async () => {
     if (!canWriteGovernance) return;
     setShowCreateModal(true);
@@ -181,25 +137,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         setNewKeyModels(mapped.map((m) => m.id));
       }
     } catch (e) {
-      console.warn('Failed to fetch live models on modal open, checking localStorage cache:', e);
-      // localStorage 캐시 fallback
-      try {
-        const cached = localStorage.getItem('ordinatio_models');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            const mappedCached = parsed.map((m) => ({
-              id: m.id || m.model_id,
-              name: m.name || m.alias || m.id || m.model_id,
-              alias: m.alias
-            }));
-            setRegisteredModels(mappedCached);
-            setNewKeyModels(mappedCached.map((m) => m.id));
-          }
-        }
-      } catch (cacheErr) {
-        console.warn('Failed to parse cached models:', cacheErr);
-      }
+      console.warn('Failed to fetch live models on modal open:', e);
     }
   };
 
@@ -245,15 +183,17 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         allowed_models: editModels,
         is_active: editStatus === 'ACTIVE'
       });
-    } catch (err) {
-      console.warn('Backend update offline, saved to persistent local storage:', err);
-    }
 
-    const updatedKeys = keys.map((k) => (k.keyId === editingKey.keyId ? updatedKeyItem : k));
-    saveKeys(updatedKeys);
-    setEditingKey(null);
-    setIsLoading(false);
-    onNotify('SUCCESS', strings.virtualKeys.alerts.keySaved(editingKey.keyId));
+      const updatedKeys = keys.map((k) => (k.keyId === editingKey.keyId ? updatedKeyItem : k));
+      setKeys(updatedKeys);
+      setEditingKey(null);
+      onNotify('SUCCESS', strings.virtualKeys.alerts.keySaved(editingKey.keyId));
+    } catch (err) {
+      console.error('Backend update failed:', err);
+      onNotify('ERROR', `가상키 수정 실패: ${err.message || '서버 오류'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Toggle Key Status (Revoke / Activate)
@@ -275,7 +215,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       }
 
       const updatedKeys = keys.map((k) => (k.keyId === keyId ? { ...k, status: nextStatus } : k));
-      saveKeys(updatedKeys);
+      setKeys(updatedKeys);
 
       if (nextStatus === 'BLOCKED') {
         onNotify('INFO', strings.virtualKeys.alerts.keyRevoked(targetKey.name, keyId));
@@ -316,13 +256,11 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     try {
       await apiClient.deleteVirtualKey(keyId, isForce);
       const updatedKeys = keys.filter((k) => k.keyId !== keyId);
-      saveKeys(updatedKeys);
+      setKeys(updatedKeys);
       onNotify('SUCCESS', strings.virtualKeys.alerts.keyDeletedSuccess(name));
     } catch (err) {
-      console.warn('Backend delete error, removing from local state:', err);
-      const updatedKeys = keys.filter((k) => k.keyId !== keyId);
-      saveKeys(updatedKeys);
-      onNotify('SUCCESS', strings.virtualKeys.alerts.keyDeleted(name));
+      console.error('Backend delete error:', err);
+      onNotify('ERROR', `가상키 삭제 실패: ${err.message || '서버 오류'}`);
     } finally {
       setIsLoading(false);
       setKeyToDelete(null);
@@ -357,7 +295,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         hardCap: res.is_hard_cap_enabled
       };
       const updatedTenants = [...tenants, createdTenant];
-      saveTenants(updatedTenants);
+      setTenants(updatedTenants);
       setShowCreateTenantModal(false);
       setNewTenantName('');
       setNewTenantCode('');
@@ -365,24 +303,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       setNewTenantHardCap(true);
       onNotify('SUCCESS', strings.virtualKeys.alerts.tenantRegisteredSuccess(res.name));
     } catch (err) {
-      console.warn('Backend create tenant offline, saving to persistent local storage:', err);
-      const fallbackId = `dept-${newTenantCode.trim().toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-      const fallbackTenant = {
-        id: fallbackId,
-        name: newTenantName.trim(),
-        code: newTenantCode.trim().toUpperCase(),
-        budget: Number(newTenantBudget),
-        spent: 0,
-        hardCap: newTenantHardCap
-      };
-      const updatedTenants = [...tenants, fallbackTenant];
-      saveTenants(updatedTenants);
-      setShowCreateTenantModal(false);
-      setNewTenantName('');
-      setNewTenantCode('');
-      setNewTenantBudget(15000000);
-      setNewTenantHardCap(true);
-      onNotify('SUCCESS', strings.virtualKeys.alerts.tenantRegisteredSafe(newTenantName));
+      console.error('Backend create tenant error:', err);
+      onNotify('ERROR', `테넌트 등록 실패: ${err.message || '서버 오류'}`);
     } finally {
       setIsLoading(false);
     }
@@ -396,7 +318,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     try {
       await apiClient.deleteTenant(tenantId);
       const updated = tenants.filter((t) => t.id !== tenantId);
-      saveTenants(updated);
+      setTenants(updated);
       setSelectedDept('ALL');
       onNotify('SUCCESS', strings.virtualKeys.alerts.tenantDeletedSuccess(targetTenant?.name || tenantId));
     } catch (err) {
@@ -450,7 +372,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       };
 
       const updatedKeys = [newKeyItem, ...keys];
-      saveKeys(updatedKeys);
+      setKeys(updatedKeys);
 
       setShowCreateModal(false);
       setNewKeyName('');
@@ -467,42 +389,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
 
       onNotify('SUCCESS', strings.virtualKeys.alerts.keyIssuedOnce(result.key_id));
     } catch (err) {
-      // Fallback for offline mode with persistent localStorage
-      console.warn('Backend create offline, creating persistent local key:', err);
-      const generatedRawKey = `sk-ord-${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
-      const generatedId = `vk-live-${Date.now().toString().slice(-6)}`;
-      
-      const newKeyItem = {
-        keyId: generatedId,
-        name: newKeyName,
-        tenantName: deptObj.name,
-        tenantId: deptObj.id,
-        allowedModels: registeredModels.length > 0 ? [registeredModels[0].id] : [],
-        rpm: Number(newKeyRpm),
-        tpm: Number(newKeyTpm),
-        spent: 0,
-        budget: deptObj.budget || 15000000,
-        status: 'ACTIVE',
-        ipWhitelist: newKeyIp,
-        keyPrefix: generatedRawKey.slice(0, 16)
-      };
-
-      const updatedKeys = [newKeyItem, ...keys];
-      saveKeys(updatedKeys);
-
-      setShowCreateModal(false);
-      setNewKeyName('');
-
-      setCreatedSecret({
-        keyId: generatedId,
-        name: newKeyName,
-        rawKey: generatedRawKey,
-        tenantName: deptObj.name,
-        notice: strings.virtualKeys.alerts.keySingleNotice
-      });
-      setShowSecretModal(true);
-
-      onNotify('SUCCESS', strings.virtualKeys.alerts.keyIssuedSaved(generatedId));
+      console.error('Backend create key error:', err);
+      onNotify('ERROR', `가상키 발급 실패: ${err.message || '서버 오류'}`);
     } finally {
       setIsLoading(false);
     }

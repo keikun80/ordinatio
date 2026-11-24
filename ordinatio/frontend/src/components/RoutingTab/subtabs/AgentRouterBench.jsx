@@ -372,7 +372,6 @@ export default function AgentRouterBench({
               value={currentRoute.route_name}
               onChange={(e) => {
                 setSelectedRouteName(e.target.value);
-                localStorage.setItem('ordinatio_selected_route', e.target.value);
               }}
               style={{ fontSize: '0.82rem', padding: '5px 10px', minWidth: '180px' }}
             >

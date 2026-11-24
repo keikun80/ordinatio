@@ -23,11 +23,6 @@ import PolicyEditModal from './modals/PolicyEditModal';
 
 export { LLM_PROVIDERS };
 
-const sanitizeModelsForStorage = (modelList) => {
-  if (!Array.isArray(modelList)) return [];
-  return modelList.map(({ apiKey, api_key, ...rest }) => rest);
-};
-
 export default function RoutingTab({ 
   onNotify, 
   activeSubTab: externalActiveSubTab, 
@@ -35,44 +30,12 @@ export default function RoutingTab({
 }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
   const canWriteRouting = isSuperAdmin || hasPermission('routing:write');
-  const [models, setModels] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ordinatio_models');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(m => m && (m.id || m.model_id)).map(m => ({
-            ...m,
-            id: m.id || m.model_id
-          }));
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
-
-  const [routes, setRoutes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ordinatio_multi_routes');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(r => r && r.route_name);
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
-
-  const [selectedRouteName, setSelectedRouteName] = useState(() => {
-    return localStorage.getItem('ordinatio_selected_route') || "";
-  });
-
+  const [models, setModels] = useState([]);
+  const [routes, setRoutes] = useState([]);
+  const [selectedRouteName, setSelectedRouteName] = useState("");
   const [isDeploying, setIsDeploying] = useState(false);
   const [isDryRunning, setIsDryRunning] = useState(false);
-  const [xdsRevision, setXdsRevision] = useState(() => {
-    return localStorage.getItem('ordinatio_xds_revision') || '';
-  });
+  const [xdsRevision, setXdsRevision] = useState('');
 
   // Registered Tenants & Dynamic Gateway Info for Mapping
   const [availableTenants, setAvailableTenants] = useState([]);
@@ -82,15 +45,11 @@ export default function RoutingTab({
   // Health Check States
   const [healthStatus, setHealthStatus] = useState({});
   const [isHealthCheckingAll, setIsHealthCheckingAll] = useState(false);
-  const [healthCheckTimeout, setHealthCheckTimeout] = useState(() => {
-    const saved = localStorage.getItem('ordinatio_health_timeout');
-    return saved ? Number(saved) : 3.0;
-  });
+  const [healthCheckTimeout, setHealthCheckTimeout] = useState(3.0);
 
   const handleHealthTimeoutChange = (val) => {
     const num = Number(val);
     setHealthCheckTimeout(num);
-    localStorage.setItem('ordinatio_health_timeout', num);
     if (onNotify) onNotify('INFO', strings.routing.alerts.healthTimeoutChanged(num));
   };
 
@@ -341,28 +300,11 @@ export default function RoutingTab({
       } : m);
 
       setModels(updated);
-      localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(updated)));
       setEditingModel(null);
       onNotify('SUCCESS', strings.routing.alerts.modelUpdated(editModelForm.alias));
     } catch (err) {
-      console.warn('Update model via API failed, updating locally:', err);
-      const updated = models.map(m => m.id === editingModel.id ? {
-        ...m,
-        name: editModelForm.name || m.name,
-        alias: editModelForm.alias,
-        endpoint: editModelForm.target_endpoint,
-        provider: editModelForm.provider || 'openai',
-        inputPricePer1k: Number(editModelForm.input_price_per_1k),
-        outputPricePer1k: Number(editModelForm.output_price_per_1k),
-        healthCheckTimeout: Number(editModelForm.health_check_timeout || 3.0),
-        apiKey: editModelForm.api_key,
-        authType: editModelForm.auth_type || 'none',
-        active: editModelForm.is_active
-      } : m);
-      setModels(updated);
-      localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(updated)));
-      setEditingModel(null);
-      onNotify('SUCCESS', strings.routing.alerts.modelUpdated(editModelForm.alias));
+      console.error('Update model via API failed:', err);
+      onNotify('ERROR', `모델 수정 실패: ${err.message || '서버 오류'}`);
     }
   };
 
@@ -409,22 +351,18 @@ export default function RoutingTab({
             active: m.is_active
           }));
           setModels(mapped);
-          localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(mapped)));
         }
 
         if (Array.isArray(routesRes)) {
           const validRoutes = routesRes.filter(r => r && r.route_name);
           setRoutes(validRoutes);
-          localStorage.setItem('ordinatio_multi_routes', JSON.stringify(validRoutes));
           if (validRoutes.length > 0 && !validRoutes.some(r => r.route_name === selectedRouteName)) {
             setSelectedRouteName(validRoutes[0].route_name);
-            localStorage.setItem('ordinatio_selected_route', validRoutes[0].route_name);
           }
         }
 
         if (activePolicyRes && activePolicyRes.xds_revision) {
           setXdsRevision(activePolicyRes.xds_revision);
-          localStorage.setItem('ordinatio_xds_revision', activePolicyRes.xds_revision);
         }
 
         // Automatic initial health check on load
@@ -445,7 +383,7 @@ export default function RoutingTab({
           }
         }).catch(err => console.warn('Initial health check failed:', err));
       } catch (err) {
-        console.warn('Using local fallback state for multi-routing:', err);
+        console.error('Failed to load routing data from backend:', err);
       }
     }
     loadData();
@@ -467,7 +405,7 @@ export default function RoutingTab({
   const currentWeights = currentRoute.traffic_weights || [];
   const totalWeight = currentWeights.reduce((sum, item) => sum + Number(item.weight || 0), 0);
 
-  // Helper to update current route in local state & storage (and optionally persist to backend)
+  // Helper to update current route in local state (and optionally persist to backend)
   const updateCurrentRoute = (updates, persistBackend = false) => {
     const targetRouteName = currentRoute.route_name;
     setRoutes(prevRoutes => {
@@ -481,13 +419,11 @@ export default function RoutingTab({
       } else {
         updatedRoutes = [...prevRoutes, { ...currentRoute, ...updates }];
       }
-      localStorage.setItem('ordinatio_multi_routes', JSON.stringify(updatedRoutes));
       return updatedRoutes;
     });
 
     if (selectedRouteName !== targetRouteName) {
       setSelectedRouteName(targetRouteName);
-      localStorage.setItem('ordinatio_selected_route', targetRouteName);
     }
 
     if (persistBackend && targetRouteName) {
@@ -809,14 +745,12 @@ export default function RoutingTab({
       const res = await apiClient.deployRouting(payload);
       const newRev = res.xds_revision;
       setXdsRevision(newRev);
-      localStorage.setItem('ordinatio_xds_revision', newRev);
       
       // Resync route list from backend to ensure persistence consistency
       try {
         const freshRoutes = await apiClient.getRoutes();
         if (freshRoutes && freshRoutes.length > 0) {
           setRoutes(freshRoutes);
-          localStorage.setItem('ordinatio_multi_routes', JSON.stringify(freshRoutes));
         }
       } catch (syncErr) {
         console.warn('Could not resync fresh routes after deploy:', syncErr);
@@ -871,17 +805,16 @@ export default function RoutingTab({
 
     try {
       await apiClient.createRoute(newRoute);
+      const updated = [...routes, newRoute];
+      setRoutes(updated);
+      setSelectedRouteName(routeName);
+      setShowNewRouteModal(false);
+      setNewRouteForm({ route_name: '', description: '', priority: 15, match_tenant: '', match_path: '' });
+      onNotify('SUCCESS', strings.routing.alerts.routeCreated(routeName));
     } catch (err) {
-      console.warn('Backend route creation fallback');
+      console.error('Backend route creation failed:', err);
+      onNotify('ERROR', `라우트 생성 실패: ${err.message || '서버 오류'}`);
     }
-
-    const updated = [...routes, newRoute];
-    setRoutes(updated);
-    localStorage.setItem('ordinatio_multi_routes', JSON.stringify(updated));
-    setSelectedRouteName(routeName);
-    setShowNewRouteModal(false);
-    setNewRouteForm({ route_name: '', description: '', priority: 15, match_tenant: '', match_path: '' });
-    onNotify('SUCCESS', strings.routing.alerts.routeCreated(routeName));
   };
 
   // Delete Current Route
@@ -897,15 +830,14 @@ export default function RoutingTab({
 
     try {
       await apiClient.deleteRoute(currentRoute.route_name);
+      const filtered = routes.filter(r => r.route_name !== currentRoute.route_name);
+      setRoutes(filtered);
+      setSelectedRouteName(filtered[0]?.route_name || '');
+      onNotify('SUCCESS', strings.routing.alerts.routeDeleted(currentRoute.route_name));
     } catch (err) {
-      console.warn('Backend route deletion fallback');
+      console.error('Backend route deletion failed:', err);
+      onNotify('ERROR', `라우트 삭제 실패: ${err.message || '서버 오류'}`);
     }
-
-    const filtered = routes.filter(r => r.route_name !== currentRoute.route_name);
-    setRoutes(filtered);
-    localStorage.setItem('ordinatio_multi_routes', JSON.stringify(filtered));
-    setSelectedRouteName(filtered[0].route_name);
-    onNotify('SUCCESS', strings.routing.alerts.routeDeleted(currentRoute.route_name));
   };
 
   // Register New Model
@@ -946,30 +878,11 @@ export default function RoutingTab({
 
       const updated = [...models, newEntry];
       setModels(updated);
-      localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(updated)));
       setShowNewModelModal(false);
       onNotify('SUCCESS', strings.routing.alerts.modelAdded(res.alias));
     } catch (err) {
-      const fallbackEntry = {
-        id: newModelForm.model_id,
-        name: newModelForm.name || newModelForm.model_id,
-        alias: newModelForm.alias || newModelForm.model_id,
-        endpoint: newModelForm.target_endpoint,
-        provider: newModelForm.provider || 'openai',
-        healthCheckTimeout: Number(newModelForm.health_check_timeout || 3.0),
-        inputPricePer1k: Number(newModelForm.input_price_per_1k),
-        outputPricePer1k: Number(newModelForm.output_price_per_1k),
-        apiKey: newModelForm.api_key,
-        authType: newModelForm.auth_type || 'none',
-        supports_streaming: newModelForm.supports_streaming !== false,
-        waitingQueue: 0,
-        active: true
-      };
-      const updated = [...models, fallbackEntry];
-      setModels(updated);
-      localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(updated)));
-      setShowNewModelModal(false);
-      onNotify('SUCCESS', strings.routing.alerts.modelAdded(newModelForm.alias));
+      console.error('Model registration failed:', err);
+      onNotify('ERROR', `모델 등록 실패: ${err.message || '서버 오류'}`);
     }
   };
 
@@ -994,7 +907,6 @@ export default function RoutingTab({
       await apiClient.deleteModel(modelId, true);
       const filtered = models.filter(m => m.id !== modelId);
       setModels(filtered);
-      localStorage.setItem('ordinatio_models', JSON.stringify(sanitizeModelsForStorage(filtered)));
 
       // Remove from currentWeights if present and rebalance
       if (inCurrentRoute) {
@@ -1016,7 +928,6 @@ export default function RoutingTab({
       apiClient.getRoutes().then(updatedRoutes => {
         if (updatedRoutes && updatedRoutes.length > 0) {
           setRoutes(updatedRoutes);
-          localStorage.setItem('ordinatio_multi_routes', JSON.stringify(updatedRoutes));
         }
       }).catch(() => {});
 

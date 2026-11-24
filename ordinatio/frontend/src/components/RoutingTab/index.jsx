@@ -778,11 +778,7 @@ export default function RoutingTab({
         onNotify('ERROR', strings.routing.alerts.dryRunFailed(res.validation_errors.join(', ')));
       }
     } catch (err) {
-      if (totalWeight === 100) {
-        onNotify('INFO', strings.routing.alerts.dryRunMockPass);
-      } else {
-        onNotify('ERROR', strings.routing.alerts.dryRunMockFail(totalWeight));
-      }
+      onNotify('ERROR', strings.routing.alerts.dryRunFailed(err.message || strings.common.noResponse));
     } finally {
       setIsDryRunning(false);
     }

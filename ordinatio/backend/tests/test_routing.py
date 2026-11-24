@@ -528,4 +528,135 @@ def test_update_model_attributes():
     assert del_res.status_code == 200
 
 
+def test_gateway_failover_chain_execution():
+    """Verify that when primary model endpoint fails, the gateway automatically falls back
+    to failover_model_id and returns x-orche-failover-applied header.
+    """
+    from unittest.mock import patch, MagicMock
+    import httpx
+    from tests.conftest import get_test_super_admin_token
+
+    admin_headers = {"Authorization": f"Bearer {get_test_super_admin_token()}"}
+    api_key_headers = {"Authorization": "Bearer sk-ord-test-key-developer", "x-strict-upstream": "true"}
+
+    # 1. Setup route with primary model and failover model
+    primary_model_id = "meta-llama/Llama-3.1-8B-Instruct"
+    failover_model_id = "meta-llama/Llama-3.1-70B-Instruct"
+
+    route_name = "test-failover-route"
+    deploy_payload = {
+        "route_name": route_name,
+        "traffic_weights": [{"model_id": primary_model_id, "weight": 100}],
+        "load_balancing_strategy": "LeastQueueDepth",
+        "failover_model_id": failover_model_id,
+        "failover_chain": [failover_model_id],
+        "deployed_by": "test-admin"
+    }
+    deploy_res = client.post("/api/v1/routing/deploy", json=deploy_payload, headers=admin_headers)
+    assert deploy_res.status_code == 200
+
+    # 2. Mock httpx to simulate failure on primary model and success on failover model
+    async def mock_post(client_self, url, *args, **kwargs):
+        payload = kwargs.get("json", {})
+        req_model = payload.get("model")
+        if req_model == primary_model_id:
+            # Primary fails with Connection error
+            raise httpx.ConnectError("Primary cluster connection refused")
+        elif req_model == failover_model_id:
+            # Failover succeeds
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {
+                "id": "chatcmpl-failover-123",
+                "object": "chat.completion",
+                "created": 1700000000,
+                "model": failover_model_id,
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "Hello from failover model!"},
+                    "finish_reason": "stop"
+                }],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}
+            }
+            return mock_resp
+        return MagicMock(status_code=502, text="Unknown model")
+
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        req_body = {
+            "model": route_name,
+            "messages": [{"role": "user", "content": "Failover test prompt"}]
+        }
+        res = client.post(
+            "/v1/chat/completions",
+            json=req_body,
+            headers=api_key_headers
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["model"] == failover_model_id or data.get("orche_metadata", {}).get("selected_model") == failover_model_id
+        assert res.headers.get("x-orche-failover-applied") == "true"
+        assert res.headers.get("x-orche-failover-model") == failover_model_id
+
+    # 3. Clean up route
+    client.delete(f"/api/v1/routing/routes/{route_name}", headers=admin_headers)
+
+
+def test_canary_auto_rollback_on_consecutive_errors():
+    """Verify that canary route automatically rolls back weights to 100% on primary
+    when canary model exceeds consecutive error threshold.
+    """
+    from unittest.mock import patch, MagicMock
+    import httpx
+    from tests.conftest import get_test_super_admin_token
+    from app.core.canary_failover import CONSECUTIVE_ERROR_THRESHOLD
+
+    admin_headers = {"Authorization": f"Bearer {get_test_super_admin_token()}"}
+    api_key_headers = {"Authorization": "Bearer sk-ord-test-key-developer", "x-strict-upstream": "true"}
+
+    primary_model_id = "meta-llama/Llama-3.1-8B-Instruct"
+    canary_model_id = "meta-llama/Llama-3.1-70B-Instruct"
+
+    route_name = "test-canary-rollback-route"
+    deploy_payload = {
+        "route_name": route_name,
+        "traffic_weights": [
+            {"model_id": primary_model_id, "weight": 80},
+            {"model_id": canary_model_id, "weight": 20}
+        ],
+        "load_balancing_strategy": "LeastQueueDepth",
+        "deployed_by": "test-admin"
+    }
+    deploy_res = client.post("/api/v1/routing/deploy", json=deploy_payload, headers=admin_headers)
+    assert deploy_res.status_code == 200
+
+    # Simulate consecutive errors on canary model
+    async def mock_post_canary_fail(client_self, url, *args, **kwargs):
+        raise httpx.ConnectError("Canary model connection failed")
+
+    with patch("httpx.AsyncClient.post", new=mock_post_canary_fail):
+        for _ in range(CONSECUTIVE_ERROR_THRESHOLD):
+            req_body = {
+                "model": canary_model_id,
+                "messages": [{"role": "user", "content": "Canary fail trigger"}]
+            }
+            client.post(
+                f"/v1/routes/{route_name}",
+                json=req_body,
+                headers=api_key_headers
+            )
+
+    # Verify route policy was rolled back to 100% on primary model
+    route_check = client.get(f"/api/v1/routing/routes/{route_name}", headers=admin_headers)
+    assert route_check.status_code == 200
+    route_data = route_check.json()
+    assert len(route_data["traffic_weights"]) == 1
+    assert route_data["traffic_weights"][0]["model_id"] == primary_model_id
+    assert route_data["traffic_weights"][0]["weight"] == 100
+    assert route_data["deployed_by"] == "auto-rollback-system"
+
+    # Clean up
+    client.delete(f"/api/v1/routing/routes/{route_name}", headers=admin_headers)
+
+
+
 

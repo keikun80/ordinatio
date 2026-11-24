@@ -52,6 +52,11 @@ from app.core.agent_router import (
 from app.core.token_limiter import token_rate_limiter
 from app.core.ext_proc_server import ext_processor, ExtProcRequest, ExtProcResponse
 from app.core.semantic_cache import semantic_cache
+from app.core.canary_failover import (
+    get_candidate_model_chain,
+    record_canary_error,
+    record_canary_success,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -757,46 +762,47 @@ async def dispatch_chat_completion(
             response.headers["x-orche-semantic-similarity"] = str(semantic_hit.similarity)
         return cached_response
 
-    # 3번 자동 정규화 조치 롤백: 사용자가 완성하여 저장한 target_endpoint URL을 직접 최우선 호출
-    endpoint_clean = target_endpoint.rstrip('/')
-    candidate_urls = [endpoint_clean]
-    
-    # 만약 완성된 경로(/chat/completions, /messages, /chat 등)가 없는 단순 도메인인 경우 호환성 보완
-    if not any(endpoint_clean.endswith(ext) for ext in ['/chat/completions', '/messages', '/chat', ':generateContent']):
-        candidate_urls.append(f"{endpoint_clean}/v1/chat/completions")
-        candidate_urls.append(f"{endpoint_clean}/chat/completions")
+    # Helper to construct candidate upstream URLs for an endpoint
+    def build_candidate_urls(ep: str) -> List[str]:
+        ep_clean = ep.rstrip('/')
+        urls = [ep_clean]
+        if not any(ep_clean.endswith(ext) for ext in ['/chat/completions', '/messages', '/chat', ':generateContent']):
+            urls.append(f"{ep_clean}/v1/chat/completions")
+            urls.append(f"{ep_clean}/chat/completions")
+        if any(k in ep for k in ["127.0.0.1", "localhost", "ollama-qwen", "host.docker.internal"]):
+            port = ep.split(":")[-1].split("/")[0]
+            urls.extend([
+                f"http://ollama-qwen:{port}/v1/chat/completions",
+                f"http://host.docker.internal:{port}/v1/chat/completions",
+                f"http://172.20.0.1:{port}/v1/chat/completions",
+                f"http://172.17.0.1:{port}/v1/chat/completions",
+                f"http://127.0.0.1:{port}/v1/chat/completions"
+            ])
+        return list(dict.fromkeys(urls))
 
-    if any(k in target_endpoint for k in ["127.0.0.1", "localhost", "ollama-qwen", "host.docker.internal"]):
-        port = target_endpoint.split(":")[-1].split("/")[0]
-        candidate_urls.extend([
-            f"http://ollama-qwen:{port}/v1/chat/completions",
-            f"http://host.docker.internal:{port}/v1/chat/completions",
-            f"http://172.20.0.1:{port}/v1/chat/completions",
-            f"http://172.17.0.1:{port}/v1/chat/completions",
-            f"http://127.0.0.1:{port}/v1/chat/completions"
-        ])
+    # Helper to build headers for an upstream model
+    def build_upstream_headers(m_entry: Optional[ModelCatalog]) -> Dict[str, str]:
+        hdrs = {"Content-Type": "application/json"}
+        m_prov = getattr(m_entry, 'provider', 'openai') or 'openai'
+        raw_key = decrypt_upstream_key(m_entry.api_key) if m_entry and m_entry.api_key else None
+        if m_prov.lower() == 'anthropic':
+            hdrs["anthropic-version"] = "2023-06-01"
+            if raw_key:
+                hdrs["x-api-key"] = raw_key
+        if raw_key:
+            auth_type_norm = (m_entry.auth_type or "none").lower()
+            if auth_type_norm == "bearer":
+                hdrs["Authorization"] = f"Bearer {raw_key}"
+            elif auth_type_norm == "apikey":
+                hdrs["apikey"] = raw_key
+        return hdrs
 
-    # De-duplicate candidate URLs preserving order
-    candidate_urls = list(dict.fromkeys(candidate_urls))
+    candidate_urls = build_candidate_urls(target_endpoint)
+    upstream_headers = build_upstream_headers(model_entry)
 
     upstream_success = False
     upstream_response_data = None
-
-    # Build upstream request headers including API key auth if configured
-    upstream_headers = {"Content-Type": "application/json"}
-    model_provider = getattr(model_entry, 'provider', 'openai') or 'openai'
-    raw_api_key = decrypt_upstream_key(model_entry.api_key) if model_entry and model_entry.api_key else None
-    if model_provider.lower() == 'anthropic':
-        upstream_headers["anthropic-version"] = "2023-06-01"
-        if raw_api_key:
-            upstream_headers["x-api-key"] = raw_api_key
-
-    if raw_api_key:
-        auth_type_norm = (model_entry.auth_type or "none").lower()
-        if auth_type_norm == "bearer":
-            upstream_headers["Authorization"] = f"Bearer {raw_api_key}"
-        elif auth_type_norm == "apikey":
-            upstream_headers["apikey"] = raw_api_key
+    applied_failover_model: Optional[str] = None
 
     # Determine tenant attribution hint early
     policy_tenant_code = None
@@ -807,6 +813,28 @@ async def dispatch_chat_completion(
     # Developer unit-test simulation check (strictly isolated to local unit-testing when ALLOW_DEV_MOCK_KEYS=True)
     is_strict = request.headers.get("x-strict-upstream") == "true"
     is_dev_test = bool(settings.ALLOW_DEV_MOCK_KEYS) and bool(raw_auth and any(k in raw_auth for k in ["sk-ord-test-key-developer", "sk-ord-your-virtual-key"]))
+
+    # Read timeout & retry configs from route policy if configured
+    policy_timeout_sec = 90.0
+    policy_max_retries = 2
+    if db_policy and db_policy.match_conditions:
+        if "timeout_seconds" in db_policy.match_conditions:
+            try:
+                policy_timeout_sec = float(db_policy.match_conditions["timeout_seconds"])
+            except Exception:
+                pass
+        if "max_retries" in db_policy.match_conditions:
+            try:
+                policy_max_retries = int(db_policy.match_conditions["max_retries"])
+            except Exception:
+                pass
+
+    # Build candidate model chain (primary -> failover_model_id -> failover_chain)
+    model_attempts = get_candidate_model_chain(
+        primary_model_id=selected_model_id,
+        db_policy=db_policy,
+        db=db
+    )
 
     # 4.1 Real-time SSE Streaming Dispatch (Claude Code & Interactive CLI)
     if is_streaming:
@@ -1010,30 +1038,55 @@ async def dispatch_chat_completion(
         }
         return StreamingResponse(stream_generator(), media_type="text/event-stream", headers=stream_headers)
 
-    client_timeout = httpx.Timeout(90.0, connect=5.0)
+    client_timeout = httpx.Timeout(policy_timeout_sec, connect=5.0)
     async with httpx.AsyncClient(timeout=client_timeout) as client:
-        for url in candidate_urls:
-            try:
-                res = await client.post(url, json=upstream_payload, headers=upstream_headers)
-                if res.status_code == 200:
-                    upstream_response_data = res.json()
-                    # Ensure choices[0].message.content has fallback for reasoning models (e.g. Qwen reasoning / DeepSeek)
-                    if upstream_response_data and "choices" in upstream_response_data:
-                        choices = upstream_response_data.get("choices", [])
-                        if choices and isinstance(choices, list):
-                            first_choice = choices[0]
-                            msg = first_choice.get("message", {})
-                            if isinstance(msg, dict) and msg.get("content") is None:
-                                reasoning = msg.get("reasoning") or msg.get("reasoning_content")
-                                if reasoning:
-                                    msg["content"] = reasoning
-                    upstream_success = True
+        for attempt_model_id, attempt_entry in model_attempts:
+            cur_endpoint = attempt_entry.target_endpoint if attempt_entry else target_endpoint
+            cur_urls = build_candidate_urls(cur_endpoint)
+            cur_headers = build_upstream_headers(attempt_entry)
+            cur_payload = dict(upstream_payload)
+            cur_payload["model"] = getattr(attempt_entry, 'model_id', attempt_model_id) if attempt_entry else attempt_model_id
+
+            model_succeeded = False
+            for retry_round in range(max(1, policy_max_retries)):
+                for url in cur_urls:
+                    try:
+                        res = await client.post(url, json=cur_payload, headers=cur_headers)
+                        if res.status_code == 200:
+                            upstream_response_data = res.json()
+                            # Ensure choices[0].message.content has fallback for reasoning models (e.g. Qwen reasoning / DeepSeek)
+                            if upstream_response_data and "choices" in upstream_response_data:
+                                choices = upstream_response_data.get("choices", [])
+                                if choices and isinstance(choices, list):
+                                    first_choice = choices[0]
+                                    msg = first_choice.get("message", {})
+                                    if isinstance(msg, dict) and msg.get("content") is None:
+                                        reasoning = msg.get("reasoning") or msg.get("reasoning_content")
+                                        if reasoning:
+                                            msg["content"] = reasoning
+                            upstream_success = True
+                            model_succeeded = True
+                            if attempt_model_id != selected_model_id:
+                                applied_failover_model = attempt_model_id
+                                model_entry = attempt_entry or model_entry
+                                selected_model_id = attempt_model_id
+                                target_endpoint = cur_endpoint
+                                serving_engine = getattr(attempt_entry, 'serving_engine', serving_engine)
+                            record_canary_success(route_name, attempt_model_id)
+                            break
+                        else:
+                            logger.warning(f"Upstream returned HTTP {res.status_code} for URL {url} (model={attempt_model_id}): {res.text[:100]}")
+                    except Exception as e:
+                        logger.warning(f"Failed connecting to upstream candidate URL {url} (model={attempt_model_id}, retry={retry_round+1}): {type(e).__name__}({e})")
+                        continue
+                if model_succeeded:
                     break
-                else:
-                    logger.warning(f"Upstream returned HTTP {res.status_code} for URL {url}: {res.text[:100]}")
-            except Exception as e:
-                logger.warning(f"Failed connecting to upstream candidate URL {url}: {type(e).__name__}({e})")
-                continue
+
+            if model_succeeded:
+                break
+            else:
+                # Failure on this model attempt - record canary error
+                record_canary_error(route_name, attempt_model_id, db_policy, db)
 
     latency_ms = round((time.perf_counter() - t0) * 1000, 2)
 
@@ -1044,6 +1097,9 @@ async def dispatch_chat_completion(
         response.headers["x-agent-route-tier"] = routing_decision.tier
         response.headers["x-orche-upstream-cluster"] = target_cluster
         response.headers["x-ratelimit-remaining-tokens"] = str(remaining_tokens)
+        if applied_failover_model:
+            response.headers["x-orche-failover-applied"] = "true"
+            response.headers["x-orche-failover-model"] = applied_failover_model
         for hk, hv in affinity_headers.items():
             response.headers[hk] = hv
 

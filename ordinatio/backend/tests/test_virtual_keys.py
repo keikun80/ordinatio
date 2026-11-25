@@ -265,3 +265,69 @@ def test_virtual_key_delete_lifecycle():
     del_again_res = client.delete(f"/api/v1/virtual-keys/{key_id}")
     assert del_again_res.status_code == 404
 
+
+def test_virtual_key_validate_ip_cidr_enforcement():
+    # 1. Create key bound to strict CIDR (10.50.0.0/16)
+    create_res = client.post(
+        "/api/v1/virtual-keys",
+        json={
+            "name": "IP 제한 테스트 키",
+            "tenant_id": "dept-wm",
+            "allowed_ip_cidrs": ["10.50.0.0/16"]
+        }
+    )
+    assert create_res.status_code == 201
+    raw_key = create_res.json()["raw_key"]
+
+    # 2. Validate with matching IP
+    valid_res = client.post(
+        "/api/v1/virtual-keys/validate",
+        json={"raw_key": raw_key, "client_ip": "10.50.12.34"}
+    )
+    assert valid_res.status_code == 200
+    assert valid_res.json()["valid"] is True
+
+    # 3. Validate with unauthorized IP
+    unauth_res = client.post(
+        "/api/v1/virtual-keys/validate",
+        json={"raw_key": raw_key, "client_ip": "192.168.1.100"}
+    )
+    assert unauth_res.status_code == 200
+    assert unauth_res.json()["valid"] is False
+    assert "접속이 허용되지 않은" in unauth_res.json()["reason"]
+
+    # 4. Validate with missing client_ip
+    missing_ip_res = client.post(
+        "/api/v1/virtual-keys/validate",
+        json={"raw_key": raw_key}
+    )
+    assert missing_ip_res.status_code == 200
+    assert missing_ip_res.json()["valid"] is False
+    assert "클라이언트 IP 정보가 누락" in missing_ip_res.json()["reason"]
+
+
+def test_rpm_rate_limiter():
+    from app.core.token_limiter import TokenRateLimiter
+    limiter = TokenRateLimiter()
+    test_key = "test-key-rpm-limit"
+
+    # Consume up to limit (3 req/min)
+    allowed1, cnt1, rem1 = limiter.check_and_consume_rpm(test_key, rpm_limit=3)
+    assert allowed1 is True
+    assert cnt1 == 1
+
+    allowed2, cnt2, rem2 = limiter.check_and_consume_rpm(test_key, rpm_limit=3)
+    assert allowed2 is True
+    assert cnt2 == 2
+
+    allowed3, cnt3, rem3 = limiter.check_and_consume_rpm(test_key, rpm_limit=3)
+    assert allowed3 is True
+    assert cnt3 == 3
+
+    # 4th request should be rejected (429)
+    allowed4, cnt4, rem4 = limiter.check_and_consume_rpm(test_key, rpm_limit=3)
+    assert allowed4 is False
+    assert cnt4 == 3
+    assert rem4 == 0
+
+

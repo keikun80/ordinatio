@@ -514,8 +514,22 @@ async def dispatch_chat_completion(
         functions=req.functions
     )
 
-    # Token Rate Limiting (TPM)
+    # Rate Limiting: 1) Requests Per Minute (RPM), 2) Tokens Per Minute (TPM)
     key_id = matched_key.key_id if matched_key else (raw_auth[:16] if raw_auth else "dev-client")
+
+    # Request Rate Limiting (RPM)
+    rpm_limit = matched_key.rpm_limit if (matched_key and matched_key.rpm_limit) else 120
+    rpm_allowed, current_rpm, remaining_rpm = token_rate_limiter.check_and_consume_rpm(
+        key_id=key_id,
+        rpm_limit=rpm_limit
+    )
+    if not rpm_allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"RPM(분당 요청 한도: {rpm_limit:,} req/min)을 초과하였습니다. 현재 요청: {current_rpm:,} req. 잠시 후 재시도하십시오."
+        )
+
+    # Token Rate Limiting (TPM)
     tpm_limit = matched_key.tpm_limit if (matched_key and matched_key.tpm_limit) else 200000
     estimated_req_tokens = max(classification.estimated_tokens, 10)
     allowed, current_usage, remaining_tokens = token_rate_limiter.check_and_consume(

@@ -1,7 +1,8 @@
 from passlib.context import CryptContext
 import secrets
 import base64
-from typing import Optional, Dict, Any
+import ipaddress
+from typing import Optional, Dict, Any, List
 from cryptography.fernet import Fernet, InvalidToken
 
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
@@ -313,5 +314,35 @@ def get_client_real_ip(request: Any) -> str:
             return x_real_ip.strip()
             
     return "127.0.0.1" if peer_host == "testclient" else peer_host
+
+
+def is_ip_allowed(client_ip: str, allowed_cidrs: List[str]) -> bool:
+    """
+    Validates whether client_ip belongs to any of the allowed CIDR subnets or IP addresses.
+    Wildcards ('0.0.0.0/0', '*') permit all traffic.
+    """
+    valid_cidrs = [
+        part.strip()
+        for raw in (allowed_cidrs or [])
+        if raw
+        for part in str(raw).split(",")
+        if part.strip()
+    ]
+    if not valid_cidrs or "0.0.0.0/0" in valid_cidrs or "*" in valid_cidrs:
+        return True
+    try:
+        ip_obj = ipaddress.ip_address(client_ip)
+        for cidr_str in valid_cidrs:
+            if "/" in cidr_str:
+                network = ipaddress.ip_network(cidr_str, strict=False)
+                if ip_obj in network:
+                    return True
+            else:
+                if ip_obj == ipaddress.ip_address(cidr_str):
+                    return True
+        return False
+    except ValueError:
+        return False
+
 
 

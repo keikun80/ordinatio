@@ -118,7 +118,7 @@ export const strings = {
       routingStudio: '라우팅 스튜디오',
       servingPool: '서빙 모델 풀',
       agentRouterDispatch: 'AgentRouter & 테스트',
-      virtualKeys: '가상 API Key & 부서',
+      virtualKeys: 'AI거버넌스',
       systemPrompts: '시스템 프롬프트 거버넌스',
       finops: 'FinOps 비용 & 예산',
       compliance: 'PII 보안 & 감사 로그',
@@ -653,18 +653,19 @@ export const strings = {
   },
 
   // ----------------------------------------------------------------------------
-  // 6. 가상 API Key & 테넌트 탭 (VirtualKeysTab)
+  // 6. AI거버넌스 탭 (VirtualKeysTab)
   // ----------------------------------------------------------------------------
   virtualKeys: {
-    title: '가상 API Key 거버넌스 및 부서 테넌트',
+    title: 'AI거버넌스 (가상 API Key 및 부서 테넌트)',
     subtitle: '부서별 가상키(sk-ord-) 발급, 토큰 쿼터 제어 및 실시간 사용량 모니터링',
     issueNewKey: '신규 가상 API Key 발급',
     manageTenants: '부서(테넌트) 관리',
-    headerTitle: '가상 API Key & 부서 관리',
+    headerTitle: 'AI거버넌스',
     headerSubtitle: '사내 부서(테넌트)별 가상 API Key 발급, 모델 접근 권한 및 속도 제한(RPM/TPM) 관리',
     readOnlyBadge: '🔒 조회 전용 권한',
     noWritePermissionTooltip: "접근 권한이 없습니다. (필요 권한: 'governance:write')",
     btnRegisterTenant: '신규 부서 등록',
+    btnEditTenant: '선택 부서 설정 수정',
     btnDeleteTenant: '선택 부서 삭제',
     btnIssueKey: '신규 API Key 발급',
     searchPlaceholder: '키 명칭, Key ID, 또는 접두사 검색...',
@@ -689,10 +690,12 @@ export const strings = {
       emptyTitle: '발급된 API Key가 없습니다',
       emptyDesc: "상단의 '+ 신규 API Key 발급' 버튼을 눌러 안전한 API Key를 생성하세요.",
       unitWan: '만',
+      noExpiry: '무기한',
       statusActive: '🟢 활성 (정상)',
       statusWarning: '🟡 예산주의 (88%)',
       statusWarningDynamic: (pct) => `🟡 예산주의 (${pct}%)`,
       statusBlocked: '🔴 차단됨 (Revoked)',
+      statusExpired: '⏱️ 만료됨 (Expired)',
       btnEditTitle: '키 정보 및 속도제한 한도 수정',
       btnEdit: '설정 변경',
       btnRevoke: '즉시 파기(Revoke)',
@@ -708,6 +711,7 @@ export const strings = {
       rpmLabel: '분당 요청 수 한도 (RPM)',
       tpmLabel: '분당 토큰 수 한도 (TPM)',
       ipWhitelistLabel: '사내 허용 IP 대역 (CIDR Whitelist)',
+      expiresAtLabel: '유효기간 만료일시 (선택)',
       statusLabel: '키 상태 (Status)',
       statusActive: '🟢 활성 (정상 호출 허용)',
       statusBlocked: '🔴 차단됨 (즉시 호출 차단)',
@@ -715,6 +719,7 @@ export const strings = {
       modelsCountAllowed: (count) => `${count}개 모델 허용됨`,
       noModelsEmpty: '현재 카탈로그에 등록된 AI 모델이 없습니다.',
       goToCatalogAction: '동적 라우팅/모델 카탈로그에서 모델 등록하기',
+      expiresAtLabel: '유효기간 만료일시 (선택)',
       btnDeleteKey: '가상키 영구 삭제',
       btnSaving: '저장 중...',
       btnSave: '변경 내용 저장'
@@ -729,13 +734,15 @@ export const strings = {
       tpmLabel: '분당 토큰 수 한도 (TPM)',
       ipWhitelistLabel: '사내 허용 IP 대역 (CIDR Whitelist)',
       ipWhitelistPlaceholder: '미입력 시 전체 IP 허용 (예: 0.0.0.0/0, 10.100.0.0/16)',
+      expiresAtLabel: '유효기간 만료일시 (선택)',
       allowedModelsLabel: (count) => `허용 대상 AI 모델 (등록된 모델 풀: ${count}개)`,
       modelsCountSelected: (count) => `${count}개 모델 선택됨`,
       noModelsEmpty: '현재 카탈로그에 등록된 AI 모델이 없습니다.',
       noModelsNotice: '가상 키 생성 전에 [동적 라우팅] 메뉴에서 모델을 먼저 등록하거나, 모델 제한 없이 발급 후 수정하십시오.',
       goToCatalogAction: '동적 라우팅/모델 카탈로그에서 모델 등록하기',
-      hardCapNoticeStrong: '하드 캡(Hard Cap) 예산 초과 즉시 차단:',
-      hardCapNoticeDesc: '부서 예산 100% 도달 시 즉시 429 반환',
+      tenantHardCapActive: '소속 부서 Hard Cap 정책: 예산 100% 소진 시 자동 차단 활성화됨',
+      tenantHardCapInactive: '소속 부서 Hard Cap 정책: 예산 초과 시에도 차단하지 않음 (Soft Cap)',
+      tenantHardCapHint: '* Hard Cap 설정은 소속 부서 단위로 일괄 적용되며, 상단 부서 설정에서 변경할 수 있습니다.',
       btnCreating: '생성 및 암호화 중...',
       btnSubmit: '발급 완료'
     },
@@ -769,6 +776,7 @@ export const strings = {
     },
     createTenantModal: {
       title: '신규 부서(테넌트) 등록 마법사',
+      editTitle: '부서(테넌트) 정보 및 예산 설정 수정',
       nameLabel: '부서 명칭 (Department Name)',
       namePlaceholder: '예: 데이터인텔리전스부',
       codeLabel: '고유 부서 코드 (Department Code)',
@@ -779,7 +787,9 @@ export const strings = {
       hardCapNoticeStrong: 'Hard Cap 자동 차단 활성화',
       hardCapNoticeDesc: '(예산 100% 초과 시 HTTP 429 즉시 차단)',
       btnRegistering: '등록 중...',
-      btnSubmit: '부서 등록 완료'
+      btnSubmit: '부서 등록 완료',
+      btnUpdating: '저장 중...',
+      btnUpdateSubmit: '부서 설정 저장'
     },
     alerts: {
       keySaved: (id) => `API Key [${id}]의 변경 내용이 성공적으로 저장되었습니다.`,
@@ -790,6 +800,7 @@ export const strings = {
       keyDeleted: (name) => `API Key [${name}]가 삭제되었습니다.`,
       tenantInputsRequired: '부서명과 부서 코드를 모두 입력해주세요.',
       tenantRegisteredSuccess: (name) => `신규 부서 [${name}]가 성공적으로 등록되었습니다.`,
+      tenantUpdatedSuccess: (name) => `부서 [${name}]의 설정이 성공적으로 저장되었습니다.`,
       tenantRegisteredSafe: (name) => `신규 부서 [${name}]가 안전하게 등록되었습니다.`,
       tenantDeletedSuccess: (name) => `부서 [${name}]가 성공적으로 삭제되었습니다.`,
       keyIssuedOnce: (id) => `API Key [${id}]가 성공적으로 발급되었습니다. 1회성 토큰을 복사하십시오.`,

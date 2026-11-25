@@ -133,5 +133,78 @@ class TokenRateLimiter:
             return 0
         return sum(cnt for ts, cnt in self._history[key_id] if ts > window_start)
 
+    def check_and_consume_rpm(self, key_id: str, rpm_limit: int) -> Tuple[bool, int, int]:
+        """
+        Validates whether adding 1 request exceeds `rpm_limit` within a 60-second sliding window.
+        Returns: (is_allowed, current_rpm_usage, remaining_rpm)
+        """
+        now = time.time()
+        window_start = now - 60.0
+
+        r_client = self._get_redis()
+        if r_client:
+            redis_key = f"ordinatio:rpm:{key_id}"
+            try:
+                pipe = r_client.pipeline()
+                pipe.zremrangebyscore(redis_key, "-inf", window_start)
+                pipe.zcard(redis_key)
+                _, current_count = pipe.execute()
+
+                if current_count + 1 > rpm_limit:
+                    remaining = max(0, rpm_limit - current_count)
+                    return False, current_count, remaining
+
+                unique_member = f"req:{uuid.uuid4().hex[:8]}"
+                pipe2 = r_client.pipeline()
+                pipe2.zadd(redis_key, {unique_member: now})
+                pipe2.expire(redis_key, 120)
+                pipe2.execute()
+
+                remaining = max(0, rpm_limit - (current_count + 1))
+                return True, current_count + 1, remaining
+            except Exception as e:
+                logger.debug(f"Redis RPM rate limiter failed, falling back to in-memory: {e}")
+                self._redis_unavailable = True
+
+        # In-memory sliding window fallback for RPM
+        rpm_hist_key = f"rpm:{key_id}"
+        if rpm_hist_key not in self._history:
+            self._history[rpm_hist_key] = []
+
+        self._history[rpm_hist_key] = [
+            (ts, cnt) for ts, cnt in self._history[rpm_hist_key] if ts > window_start
+        ]
+
+        current_count = len(self._history[rpm_hist_key])
+        if current_count + 1 > rpm_limit:
+            remaining = max(0, rpm_limit - current_count)
+            return False, current_count, remaining
+
+        self._history[rpm_hist_key].append((now, 1))
+        remaining = max(0, rpm_limit - (current_count + 1))
+        return True, current_count + 1, remaining
+
+    def get_current_rpm(self, key_id: str) -> int:
+        now = time.time()
+        window_start = now - 60.0
+
+        r_client = self._get_redis()
+        if r_client:
+            redis_key = f"ordinatio:rpm:{key_id}"
+            try:
+                pipe = r_client.pipeline()
+                pipe.zremrangebyscore(redis_key, "-inf", window_start)
+                pipe.zcard(redis_key)
+                _, current_count = pipe.execute()
+                return current_count
+            except Exception:
+                self._redis_unavailable = True
+
+        rpm_hist_key = f"rpm:{key_id}"
+        if rpm_hist_key not in self._history:
+            return 0
+        return sum(1 for ts, _ in self._history[rpm_hist_key] if ts > window_start)
+
+
 # Global singleton instance
 token_rate_limiter = TokenRateLimiter()

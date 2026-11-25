@@ -17,7 +17,7 @@ from app.schemas.virtual_key import (
     VirtualKeyValidateRequest,
     VirtualKeyValidateResponse,
 )
-from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key, SYSTEM_DIAGNOSTICS_KEY_ID
+from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key, SYSTEM_DIAGNOSTICS_KEY_ID, is_ip_allowed
 from app.api.deps import require_permission, get_tenant_scope
 
 router = APIRouter(prefix="/virtual-keys", tags=["Virtual Key Lifecycle"])
@@ -231,6 +231,8 @@ def update_virtual_key(
             key.revoked_reason = None
         elif payload.revoked_reason:
             key.revoked_reason = payload.revoked_reason
+    if payload.expires_at is not None:
+        key.expires_at = payload.expires_at
 
     db.commit()
     db.refresh(key)
@@ -330,6 +332,22 @@ def validate_virtual_key_endpoint(
             key_id=matched_key.key_id,
             reason="유효기간이 만료된 가상키입니다."
         )
+
+    # Check IP CIDR whitelist if configured
+    allowed_cidrs = matched_key.allowed_ip_cidrs or []
+    if allowed_cidrs and len(allowed_cidrs) > 0 and "0.0.0.0/0" not in allowed_cidrs and "*" not in allowed_cidrs:
+        if not payload.client_ip:
+            return VirtualKeyValidateResponse(
+                valid=False,
+                key_id=matched_key.key_id,
+                reason="클라이언트 IP 정보가 누락되어 IP 화이트리스트 검증을 통과할 수 없습니다."
+            )
+        if not is_ip_allowed(payload.client_ip, allowed_cidrs):
+            return VirtualKeyValidateResponse(
+                valid=False,
+                key_id=matched_key.key_id,
+                reason=f"접속이 허용되지 않은 클라이언트 IP 대역입니다: {payload.client_ip}"
+            )
 
     # Check Tenant Hard Cap 100% budget limit
     tenant = matched_key.tenant

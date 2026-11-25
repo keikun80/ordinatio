@@ -22,6 +22,7 @@ class VirtualKeyUpdate(BaseModel):
     tpm_limit: Optional[int] = Field(None, ge=1, le=10000000, description="분당 토큰 수(TPM) 제한")
     is_active: Optional[bool] = Field(None, description="활성화 상태")
     revoked_reason: Optional[str] = Field(None, description="비활성화 사유")
+    expires_at: Optional[datetime] = Field(None, description="가상 API Key 만료 일시 (UTC)")
 
 class VirtualKeyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -30,12 +30,20 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   const [newTenantBudget, setNewTenantBudget] = useState(15000000);
   const [newTenantHardCap, setNewTenantHardCap] = useState(true);
 
+  // Edit Tenant (Department) Modal State
+  const [showEditTenantModal, setShowEditTenantModal] = useState(false);
+  const [editTenantName, setEditTenantName] = useState('');
+  const [editTenantCode, setEditTenantCode] = useState('');
+  const [editTenantBudget, setEditTenantBudget] = useState(15000000);
+  const [editTenantHardCap, setEditTenantHardCap] = useState(true);
+
   // Edit Key Modal State
   const [editingKey, setEditingKey] = useState(null);
   const [editName, setEditName] = useState('');
   const [editRpm, setEditRpm] = useState(300);
   const [editTpm, setEditTpm] = useState(300000);
   const [editIp, setEditIp] = useState('');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [editModels, setEditModels] = useState([]);
   const [registeredModels, setRegisteredModels] = useState([]);
@@ -45,7 +53,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   const [newKeyDept, setNewKeyDept] = useState('');
   const [newKeyRpm, setNewKeyRpm] = useState(300);
   const [newKeyTpm, setNewKeyTpm] = useState(300000);
-  const [newKeyHardCap, setNewKeyHardCap] = useState(true);
+  const [newKeyExpiresAt, setNewKeyExpiresAt] = useState('');
   const [newKeyIp, setNewKeyIp] = useState('');
   const [newKeyModels, setNewKeyModels] = useState([]);
 
@@ -84,6 +92,12 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
             const keySpent = Number(k.spent_krw ?? matchedTenant?.spent ?? 0);
             const keyBudget = Number(k.tenant_budget_krw ?? matchedTenant?.budget ?? 0);
             const burnPct = keyBudget > 0 ? Math.round((keySpent / keyBudget) * 100) : 0;
+            const isExpired = k.expires_at && new Date(k.expires_at) < new Date();
+            let keyStatus = 'ACTIVE';
+            if (!k.is_active) keyStatus = 'BLOCKED';
+            else if (isExpired) keyStatus = 'EXPIRED';
+            else if (burnPct >= 80) keyStatus = 'WARNING';
+
             return {
               keyId: k.key_id,
               name: k.name,
@@ -95,9 +109,10 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
               spent: keySpent,
               budget: keyBudget,
               totalTokens: Number(k.total_tokens || 0),
-              status: !k.is_active ? 'BLOCKED' : (burnPct >= 80 ? 'WARNING' : 'ACTIVE'),
+              status: keyStatus,
               ipWhitelist: k.allowed_ip_cidrs && k.allowed_ip_cidrs.length > 0 ? k.allowed_ip_cidrs.join(', ') : '',
-              keyPrefix: k.key_prefix
+              keyPrefix: k.key_prefix,
+              expiresAt: k.expires_at ? String(k.expires_at).slice(0, 10) : ''
             };
           });
           setKeys(mappedKeys);
@@ -148,7 +163,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     setEditRpm(keyItem.rpm);
     setEditTpm(keyItem.tpm);
     setEditIp(keyItem.ipWhitelist || '');
-    setEditStatus(keyItem.status);
+    setEditExpiresAt(keyItem.expiresAt || '');
+    setEditStatus(keyItem.status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE');
     setEditModels(keyItem.allowedModels || (registeredModels.length > 0 ? [registeredModels[0].id] : []));
   };
 
@@ -169,6 +185,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       rpm: Number(editRpm),
       tpm: Number(editTpm),
       ipWhitelist: parsedEditCidrs.join(', '),
+      expiresAt: editExpiresAt,
       status: editStatus,
       allowedModels: editModels
     };
@@ -181,7 +198,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         tpm_limit: Number(editTpm),
         allowed_ip_cidrs: parsedEditCidrs,
         allowed_models: editModels,
-        is_active: editStatus === 'ACTIVE'
+        is_active: editStatus === 'ACTIVE',
+        expires_at: editExpiresAt ? new Date(`${editExpiresAt}T23:59:59Z`).toISOString() : null
       });
 
       const updatedKeys = keys.map((k) => (k.keyId === editingKey.keyId ? updatedKeyItem : k));
@@ -310,6 +328,61 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     }
   };
 
+  // Open Edit Tenant (Department) Modal
+  const handleOpenEditTenant = () => {
+    if (!canWriteGovernance || !selectedDept || selectedDept === 'ALL') return;
+    const targetTenant = tenants.find((t) => t.id === selectedDept);
+    if (!targetTenant) return;
+    setEditTenantName(targetTenant.name);
+    setEditTenantCode(targetTenant.code);
+    setEditTenantBudget(targetTenant.budget);
+    setEditTenantHardCap(targetTenant.hardCap);
+    setShowEditTenantModal(true);
+  };
+
+  // Save Edit Tenant (Department)
+  const handleSaveEditTenant = async (e) => {
+    e.preventDefault();
+    if (!canWriteGovernance || !selectedDept || selectedDept === 'ALL') return;
+    if (!editTenantName.trim()) {
+      onNotify('ERROR', '부서명을 입력해주세요.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await apiClient.updateTenant(selectedDept, {
+        name: editTenantName.trim(),
+        monthly_budget_krw: Number(editTenantBudget),
+        is_hard_cap_enabled: editTenantHardCap
+      });
+      const updatedTenants = tenants.map((t) =>
+        t.id === selectedDept
+          ? {
+              ...t,
+              name: res.name,
+              budget: Number(res.monthly_budget_krw),
+              hardCap: res.is_hard_cap_enabled
+            }
+          : t
+      );
+      setTenants(updatedTenants);
+      setKeys((prevKeys) =>
+        prevKeys.map((k) =>
+          k.tenantId === selectedDept
+            ? { ...k, tenantName: res.name, budget: Number(res.monthly_budget_krw) }
+            : k
+        )
+      );
+      setShowEditTenantModal(false);
+      onNotify('SUCCESS', strings.virtualKeys.alerts.tenantUpdatedSuccess(res.name));
+    } catch (err) {
+      console.error('Failed to update tenant:', err);
+      onNotify('ERROR', `부서 수정 실패: ${err.message || '서버 오류'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Delete Tenant (Department)
   const handleDeleteTenant = async (tenantId) => {
     if (!canWriteGovernance || !tenantId || tenantId === 'ALL') return;
@@ -353,7 +426,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         allowed_models: targetAllowedModels,
         allowed_ip_cidrs: parsedNewCidrs,
         rpm_limit: Number(newKeyRpm),
-        tpm_limit: Number(newKeyTpm)
+        tpm_limit: Number(newKeyTpm),
+        expires_at: newKeyExpiresAt ? new Date(`${newKeyExpiresAt}T23:59:59Z`).toISOString() : null
       });
 
       const newKeyItem = {
@@ -368,7 +442,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         budget: Number(result.tenant_budget_krw ?? deptObj.budget ?? 0),
         status: 'ACTIVE',
         ipWhitelist: result.allowed_ip_cidrs && result.allowed_ip_cidrs.length > 0 ? result.allowed_ip_cidrs.join(', ') : parsedNewCidrs.join(', '),
-        keyPrefix: result.key_prefix
+        keyPrefix: result.key_prefix,
+        expiresAt: newKeyExpiresAt
       };
 
       const updatedKeys = [newKeyItem, ...keys];
@@ -496,17 +571,30 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
               ))}
             </select>
             {selectedDept !== 'ALL' && canWriteGovernance && (
-              <button
-                type="button"
-                className="btn btn-danger"
-                data-testid="vk-btn-delete-tenant"
-                disabled={isLoading}
-                onClick={() => handleDeleteTenant(selectedDept)}
-                style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-              >
-                <Trash2 size={14} />
-                <span>{strings.virtualKeys.btnDeleteTenant}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  data-testid="vk-btn-edit-tenant"
+                  disabled={isLoading}
+                  onClick={handleOpenEditTenant}
+                  style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Sliders size={14} color="#38bdf8" />
+                  <span>{strings.virtualKeys.btnEditTenant}</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  data-testid="vk-btn-delete-tenant"
+                  disabled={isLoading}
+                  onClick={() => handleDeleteTenant(selectedDept)}
+                  style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Trash2 size={14} />
+                  <span>{strings.virtualKeys.btnDeleteTenant}</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -553,7 +641,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                         {k.keyId}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Prefix: <code style={{ color: '#94a3b8' }}>{k.keyPrefix ? `${k.keyPrefix}...` : 'sk-ord-***'}</code> | IP: {k.ipWhitelist || '0.0.0.0/0'}
+                        Prefix: <code style={{ color: '#94a3b8' }}>{k.keyPrefix ? `${k.keyPrefix}...` : 'sk-ord-***'}</code> | IP: {k.ipWhitelist || '0.0.0.0/0'} | 만료: <span style={{ color: k.expiresAt ? '#e2e8f0' : '#64748b' }}>{k.expiresAt || strings.virtualKeys.table.noExpiry}</span>
                       </div>
                     </td>
                     <td>
@@ -593,6 +681,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                       {k.status === 'ACTIVE' && <span className="badge active" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusActive}</span>}
                       {k.status === 'WARNING' && <span className="badge warning" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusWarningDynamic(percent)}</span>}
                       {k.status === 'BLOCKED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusBlocked}</span>}
+                      {k.status === 'EXPIRED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusExpired}</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -721,6 +810,34 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                     <option value="ACTIVE">{strings.virtualKeys.editModal.statusActive}</option>
                     <option value="BLOCKED">{strings.virtualKeys.editModal.statusBlocked}</option>
                   </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.editModal.expiresAtLabel}</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    data-testid="vk-modal-edit-input-expires"
+                    value={editExpiresAt}
+                    onChange={(e) => setEditExpiresAt(e.target.value)}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    * 미입력 시 유효기간 없이 무기한 유지됩니다.
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.editModal.expiresAtLabel}</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    data-testid="vk-modal-edit-input-expires"
+                    value={editExpiresAt}
+                    onChange={(e) => setEditExpiresAt(e.target.value)}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    * 비워둘 경우 만료일 없이 무기한 사용됩니다.
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -965,17 +1082,37 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                   </div>
                 </div>
 
-                <div style={{ background: 'rgba(244, 63, 94, 0.08)', padding: '12px', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.25)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.82rem', cursor: 'pointer', color: '#fda4af' }}>
-                    <input
-                      type="checkbox"
-                      data-testid="vk-modal-toggle-hardcap"
-                      checked={newKeyHardCap}
-                      onChange={(e) => setNewKeyHardCap(e.target.checked)}
-                    />
-                    <span><strong>{strings.virtualKeys.createKeyModal.hardCapNoticeStrong}</strong> {strings.virtualKeys.createKeyModal.hardCapNoticeDesc}</span>
-                  </label>
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.createKeyModal.expiresAtLabel}</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    data-testid="vk-modal-input-expires"
+                    value={newKeyExpiresAt}
+                    onChange={(e) => setNewKeyExpiresAt(e.target.value)}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    * 미입력 시 유효기간 없이 무기한 유지됩니다.
+                  </div>
                 </div>
+
+                {(() => {
+                  const selectedTenantObj = tenants.find((t) => t.id === newKeyDept) || tenants[0];
+                  const isHardCap = selectedTenantObj?.hardCap;
+                  return (
+                    <div style={{ background: isHardCap ? 'rgba(244, 63, 94, 0.08)' : 'rgba(56, 189, 248, 0.08)', padding: '12px', borderRadius: '6px', border: `1px solid ${isHardCap ? 'rgba(244, 63, 94, 0.25)' : 'rgba(56, 189, 248, 0.25)'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: isHardCap ? '#fda4af' : '#7dd3fc' }}>
+                        <ShieldCheck size={18} style={{ color: isHardCap ? '#f43f5e' : '#38bdf8', flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <strong>{isHardCap ? strings.virtualKeys.createKeyModal.tenantHardCapActive : strings.virtualKeys.createKeyModal.tenantHardCapInactive}</strong>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            {strings.virtualKeys.createKeyModal.tenantHardCapHint}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="modal-footer">
                 <button 
@@ -1251,6 +1388,97 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                   disabled={isLoading}
                 >
                   {isLoading ? strings.virtualKeys.createTenantModal.btnRegistering : strings.virtualKeys.createTenantModal.btnSubmit}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tenant (Department) Modal */}
+      {showEditTenantModal && (
+        <div className="modal-overlay" onClick={() => setShowEditTenantModal(false)}>
+          <div className="modal-content" data-testid="vk-modal-edit-tenant" data-screen-id="SCR-VK-M06" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={handleSaveEditTenant}>
+              <div className="modal-header">
+                <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building size={20} color="var(--accent-cyan)" />
+                  <span>{strings.virtualKeys.createTenantModal.editTitle}</span>
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.createTenantModal.nameLabel} <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    className="form-input"
+                    data-testid="vk-modal-edit-tenant-input-name"
+                    value={editTenantName}
+                    onChange={(e) => setEditTenantName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.createTenantModal.codeLabel}</label>
+                  <input
+                    className="form-input"
+                    data-testid="vk-modal-edit-tenant-input-code"
+                    value={editTenantCode}
+                    disabled
+                    style={{ fontFamily: 'var(--font-mono)', opacity: 0.7, cursor: 'not-allowed' }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    * 부서 식별 코드는 데이터 정합성을 위해 변경할 수 없습니다.
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{strings.virtualKeys.createTenantModal.budgetLabel}</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    data-testid="vk-modal-edit-tenant-input-budget"
+                    value={editTenantBudget}
+                    onChange={(e) => setEditTenantBudget(e.target.value)}
+                    min="0"
+                    step="1000000"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                    required
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                    {strings.virtualKeys.createTenantModal.budgetDisplay(Number(editTenantBudget || 0).toLocaleString())}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                    <input
+                      type="checkbox"
+                      data-testid="vk-modal-edit-tenant-toggle-hardcap"
+                      checked={editTenantHardCap}
+                      onChange={(e) => setEditTenantHardCap(e.target.checked)}
+                    />
+                    <span><strong>{strings.virtualKeys.createTenantModal.hardCapNoticeStrong}</strong> {strings.virtualKeys.createTenantModal.hardCapNoticeDesc}</span>
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  data-testid="vk-modal-edit-tenant-btn-cancel"
+                  onClick={() => setShowEditTenantModal(false)}
+                >
+                  {strings.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  data-testid="vk-modal-edit-tenant-btn-submit"
+                  data-function-id="FNC-VK-UPDATE-TENANT"
+                  disabled={isLoading}
+                >
+                  {isLoading ? strings.virtualKeys.createTenantModal.btnUpdating : strings.virtualKeys.createTenantModal.btnUpdateSubmit}
                 </button>
               </div>
             </form>

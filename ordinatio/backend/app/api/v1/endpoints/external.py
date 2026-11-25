@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -8,7 +9,7 @@ from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
 from app.models.model_catalog import ModelCatalog
-from app.core.security import verify_virtual_key
+from app.core.security import verify_virtual_key, is_ip_allowed, get_client_real_ip
 from app.schemas.external import (
     UsageReportRequest,
     UsageReportResponse,
@@ -22,12 +23,14 @@ from app.api.deps import require_permission
 router = APIRouter(prefix="/external", tags=["External Application Integration"])
 
 def authenticate_client_key(
+    request: Request,
     authorization: Optional[str] = Header(None),
     x_virtual_key: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ) -> VirtualKey:
     """
     사내 AI 클라이언트의 Authorization: Bearer sk-ord-... 또는 X-Virtual-Key 헤더 인증
+    (만료일시, IP CIDR 화이트리스트, 부서 Hard Cap 100% 한도 초과 검증 포함)
     """
     raw_key = None
     if authorization and authorization.startswith("Bearer "):
@@ -67,6 +70,34 @@ def authenticate_client_key(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"차단/파기된 가상키입니다: {matched_key.revoked_reason or '관리자에 의한 차단'}"
         )
+
+    # 1. 만료일시 검증 (Expires At)
+    if matched_key.expires_at and matched_key.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="유효기간이 만료된 가상키입니다."
+        )
+
+    # 2. IP CIDR 화이트리스트 검증
+    allowed_cidrs = matched_key.allowed_ip_cidrs or []
+    if allowed_cidrs and len(allowed_cidrs) > 0 and "0.0.0.0/0" not in allowed_cidrs and "*" not in allowed_cidrs:
+        client_ip = get_client_real_ip(request)
+        if not client_ip or not is_ip_allowed(client_ip, allowed_cidrs):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"접속이 허용되지 않은 클라이언트 IP 대역입니다: {client_ip or '알 수 없음'}"
+            )
+
+    # 3. 부서 Hard Cap 100% 예산 소진 검증
+    tenant = matched_key.tenant
+    if tenant and tenant.is_hard_cap_enabled:
+        monthly_budget = float(tenant.monthly_budget_krw)
+        spent_budget = float(tenant.spent_budget_krw)
+        if monthly_budget > 0 and spent_budget >= monthly_budget:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"TENANT_HARD_CAP_EXCEEDED: 부서({tenant.name})의 월간 AI 예산(₩{int(monthly_budget):,})이 100% 소진되어 Hard Cap 정책에 의해 신규 추론 호출이 자동 차단되었습니다."
+            )
 
     return matched_key
 

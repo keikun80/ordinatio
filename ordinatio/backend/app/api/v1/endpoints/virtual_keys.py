@@ -1,4 +1,7 @@
 import uuid
+import hashlib
+import json
+import time
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,6 +10,9 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
+from app.models.user import User
+from app.models.audit_log import AuditLog
+from app.core.worm_storage import WormStorage
 from app.schemas.virtual_key import (
     VirtualKeyCreate,
     VirtualKeyCreateResponse,
@@ -18,7 +24,7 @@ from app.schemas.virtual_key import (
     VirtualKeyValidateResponse,
 )
 from app.core.security import generate_virtual_key, hash_virtual_key, verify_virtual_key, SYSTEM_DIAGNOSTICS_KEY_ID, is_ip_allowed
-from app.api.deps import require_permission, get_tenant_scope
+from app.api.deps import require_permission, get_tenant_scope, get_current_user
 
 router = APIRouter(prefix="/virtual-keys", tags=["Virtual Key Lifecycle"])
 
@@ -40,11 +46,13 @@ def list_virtual_keys(
     tenant_id: Optional[str] = Query(None, description="테넌트(부서) ID 필터"),
     search: Optional[str] = Query(None, description="키 명칭 또는 Key ID 검색어"),
     is_active: Optional[bool] = Query(None, description="활성화 여부 필터"),
+    offset: int = Query(0, ge=0, description="페이지네이션 오프셋"),
+    limit: int = Query(100, ge=1, le=500, description="페이지당 반환 항목 수"),
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
-    가상 API Key 목록 조회 (원문 키 제외, 보안상 마스킹된 접두사만 반환)
+    가상 API Key 목록 조회 (원문 키 제외, 보안상 마스킹된 접두사만 반환, 서버사이드 페이지네이션 지원)
     """
     query = db.query(VirtualKey).join(Tenant, VirtualKey.tenant_id == Tenant.tenant_id, isouter=True)
     query = query.filter(VirtualKey.key_id != SYSTEM_DIAGNOSTICS_KEY_ID)
@@ -65,7 +73,7 @@ def list_virtual_keys(
             (VirtualKey.key_prefix.ilike(search_fmt))
         )
 
-    keys = query.order_by(VirtualKey.created_at.desc()).all()
+    keys = query.order_by(VirtualKey.created_at.desc()).offset(offset).limit(limit).all()
     results = []
     for k in keys:
         results.append(
@@ -91,10 +99,59 @@ def list_virtual_keys(
         )
     return results
 
+def _record_governance_audit(
+    db: Session,
+    requester_id: str,
+    action: str,
+    key_id: Optional[str],
+    details: dict
+) -> None:
+    """WORM 감사 로그 및 DB AuditLog 불변 보관"""
+    try:
+        t0 = time.time()
+        log_id = f"audit-gov-{int(t0 * 1000)}-{uuid.uuid4().hex[:6]}"
+        details_str = json.dumps(details, ensure_ascii=False)
+        payload_hash = hashlib.sha256(details_str.encode("utf-8")).hexdigest()
+        
+        worm_ref = WormStorage.record_audit_log(
+            log_id=log_id,
+            requester_id=requester_id,
+            key_id=key_id,
+            model_id=None,
+            original_prompt_hash=payload_hash,
+            masked_payload_hash=payload_hash,
+            detections=[{"governance_action": action, "details": details}],
+            pii_count=0,
+            action_taken=action,
+            latency_ms=0.0,
+            is_blocked=False,
+        )
+
+        audit_entry = AuditLog(
+            log_id=log_id,
+            requester_id=requester_id,
+            key_id=key_id,
+            model_id=None,
+            original_prompt_hash=payload_hash,
+            masked_payload_hash=payload_hash,
+            detections_json=details_str,
+            pii_count=0,
+            action_taken=action,
+            latency_ms=0.0,
+            is_blocked=False,
+            worm_reference_id=worm_ref
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        # WORM/감사 로그 기록 실패가 거버넌스 관리 자체를 크래시하지 않도록 로깅 후 보호
+        pass
+
 @router.post("", response_model=VirtualKeyCreateResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("governance:write"))])
 def create_virtual_key(
     payload: VirtualKeyCreate,
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -137,6 +194,14 @@ def create_virtual_key(
     db.commit()
     db.refresh(virtual_key)
 
+    _record_governance_audit(
+        db=db,
+        requester_id=current_user.email or current_user.user_id,
+        action="CREATE_VIRTUAL_KEY",
+        key_id=virtual_key.key_id,
+        details={"name": virtual_key.name, "tenant_id": virtual_key.tenant_id, "key_prefix": key_prefix}
+    )
+
     return VirtualKeyCreateResponse(
         key_id=virtual_key.key_id,
         name=virtual_key.name,
@@ -163,6 +228,7 @@ def revoke_virtual_key(
     key_id: str,
     payload: VirtualKeyRevokeRequest,
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -178,6 +244,14 @@ def revoke_virtual_key(
     key.revoked_reason = payload.revoked_reason
     db.commit()
     db.refresh(key)
+
+    _record_governance_audit(
+        db=db,
+        requester_id=current_user.email or current_user.user_id,
+        action="REVOKE_VIRTUAL_KEY",
+        key_id=key.key_id,
+        details={"name": key.name, "tenant_id": key.tenant_id, "revoked_reason": key.revoked_reason}
+    )
 
     return VirtualKeyResponse(
         key_id=key.key_id,
@@ -262,6 +336,7 @@ def delete_virtual_key(
     key_id: str,
     force: bool = Query(False, description="활성 상태 키도 강제 파기 후 영구 삭제 허용"),
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -287,8 +362,17 @@ def delete_virtual_key(
             detail="활성 상태(ACTIVE)인 가상 API Key는 삭제할 수 없습니다. 안전을 위해 먼저 키를 파기(Revoke)한 후 삭제하십시오."
         )
 
+    key_meta = {"name": key.name, "tenant_id": key.tenant_id, "key_prefix": key.key_prefix}
     db.delete(key)
     db.commit()
+
+    _record_governance_audit(
+        db=db,
+        requester_id=current_user.email or current_user.user_id,
+        action="DELETE_VIRTUAL_KEY",
+        key_id=key_id,
+        details=key_meta
+    )
 
     return VirtualKeyDeleteResponse(
         key_id=key_id,

@@ -89,14 +89,18 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
         if (Array.isArray(liveKeys)) {
           const mappedKeys = liveKeys.map((k) => {
             const matchedTenant = mappedTenants.find((t) => t.id === k.tenant_id);
-            const keySpent = Number(k.spent_krw ?? matchedTenant?.spent ?? 0);
-            const keyBudget = Number(k.tenant_budget_krw ?? matchedTenant?.budget ?? 0);
-            const burnPct = keyBudget > 0 ? Math.round((keySpent / keyBudget) * 100) : 0;
+            const keySpent = Number(k.spent_krw ?? 0);
+            const tenantSpent = Number(matchedTenant?.spent ?? 0);
+            const tenantBudget = Number(k.tenant_budget_krw ?? matchedTenant?.budget ?? 0);
+            const tenantBurnPct = tenantBudget > 0 ? Math.round((tenantSpent / tenantBudget) * 100) : 0;
+            const isHardCapExceeded = Boolean(matchedTenant?.isHardCap && tenantBudget > 0 && tenantSpent >= tenantBudget);
             const isExpired = k.expires_at && new Date(k.expires_at) < new Date();
+            
             let keyStatus = 'ACTIVE';
             if (!k.is_active) keyStatus = 'BLOCKED';
             else if (isExpired) keyStatus = 'EXPIRED';
-            else if (burnPct >= 80) keyStatus = 'WARNING';
+            else if (isHardCapExceeded) keyStatus = 'BLOCKED';
+            else if (tenantBurnPct >= 80) keyStatus = 'WARNING';
 
             return {
               keyId: k.key_id,
@@ -107,7 +111,10 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
               rpm: k.rpm_limit,
               tpm: k.tpm_limit,
               spent: keySpent,
-              budget: keyBudget,
+              tenantSpent: tenantSpent,
+              tenantBudget: tenantBudget,
+              tenantBurnPct: tenantBurnPct,
+              isHardCapExceeded: isHardCapExceeded,
               totalTokens: Number(k.total_tokens || 0),
               status: keyStatus,
               ipWhitelist: k.allowed_ip_cidrs && k.allowed_ip_cidrs.length > 0 ? k.allowed_ip_cidrs.join(', ') : '',
@@ -223,7 +230,9 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     const targetKey = keys.find((k) => k.keyId === keyId);
     if (!targetKey) return;
 
-    const nextStatus = targetKey.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+    // P0 FIX: Any key not BLOCKED (ACTIVE, WARNING, EXPIRED) should transition to BLOCKED on Revoke.
+    const isCurrentlyBlocked = targetKey.status === 'BLOCKED';
+    const nextStatus = isCurrentlyBlocked ? 'ACTIVE' : 'BLOCKED';
 
     try {
       if (nextStatus === 'BLOCKED') {
@@ -632,7 +641,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                 </tr>
               ) : (
                 filteredKeys.map((k) => {
-                  const percent = k.budget > 0 ? Math.min(100, Math.round((k.spent / k.budget) * 100)) : 0;
+                  const percent = k.tenantBurnPct ?? (k.budget > 0 ? Math.min(100, Math.round((k.spent / k.budget) * 100)) : 0);
                   return (
                     <tr key={k.keyId} data-testid={`vk-row-${k.keyId}`}>
                     <td>
@@ -660,19 +669,22 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                       <div>{k.rpm} RPM</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>{k.tpm.toLocaleString()} TPM</div>
                     </td>
-                    <td style={{ minWidth: '150px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                        <span>₩{(k.spent / 10000).toLocaleString()}{strings.virtualKeys.table.unitWan} / ₩{(k.budget / 10000).toLocaleString()}{strings.virtualKeys.table.unitWan}</span>
-                        <span style={{ fontWeight: 700, color: percent >= 100 ? '#f43f5e' : percent >= 80 ? '#fbbf24' : '#34d399' }}>
-                          {percent}%
+                    <td style={{ minWidth: '170px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', marginBottom: '2px' }}>
+                        ₩{Math.round(k.spent).toLocaleString()}원
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' }}>
+                        <span>부서 소진율: ₩{((k.tenantSpent || 0) / 10000).toLocaleString()}만 / ₩{((k.tenantBudget || 0) / 10000).toLocaleString()}만</span>
+                        <span style={{ fontWeight: 700, color: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#fbbf24' : '#34d399' }}>
+                          {k.tenantBurnPct || 0}%
                         </span>
                       </div>
-                      <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
                         <div
                           style={{
-                            width: `${percent}%`,
+                            width: `${Math.min(100, k.tenantBurnPct || 0)}%`,
                             height: '100%',
-                            background: percent >= 100 ? '#f43f5e' : percent >= 80 ? '#f59e0b' : 'linear-gradient(90deg, #3b82f6, #10b981)'
+                            background: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#f59e0b' : 'linear-gradient(90deg, #3b82f6, #10b981)'
                           }}
                         />
                       </div>

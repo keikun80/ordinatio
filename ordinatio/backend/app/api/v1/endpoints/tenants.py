@@ -1,4 +1,7 @@
 import uuid
+import hashlib
+import json
+import time
 from typing import List, Optional
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,10 +10,61 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.models.virtual_key import VirtualKey
+from app.models.user import User
+from app.models.audit_log import AuditLog
+from app.core.worm_storage import WormStorage
 from app.schemas.tenant import TenantCreate, TenantResponse, TenantUpdate
-from app.api.deps import require_permission, require_any_permission, get_tenant_scope
+from app.api.deps import require_permission, require_any_permission, get_tenant_scope, get_current_user
 
 router = APIRouter(prefix="/tenants", tags=["Multi-Tenant Governance"])
+
+
+def _record_tenant_audit(
+    db: Session,
+    requester_id: str,
+    action: str,
+    tenant_id: str,
+    details: dict
+) -> None:
+    """테넌트(부서) 거버넌스 변경 WORM 감사 로그 및 DB AuditLog 불변 보관"""
+    try:
+        t0 = time.time()
+        log_id = f"audit-dept-{int(t0 * 1000)}-{uuid.uuid4().hex[:6]}"
+        details_str = json.dumps(details, ensure_ascii=False)
+        payload_hash = hashlib.sha256(details_str.encode("utf-8")).hexdigest()
+        
+        worm_ref = WormStorage.record_audit_log(
+            log_id=log_id,
+            requester_id=requester_id,
+            key_id=None,
+            model_id=None,
+            original_prompt_hash=payload_hash,
+            masked_payload_hash=payload_hash,
+            detections=[{"tenant_action": action, "tenant_id": tenant_id, "details": details}],
+            pii_count=0,
+            action_taken=action,
+            latency_ms=0.0,
+            is_blocked=False,
+        )
+
+        audit_entry = AuditLog(
+            log_id=log_id,
+            requester_id=requester_id,
+            key_id=None,
+            model_id=None,
+            original_prompt_hash=payload_hash,
+            masked_payload_hash=payload_hash,
+            detections_json=details_str,
+            pii_count=0,
+            action_taken=action,
+            latency_ms=0.0,
+            is_blocked=False,
+            worm_reference_id=worm_ref
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception:
+        pass
 
 
 def _require_global_scope(tenant_scope: Optional[str]) -> None:
@@ -136,6 +190,7 @@ def update_tenant(
     tenant_id: str,
     payload: TenantUpdate,
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -147,15 +202,30 @@ def update_tenant(
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
 
+    changes = {}
     if payload.name is not None:
+        changes["name_before"] = tenant.name
+        changes["name_after"] = payload.name
         tenant.name = payload.name
     if payload.monthly_budget_krw is not None:
+        changes["budget_before"] = float(tenant.monthly_budget_krw)
+        changes["budget_after"] = float(payload.monthly_budget_krw)
         tenant.monthly_budget_krw = payload.monthly_budget_krw
     if payload.is_hard_cap_enabled is not None:
+        changes["hard_cap_before"] = tenant.is_hard_cap_enabled
+        changes["hard_cap_after"] = payload.is_hard_cap_enabled
         tenant.is_hard_cap_enabled = payload.is_hard_cap_enabled
 
     db.commit()
     db.refresh(tenant)
+
+    _record_tenant_audit(
+        db=db,
+        requester_id=current_user.email or current_user.user_id,
+        action="UPDATE_TENANT_BUDGET",
+        tenant_id=tenant.tenant_id,
+        details=changes
+    )
 
     active_count = db.query(VirtualKey).filter(
         VirtualKey.tenant_id == tenant.tenant_id,

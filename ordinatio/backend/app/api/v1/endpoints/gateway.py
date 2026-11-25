@@ -442,6 +442,29 @@ async def dispatch_chat_completion(
 
     req.messages = normalized_req_messages
 
+    # 0.5 System Prompt Governance Auto-Injection (Hierarchy: VIRTUAL_KEY > ROUTE > TENANT > GLOBAL)
+    try:
+        from app.core.prompt_injector import resolve_and_inject_system_prompt
+        effective_key_id = matched_key.key_id if matched_key else None
+        effective_tenant_id = matched_key.tenant_id if matched_key else None
+
+        current_msgs_dict = [{"role": m.role, "content": m.content} for m in req.messages]
+        injected_msgs_dict, matched_prompt, prompt_resolved_by = resolve_and_inject_system_prompt(
+            db=db,
+            messages=current_msgs_dict,
+            key_id=effective_key_id,
+            route_name=route_name,
+            tenant_id=effective_tenant_id
+        )
+        if matched_prompt:
+            req.messages = [ChatMessage(role=m["role"], content=m["content"]) for m in injected_msgs_dict]
+            if response:
+                response.headers["x-orche-prompt-injected"] = matched_prompt.prompt_id
+                response.headers["x-orche-prompt-target"] = prompt_resolved_by or "NONE"
+                response.headers["x-orche-prompt-mode"] = matched_prompt.injection_mode
+    except Exception as pe:
+        logger.debug(f"Gateway system prompt injection skipped: {pe}")
+
     # 1. PII Inspection & WORM Audit
     user_prompt = ""
     for msg in reversed(req.messages):

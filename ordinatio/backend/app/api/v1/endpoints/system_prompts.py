@@ -162,7 +162,16 @@ def list_system_prompts(
     if is_active is not None:
         query = query.filter(SystemPrompt.is_active == is_active)
     if search:
-        query = query.filter(SystemPrompt.name.ilike(f"%{search}%"))
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                SystemPrompt.name.ilike(f"%{search}%"),
+                SystemPrompt.description.ilike(f"%{search}%"),
+                SystemPrompt.content.ilike(f"%{search}%"),
+                SystemPrompt.target_name.ilike(f"%{search}%"),
+                SystemPrompt.target_id.ilike(f"%{search}%")
+            )
+        )
 
     prompts = query.order_by(SystemPrompt.created_at.desc()).offset(offset).limit(limit).all()
 

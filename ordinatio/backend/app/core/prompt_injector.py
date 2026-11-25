@@ -1,7 +1,10 @@
 import logging
+import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from app.models.system_prompt import SystemPrompt
+from app.models.tenant import Tenant
+from app.models.virtual_key import VirtualKey
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ def resolve_system_prompt_for_context(
     """
     위계적 우선순위에 따라 활성화된 시스템 프롬프트를 탐색합니다.
     우선순위: VIRTUAL_KEY (1순위) > ROUTE (2순위) > TENANT (3순위) > GLOBAL (4순위)
+    key_id와 tenant_id는 별칭/코드(prefix, department_code) 역조회를 지원합니다.
     """
     try:
         active_prompts = db.query(SystemPrompt).filter(SystemPrompt.is_active == True).all()
@@ -22,9 +26,19 @@ def resolve_system_prompt_for_context(
 
         # Priority 1: Virtual Key Binding
         if key_id:
+            # 1-1. 직접 매칭
             for p in active_prompts:
                 if p.target_type == "VIRTUAL_KEY" and p.target_id == key_id:
                     return p, "VIRTUAL_KEY"
+
+            # 1-2. key_id가 prefix 또는 raw secret 형태로 전달된 경우 역조회
+            vk_cand = db.query(VirtualKey).filter(
+                (VirtualKey.key_id == key_id) | (VirtualKey.key_prefix == key_id[:16])
+            ).first()
+            if vk_cand:
+                for p in active_prompts:
+                    if p.target_type == "VIRTUAL_KEY" and p.target_id == vk_cand.key_id:
+                        return p, "VIRTUAL_KEY"
 
         # Priority 2: Route Binding
         if route_name:
@@ -34,9 +48,19 @@ def resolve_system_prompt_for_context(
 
         # Priority 3: Tenant Binding
         if tenant_id:
+            # 3-1. 직접 매칭
             for p in active_prompts:
                 if p.target_type == "TENANT" and p.target_id == tenant_id:
                     return p, "TENANT"
+
+            # 3-2. tenant_id가 department_code("DEV", "FIN" 등)로 전달된 경우 역조회
+            t_cand = db.query(Tenant).filter(
+                (Tenant.tenant_id == tenant_id) | (Tenant.department_code == tenant_id)
+            ).first()
+            if t_cand:
+                for p in active_prompts:
+                    if p.target_type == "TENANT" and p.target_id == t_cand.tenant_id:
+                        return p, "TENANT"
 
         # Priority 4: Global Binding
         for p in active_prompts:
@@ -48,17 +72,51 @@ def resolve_system_prompt_for_context(
 
     return None, None
 
+def render_prompt_variables(
+    content: str,
+    context: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    동적 템플릿 변수 치환기:
+    {{date}}, {{current_date}}, {{datetime}}, {{route_name}}, {{tenant_id}}, {{tenant_name}}, {{key_id}}
+    """
+    if not content:
+        return ""
+    if not context:
+        context = {}
+
+    now = datetime.datetime.now()
+    now_str = now.strftime("%Y-%m-%d")
+    now_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    replacements = {
+        "{{date}}": now_str,
+        "{{current_date}}": now_str,
+        "{{datetime}}": now_time_str,
+        "{{route_name}}": str(context.get("route_name") or ""),
+        "{{tenant_id}}": str(context.get("tenant_id") or ""),
+        "{{tenant_name}}": str(context.get("tenant_name") or ""),
+        "{{key_id}}": str(context.get("key_id") or ""),
+    }
+
+    rendered = content
+    for placeholder, val in replacements.items():
+        if placeholder in rendered:
+            rendered = rendered.replace(placeholder, val)
+    return rendered
+
 def inject_system_prompt(
     messages: List[Dict[str, Any]],
-    prompt: SystemPrompt
+    prompt: SystemPrompt,
+    context: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """
-    주입 모드(PREPEND / OVERRIDE / FALLBACK_ONLY)에 따라 프롬프트를 메시지 목록에 합성합니다.
+    주입 모드(PREPEND / OVERRIDE / FALLBACK_ONLY) 및 동적 템플릿 변수에 따라 프롬프트를 메시지 목록에 합성합니다.
     """
     if not prompt or not prompt.content:
         return messages
 
-    sys_content = prompt.content
+    sys_content = render_prompt_variables(prompt.content, context)
     mode = prompt.injection_mode
     existing_sys_indices = [i for i, m in enumerate(messages) if m.get("role") == "system"]
 
@@ -94,7 +152,7 @@ def resolve_and_inject_system_prompt(
     tenant_id: Optional[str] = None
 ) -> Tuple[List[Dict[str, Any]], Optional[SystemPrompt], Optional[str]]:
     """
-    우선순위 해석 및 주입을 원스톱으로 처리하여 (최종 메시지, 적용된 프롬프트, 해석 소스)를 반환합니다.
+    우선순위 해석 및 동적 변수 주입을 원스톱으로 처리하여 (최종 메시지, 적용된 프롬프트, 해석 소스)를 반환합니다.
     """
     prompt, resolved_by = resolve_system_prompt_for_context(
         db=db,
@@ -106,5 +164,19 @@ def resolve_and_inject_system_prompt(
     if not prompt:
         return messages, None, None
 
-    final_messages = inject_system_prompt(messages=messages, prompt=prompt)
+    # Context enrichment for template variables
+    tenant_name = None
+    if tenant_id:
+        t = db.query(Tenant).filter((Tenant.tenant_id == tenant_id) | (Tenant.department_code == tenant_id)).first()
+        if t:
+            tenant_name = t.name
+
+    context = {
+        "key_id": key_id,
+        "route_name": route_name,
+        "tenant_id": tenant_id,
+        "tenant_name": tenant_name
+    }
+
+    final_messages = inject_system_prompt(messages=messages, prompt=prompt, context=context)
     return final_messages, prompt, resolved_by

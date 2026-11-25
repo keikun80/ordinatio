@@ -102,13 +102,38 @@ class ExtProcessorService:
         try:
             from app.db.session import SessionLocal
             from app.core.prompt_injector import resolve_and_inject_system_prompt
+            from app.models.virtual_key import VirtualKey
             with SessionLocal() as db:
+                # Resolve real VirtualKey entity and tenant context
+                real_key_id = None
+                real_tenant_id = tenant_id
+                if raw_key:
+                    if raw_key.startswith("vk-"):
+                        real_key_id = raw_key
+                        vk_obj = db.query(VirtualKey).filter(VirtualKey.key_id == raw_key).first()
+                        if vk_obj and not real_tenant_id:
+                            real_tenant_id = vk_obj.tenant_id
+                    else:
+                        prefix = raw_key[:16]
+                        candidates = db.query(VirtualKey).filter(VirtualKey.key_prefix == prefix).all()
+                        for cand in candidates:
+                            from app.core.security import verify_virtual_key
+                            if verify_virtual_key(raw_key, cand.key_hash):
+                                real_key_id = cand.key_id
+                                if not real_tenant_id:
+                                    real_tenant_id = cand.tenant_id
+                                break
+                        if not real_key_id and candidates:
+                            real_key_id = candidates[0].key_id
+                            if not real_tenant_id:
+                                real_tenant_id = candidates[0].tenant_id
+
                 injected_messages, matched_p, resolved_by = resolve_and_inject_system_prompt(
                     db=db,
                     messages=messages,
-                    key_id=key_id,
+                    key_id=real_key_id or key_id,
                     route_name=route_name,
-                    tenant_id=tenant_id
+                    tenant_id=real_tenant_id
                 )
                 if matched_p and body and isinstance(body, dict):
                     body_override = dict(body)

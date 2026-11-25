@@ -232,3 +232,19 @@ def test_system_prompt_duplicate_binding_prevention_and_audit():
         audit = db.query(AuditLog).filter(AuditLog.action_taken.like("PROMPT_%")).first()
         assert audit is not None
         assert "audit-prompt-" in audit.log_id
+
+def test_system_prompts_content_search():
+    """Verify that search query filters by content, description, target_name as well as name."""
+    # Search by keyword in content: '주민등록번호' (in sp-global-guardrail content)
+    res = client.get("/api/v1/system-prompts?search=주민등록번호")
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) >= 1
+    assert any("주민등록번호" in p["content"] for p in items)
+
+    # Search by keyword in content: 'PEP8' (in sp-route-code content)
+    res_code = client.get("/api/v1/system-prompts?search=PEP8")
+    assert res_code.status_code == 200
+    items_code = res_code.json()
+    assert len(items_code) >= 1
+    assert any("PEP8" in p["content"] for p in items_code)

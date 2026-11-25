@@ -405,12 +405,23 @@ async def _execute_single_test_call(
 
     raw_messages = [{"role": "user", "content": message}]
     from app.core.prompt_injector import resolve_and_inject_system_prompt
+    from app.core.security import SYSTEM_DIAGNOSTICS_KEY_ID
+    from app.models.tenant import Tenant
+
+    resolved_tenant_id = tenant_code
+    if tenant_code:
+        t_obj = db.query(Tenant).filter(
+            (Tenant.department_code == tenant_code) | (Tenant.tenant_id == tenant_code)
+        ).first()
+        if t_obj:
+            resolved_tenant_id = t_obj.tenant_id
+
     injected_messages, applied_prompt, resolved_by = resolve_and_inject_system_prompt(
         db=db,
         messages=raw_messages,
-        key_id=SYSTEM_DIAGNOSTICS_KEY[:16],
+        key_id=SYSTEM_DIAGNOSTICS_KEY_ID,
         route_name=route_name,
-        tenant_id=tenant_code
+        tenant_id=resolved_tenant_id
     )
 
     applied_prompt_name = applied_prompt.name if applied_prompt else None

@@ -125,7 +125,9 @@ export default function SystemPromptsTab({ onNotify }) {
     const matchesSearch = !searchTerm.trim() ||
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.target_name && p.target_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      (p.content && p.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.target_name && p.target_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.target_id && p.target_id.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
 
@@ -191,6 +193,7 @@ export default function SystemPromptsTab({ onNotify }) {
     setFormContent(tpl.content);
     setFormTargetType(tpl.targetType);
     if (tpl.targetType === 'ROUTE' && routes.length > 0) setFormTargetId(routes[0].route_name);
+    else if (tpl.targetType === 'VIRTUAL_KEY' && virtualKeys.length > 0) setFormTargetId(virtualKeys[0].key_id || virtualKeys[0].keyId);
     else if (tpl.targetType === 'TENANT' && tenants.length > 0) setFormTargetId(tenants[0].tenant_id || tenants[0].id);
     else setFormTargetId('');
   };
@@ -249,7 +252,8 @@ export default function SystemPromptsTab({ onNotify }) {
       );
       onNotify('SUCCESS', strings.systemPrompts.alerts.statusChanged(p.name, nextActive));
     } catch (err) {
-      onNotify('ERROR', strings.systemPrompts.alerts.statusFailed);
+      const errorMsg = err?.message || err?.detail || strings.systemPrompts.alerts.statusFailed;
+      onNotify('ERROR', errorMsg);
     }
   };
 

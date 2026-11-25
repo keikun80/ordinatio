@@ -134,3 +134,97 @@ def test_ext_proc_server_injects_prompt_into_body():
     assert injected_msgs[0]["role"] == "system"
     assert "시큐어 코딩 지침" in injected_msgs[0]["content"]
     assert injected_msgs[1]["content"] == "SQL 쿼리 짜줘"
+
+def test_dynamic_prompt_template_variables():
+    """Verify {{date}}, {{route_name}}, {{tenant_name}} placeholder substitutions."""
+    with TestSessionLocal() as db:
+        prompt = SystemPrompt(
+            prompt_id="sp-test-vars",
+            name="동적 변수 템플릿 테스트",
+            content="오늘 날짜는 {{date}}이며 라우트는 {{route_name}}, 테넌트는 {{tenant_id}}입니다.",
+            target_type="ROUTE",
+            target_id="test-route-vars",
+            injection_mode="PREPEND",
+            is_active=True
+        )
+        db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-test-vars").delete()
+        db.add(prompt)
+        db.commit()
+
+        msgs, applied, resolved_by = resolve_and_inject_system_prompt(
+            db=db,
+            messages=[{"role": "user", "content": "안녕하세요"}],
+            route_name="test-route-vars",
+            tenant_id="dept-test"
+        )
+        assert applied is not None
+        assert resolved_by == "ROUTE"
+        sys_msg = msgs[0]["content"]
+        import datetime
+        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        assert f"오늘 날짜는 {today_str}" in sys_msg
+        assert "라우트는 test-route-vars" in sys_msg
+        assert "테넌트는 dept-test" in sys_msg
+
+        # Clean up
+        db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-test-vars").delete()
+        db.commit()
+
+def test_ext_proc_server_injects_prompt_for_virtual_key():
+    """Verify that ext_proc matches virtual key target correctly."""
+    with TestSessionLocal() as db:
+        from app.models.virtual_key import VirtualKey
+        from app.core.security import hash_virtual_key
+
+        db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-vk-extproc").delete()
+        db.query(VirtualKey).filter(VirtualKey.key_id == "vk-extproc-target").delete()
+
+        raw_test_key = "sk-ord-extproc-test-key-12345"
+        test_vk = VirtualKey(
+            key_id="vk-extproc-target",
+            name="ExtProc 테스트 가상키",
+            key_hash=hash_virtual_key(raw_test_key),
+            key_prefix=raw_test_key[:16],
+            tenant_id="dept-wm",
+            is_active=True
+        )
+        db.add(test_vk)
+
+        prompt = SystemPrompt(
+            prompt_id="sp-vk-extproc",
+            name="가상키 ExtProc 전용 프롬프트",
+            content="[가상키 특별 감사 지침]",
+            target_type="VIRTUAL_KEY",
+            target_id="vk-extproc-target",
+            injection_mode="OVERRIDE",
+            is_active=True
+        )
+        db.add(prompt)
+        db.commit()
+
+    headers = {
+        "authorization": f"Bearer {raw_test_key}",
+        "x-orche-route": "code-copilot-v2",
+        "x-session-id": "sess-test-vk"
+    }
+    body = {
+        "model": "meta-llama/Llama-3.1-70B-Instruct",
+        "messages": [
+            {"role": "system", "content": "기존 시스템 메시지"},
+            {"role": "user", "content": "테스트 질문"}
+        ]
+    }
+
+    res = ext_processor.process_request(headers=headers, body=body)
+    assert res.status == "CONTINUE"
+    assert res.headers_to_add.get("x-orche-prompt-injected") == "sp-vk-extproc"
+    assert res.headers_to_add.get("x-orche-prompt-target") == "VIRTUAL_KEY"
+    assert res.body_override is not None
+    assert res.body_override["messages"][0]["content"] == "[가상키 특별 감사 지침]"
+
+    # Clean up
+    with TestSessionLocal() as db:
+        db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-vk-extproc").delete()
+        db.query(VirtualKey).filter(VirtualKey.key_id == "vk-extproc-target").delete()
+        db.commit()
+

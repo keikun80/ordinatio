@@ -883,25 +883,11 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab =
       {/* Tab Content: Tenants (Departments) View */}
       {currentSubTab === 'tenants' && (
         <div className="card" data-testid="vk-tenants-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#ffffff' }}>부서(테넌트) 목록 및 예산 정책</h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                각 부서별 월간 예산 한도와 현재 소진액, Hard Cap 정책을 관리하고 누적 소진액을 롤오버/리셋할 수 있습니다.
-              </p>
-            </div>
-            {canWriteGovernance && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                data-testid="vk-btn-add-tenant-inline"
-                onClick={() => setShowNewTenantModal(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Plus size={15} />
-                <span>신규 부서 등록</span>
-              </button>
-            )}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#ffffff' }}>부서(테넌트) 목록 및 예산 정책</h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              각 부서별 월간 예산 한도와 현재 소진액, Hard Cap 정책을 관리하고 누적 소진액을 롤오버/리셋할 수 있습니다.
+            </p>
           </div>
           <div className="table-container">
             <table className="data-table" data-testid="vk-table-tenants">

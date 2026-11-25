@@ -185,6 +185,58 @@ def get_tenant(
         updated_at=tenant.updated_at
     )
 
+
+@router.post("/{tenant_id}/reset-spent", response_model=TenantResponse, dependencies=[Depends(require_permission("governance:write"))])
+def reset_tenant_spent_budget(
+    tenant_id: str,
+    tenant_scope: Optional[str] = Depends(get_tenant_scope),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    테넌트(부서) 월간 누적 소진액(spent_budget_krw) 초기화 (0.00 KRW)
+    - 월간 정산 후 롤오버 또는 Hard Cap 해제 시 전사 관리자가 수행
+    - WORM 불변 감사 로그에 RESET_TENANT_SPENT_BUDGET 기록
+    """
+    _require_global_scope(tenant_scope)
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
+
+    previous_spent = float(tenant.spent_budget_krw or 0.0)
+    tenant.spent_budget_krw = Decimal("0.00")
+    db.commit()
+    db.refresh(tenant)
+
+    _record_tenant_audit(
+        db=db,
+        requester_id=current_user.email or current_user.user_id,
+        action="RESET_TENANT_SPENT_BUDGET",
+        tenant_id=tenant.tenant_id,
+        details={
+            "previous_spent_krw": previous_spent,
+            "reset_spent_krw": 0.0,
+            "monthly_budget_krw": float(tenant.monthly_budget_krw),
+        }
+    )
+
+    active_count = db.query(VirtualKey).filter(
+        VirtualKey.tenant_id == tenant.tenant_id,
+        VirtualKey.is_active == True
+    ).count()
+
+    return TenantResponse(
+        tenant_id=tenant.tenant_id,
+        name=tenant.name,
+        department_code=tenant.department_code,
+        monthly_budget_krw=tenant.monthly_budget_krw,
+        is_hard_cap_enabled=tenant.is_hard_cap_enabled,
+        spent_budget_krw=tenant.spent_budget_krw or Decimal("0.00"),
+        active_keys_count=active_count,
+        created_at=tenant.created_at,
+        updated_at=tenant.updated_at
+    )
+
 @router.patch("/{tenant_id}", response_model=TenantResponse, dependencies=[Depends(require_permission("governance:write"))])
 def update_tenant(
     tenant_id: str,

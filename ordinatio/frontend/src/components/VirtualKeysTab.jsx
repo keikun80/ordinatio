@@ -15,7 +15,10 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   const [tenants, setTenants] = useState([]);
 
   const [selectedDept, setSelectedDept] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSecretModal, setShowSecretModal] = useState(false);
   const [createdSecret, setCreatedSecret] = useState(null);
@@ -392,6 +395,38 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
     }
   };
 
+  // Reset Tenant Spent Budget
+  const handleResetTenantSpent = async () => {
+    if (!canWriteGovernance || !selectedDept || selectedDept === 'ALL') return;
+    const targetTenant = tenants.find((t) => t.id === selectedDept);
+    if (!window.confirm(`[${targetTenant?.name || selectedDept}] 부서의 누적 소진액을 0원으로 초기화하시겠습니까? (월간 예산 갱신)`)) return;
+    setIsLoading(true);
+    try {
+      const res = await apiClient.resetTenantSpent(selectedDept);
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === selectedDept
+            ? { ...t, spent: 0 }
+            : t
+        )
+      );
+      setKeys((prevKeys) =>
+        prevKeys.map((k) =>
+          k.tenantId === selectedDept
+            ? { ...k, tenantSpent: 0, tenantBurnPct: 0, isHardCapExceeded: false, status: k.status === 'BLOCKED' && k.isHardCapExceeded ? 'ACTIVE' : k.status }
+            : k
+        )
+      );
+      setShowEditTenantModal(false);
+      onNotify('SUCCESS', `부서 [${res.name}]의 누적 소진액이 ₩0원으로 초기화되었습니다.`);
+    } catch (err) {
+      console.error('Reset tenant spent failed:', err);
+      onNotify('ERROR', `소진액 초기화 실패: ${err.message || '서버 오류'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Delete Tenant (Department)
   const handleDeleteTenant = async (tenantId) => {
     if (!canWriteGovernance || !tenantId || tenantId === 'ALL') return;
@@ -495,12 +530,16 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
   // Filter keys
   const filteredKeys = keys.filter((k) => {
     const matchesDept = selectedDept === 'ALL' || k.tenantId === selectedDept;
+    const matchesStatus = selectedStatus === 'ALL' || k.status === selectedStatus;
     const matchesSearch =
       k.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       k.keyId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (k.keyPrefix && k.keyPrefix.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesDept && matchesSearch;
+    return matchesDept && matchesStatus && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredKeys.length / pageSize));
+  const paginatedKeys = filteredKeys.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="tab-pane" data-testid="vk-page-container" data-screen-id="SCR-VK-01">
@@ -560,19 +599,43 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                 style={{ paddingLeft: '36px', color: '#F54927' }}
                 placeholder={strings.virtualKeys.searchPlaceholder}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
               />
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>상태:</span>
+            <select
+              className="form-select"
+              data-testid="vk-select-status-filter"
+              style={{ width: 'auto' }}
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="ALL">전체 상태</option>
+              <option value="ACTIVE">활성 (ACTIVE)</option>
+              <option value="WARNING">경고 (WARNING)</option>
+              <option value="BLOCKED">차단 (BLOCKED)</option>
+              <option value="EXPIRED">만료 (EXPIRED)</option>
+            </select>
+
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{strings.virtualKeys.deptFilterLabel}</span>
             <select
               className="form-select"
               data-testid="vk-select-tenant-filter"
               style={{ width: 'auto' }}
               value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
+              onChange={(e) => {
+                setSelectedDept(e.target.value);
+                setCurrentPage(1);
+              }}
             >
               <option value="ALL">{strings.virtualKeys.allDepts}</option>
               {tenants.map((t) => (
@@ -640,7 +703,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                   </td>
                 </tr>
               ) : (
-                filteredKeys.map((k) => {
+                paginatedKeys.map((k) => {
                   const percent = k.tenantBurnPct ?? (k.budget > 0 ? Math.min(100, Math.round((k.spent / k.budget) * 100)) : 0);
                   return (
                     <tr key={k.keyId} data-testid={`vk-row-${k.keyId}`}>
@@ -739,6 +802,36 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {filteredKeys.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            <div>
+              총 <strong style={{ color: '#ffffff' }}>{filteredKeys.length}</strong>개 항목 (페이지 {currentPage} / {totalPages})
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                style={{ padding: '4px 10px' }}
+              >
+                이전
+              </button>
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPage}</span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                style={{ padding: '4px 10px' }}
+              >
+                다음
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Key Modal (설정 변경 모달) */}
@@ -1474,24 +1567,37 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                   </label>
                 </div>
               </div>
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  data-testid="vk-modal-edit-tenant-btn-cancel"
-                  onClick={() => setShowEditTenantModal(false)}
-                >
-                  {strings.common.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  data-testid="vk-modal-edit-tenant-btn-submit"
-                  data-function-id="FNC-VK-UPDATE-TENANT"
+                  data-testid="vk-modal-edit-tenant-btn-reset-spent"
+                  onClick={handleResetTenantSpent}
                   disabled={isLoading}
+                  style={{ color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.4)', background: 'rgba(251, 191, 36, 0.1)' }}
+                  title="월간 정산 후 부서의 누적 소비액을 0원으로 리셋합니다."
                 >
-                  {isLoading ? strings.virtualKeys.createTenantModal.btnUpdating : strings.virtualKeys.createTenantModal.btnUpdateSubmit}
+                  소진액 초기화 (월간 롤오버)
                 </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    data-testid="vk-modal-edit-tenant-btn-cancel"
+                    onClick={() => setShowEditTenantModal(false)}
+                  >
+                    {strings.common.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    data-testid="vk-modal-edit-tenant-btn-submit"
+                    data-function-id="FNC-VK-UPDATE-TENANT"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? strings.virtualKeys.createTenantModal.btnUpdating : strings.virtualKeys.createTenantModal.btnUpdateSubmit}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

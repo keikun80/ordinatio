@@ -331,3 +331,53 @@ def test_rpm_rate_limiter():
     assert rem4 == 0
 
 
+def test_tpm_rate_limiter():
+    from app.core.token_limiter import TokenRateLimiter
+    limiter = TokenRateLimiter()
+    test_key = "test-key-tpm-limit"
+
+    # Consume 150,000 tokens out of 200,000 TPM limit
+    allowed1, current1, rem1 = limiter.check_and_consume(test_key, requested_tokens=150000, tpm_limit=200000)
+    assert allowed1 is True
+    assert current1 == 150000
+    assert rem1 == 50000
+
+    # Requesting another 60,000 tokens should be blocked (would exceed 200,000)
+    allowed2, current2, rem2 = limiter.check_and_consume(test_key, requested_tokens=60000, tpm_limit=200000)
+    assert allowed2 is False
+    assert current2 == 150000  # Usage not incremented when blocked
+    assert rem2 == 50000
+
+    # Requesting 40,000 tokens fits within remaining 50,000
+    allowed3, current3, rem3 = limiter.check_and_consume(test_key, requested_tokens=40000, tpm_limit=200000)
+    assert allowed3 is True
+    assert current3 == 190000
+    assert rem3 == 10000
+
+
+def test_tenant_reset_spent_budget():
+    # 1. Update spent budget directly on existing tenant
+    db = TestSessionLocal()
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == "dept-wm").first()
+    assert tenant is not None
+    tenant.spent_budget_krw = 9999999.00
+    db.commit()
+    db.close()
+
+    # Verify spent_budget is reflected
+    res = client.get("/api/v1/tenants/dept-wm")
+    assert res.status_code == 200
+    assert float(res.json()["spent_budget_krw"]) == 9999999.00
+
+    # 2. Reset spent budget via POST /api/v1/tenants/{id}/reset-spent
+    reset_res = client.post("/api/v1/tenants/dept-wm/reset-spent")
+    assert reset_res.status_code == 200
+    assert float(reset_res.json()["spent_budget_krw"]) == 0.0
+
+    # Verify persistent state in DB
+    check_res = client.get("/api/v1/tenants/dept-wm")
+    assert check_res.status_code == 200
+    assert float(check_res.json()["spent_budget_krw"]) == 0.0
+
+
+

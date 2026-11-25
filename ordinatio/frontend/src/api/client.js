@@ -123,6 +123,18 @@ export const apiClient = {
     return await res.json();
   },
 
+  async resetTenantSpent(tenantId) {
+    const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}/reset-spent`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || '부서 누적 소진액 초기화 실패');
+    }
+    return await res.json();
+  },
+
   async updateTenantBudget(tenantId, data) {
     const res = await fetch(`${API_BASE_URL}/external/tenants/${tenantId}/budget`, {
       method: 'PATCH',

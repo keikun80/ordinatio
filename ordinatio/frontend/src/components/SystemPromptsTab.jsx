@@ -127,8 +127,25 @@ export default function SystemPromptsTab({ onNotify }) {
     return matchesFilter && matchesSearch;
   });
 
-  // Calculate estimated tokens
-  const estimatedTokens = Math.max(Math.floor(formContent.length / 3), 0);
+  // Calculate estimated tokens with CJK/Latin weighted heuristics
+  const calculateEstimatedTokens = (text) => {
+    if (!text) return 0;
+    let cjkCount = 0;
+    let otherCount = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if ((code >= 0xac00 && code <= 0xd7a3) || (code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3040 && code <= 0x30ff)) {
+        cjkCount++;
+      } else {
+        otherCount++;
+      }
+    }
+    const words = text.replace(/[\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const otherTokens = Math.floor(words.length * 1.3) + Math.floor((otherCount - words.join('').length) / 4);
+    const cjkTokens = Math.floor(cjkCount * 0.65);
+    return Math.max(1, cjkTokens + otherTokens);
+  };
+  const estimatedTokens = calculateEstimatedTokens(formContent);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -708,11 +725,15 @@ export default function SystemPromptsTab({ onNotify }) {
                         onChange={(e) => setFormTargetId(e.target.value)}
                         required
                       >
-                        {virtualKeys.map((k) => (
-                          <option key={k.key_id || k.keyId} value={k.key_id || k.keyId}>
-                            {k.name} ({k.key_id || k.keyId}) - {k.tenant_name || k.tenantName || strings.systemPrompts.tenantFallback}
-                          </option>
-                        ))}
+                        {virtualKeys.map((k) => {
+                          const isKeyActive = k.is_active ?? (k.status === 'ACTIVE');
+                          const statusText = isKeyActive ? '' : ' [비활성/차단]';
+                          return (
+                            <option key={k.key_id || k.keyId} value={k.key_id || k.keyId}>
+                              {k.name} ({k.key_id || k.keyId}){statusText} - {k.tenant_name || k.tenantName || strings.systemPrompts.tenantFallback}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   )}
@@ -842,10 +863,10 @@ export default function SystemPromptsTab({ onNotify }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px' }}>
                 <div>
                   <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.vkeyLabel}</label>
-                  <select 
-                    className="form-select" 
+                  <select
+                    className="form-select"
                     data-testid="sp-sim-select-key"
-                    value={simKeyId} 
+                    value={simKeyId}
                     onChange={(e) => setSimKeyId(e.target.value)}
                   >
                     <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
@@ -857,10 +878,10 @@ export default function SystemPromptsTab({ onNotify }) {
 
                 <div>
                   <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.routeLabel}</label>
-                  <select 
-                    className="form-select" 
+                  <select
+                    className="form-select"
                     data-testid="sp-sim-select-route"
-                    value={simRouteName} 
+                    value={simRouteName}
                     onChange={(e) => setSimRouteName(e.target.value)}
                   >
                     <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
@@ -872,10 +893,10 @@ export default function SystemPromptsTab({ onNotify }) {
 
                 <div>
                   <label className="form-label" style={{ fontSize: '0.76rem' }}>{strings.systemPrompts.simModal.tenantLabel}</label>
-                  <select 
-                    className="form-select" 
+                  <select
+                    className="form-select"
                     data-testid="sp-sim-select-tenant"
-                    value={simTenantId} 
+                    value={simTenantId}
                     onChange={(e) => setSimTenantId(e.target.value)}
                   >
                     <option value="">{strings.systemPrompts.simModal.ignoreOption}</option>
@@ -961,11 +982,11 @@ export default function SystemPromptsTab({ onNotify }) {
             </div>
 
             <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
+              <button
+                type="button"
+                className="btn btn-secondary"
                 data-testid="sp-sim-btn-close"
-                onClick={() => setSimulatorOpen(false)} 
+                onClick={() => setSimulatorOpen(false)}
                 style={{ width: '100%' }}
               >
                 {strings.systemPrompts.simModal.btnClose}

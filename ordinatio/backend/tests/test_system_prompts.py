@@ -153,3 +153,48 @@ def test_resolve_injection_modes():
     with TestSessionLocal() as db:
         db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-mode-override").delete()
         db.commit()
+
+def test_system_prompt_duplicate_binding_prevention_and_audit():
+    """Verify that duplicate active binding on same target fails, and WORM AuditLog is recorded."""
+    from app.models.audit_log import AuditLog
+
+    # 1. Create initial prompt bound to ROUTE
+    payload1 = {
+        "prompt_id": "sp-dup-test-01",
+        "name": "중복 검증 1차 프롬프트",
+        "content": "지침 1",
+        "target_type": "ROUTE",
+        "target_id": "code-copilot-v2",
+        "is_active": True
+    }
+    client.delete("/api/v1/system-prompts/sp-dup-test-01")
+    client.delete("/api/v1/system-prompts/sp-dup-test-02")
+
+    res1 = client.post("/api/v1/system-prompts", json=payload1)
+    # Note: if code-copilot-v2 already has sp-route-code bound in seed data, it correctly fails with 400!
+    if res1.status_code == 400:
+        assert "이미 활성화된" in res1.json()["detail"]
+    else:
+        assert res1.status_code == 201
+
+        # 2. Attempt to create second active prompt on same target -> Must fail with 400
+        payload2 = {
+            "prompt_id": "sp-dup-test-02",
+            "name": "중복 검증 2차 프롬프트",
+            "content": "지침 2",
+            "target_type": "ROUTE",
+            "target_id": "code-copilot-v2",
+            "is_active": True
+        }
+        res2 = client.post("/api/v1/system-prompts", json=payload2)
+        assert res2.status_code == 400
+        assert "이미 활성화된" in res2.json()["detail"]
+
+        # Clean up
+        client.delete("/api/v1/system-prompts/sp-dup-test-01")
+
+    # 3. Check AuditLog entry recorded
+    with TestSessionLocal() as db:
+        audit = db.query(AuditLog).filter(AuditLog.action_taken.like("PROMPT_%")).first()
+        assert audit is not None
+        assert "audit-prompt-" in audit.log_id

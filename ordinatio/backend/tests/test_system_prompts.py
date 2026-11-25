@@ -51,6 +51,7 @@ def test_create_and_delete_system_prompt():
     assert created["prompt_id"] == "sp-api-test-01"
     assert created["estimated_tokens"] > 0
     assert created["target_name"] == "전사 공통 (Global)"
+    assert created.get("version", 1) == 1
 
     # 2. Get
     get_res = client.get("/api/v1/system-prompts/sp-api-test-01")
@@ -65,6 +66,7 @@ def test_create_and_delete_system_prompt():
     assert put_res.status_code == 200
     assert put_res.json()["name"] == "수정된 API 테스트 프롬프트"
     assert put_res.json()["injection_mode"] == "OVERRIDE"
+    assert put_res.json().get("version") == 2
 
     # 4. Delete
     del_res = client.delete("/api/v1/system-prompts/sp-api-test-01")

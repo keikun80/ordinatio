@@ -45,7 +45,7 @@ def _estimate_tokens(text: str) -> int:
     other_text = "".join(other_chars)
     words = other_text.split()
     other_tokens = int(len(words) * 1.3) + (len(other_text) - len("".join(words))) // 4
-    cjk_tokens = int(cjk_count * 0.65)
+    cjk_tokens = int(cjk_count * 1.5)
     return max(1, cjk_tokens + other_tokens)
 
 def _record_prompt_audit_log(
@@ -61,6 +61,7 @@ def _record_prompt_audit_log(
         log_id = f"audit-prompt-{int(t0 * 1000)}-{uuid.uuid4().hex[:6]}"
         details_str = json.dumps(details, ensure_ascii=False)
         payload_hash = hashlib.sha256(details_str.encode("utf-8")).hexdigest()
+        elapsed_latency_ms = round((time.time() - t0) * 1000, 2)
 
         worm_ref = WormStorage.record_audit_log(
             log_id=log_id,
@@ -72,7 +73,7 @@ def _record_prompt_audit_log(
             detections=[{"prompt_governance_action": action, "prompt_id": prompt_id, "details": details}],
             pii_count=0,
             action_taken=action,
-            latency_ms=0.0,
+            latency_ms=elapsed_latency_ms,
             is_blocked=False,
         )
 
@@ -86,7 +87,7 @@ def _record_prompt_audit_log(
             detections_json=details_str,
             pii_count=0,
             action_taken=action,
-            latency_ms=0.0,
+            latency_ms=elapsed_latency_ms,
             is_blocked=False,
             worm_reference_id=worm_ref
         )
@@ -182,7 +183,8 @@ def list_system_prompts(
             if latest_name and latest_name != p.target_name:
                 p.target_name = latest_name
         except Exception:
-            pass
+            if p.target_type != "GLOBAL":
+                p.target_name = f"{p.target_name or p.target_id} [삭제된 자원]"
 
     return prompts
 
@@ -233,16 +235,24 @@ def create_system_prompt(
     target_name = payload.target_name or _validate_and_enrich_target(payload.target_type, payload.target_id, db)
     token_count = _estimate_tokens(payload.content)
 
+    # ROUTE 타입인 경우 target_id를 정규화된 라우트 명칭으로 보정
+    effective_target_id = payload.target_id
+    if payload.target_type == "ROUTE" and target_name:
+        effective_target_id = target_name
+    elif payload.target_type == "GLOBAL":
+        effective_target_id = None
+
     new_prompt = SystemPrompt(
         prompt_id=prompt_id,
         name=payload.name,
         description=payload.description,
         content=payload.content,
         target_type=payload.target_type,
-        target_id=payload.target_id if payload.target_type != "GLOBAL" else None,
+        target_id=effective_target_id,
         target_name=target_name,
         injection_mode=payload.injection_mode,
         estimated_tokens=token_count,
+        version=1,
         is_active=payload.is_active
     )
 
@@ -353,11 +363,15 @@ def update_system_prompt(
             prompt.target_name = "전사 공통 (Global)"
         else:
             t_id = payload.target_id if payload.target_id is not None else prompt.target_id
-            prompt.target_id = t_id
-            prompt.target_name = payload.target_name or _validate_and_enrich_target(payload.target_type, t_id, db)
+            t_name = payload.target_name or _validate_and_enrich_target(payload.target_type, t_id, db)
+            prompt.target_id = t_name if payload.target_type == "ROUTE" else t_id
+            prompt.target_name = t_name
     elif payload.target_id is not None and prompt.target_type != "GLOBAL":
-        prompt.target_id = payload.target_id
-        prompt.target_name = payload.target_name or _validate_and_enrich_target(prompt.target_type, payload.target_id, db)
+        t_name = payload.target_name or _validate_and_enrich_target(prompt.target_type, payload.target_id, db)
+        prompt.target_id = t_name if prompt.target_type == "ROUTE" else payload.target_id
+        prompt.target_name = t_name
+
+    prompt.version = (prompt.version or 1) + 1
 
     db.commit()
     db.refresh(prompt)
@@ -429,7 +443,9 @@ def resolve_system_prompt(
     엔진 코어(resolve_and_inject_system_prompt)를 직접 호출하여 100% 동일한 합성 및 멀티모달 처리 보장
     우선순위: VIRTUAL_KEY > ROUTE > TENANT > GLOBAL
     """
-    input_msgs = req.input_messages or [{"role": "user", "content": "안녕하세요. 모델 테스트입니다."}]
+    input_msgs = req.input_messages if req.input_messages is not None else []
+    if not input_msgs:
+        input_msgs = [{"role": "user", "content": "프롬프트 거버넌스 시뮬레이션 요청"}]
 
     final_msgs, matched_prompt, resolved_by = resolve_and_inject_system_prompt(
         db=db,

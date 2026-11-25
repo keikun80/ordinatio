@@ -33,6 +33,7 @@ class SystemPromptResponse(SystemPromptBase):
 
     prompt_id: str
     estimated_tokens: int
+    version: int = 1
     created_at: datetime
     updated_at: datetime
 

@@ -149,7 +149,7 @@ export default function SystemPromptsTab({ onNotify }) {
     }
     const words = text.replace(/[\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff]/g, ' ').trim().split(/\s+/).filter(Boolean);
     const otherTokens = Math.floor(words.length * 1.3) + Math.floor((otherCount - words.join('').length) / 4);
-    const cjkTokens = Math.floor(cjkCount * 0.65);
+    const cjkTokens = Math.floor(cjkCount * 1.5);
     return Math.max(1, cjkTokens + otherTokens);
   };
   const estimatedTokens = calculateEstimatedTokens(formContent);
@@ -477,8 +477,11 @@ export default function SystemPromptsTab({ onNotify }) {
                 <div>
                   {/* Top Bar: Title & Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.98rem', color: 'var(--text-primary)' }} data-testid={`sp-text-name-${p.prompt_id}`}>
-                      {p.name}
+                    <div style={{ fontWeight: 600, fontSize: '0.98rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }} data-testid={`sp-text-name-${p.prompt_id}`}>
+                      <span>{p.name}</span>
+                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', background: 'rgba(255,255,255,0.08)', color: '#94a3b8', padding: '1px 6px', borderRadius: '4px' }}>
+                        v{p.version || 1}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span
@@ -518,9 +521,9 @@ export default function SystemPromptsTab({ onNotify }) {
                         padding: '3px 8px',
                         borderRadius: '4px',
                         fontSize: '0.74rem',
-                        background: `${targetColor}18`,
-                        color: targetColor,
-                        border: `1px solid ${targetColor}40`,
+                        background: p.target_name?.includes('[삭제된 자원]') ? 'rgba(239, 68, 68, 0.15)' : `${targetColor}18`,
+                        color: p.target_name?.includes('[삭제된 자원]') ? '#f87171' : targetColor,
+                        border: `1px solid ${p.target_name?.includes('[삭제된 자원]') ? 'rgba(239, 68, 68, 0.4)' : `${targetColor}40`}`,
                         fontWeight: 600
                       }}
                     >

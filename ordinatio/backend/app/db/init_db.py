@@ -42,6 +42,7 @@ def init_db():
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS failover_chain JSONB DEFAULT '[]'::jsonb;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS description TEXT;"))
+                conn.execute(text("ALTER TABLE system_prompts ADD COLUMN IF NOT EXISTS version INT DEFAULT 1;"))
         except Exception as mig_err:
             logger.debug(f"Column migration check: {mig_err}")
 

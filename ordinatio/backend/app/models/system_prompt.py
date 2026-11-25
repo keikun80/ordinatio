@@ -13,6 +13,7 @@ class SystemPrompt(Base):
     target_name = Column(String(128), nullable=True)              # UI 렌더링용 캐시 명칭
     injection_mode = Column(String(32), nullable=False, default="PREPEND")  # 'PREPEND', 'OVERRIDE', 'FALLBACK_ONLY'
     estimated_tokens = Column(Integer, default=0, nullable=False)
+    version = Column(Integer, default=1, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -879,6 +879,23 @@ code {
   background: rgba(15, 23, 42, 0.95);
 }
 
+/* Date picker indicator dark mode styling and cursor */
+input[type="date"].form-input {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.8);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+input[type="date"].form-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 /* Sliders */
 .slider-container {
   display: flex;

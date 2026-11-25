@@ -925,23 +925,11 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                     data-testid="vk-modal-edit-input-expires"
                     value={editExpiresAt}
                     onChange={(e) => setEditExpiresAt(e.target.value)}
+                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    style={{ colorScheme: 'dark' }}
                   />
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     * 미입력 시 유효기간 없이 무기한 유지됩니다.
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">{strings.virtualKeys.editModal.expiresAtLabel}</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    data-testid="vk-modal-edit-input-expires"
-                    value={editExpiresAt}
-                    onChange={(e) => setEditExpiresAt(e.target.value)}
-                  />
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    * 비워둘 경우 만료일 없이 무기한 사용됩니다.
                   </div>
                 </div>
 
@@ -1195,6 +1183,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                     data-testid="vk-modal-input-expires"
                     value={newKeyExpiresAt}
                     onChange={(e) => setNewKeyExpiresAt(e.target.value)}
+                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    style={{ colorScheme: 'dark' }}
                   />
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     * 미입력 시 유효기간 없이 무기한 유지됩니다.

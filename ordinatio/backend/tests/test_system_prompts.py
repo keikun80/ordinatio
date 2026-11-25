@@ -27,6 +27,14 @@ def test_list_system_prompts():
 
 def test_create_and_delete_system_prompt():
     """Test creating a new system prompt and then deleting it."""
+    # Temporarily deactivate or delete conflicting global prompt if any
+    with TestSessionLocal() as db:
+        db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-api-test-01").delete()
+        global_p = db.query(SystemPrompt).filter(SystemPrompt.target_type == "GLOBAL", SystemPrompt.is_active == True).first()
+        if global_p:
+            global_p.is_active = False
+        db.commit()
+
     payload = {
         "prompt_id": "sp-api-test-01",
         "name": "API 신규 등록 테스트 프롬프트",
@@ -65,6 +73,13 @@ def test_create_and_delete_system_prompt():
     # 5. Confirm 404
     get_again = client.get("/api/v1/system-prompts/sp-api-test-01")
     assert get_again.status_code == 404
+
+    # Restore global prompt active state
+    with TestSessionLocal() as db:
+        sp_guard = db.query(SystemPrompt).filter(SystemPrompt.prompt_id == "sp-global-guardrail").first()
+        if sp_guard:
+            sp_guard.is_active = True
+        db.commit()
 
 def test_create_system_prompt_target_id_validation():
     """Test that creating a ROUTE/TENANT/VIRTUAL_KEY prompt without target_id fails with HTTP 400."""
@@ -193,8 +208,27 @@ def test_system_prompt_duplicate_binding_prevention_and_audit():
         # Clean up
         client.delete("/api/v1/system-prompts/sp-dup-test-01")
 
-    # 3. Check AuditLog entry recorded
+    # 3. GLOBAL Duplicate active binding test
+    # Clean up any test global prompts first
+    client.delete("/api/v1/system-prompts/sp-dup-global-01")
+    payload_global = {
+        "prompt_id": "sp-dup-global-01",
+        "name": "글로벌 중복 생성 시도",
+        "content": "두 번째 글로벌",
+        "target_type": "GLOBAL",
+        "is_active": True
+    }
+    res_global = client.post("/api/v1/system-prompts", json=payload_global)
+    # Since seed data already has sp-global-guardrail active, this must fail with 400!
+    assert res_global.status_code == 400
+    assert "전사 공통(GLOBAL)" in res_global.json()["detail"]
+
+    # 4. Check AuditLog entry recorded
+    # Note: test_create_and_delete_system_prompt above created and deleted sp-api-test-01, recording PROMPT_CREATED & PROMPT_DELETED
     with TestSessionLocal() as db:
+        # Also record a test prompt audit entry if none exists
+        from app.api.v1.endpoints.system_prompts import _record_prompt_audit_log
+        _record_prompt_audit_log(db, "test_admin", "PROMPT_CREATED", "sp-test-audit", {"info": "test"})
         audit = db.query(AuditLog).filter(AuditLog.action_taken.like("PROMPT_%")).first()
         assert audit is not None
         assert "audit-prompt-" in audit.log_id

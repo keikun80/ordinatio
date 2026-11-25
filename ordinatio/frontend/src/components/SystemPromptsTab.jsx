@@ -167,7 +167,13 @@ export default function SystemPromptsTab({ onNotify }) {
     setFormDesc(p.description || '');
     setFormContent(p.content);
     setFormTargetType(p.target_type);
-    setFormTargetId(p.target_id || '');
+    let targetId = p.target_id || '';
+    if (!targetId) {
+      if (p.target_type === 'ROUTE' && routes.length > 0) targetId = routes[0].route_name;
+      else if (p.target_type === 'VIRTUAL_KEY' && virtualKeys.length > 0) targetId = virtualKeys[0].key_id || virtualKeys[0].keyId;
+      else if (p.target_type === 'TENANT' && tenants.length > 0) targetId = tenants[0].tenant_id || tenants[0].id;
+    }
+    setFormTargetId(targetId);
     setFormInjectionMode(p.injection_mode || 'PREPEND');
     setFormIsActive(p.is_active);
     setShowEditModal(true);

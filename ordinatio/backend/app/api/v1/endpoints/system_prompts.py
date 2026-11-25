@@ -150,7 +150,7 @@ def list_system_prompts(
     db: Session = Depends(get_db)
 ):
     """
-    시스템 프롬프트 카탈로그 목록 조회
+    시스템 프롬프트 카탈로그 목록 조회 (실시간 타겟 명칭 최신 동기화)
     """
     query = db.query(SystemPrompt)
     if target_type:
@@ -160,7 +160,18 @@ def list_system_prompts(
     if search:
         query = query.filter(SystemPrompt.name.ilike(f"%{search}%"))
 
-    return query.order_by(SystemPrompt.created_at.desc()).all()
+    prompts = query.order_by(SystemPrompt.created_at.desc()).all()
+
+    # 실시간 최신 target_name 동기화
+    for p in prompts:
+        try:
+            latest_name = _validate_and_enrich_target(p.target_type, p.target_id, db)
+            if latest_name and latest_name != p.target_name:
+                p.target_name = latest_name
+        except Exception:
+            pass
+
+    return prompts
 
 @router.post("", response_model=SystemPromptResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("prompts:write"))])
 def create_system_prompt(
@@ -169,7 +180,7 @@ def create_system_prompt(
     db: Session = Depends(get_db)
 ):
     """
-    신규 시스템 프롬프트 등록 및 1:1 타겟 바인딩 (동일 타겟 중복 등록 방지 및 WORM 감사로그 기록)
+    신규 시스템 프롬프트 등록 및 1:1 타겟 바인딩 (동일 타겟/GLOBAL 중복 활성화 방지 및 WORM 감사로그 기록)
     """
     prompt_id = payload.prompt_id or f"sp-{uuid.uuid4().hex[:8]}"
 
@@ -181,18 +192,29 @@ def create_system_prompt(
             detail=f"이미 존재하는 시스템 프롬프트 ID입니다: {prompt_id}"
         )
 
-    # 동일 타겟 중복 활성화 방지 검증 (GLOBAL 제외)
-    if payload.target_type != "GLOBAL" and payload.target_id and payload.is_active:
-        duplicate = db.query(SystemPrompt).filter(
-            SystemPrompt.target_type == payload.target_type,
-            SystemPrompt.target_id == payload.target_id,
-            SystemPrompt.is_active == True
-        ).first()
-        if duplicate:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"해당 {payload.target_type} 대상({payload.target_id})에 이미 활성화된 시스템 프롬프트 '{duplicate.name}'({duplicate.prompt_id})가 존재합니다."
-            )
+    # 동일 타겟 중복 활성화 방지 검증
+    if payload.is_active:
+        if payload.target_type == "GLOBAL":
+            duplicate_global = db.query(SystemPrompt).filter(
+                SystemPrompt.target_type == "GLOBAL",
+                SystemPrompt.is_active == True
+            ).first()
+            if duplicate_global:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"이미 활성화된 전사 공통(GLOBAL) 시스템 프롬프트 '{duplicate_global.name}'({duplicate_global.prompt_id})가 존재합니다. 기존 프롬프트를 비활성화하거나 수정한 후 다시 등록하십시오."
+                )
+        elif payload.target_id:
+            duplicate = db.query(SystemPrompt).filter(
+                SystemPrompt.target_type == payload.target_type,
+                SystemPrompt.target_id == payload.target_id,
+                SystemPrompt.is_active == True
+            ).first()
+            if duplicate:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"해당 {payload.target_type} 대상({payload.target_id})에 이미 활성화된 시스템 프롬프트 '{duplicate.name}'({duplicate.prompt_id})가 존재합니다."
+                )
 
     # 타겟 검증 및 명칭 보강
     target_name = payload.target_name or _validate_and_enrich_target(payload.target_type, payload.target_id, db)
@@ -273,18 +295,30 @@ def update_system_prompt(
     new_is_active = payload.is_active if payload.is_active is not None else prompt.is_active
 
     # 동일 타겟 중복 활성화 방지 검증 (본인 제외)
-    if new_target_type != "GLOBAL" and new_target_id and new_is_active:
-        duplicate = db.query(SystemPrompt).filter(
-            SystemPrompt.target_type == new_target_type,
-            SystemPrompt.target_id == new_target_id,
-            SystemPrompt.is_active == True,
-            SystemPrompt.prompt_id != prompt_id
-        ).first()
-        if duplicate:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"해당 {new_target_type} 대상({new_target_id})에 이미 활성화된 다른 시스템 프롬프트 '{duplicate.name}'({duplicate.prompt_id})가 존재합니다."
-            )
+    if new_is_active:
+        if new_target_type == "GLOBAL":
+            duplicate_global = db.query(SystemPrompt).filter(
+                SystemPrompt.target_type == "GLOBAL",
+                SystemPrompt.is_active == True,
+                SystemPrompt.prompt_id != prompt_id
+            ).first()
+            if duplicate_global:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"이미 활성화된 다른 전사 공통(GLOBAL) 시스템 프롬프트 '{duplicate_global.name}'({duplicate_global.prompt_id})가 존재합니다."
+                )
+        elif new_target_id:
+            duplicate = db.query(SystemPrompt).filter(
+                SystemPrompt.target_type == new_target_type,
+                SystemPrompt.target_id == new_target_id,
+                SystemPrompt.is_active == True,
+                SystemPrompt.prompt_id != prompt_id
+            ).first()
+            if duplicate:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"해당 {new_target_type} 대상({new_target_id})에 이미 활성화된 다른 시스템 프롬프트 '{duplicate.name}'({duplicate.prompt_id})가 존재합니다."
+                )
 
     if payload.name is not None:
         prompt.name = payload.name

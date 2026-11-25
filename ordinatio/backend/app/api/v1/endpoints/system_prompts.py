@@ -3,7 +3,7 @@ import hashlib
 import json
 import time
 from typing import List, Optional, Any, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -53,7 +53,9 @@ def _record_prompt_audit_log(
     requester_id: str,
     action: str,
     prompt_id: str,
-    details: dict
+    details: dict,
+    key_id: Optional[str] = None,
+    model_id: Optional[str] = None
 ) -> None:
     """시스템 프롬프트 거버넌스 라이프사이클 변경 WORM 감사 로그 및 DB AuditLog 불변 보관"""
     try:
@@ -66,8 +68,8 @@ def _record_prompt_audit_log(
         worm_ref = WormStorage.record_audit_log(
             log_id=log_id,
             requester_id=requester_id,
-            key_id=None,
-            model_id=None,
+            key_id=key_id,
+            model_id=model_id,
             original_prompt_hash=payload_hash,
             masked_payload_hash=payload_hash,
             detections=[{"prompt_governance_action": action, "prompt_id": prompt_id, "details": details}],
@@ -80,8 +82,8 @@ def _record_prompt_audit_log(
         audit_entry = AuditLog(
             log_id=log_id,
             requester_id=requester_id,
-            key_id=None,
-            model_id=None,
+            key_id=key_id,
+            model_id=model_id,
             original_prompt_hash=payload_hash,
             masked_payload_hash=payload_hash,
             detections_json=details_str,
@@ -147,6 +149,7 @@ from app.core.prompt_injector import resolve_and_inject_system_prompt
 
 @router.get("", response_model=List[SystemPromptResponse], dependencies=[Depends(require_permission("prompts:read"))])
 def list_system_prompts(
+    response: Response,
     target_type: Optional[str] = Query(None, description="타겟 유형 필터링 (ROUTE, VIRTUAL_KEY, TENANT, GLOBAL)"),
     is_active: Optional[bool] = Query(None, description="활성화 여부 필터링"),
     search: Optional[str] = Query(None, description="프롬프트 명칭 검색어"),
@@ -173,6 +176,9 @@ def list_system_prompts(
                 SystemPrompt.target_id.ilike(f"%{search}%")
             )
         )
+
+    total_count = query.count()
+    response.headers["X-Total-Count"] = str(total_count)
 
     prompts = query.order_by(SystemPrompt.created_at.desc()).offset(offset).limit(limit).all()
 
@@ -262,6 +268,7 @@ def create_system_prompt(
 
     # WORM 감사로그 기록
     requester = getattr(current_user, "username", "SYSTEM_PROMPT_ADMIN")
+    content_hash = hashlib.sha256(new_prompt.content.encode("utf-8")).hexdigest()
     _record_prompt_audit_log(
         db=db,
         requester_id=requester,
@@ -273,8 +280,12 @@ def create_system_prompt(
             "target_id": new_prompt.target_id,
             "injection_mode": new_prompt.injection_mode,
             "estimated_tokens": new_prompt.estimated_tokens,
+            "content_hash": content_hash,
+            "version": new_prompt.version,
             "is_active": new_prompt.is_active
-        }
+        },
+        key_id=new_prompt.target_id if new_prompt.target_type == "VIRTUAL_KEY" else None,
+        model_id=new_prompt.target_name if new_prompt.target_type == "ROUTE" else None
     )
 
     return new_prompt
@@ -343,6 +354,18 @@ def update_system_prompt(
                     detail=f"해당 {new_target_type} 대상({new_target_id})에 이미 활성화된 다른 시스템 프롬프트 '{duplicate.name}'({duplicate.prompt_id})가 존재합니다."
                 )
 
+    # 수정 전 상태 스냅샷 저장
+    prev_snapshot = {
+        "name": prompt.name,
+        "description": prompt.description,
+        "content_hash": hashlib.sha256(prompt.content.encode("utf-8")).hexdigest(),
+        "target_type": prompt.target_type,
+        "target_id": prompt.target_id,
+        "injection_mode": prompt.injection_mode,
+        "is_active": prompt.is_active,
+        "version": prompt.version or 1
+    }
+
     if payload.name is not None:
         prompt.name = payload.name
     if payload.description is not None:
@@ -378,6 +401,7 @@ def update_system_prompt(
 
     # WORM 감사로그 기록
     requester = getattr(current_user, "username", "SYSTEM_PROMPT_ADMIN")
+    new_content_hash = hashlib.sha256(prompt.content.encode("utf-8")).hexdigest()
     _record_prompt_audit_log(
         db=db,
         requester_id=requester,
@@ -389,8 +413,18 @@ def update_system_prompt(
             "target_id": prompt.target_id,
             "injection_mode": prompt.injection_mode,
             "estimated_tokens": prompt.estimated_tokens,
-            "is_active": prompt.is_active
-        }
+            "content_hash": new_content_hash,
+            "version": prompt.version,
+            "is_active": prompt.is_active,
+            "previous_state": prev_snapshot,
+            "diff": {
+                k: {"old": prev_snapshot.get(k), "new": getattr(prompt, k, None)}
+                for k in ["name", "target_type", "target_id", "injection_mode", "is_active", "version"]
+                if prev_snapshot.get(k) != getattr(prompt, k, None)
+            }
+        },
+        key_id=prompt.target_id if prompt.target_type == "VIRTUAL_KEY" else None,
+        model_id=prompt.target_name if prompt.target_type == "ROUTE" else None
     )
 
     return prompt
@@ -428,7 +462,9 @@ def delete_system_prompt(
         requester_id=requester,
         action="PROMPT_DELETED",
         prompt_id=prompt_id,
-        details=deleted_info
+        details=deleted_info,
+        key_id=prompt.target_id if prompt.target_type == "VIRTUAL_KEY" else None,
+        model_id=prompt.target_name if prompt.target_type == "ROUTE" else None
     )
 
     return {"message": f"시스템 프롬프트 [{prompt_id}]가 성공적으로 삭제되었습니다.", "prompt_id": prompt_id}
@@ -447,17 +483,23 @@ def resolve_system_prompt(
     if not input_msgs:
         input_msgs = [{"role": "user", "content": "프롬프트 거버넌스 시뮬레이션 요청"}]
 
-    final_msgs, matched_prompt, resolved_by = resolve_and_inject_system_prompt(
+    resolve_res = resolve_and_inject_system_prompt(
         db=db,
         messages=input_msgs,
         key_id=req.key_id,
         route_name=req.route_name,
         tenant_id=req.tenant_id
     )
+    final_msgs, matched_prompt, resolved_by = resolve_res
+
+    applied_vars = getattr(resolve_res, "applied_variables", {})
+    tok_delta = getattr(resolve_res, "token_delta", 0)
 
     return PromptResolveResponse(
         matched=matched_prompt is not None,
         resolved_by=resolved_by,
         matched_prompt=SystemPromptResponse.model_validate(matched_prompt) if matched_prompt else None,
-        final_messages=final_msgs
+        final_messages=final_msgs,
+        applied_variables=applied_vars,
+        token_delta=tok_delta
     )

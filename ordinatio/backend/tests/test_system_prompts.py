@@ -236,10 +236,18 @@ def test_system_prompt_duplicate_binding_prevention_and_audit():
         assert "audit-prompt-" in audit.log_id
 
 def test_system_prompts_content_search():
-    """Verify that search query filters by content, description, target_name as well as name."""
+    """Verify that search query filters by content, description, target_name as well as name, and returns X-Total-Count header."""
+    # Check X-Total-Count header
+    res_all = client.get("/api/v1/system-prompts")
+    assert res_all.status_code == 200
+    assert "X-Total-Count" in res_all.headers
+    total_val = int(res_all.headers["X-Total-Count"])
+    assert total_val >= 3
+
     # Search by keyword in content: '주민등록번호' (in sp-global-guardrail content)
     res = client.get("/api/v1/system-prompts?search=주민등록번호")
     assert res.status_code == 200
+    assert "X-Total-Count" in res.headers
     items = res.json()
     assert len(items) >= 1
     assert any("주민등록번호" in p["content"] for p in items)
@@ -250,3 +258,18 @@ def test_system_prompts_content_search():
     items_code = res_code.json()
     assert len(items_code) >= 1
     assert any("PEP8" in p["content"] for p in items_code)
+
+def test_prompt_simulator_token_delta_and_applied_vars():
+    """Verify simulator /resolve returns applied_variables and positive token_delta."""
+    resolve_req = {
+        "route_name": "code-copilot-v2",
+        "input_messages": [
+            {"role": "user", "content": "파이썬 함수 작성해줘"}
+        ]
+    }
+    res = client.post("/api/v1/system-prompts/resolve", json=resolve_req)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["matched"] is True
+    assert data["token_delta"] > 0
+    assert isinstance(data["applied_variables"], dict)

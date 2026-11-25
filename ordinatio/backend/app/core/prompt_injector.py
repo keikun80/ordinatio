@@ -75,13 +75,14 @@ def resolve_system_prompt_for_context(
 def render_prompt_variables(
     content: str,
     context: Optional[Dict[str, Any]] = None
-) -> str:
+) -> Tuple[str, Dict[str, str]]:
     """
     동적 템플릿 변수 치환기:
     {{date}}, {{current_date}}, {{datetime}}, {{route_name}}, {{tenant_id}}, {{tenant_name}}, {{key_id}}
+    반환: (치환된_텍스트, 적용된_변수_딕셔너리)
     """
     if not content:
-        return ""
+        return "", {}
     if not context:
         context = {}
 
@@ -100,10 +101,26 @@ def render_prompt_variables(
     }
 
     rendered = content
+    applied_vars = {}
     for placeholder, val in replacements.items():
         if placeholder in rendered:
             rendered = rendered.replace(placeholder, val)
-    return rendered
+            applied_vars[placeholder] = val
+    return rendered, applied_vars
+
+SYS_ROLES = {"system", "developer"}
+
+def _calc_raw_tokens(msgs: List[Dict[str, Any]]) -> int:
+    total = 0
+    for m in msgs:
+        c = m.get("content", "")
+        if isinstance(c, str):
+            total += max(1, len(c) // 3)
+        elif isinstance(c, list):
+            for part in c:
+                if isinstance(part, dict) and "text" in part:
+                    total += max(1, len(str(part.get("text", ""))) // 3)
+    return total
 
 def inject_system_prompt(
     messages: List[Dict[str, Any]],
@@ -111,28 +128,29 @@ def inject_system_prompt(
     context: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """
-    주입 모드(PREPEND / OVERRIDE / FALLBACK_ONLY) 및 동적 템플릿 변수에 따라 프롬프트를 메시지 목록에 합성합니다.
+    주입 모드(PREPEND / OVERRIDE / FALLBACK_ONLY), 최신 OpenAI 추론 모델 규격(role: developer)
+    및 동적 템플릿 변수에 따라 프롬프트를 메시지 목록에 합성합니다.
     """
     if not prompt or not prompt.content:
         return messages
 
-    sys_content = render_prompt_variables(prompt.content, context)
+    sys_content, _ = render_prompt_variables(prompt.content, context)
     mode = prompt.injection_mode
-    existing_sys_indices = [i for i, m in enumerate(messages) if m.get("role") == "system"]
+    existing_sys_indices = [i for i, m in enumerate(messages) if m.get("role") in SYS_ROLES]
 
     new_messages = [dict(m) for m in messages]
 
     if mode == "OVERRIDE":
-        # 기존 system 메시지 전부 제거 후 신규 system 주입
-        new_messages = [m for m in new_messages if m.get("role") != "system"]
+        # 기존 system 및 developer 메시지 전부 제거 후 신규 system 주입
+        new_messages = [m for m in new_messages if m.get("role") not in SYS_ROLES]
         new_messages.insert(0, {"role": "system", "content": sys_content})
     elif mode == "FALLBACK_ONLY":
-        # 기존 system 메시지가 없을 때만 선두에 추가
+        # 기존 system 또는 developer 메시지가 없을 때만 선두에 추가
         if not existing_sys_indices:
             new_messages.insert(0, {"role": "system", "content": sys_content})
     else:  # PREPEND (기본 추천 전략)
         if existing_sys_indices:
-            # 기존 system 메시지 앞에 사내 표준 규정을 결합
+            # 기존 첫 번째 system/developer 메시지 앞에 사내 표준 규정을 결합
             first_idx = existing_sys_indices[0]
             orig_content = new_messages[first_idx].get("content", "")
             if isinstance(orig_content, list):
@@ -144,13 +162,28 @@ def inject_system_prompt(
 
     return new_messages
 
+class ResolveResult(tuple):
+    """
+    3-요소 튜플 (messages, prompt, resolved_by)과 100% 하위 호환되며,
+    applied_variables와 token_delta 속성을 제공하는 결과 컨테이너
+    """
+    def __new__(cls, messages, prompt, resolved_by, applied_variables=None, token_delta=0):
+        return super().__new__(cls, (messages, prompt, resolved_by))
+
+    def __init__(self, messages, prompt, resolved_by, applied_variables=None, token_delta=0):
+        self.messages = messages
+        self.prompt = prompt
+        self.resolved_by = resolved_by
+        self.applied_variables = applied_variables or {}
+        self.token_delta = token_delta
+
 def resolve_and_inject_system_prompt(
     db: Session,
     messages: List[Dict[str, Any]],
     key_id: Optional[str] = None,
     route_name: Optional[str] = None,
     tenant_id: Optional[str] = None
-) -> Tuple[List[Dict[str, Any]], Optional[SystemPrompt], Optional[str]]:
+) -> ResolveResult:
     """
     우선순위 해석 및 동적 변수 주입을 원스톱으로 처리하여 (최종 메시지, 적용된 프롬프트, 해석 소스)를 반환합니다.
     """
@@ -162,7 +195,7 @@ def resolve_and_inject_system_prompt(
     )
 
     if not prompt:
-        return messages, None, None
+        return ResolveResult(messages, None, None, {}, 0)
 
     # Context enrichment for template variables
     tenant_name = None
@@ -178,5 +211,10 @@ def resolve_and_inject_system_prompt(
         "tenant_name": tenant_name
     }
 
+    _, applied_vars = render_prompt_variables(prompt.content, context)
+    tokens_before = _calc_raw_tokens(messages)
     final_messages = inject_system_prompt(messages=messages, prompt=prompt, context=context)
-    return final_messages, prompt, resolved_by
+    tokens_after = _calc_raw_tokens(final_messages)
+    token_delta = max(0, tokens_after - tokens_before)
+
+    return ResolveResult(final_messages, prompt, resolved_by, applied_vars, token_delta)

@@ -135,6 +135,45 @@ def test_ext_proc_server_injects_prompt_into_body():
     assert "시큐어 코딩 지침" in injected_msgs[0]["content"]
     assert injected_msgs[1]["content"] == "SQL 쿼리 짜줘"
 
+def test_developer_role_prompt_injection():
+    """Verify that OpenAI o1/o3 'developer' role is correctly recognized and handled in PREPEND/OVERRIDE."""
+    from app.core.prompt_injector import inject_system_prompt
+
+    dummy_prepend = SystemPrompt(
+        prompt_id="test-prepend",
+        name="테스트 프리펜드",
+        content="[주입된 보안 지침]",
+        target_type="GLOBAL",
+        injection_mode="PREPEND"
+    )
+    dummy_override = SystemPrompt(
+        prompt_id="test-override",
+        name="테스트 오버라이드",
+        content="[강제 대체 지침]",
+        target_type="GLOBAL",
+        injection_mode="OVERRIDE"
+    )
+
+    # 1. Existing 'developer' role message in payload
+    dev_msgs = [
+        {"role": "developer", "content": "기존 개발자 지침"},
+        {"role": "user", "content": "코드 짜줘"}
+    ]
+
+    # PREPEND should merge into existing developer message
+    res_prep = inject_system_prompt(dev_msgs, dummy_prepend)
+    assert len(res_prep) == 2
+    assert res_prep[0]["role"] == "developer"
+    assert "[주입된 보안 지침]" in res_prep[0]["content"]
+    assert "기존 개발자 지침" in res_prep[0]["content"]
+
+    # OVERRIDE should replace all system/developer messages
+    res_over = inject_system_prompt(dev_msgs, dummy_override)
+    assert len(res_over) == 2
+    assert res_over[0]["role"] == "system"
+    assert res_over[0]["content"] == "[강제 대체 지침]"
+    assert res_over[1]["role"] == "user"
+
 def test_dynamic_prompt_template_variables():
     """Verify {{date}}, {{route_name}}, {{tenant_name}} placeholder substitutions."""
     with TestSessionLocal() as db:

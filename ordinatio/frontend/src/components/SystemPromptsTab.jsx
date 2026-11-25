@@ -67,6 +67,7 @@ export default function SystemPromptsTab({ onNotify }) {
       name: strings.systemPrompts.presets.guardrailName,
       desc: strings.systemPrompts.presets.guardrailDesc,
       targetType: 'GLOBAL',
+      injectionMode: 'PREPEND',
       content: strings.systemPrompts.presets.guardrailContent
     },
     {
@@ -74,6 +75,7 @@ export default function SystemPromptsTab({ onNotify }) {
       name: strings.systemPrompts.presets.wmName,
       desc: strings.systemPrompts.presets.wmDesc,
       targetType: 'TENANT',
+      injectionMode: 'PREPEND',
       content: strings.systemPrompts.presets.wmContent
     },
     {
@@ -81,6 +83,7 @@ export default function SystemPromptsTab({ onNotify }) {
       name: strings.systemPrompts.presets.secureCodeName,
       desc: strings.systemPrompts.presets.secureCodeDesc,
       targetType: 'ROUTE',
+      injectionMode: 'OVERRIDE',
       content: strings.systemPrompts.presets.secureCodeContent
     }
   ];
@@ -192,6 +195,9 @@ export default function SystemPromptsTab({ onNotify }) {
     setFormDesc(tpl.desc);
     setFormContent(tpl.content);
     setFormTargetType(tpl.targetType);
+    if (tpl.injectionMode || tpl.injection_mode) {
+      setFormInjectionMode(tpl.injectionMode || tpl.injection_mode);
+    }
     if (tpl.targetType === 'ROUTE' && routes.length > 0) setFormTargetId(routes[0].route_name);
     else if (tpl.targetType === 'VIRTUAL_KEY' && virtualKeys.length > 0) setFormTargetId(virtualKeys[0].key_id || virtualKeys[0].keyId);
     else if (tpl.targetType === 'TENANT' && tenants.length > 0) setFormTargetId(tenants[0].tenant_id || tenants[0].id);
@@ -1006,12 +1012,35 @@ export default function SystemPromptsTab({ onNotify }) {
                       <CheckCircle2 size={16} />
                       <span>{simResult.matched ? strings.systemPrompts.simModal.resultMatched(simResult.resolved_by) : strings.systemPrompts.simModal.resultUnmatched}</span>
                     </div>
-                    {simResult.matched_prompt && (
-                      <span className="badge active" data-testid="sp-sim-result-badge" style={{ fontSize: '0.7rem' }}>
-                        {simResult.matched_prompt.name} ({simResult.matched_prompt.injection_mode})
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {simResult.token_delta !== undefined && simResult.token_delta > 0 && (
+                        <span className="badge" data-testid="sp-sim-token-delta" style={{ fontSize: '0.68rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                          +{simResult.token_delta} Tokens
+                        </span>
+                      )}
+                      {simResult.matched_prompt && (
+                        <span className="badge active" data-testid="sp-sim-result-badge" style={{ fontSize: '0.7rem' }}>
+                          {simResult.matched_prompt.name} ({simResult.matched_prompt.injection_mode})
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Dynamic Template Variables */}
+                  {simResult.applied_variables && Object.keys(simResult.applied_variables).length > 0 && (
+                    <div style={{ marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '5px', fontWeight: 600 }}>
+                        동적 템플릿 변수 치환 ({Object.keys(simResult.applied_variables).length}개):
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} data-testid="sp-sim-applied-vars">
+                        {Object.entries(simResult.applied_variables).map(([k, v]) => (
+                          <span key={k} style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', background: 'rgba(56, 189, 248, 0.1)', color: '#7dd3fc', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                            {`{{${k}}}`} = <strong style={{ color: '#fff' }}>{String(v)}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                     <strong>{strings.systemPrompts.simModal.finalPayloadTitle}</strong>

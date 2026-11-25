@@ -48,3 +48,5 @@ class PromptResolveResponse(BaseModel):
     resolved_by: Optional[str] = Field(None, description="매칭된 우선순위 소스 ('VIRTUAL_KEY', 'ROUTE', 'TENANT', 'GLOBAL', None)")
     matched_prompt: Optional[SystemPromptResponse] = Field(None, description="매칭된 시스템 프롬프트 정보")
     final_messages: List[Dict[str, Any]] = Field(default_factory=list, description="프롬프트 주입 후 최종 메시지 배열")
+    applied_variables: Dict[str, str] = Field(default_factory=dict, description="치환된 동적 템플릿 변수 맵")
+    token_delta: int = Field(0, description="주입으로 인해 증가한 토큰 오버헤드")

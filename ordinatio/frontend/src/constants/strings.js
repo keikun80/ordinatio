@@ -119,6 +119,8 @@ export const strings = {
       servingPool: '서빙 모델 풀',
       agentRouterDispatch: 'AgentRouter & 테스트',
       virtualKeys: 'AI거버넌스',
+      subKeyManagement: '가상 API Key 관리',
+      subTenantManagement: '부서(테넌트) 관리',
       systemPrompts: '시스템 프롬프트 거버넌스',
       finops: 'FinOps 비용 & 예산',
       compliance: 'PII 보안 & 감사 로그',

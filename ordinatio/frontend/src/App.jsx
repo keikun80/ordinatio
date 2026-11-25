@@ -32,6 +32,7 @@ function Dashboard() {
   const canAccessSettings = isSuperAdmin || hasPermission('system:read') || hasPermission('system:write');
   const [activeTab, setActiveTab] = useState('overview');
   const [routingSubTab, setRoutingSubTab] = useState('routing');
+  const [govSubTab, setGovSubTab] = useState('keys');
   const [toasts, setToasts] = useState([]);
   const [isInspectorActive, setIsInspectorActive] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -88,7 +89,7 @@ function Dashboard() {
   // 1. Loading splash screen while session token is verified
   if (isLoading) {
     return (
-      <div 
+      <div
         style={{
           minHeight: '100vh',
           width: '100vw',
@@ -118,16 +119,18 @@ function Dashboard() {
   return (
     <div className="app-container">
       {/* Sidebar Navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         routingSubTab={routingSubTab}
         setRoutingSubTab={setRoutingSubTab}
+        govSubTab={govSubTab}
+        setGovSubTab={setGovSubTab}
       />
 
       {/* Main Wrapper */}
       <div className="main-wrapper" data-screen-id="SCR-COM-00">
-        <Header 
+        <Header
           theme={theme}
           onToggleTheme={toggleTheme}
           isInspectorActive={isInspectorActive}
@@ -142,21 +145,26 @@ function Dashboard() {
             </div>
           }>
             {activeTab === 'overview' && canAccessOverview && (
-              <OverviewTab 
+              <OverviewTab
                 onNavigateTab={(tab) => setActiveTab(tab)}
               />
             )}
 
             {activeTab === 'routing' && canAccessRouting && (
-              <RoutingTab 
+              <RoutingTab
                 activeSubTab={routingSubTab}
                 setActiveSubTab={setRoutingSubTab}
-                onNotify={addToast} 
+                onNotify={addToast}
               />
             )}
 
             {activeTab === 'virtual-keys' && canAccessGovernance && (
-              <VirtualKeysTab onNotify={addToast} onNavigateTab={(tab) => setActiveTab(tab)} />
+              <VirtualKeysTab
+                activeSubTab={govSubTab}
+                setActiveSubTab={setGovSubTab}
+                onNotify={addToast}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+              />
             )}
 
             {activeTab === 'system-prompts' && canAccessPrompts && (
@@ -176,9 +184,9 @@ function Dashboard() {
             )}
 
             {((activeTab === 'users' && canAccessUsers) || (activeTab === 'roles' && canAccessRoles)) && (
-              <UsersTab 
+              <UsersTab
                 defaultSubTab={activeTab === 'roles' ? 'roles' : 'users'}
-                onNotify={addToast} 
+                onNotify={addToast}
               />
             )}
 
@@ -190,9 +198,9 @@ function Dashboard() {
       </div>
 
       {/* Dev UI Inspector Overlay */}
-      <DevInspector 
-        isActive={isInspectorActive} 
-        onToggle={() => setIsInspectorActive((prev) => !prev)} 
+      <DevInspector
+        isActive={isInspectorActive}
+        onToggle={() => setIsInspectorActive((prev) => !prev)}
       />
 
       {/* Global Toast Notification Container */}
@@ -204,7 +212,7 @@ function Dashboard() {
             {toast.type === 'INFO' && <Info size={18} color="#38bdf8" />}
             {toast.type === 'WARNING' && <AlertTriangle size={18} color="#fbbf24" />}
             <span style={{ fontSize: '0.85rem', flex: 1 }}>{toast.message}</span>
-            <button 
+            <button
               onClick={() => removeToast(toast.id)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
             >

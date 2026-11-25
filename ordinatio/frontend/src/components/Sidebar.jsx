@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  GitFork, 
-  KeyRound, 
-  Coins, 
-  ShieldAlert, 
-  PackageCheck, 
+import {
+  LayoutDashboard,
+  GitFork,
+  KeyRound,
+  Coins,
+  ShieldAlert,
+  PackageCheck,
   Sparkles,
   Layers,
   ChevronDown,
@@ -14,23 +14,27 @@ import {
   ScrollText,
   Users,
   ShieldCheck,
-  Sliders
+  Sliders,
+  Building
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { strings } from '../constants/strings';
 
-export default function Sidebar({ 
-  activeTab, 
-  setActiveTab, 
-  routingSubTab = 'routing', 
-  setRoutingSubTab
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  routingSubTab = 'routing',
+  setRoutingSubTab,
+  govSubTab = 'keys',
+  setGovSubTab
 }) {
   const { isSuperAdmin, hasPermission } = useAuth();
   const canAccessUsers = isSuperAdmin || hasPermission('users:read') || hasPermission('users:write');
   const canAccessRoles = isSuperAdmin || hasPermission('roles:manage');
   const canAccessSettings = isSuperAdmin || hasPermission('system:read') || hasPermission('system:write');
   const [isRoutingExpanded, setIsRoutingExpanded] = useState(true);
+  const [isGovExpanded, setIsGovExpanded] = useState(true);
   const [systemInfo, setSystemInfo] = useState(null);
 
   useEffect(() => {
@@ -43,6 +47,8 @@ export default function Sidebar({
   useEffect(() => {
     if (activeTab === 'routing') {
       setIsRoutingExpanded(true);
+    } else if (activeTab === 'virtual-keys') {
+      setIsGovExpanded(true);
     }
   }, [activeTab]);
 
@@ -50,6 +56,11 @@ export default function Sidebar({
     { id: 'routing', label: strings.nav.menus.routingStudio, icon: GitFork },
     { id: 'catalog', label: strings.nav.menus.servingPool, icon: Cpu },
     { id: 'dispatch', label: strings.nav.menus.agentRouterDispatch, icon: Compass }
+  ];
+
+  const govSubItems = [
+    { id: 'keys', label: strings.nav.menus.subKeyManagement || '가상 API Key 관리', icon: KeyRound },
+    { id: 'tenants', label: strings.nav.menus.subTenantManagement || '부서(테넌트) 관리', icon: Building }
   ];
 
   const handleRoutingHeaderClick = () => {
@@ -61,11 +72,28 @@ export default function Sidebar({
     }
   };
 
-  const handleSubItemClick = (subId, e) => {
+  const handleGovHeaderClick = () => {
+    if (activeTab !== 'virtual-keys') {
+      setActiveTab('virtual-keys');
+      setIsGovExpanded(true);
+    } else {
+      setIsGovExpanded(!isGovExpanded);
+    }
+  };
+
+  const handleRoutingSubClick = (subId, e) => {
     e.stopPropagation();
     setActiveTab('routing');
     if (setRoutingSubTab) {
       setRoutingSubTab(subId);
+    }
+  };
+
+  const handleGovSubClick = (subId, e) => {
+    e.stopPropagation();
+    setActiveTab('virtual-keys');
+    if (setGovSubTab) {
+      setGovSubTab(subId);
     }
   };
 
@@ -74,16 +102,30 @@ export default function Sidebar({
       { id: 'overview', label: strings.nav.menus.overview, icon: LayoutDashboard }
     ] : []),
     ...(isSuperAdmin || hasPermission('routing:read') ? [
-      { 
-        id: 'routing', 
-        label: strings.nav.menus.modelRouting, 
-        icon: GitFork, 
+      {
+        id: 'routing',
+        label: strings.nav.menus.modelRouting,
+        icon: GitFork,
         isAccordion: true,
-        subItems: routingSubItems
+        isExpanded: isRoutingExpanded,
+        onHeaderClick: handleRoutingHeaderClick,
+        subItems: routingSubItems,
+        activeSubId: routingSubTab,
+        onSubClick: handleRoutingSubClick
       }
     ] : []),
     ...(isSuperAdmin || hasPermission('governance:read') ? [
-      { id: 'virtual-keys', label: strings.nav.menus.virtualKeys, icon: KeyRound }
+      {
+        id: 'virtual-keys',
+        label: strings.nav.menus.virtualKeys,
+        icon: KeyRound,
+        isAccordion: true,
+        isExpanded: isGovExpanded,
+        onHeaderClick: handleGovHeaderClick,
+        subItems: govSubItems,
+        activeSubId: govSubTab,
+        onSubClick: handleGovSubClick
+      }
     ] : []),
     ...(isSuperAdmin || hasPermission('prompts:read') ? [
       { id: 'system-prompts', label: strings.nav.menus.systemPrompts, icon: ScrollText }
@@ -130,29 +172,29 @@ export default function Sidebar({
               <div key={item.id} className="nav-accordion-group" data-testid={`com-tab-group-${item.id}`}>
                 <div
                   className={`nav-accordion-header ${isActive ? 'active' : ''}`}
-                  onClick={handleRoutingHeaderClick}
+                  onClick={item.onHeaderClick || handleRoutingHeaderClick}
                   data-testid={`com-tab-${item.id}`}
-                  data-screen-id="SCR-RT-00"
+                  data-screen-id={item.id === 'routing' ? 'SCR-RT-00' : 'SCR-VK-00'}
                   title={strings.nav.toggleSubmenuTooltip}
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
-                  <div className={`nav-accordion-arrow ${isRoutingExpanded ? 'open' : ''}`} style={{ marginLeft: 'auto' }}>
+                  <div className={`nav-accordion-arrow ${item.isExpanded ? 'open' : ''}`} style={{ marginLeft: 'auto' }}>
                     <ChevronDown size={15} />
                   </div>
                 </div>
 
-                {isRoutingExpanded && (
-                  <div className="nav-sub-menu" data-testid="com-sidebar-routing-submenu">
+                {item.isExpanded && (
+                  <div className="nav-sub-menu" data-testid={`com-sidebar-${item.id}-submenu`}>
                     {item.subItems.map((sub) => {
                       const SubIcon = sub.icon;
-                      const isSubActive = isActive && routingSubTab === sub.id;
+                      const isSubActive = isActive && item.activeSubId === sub.id;
                       return (
                         <div
                           key={sub.id}
                           className={`nav-sub-item ${isSubActive ? 'active' : ''}`}
-                          onClick={(e) => handleSubItemClick(sub.id, e)}
-                          data-testid={`com-subtab-routing-${sub.id}`}
+                          onClick={(e) => (item.onSubClick ? item.onSubClick(sub.id, e) : handleRoutingSubClick(sub.id, e))}
+                          data-testid={`com-subtab-${item.id}-${sub.id}`}
                         >
                           <SubIcon size={14} color={isSubActive ? 'var(--accent-cyan)' : 'currentColor'} />
                           <span>{sub.label}</span>

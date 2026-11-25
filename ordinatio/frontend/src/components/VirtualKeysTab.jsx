@@ -5,11 +5,26 @@ import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
 import { copyToClipboard } from '../utils/clipboard';
 
-export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
+export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab = 'keys', setActiveSubTab }) {
   const auth = useAuth?.() || {};
   const isSuperAdmin = auth.isSuperAdmin || auth.user?.role === 'SUPER_ADMIN';
   const hasPermission = auth.hasPermission || (() => true);
   const canWriteGovernance = isSuperAdmin || hasPermission('governance:write');
+
+  const [currentSubTab, setCurrentSubTab] = useState(activeSubTab);
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setCurrentSubTab(activeSubTab);
+    }
+  }, [activeSubTab]);
+
+  const handleSubTabChange = (tabId) => {
+    setCurrentSubTab(tabId);
+    if (setActiveSubTab) {
+      setActiveSubTab(tabId);
+    }
+  };
 
   const [keys, setKeys] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -98,7 +113,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
             const tenantBurnPct = tenantBudget > 0 ? Math.round((tenantSpent / tenantBudget) * 100) : 0;
             const isHardCapExceeded = Boolean(matchedTenant?.isHardCap && tenantBudget > 0 && tenantSpent >= tenantBudget);
             const isExpired = k.expires_at && new Date(k.expires_at) < new Date();
-            
+
             let keyStatus = 'ACTIVE';
             if (!k.is_active) keyStatus = 'BLOCKED';
             else if (isExpired) keyStatus = 'EXPIRED';
@@ -546,8 +561,8 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
       {/* Page Header */}
       <div className="page-header" data-testid="vk-header-section">
         <div className="page-title-wrap">
-          <h1>{strings.virtualKeys.headerTitle}</h1>
-          <p>{strings.virtualKeys.headerSubtitle}</p>
+          <h1>{currentSubTab === 'tenants' ? '부서(테넌트) 관리' : strings.virtualKeys.headerTitle}</h1>
+          <p>{currentSubTab === 'tenants' ? '사내 조직별 AI 예산 한도(Hard Cap), 토큰 쿼터 및 활성 가상키 관리' : strings.virtualKeys.headerSubtitle}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {!canWriteGovernance && (
@@ -560,279 +575,450 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
               {strings.virtualKeys.readOnlyBadge}
             </span>
           )}
-          <button 
-            className="btn btn-secondary"
-            data-testid="vk-btn-open-create-tenant"
-            data-function-id="FNC-VK-OPEN-TENANT-MODAL"
-            disabled={!canWriteGovernance}
-            title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
-            onClick={() => { if (!canWriteGovernance) return; setShowCreateTenantModal(true); }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', ...(!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
-          >
-            <Building size={16} color="var(--accent-cyan)" />
-            <span>{strings.virtualKeys.btnRegisterTenant}</span>
-          </button>
-          <button 
-            className="btn btn-primary" 
-            data-testid="vk-btn-open-create"
-            data-function-id="FNC-VK-OPEN-MODAL"
-            disabled={!canWriteGovernance}
-            title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
-            onClick={handleOpenCreateModal}
-            style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >
-            <Plus size={16} />
-            <span>{strings.virtualKeys.btnIssueKey}</span>
-          </button>
+          {currentSubTab === 'tenants' ? (
+            <button
+              className="btn btn-primary"
+              data-testid="vk-btn-open-create-tenant"
+              data-function-id="FNC-VK-OPEN-TENANT-MODAL"
+              disabled={!canWriteGovernance}
+              title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
+              onClick={() => { if (!canWriteGovernance) return; setShowCreateTenantModal(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', ...(!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            >
+              <Building size={16} />
+              <span>{strings.virtualKeys.btnRegisterTenant}</span>
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              data-testid="vk-btn-open-create"
+              data-function-id="FNC-VK-OPEN-MODAL"
+              disabled={!canWriteGovernance}
+              title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
+              onClick={handleOpenCreateModal}
+              style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
+              <Plus size={16} />
+              <span>{strings.virtualKeys.btnIssueKey}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="card" data-testid="vk-filter-card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1, minWidth: '260px' }}>
-            <div style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#F54927' }} />
-              <input
-                className="form-input"
-                data-testid="vk-input-search"
-                style={{ paddingLeft: '36px', color: '#F54927' }}
-                placeholder={strings.virtualKeys.searchPlaceholder}
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
+      {/* Sub-Tab Navigation (Keys vs Tenants) */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
+        <button
+          type="button"
+          data-testid="vk-subtab-keys"
+          onClick={() => handleSubTabChange('keys')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: currentSubTab === 'keys' ? '1px solid #38bdf8' : '1px solid transparent',
+            background: currentSubTab === 'keys' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+            color: currentSubTab === 'keys' ? '#38bdf8' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.88rem',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <KeyRound size={16} />
+          <span>가상 API Key 관리 ({keys.length})</span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="vk-subtab-tenants"
+          onClick={() => handleSubTabChange('tenants')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: currentSubTab === 'tenants' ? '1px solid var(--accent-cyan)' : '1px solid transparent',
+            background: currentSubTab === 'tenants' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+            color: currentSubTab === 'tenants' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.88rem',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Building size={16} />
+          <span>부서(테넌트) 관리 ({tenants.length})</span>
+        </button>
+      </div>
+
+      {/* Tab Content: Virtual Keys View */}
+      {currentSubTab === 'keys' && (
+        <>
+          {/* Filter Bar */}
+          <div className="card" data-testid="vk-filter-card" style={{ marginBottom: '20px', padding: '16px 20px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1, minWidth: '260px' }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#F54927' }} />
+                  <input
+                    className="form-input"
+                    data-testid="vk-input-search"
+                    style={{ paddingLeft: '36px', color: '#F54927' }}
+                    placeholder={strings.virtualKeys.searchPlaceholder}
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>상태:</span>
+                <select
+                  className="form-select"
+                  data-testid="vk-select-status-filter"
+                  style={{ width: 'auto' }}
+                  value={selectedStatus}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="ALL">전체 상태</option>
+                  <option value="ACTIVE">활성 (ACTIVE)</option>
+                  <option value="WARNING">경고 (WARNING)</option>
+                  <option value="BLOCKED">차단 (BLOCKED)</option>
+                  <option value="EXPIRED">만료 (EXPIRED)</option>
+                </select>
+
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{strings.virtualKeys.deptFilterLabel}</span>
+                <select
+                  className="form-select"
+                  data-testid="vk-select-tenant-filter"
+                  style={{ width: 'auto' }}
+                  value={selectedDept}
+                  onChange={(e) => {
+                    setSelectedDept(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="ALL">{strings.virtualKeys.allDepts}</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>상태:</span>
-            <select
-              className="form-select"
-              data-testid="vk-select-status-filter"
-              style={{ width: 'auto' }}
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="ALL">전체 상태</option>
-              <option value="ACTIVE">활성 (ACTIVE)</option>
-              <option value="WARNING">경고 (WARNING)</option>
-              <option value="BLOCKED">차단 (BLOCKED)</option>
-              <option value="EXPIRED">만료 (EXPIRED)</option>
-            </select>
+          {/* Virtual Keys Table */}
+          <div className="card" data-testid="vk-table-card">
+            <div className="table-container">
+              <table className="data-table" data-testid="vk-table-keys">
+                <thead>
+                  <tr>
+                    <th>{strings.virtualKeys.table.colKey}</th>
+                    <th>{strings.virtualKeys.table.colTenant}</th>
+                    <th>{strings.virtualKeys.table.colModels}</th>
+                    <th>{strings.virtualKeys.table.colRateLimits}</th>
+                    <th>{strings.virtualKeys.table.colBurnRate}</th>
+                    <th>{strings.virtualKeys.table.colStatus}</th>
+                    <th>{strings.virtualKeys.table.colActions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredKeys.length === 0 ? (
+                    <tr data-testid="vk-row-empty">
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                          <KeyRound size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {strings.virtualKeys.table.emptyTitle}
+                          </div>
+                          <div style={{ fontSize: '0.8rem' }}>
+                            {strings.virtualKeys.table.emptyDesc}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedKeys.map((k) => {
+                      const percent = k.tenantBurnPct ?? (k.budget > 0 ? Math.min(100, Math.round((k.spent / k.budget) * 100)) : 0);
+                      return (
+                        <tr key={k.keyId} data-testid={`vk-row-${k.keyId}`}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#ffffff' }}>{k.name}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#38bdf8' }}>
+                            {k.keyId}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Prefix: <code style={{ color: '#94a3b8' }}>{k.keyPrefix ? `${k.keyPrefix}...` : 'sk-ord-***'}</code> | IP: {k.ipWhitelist || '0.0.0.0/0'} | 만료: <span style={{ color: k.expiresAt ? '#e2e8f0' : '#64748b' }}>{k.expiresAt || strings.virtualKeys.table.noExpiry}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge info">{k.tenantName}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {k.allowedModels.map((m, idx) => (
+                              <span key={idx} style={{ fontSize: '0.74rem', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
+                                {m.split('/')[1] || m}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                          <div>{k.rpm} RPM</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>{k.tpm.toLocaleString()} TPM</div>
+                        </td>
+                        <td style={{ minWidth: '170px' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', marginBottom: '2px' }}>
+                            ₩{Math.round(k.spent).toLocaleString()}원
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' }}>
+                            <span>부서 소진율: ₩{((k.tenantSpent || 0) / 10000).toLocaleString()}만 / ₩{((k.tenantBudget || 0) / 10000).toLocaleString()}만</span>
+                            <span style={{ fontWeight: 700, color: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#fbbf24' : '#34d399' }}>
+                              {k.tenantBurnPct || 0}%
+                            </span>
+                          </div>
+                          <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${Math.min(100, k.tenantBurnPct || 0)}%`,
+                                height: '100%',
+                                background: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#f59e0b' : 'linear-gradient(90deg, #3b82f6, #10b981)'
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          {k.status === 'ACTIVE' && <span className="badge active" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusActive}</span>}
+                          {k.status === 'WARNING' && <span className="badge warning" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusWarningDynamic(percent)}</span>}
+                          {k.status === 'BLOCKED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusBlocked}</span>}
+                          {k.status === 'EXPIRED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusExpired}</span>}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              data-testid={`vk-btn-edit-${k.keyId}`}
+                              disabled={!canWriteGovernance}
+                              onClick={() => { if (!canWriteGovernance) return; handleOpenEdit(k); }}
+                              title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : strings.virtualKeys.table.btnEditTitle}
+                              style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                            >
+                              <Sliders size={13} />
+                              <span>{strings.virtualKeys.table.btnEdit}</span>
+                            </button>
+                            <button
+                              className={`btn btn-sm ${k.status === 'BLOCKED' ? 'btn-secondary' : 'btn-danger'}`}
+                              data-testid={`vk-btn-toggle-${k.keyId}`}
+                              data-function-id="FNC-VK-REVOKE"
+                              disabled={!canWriteGovernance}
+                              onClick={() => { if (!canWriteGovernance) return; toggleKeyStatus(k.keyId); }}
+                              title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
+                              style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                            >
+                              {k.status === 'BLOCKED' ? strings.virtualKeys.table.btnActivate : strings.virtualKeys.table.btnRevoke}
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              data-testid={`vk-btn-delete-${k.keyId}`}
+                              data-function-id="FNC-VK-DELETE"
+                              disabled={!canWriteGovernance}
+                              onClick={() => { if (!canWriteGovernance) return; handleDeleteKey(k); }}
+                              title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : (k.status === 'ACTIVE' ? strings.virtualKeys.table.btnDeleteTitleActive : strings.virtualKeys.table.btnDeleteTitleRevoked)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171', ...(!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                            >
+                              <Trash2 size={13} />
+                              <span>{strings.virtualKeys.table.btnDelete}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }))}
+                </tbody>
+              </table>
+            </div>
 
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{strings.virtualKeys.deptFilterLabel}</span>
-            <select
-              className="form-select"
-              data-testid="vk-select-tenant-filter"
-              style={{ width: 'auto' }}
-              value={selectedDept}
-              onChange={(e) => {
-                setSelectedDept(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="ALL">{strings.virtualKeys.allDepts}</option>
-              {tenants.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            {selectedDept !== 'ALL' && canWriteGovernance && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  data-testid="vk-btn-edit-tenant"
-                  disabled={isLoading}
-                  onClick={handleOpenEditTenant}
-                  style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Sliders size={14} color="#38bdf8" />
-                  <span>{strings.virtualKeys.btnEditTenant}</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  data-testid="vk-btn-delete-tenant"
-                  disabled={isLoading}
-                  onClick={() => handleDeleteTenant(selectedDept)}
-                  style={{ padding: '6px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Trash2 size={14} />
-                  <span>{strings.virtualKeys.btnDeleteTenant}</span>
-                </button>
-              </>
+            {/* Pagination Bar */}
+            {filteredKeys.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                <div>
+                  총 <strong style={{ color: '#ffffff' }}>{filteredKeys.length}</strong>개 항목 (페이지 {currentPage} / {totalPages})
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    style={{ padding: '4px 10px' }}
+                  >
+                    이전
+                  </button>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPage}</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    style={{ padding: '4px 10px' }}
+                  >
+                    다음
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
-      {/* Virtual Keys Table */}
-      <div className="card" data-testid="vk-table-card">
-        <div className="table-container">
-          <table className="data-table" data-testid="vk-table-keys">
-            <thead>
-              <tr>
-                <th>{strings.virtualKeys.table.colKey}</th>
-                <th>{strings.virtualKeys.table.colTenant}</th>
-                <th>{strings.virtualKeys.table.colModels}</th>
-                <th>{strings.virtualKeys.table.colRateLimits}</th>
-                <th>{strings.virtualKeys.table.colBurnRate}</th>
-                <th>{strings.virtualKeys.table.colStatus}</th>
-                <th>{strings.virtualKeys.table.colActions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredKeys.length === 0 ? (
-                <tr data-testid="vk-row-empty">
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                      <KeyRound size={32} color="var(--text-muted)" style={{ opacity: 0.5 }} />
-                      <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        {strings.virtualKeys.table.emptyTitle}
-                      </div>
-                      <div style={{ fontSize: '0.8rem' }}>
-                        {strings.virtualKeys.table.emptyDesc}
-                      </div>
-                    </div>
-                  </td>
+      {/* Tab Content: Tenants (Departments) View */}
+      {currentSubTab === 'tenants' && (
+        <div className="card" data-testid="vk-tenants-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#ffffff' }}>부서(테넌트) 목록 및 예산 정책</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                각 부서별 월간 예산 한도와 현재 소진액, Hard Cap 정책을 관리하고 누적 소진액을 롤오버/리셋할 수 있습니다.
+              </p>
+            </div>
+            {canWriteGovernance && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                data-testid="vk-btn-add-tenant-inline"
+                onClick={() => setShowNewTenantModal(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Plus size={15} />
+                <span>신규 부서 등록</span>
+              </button>
+            )}
+          </div>
+          <div className="table-container">
+            <table className="data-table" data-testid="vk-table-tenants">
+              <thead>
+                <tr>
+                  <th>부서 코드 / ID</th>
+                  <th>부서 명칭</th>
+                  <th>월간 예산 한도</th>
+                  <th>당월 누적 소진액</th>
+                  <th>소진율 및 Hard Cap</th>
+                  <th>활성 가상 키</th>
+                  <th>관리 작업</th>
                 </tr>
-              ) : (
-                paginatedKeys.map((k) => {
-                  const percent = k.tenantBurnPct ?? (k.budget > 0 ? Math.min(100, Math.round((k.spent / k.budget) * 100)) : 0);
-                  return (
-                    <tr key={k.keyId} data-testid={`vk-row-${k.keyId}`}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#ffffff' }}>{k.name}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#38bdf8' }}>
-                        {k.keyId}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Prefix: <code style={{ color: '#94a3b8' }}>{k.keyPrefix ? `${k.keyPrefix}...` : 'sk-ord-***'}</code> | IP: {k.ipWhitelist || '0.0.0.0/0'} | 만료: <span style={{ color: k.expiresAt ? '#e2e8f0' : '#64748b' }}>{k.expiresAt || strings.virtualKeys.table.noExpiry}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge info">{k.tenantName}</span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {k.allowedModels.map((m, idx) => (
-                          <span key={idx} style={{ fontSize: '0.74rem', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
-                            {m.split('/')[1] || m}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
-                      <div>{k.rpm} RPM</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>{k.tpm.toLocaleString()} TPM</div>
-                    </td>
-                    <td style={{ minWidth: '170px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', marginBottom: '2px' }}>
-                        ₩{Math.round(k.spent).toLocaleString()}원
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' }}>
-                        <span>부서 소진율: ₩{((k.tenantSpent || 0) / 10000).toLocaleString()}만 / ₩{((k.tenantBudget || 0) / 10000).toLocaleString()}만</span>
-                        <span style={{ fontWeight: 700, color: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#fbbf24' : '#34d399' }}>
-                          {k.tenantBurnPct || 0}%
-                        </span>
-                      </div>
-                      <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            width: `${Math.min(100, k.tenantBurnPct || 0)}%`,
-                            height: '100%',
-                            background: (k.tenantBurnPct || 0) >= 100 ? '#f43f5e' : (k.tenantBurnPct || 0) >= 80 ? '#f59e0b' : 'linear-gradient(90deg, #3b82f6, #10b981)'
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      {k.status === 'ACTIVE' && <span className="badge active" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusActive}</span>}
-                      {k.status === 'WARNING' && <span className="badge warning" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusWarningDynamic(percent)}</span>}
-                      {k.status === 'BLOCKED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusBlocked}</span>}
-                      {k.status === 'EXPIRED' && <span className="badge danger" data-testid={`vk-badge-status-${k.keyId}`}>{strings.virtualKeys.table.statusExpired}</span>}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          data-testid={`vk-btn-edit-${k.keyId}`}
-                          disabled={!canWriteGovernance}
-                          onClick={() => { if (!canWriteGovernance) return; handleOpenEdit(k); }}
-                          title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : strings.virtualKeys.table.btnEditTitle}
-                          style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                        >
-                          <Sliders size={13} />
-                          <span>{strings.virtualKeys.table.btnEdit}</span>
-                        </button>
-                        <button
-                          className={`btn btn-sm ${k.status === 'BLOCKED' ? 'btn-secondary' : 'btn-danger'}`}
-                          data-testid={`vk-btn-toggle-${k.keyId}`}
-                          data-function-id="FNC-VK-REVOKE"
-                          disabled={!canWriteGovernance}
-                          onClick={() => { if (!canWriteGovernance) return; toggleKeyStatus(k.keyId); }}
-                          title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : undefined}
-                          style={!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                        >
-                          {k.status === 'BLOCKED' ? strings.virtualKeys.table.btnActivate : strings.virtualKeys.table.btnRevoke}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-danger"
-                          data-testid={`vk-btn-delete-${k.keyId}`}
-                          data-function-id="FNC-VK-DELETE"
-                          disabled={!canWriteGovernance}
-                          onClick={() => { if (!canWriteGovernance) return; handleDeleteKey(k); }}
-                          title={!canWriteGovernance ? strings.virtualKeys.noWritePermissionTooltip : (k.status === 'ACTIVE' ? strings.virtualKeys.table.btnDeleteTitleActive : strings.virtualKeys.table.btnDeleteTitleRevoked)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171', ...(!canWriteGovernance ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
-                        >
-                          <Trash2 size={13} />
-                          <span>{strings.virtualKeys.table.btnDelete}</span>
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {tenants.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                      <Building size={32} color="var(--text-muted)" style={{ opacity: 0.5, marginBottom: '8px' }} />
+                      <div>등록된 부서가 없습니다. '신규 부서 등록' 버튼을 눌러 부서를 생성하세요.</div>
                     </td>
                   </tr>
-                );
-              }))}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  tenants.map((t) => {
+                    const budget = t.monthly_budget_krw || t.monthlyBudget || 0;
+                    const spent = t.current_month_spent_krw || t.currentMonthSpent || 0;
+                    const burnPct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+                    const isHardCap = t.hard_cap_enabled ?? t.hardCapEnabled ?? true;
+                    const deptKeys = keys.filter(k => k.tenantId === t.id);
+                    const activeDeptKeys = deptKeys.filter(k => k.status === 'ACTIVE');
 
-        {/* Pagination Bar */}
-        {filteredKeys.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            <div>
-              총 <strong style={{ color: '#ffffff' }}>{filteredKeys.length}</strong>개 항목 (페이지 {currentPage} / {totalPages})
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                style={{ padding: '4px 10px' }}
-              >
-                이전
-              </button>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPage}</span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                style={{ padding: '4px 10px' }}
-              >
-                다음
-              </button>
-            </div>
+                    return (
+                      <tr key={t.id} data-testid={`vk-tenant-row-${t.id}`}>
+                        <td>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--accent-cyan)' }}>
+                            {t.id}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#ffffff' }}>{t.name}</div>
+                          {t.description && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              {t.description}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                          ₩{budget.toLocaleString()}원
+                        </td>
+                        <td>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: spent > 0 ? '#f8fafc' : 'var(--text-muted)' }}>
+                            ₩{Math.round(spent).toLocaleString()}원
+                          </div>
+                        </td>
+                        <td style={{ minWidth: '180px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '3px' }}>
+                            <span style={{ color: burnPct >= 100 ? '#f43f5e' : burnPct >= 80 ? '#fbbf24' : '#34d399', fontWeight: 700 }}>
+                              {burnPct}%
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              {isHardCap ? 'Hard Cap 적용' : '소프트 한도'}
+                            </span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${burnPct}%`,
+                                height: '100%',
+                                background: burnPct >= 100 ? '#f43f5e' : burnPct >= 80 ? '#f59e0b' : 'linear-gradient(90deg, #3b82f6, #10b981)'
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge info" style={{ fontFamily: 'var(--font-mono)' }}>
+                            {activeDeptKeys.length} / {deptKeys.length}개
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              data-testid={`vk-btn-edit-tenant-row-${t.id}`}
+                              disabled={!canWriteGovernance}
+                              onClick={() => {
+                                setSelectedDept(t.id);
+                                handleOpenEditTenant();
+                              }}
+                              title="부서 예산 및 정책 수정"
+                            >
+                              <Sliders size={13} />
+                              <span>설정 수정</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger"
+                              data-testid={`vk-btn-delete-tenant-row-${t.id}`}
+                              disabled={!canWriteGovernance || deptKeys.length > 0}
+                              onClick={() => handleDeleteTenant(t.id)}
+                              title={deptKeys.length > 0 ? '소속 가상 키가 있어 삭제할 수 없습니다' : '부서 삭제'}
+                              style={deptKeys.length > 0 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                            >
+                              <Trash2 size={13} />
+                              <span>삭제</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Edit Key Modal (설정 변경 모달) */}
       {editingKey && (
@@ -1012,17 +1198,17 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                   <span>{strings.virtualKeys.editModal.btnDeleteKey}</span>
                 </button>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
                     data-testid="vk-modal-edit-btn-cancel"
                     onClick={() => setEditingKey(null)}
                   >
                     {strings.common.cancel}
                   </button>
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary" 
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
                     data-testid="vk-modal-edit-btn-submit"
                     data-function-id="FNC-VK-UPDATE"
                     disabled={isLoading}
@@ -1210,17 +1396,17 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab }) {
                 })()}
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   data-testid="vk-modal-btn-cancel"
                   onClick={() => setShowCreateModal(false)}
                 >
                   {strings.common.cancel}
                 </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
+                <button
+                  type="submit"
+                  className="btn btn-primary"
                   data-testid="vk-modal-btn-submit"
                   data-function-id="FNC-VK-ISSUE"
                   disabled={isLoading}

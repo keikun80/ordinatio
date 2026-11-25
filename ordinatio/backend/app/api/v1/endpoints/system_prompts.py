@@ -142,15 +142,19 @@ def _validate_and_enrich_target(
 
     return target_id
 
+from app.core.prompt_injector import resolve_and_inject_system_prompt
+
 @router.get("", response_model=List[SystemPromptResponse], dependencies=[Depends(require_permission("prompts:read"))])
 def list_system_prompts(
     target_type: Optional[str] = Query(None, description="타겟 유형 필터링 (ROUTE, VIRTUAL_KEY, TENANT, GLOBAL)"),
     is_active: Optional[bool] = Query(None, description="활성화 여부 필터링"),
     search: Optional[str] = Query(None, description="프롬프트 명칭 검색어"),
+    offset: int = Query(0, ge=0, description="페이지네이션 오프셋"),
+    limit: int = Query(100, ge=1, le=500, description="페이지당 반환 항목 수"),
     db: Session = Depends(get_db)
 ):
     """
-    시스템 프롬프트 카탈로그 목록 조회 (실시간 타겟 명칭 최신 동기화)
+    시스템 프롬프트 카탈로그 목록 조회 (서버사이드 페이지네이션 및 실시간 타겟 명칭 최신 동기화)
     """
     query = db.query(SystemPrompt)
     if target_type:
@@ -160,7 +164,7 @@ def list_system_prompts(
     if search:
         query = query.filter(SystemPrompt.name.ilike(f"%{search}%"))
 
-    prompts = query.order_by(SystemPrompt.created_at.desc()).all()
+    prompts = query.order_by(SystemPrompt.created_at.desc()).offset(offset).limit(limit).all()
 
     # 실시간 최신 target_name 동기화
     for p in prompts:
@@ -413,78 +417,22 @@ def resolve_system_prompt(
 ):
     """
     가상키/라우트/테넌트 컨텍스트 기반 우선순위 해석 및 최종 메시지 배열 합성 시뮬레이션
+    엔진 코어(resolve_and_inject_system_prompt)를 직접 호출하여 100% 동일한 합성 및 멀티모달 처리 보장
     우선순위: VIRTUAL_KEY > ROUTE > TENANT > GLOBAL
     """
-    active_prompts = db.query(SystemPrompt).filter(SystemPrompt.is_active == True).all()
-
-    matched_prompt: Optional[SystemPrompt] = None
-    resolved_by: Optional[str] = None
-
-    # Priority 1: Virtual Key
-    if req.key_id:
-        for p in active_prompts:
-            if p.target_type == "VIRTUAL_KEY" and p.target_id == req.key_id:
-                matched_prompt = p
-                resolved_by = "VIRTUAL_KEY"
-                break
-
-    # Priority 2: Route
-    if not matched_prompt and req.route_name:
-        for p in active_prompts:
-            if p.target_type == "ROUTE" and p.target_id == req.route_name:
-                matched_prompt = p
-                resolved_by = "ROUTE"
-                break
-
-    # Priority 3: Tenant
-    if not matched_prompt and req.tenant_id:
-        for p in active_prompts:
-            if p.target_type == "TENANT" and p.target_id == req.tenant_id:
-                matched_prompt = p
-                resolved_by = "TENANT"
-                break
-
-    # Priority 4: Global
-    if not matched_prompt:
-        for p in active_prompts:
-            if p.target_type == "GLOBAL":
-                matched_prompt = p
-                resolved_by = "GLOBAL"
-                break
-
-    # 메시지 합성
     input_msgs = req.input_messages or [{"role": "user", "content": "안녕하세요. 모델 테스트입니다."}]
-    final_msgs = [dict(m) for m in input_msgs]
 
-    if not matched_prompt:
-        return PromptResolveResponse(
-            matched=False,
-            resolved_by=None,
-            matched_prompt=None,
-            final_messages=final_msgs
-        )
-
-    sys_content = matched_prompt.content
-    mode = matched_prompt.injection_mode
-    existing_sys_indices = [i for i, m in enumerate(final_msgs) if m.get("role") == "system"]
-
-    if mode == "OVERRIDE":
-        final_msgs = [m for m in final_msgs if m.get("role") != "system"]
-        final_msgs.insert(0, {"role": "system", "content": sys_content})
-    elif mode == "FALLBACK_ONLY":
-        if not existing_sys_indices:
-            final_msgs.insert(0, {"role": "system", "content": sys_content})
-    else:  # PREPEND
-        if existing_sys_indices:
-            first_idx = existing_sys_indices[0]
-            orig_content = final_msgs[first_idx].get("content", "")
-            final_msgs[first_idx]["content"] = f"{sys_content}\n\n{orig_content}"
-        else:
-            final_msgs.insert(0, {"role": "system", "content": sys_content})
+    final_msgs, matched_prompt, resolved_by = resolve_and_inject_system_prompt(
+        db=db,
+        messages=input_msgs,
+        key_id=req.key_id,
+        route_name=req.route_name,
+        tenant_id=req.tenant_id
+    )
 
     return PromptResolveResponse(
-        matched=True,
+        matched=matched_prompt is not None,
         resolved_by=resolved_by,
-        matched_prompt=SystemPromptResponse.model_validate(matched_prompt),
+        matched_prompt=SystemPromptResponse.model_validate(matched_prompt) if matched_prompt else None,
         final_messages=final_msgs
     )

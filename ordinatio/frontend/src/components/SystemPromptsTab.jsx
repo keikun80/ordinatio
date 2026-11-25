@@ -32,6 +32,8 @@ export default function SystemPromptsTab({ onNotify }) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 9;
 
   // Modal States
   const [showEditModal, setShowEditModal] = useState(false);
@@ -126,6 +128,9 @@ export default function SystemPromptsTab({ onNotify }) {
       (p.target_name && p.target_name.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredPrompts.length / pageSize));
+  const paginatedPrompts = filteredPrompts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Calculate estimated tokens with CJK/Latin weighted heuristics
   const calculateEstimatedTokens = (text) => {
@@ -403,7 +408,10 @@ export default function SystemPromptsTab({ onNotify }) {
               <button
                 key={tab.id}
                 data-testid={`sp-tab-filter-${tab.id}`}
-                onClick={() => setSelectedFilter(tab.id)}
+                onClick={() => {
+                  setSelectedFilter(tab.id);
+                  setCurrentPage(1);
+                }}
                 className={`btn btn-sm ${selectedFilter === tab.id ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ fontSize: '0.78rem', padding: '5px 12px' }}
               >
@@ -419,7 +427,10 @@ export default function SystemPromptsTab({ onNotify }) {
               data-testid="sp-input-search"
               placeholder={strings.systemPrompts.searchPromptsPlaceholder}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="form-input"
               style={{ paddingLeft: '32px', fontSize: '0.82rem', height: '34px' }}
             />
@@ -429,8 +440,8 @@ export default function SystemPromptsTab({ onNotify }) {
 
       {/* 3. Prompts Card Grid */}
       <div data-testid="sp-grid-prompts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '18px' }}>
-        {filteredPrompts.length > 0 ? (
-          filteredPrompts.map((p) => {
+        {paginatedPrompts.length > 0 ? (
+          paginatedPrompts.map((p) => {
             const targetColor =
               p.target_type === 'VIRTUAL_KEY' ? '#f59e0b' :
               p.target_type === 'ROUTE' ? '#818cf8' :
@@ -589,6 +600,38 @@ export default function SystemPromptsTab({ onNotify }) {
           </div>
         )}
       </div>
+
+      {/* Pagination Bar */}
+      {filteredPrompts.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', marginTop: '16px', background: 'var(--bg-panel)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <div>
+            총 <strong style={{ color: '#ffffff' }}>{filteredPrompts.length}</strong>개 항목 (페이지 {currentPage} / {totalPages})
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              data-testid="sp-pagination-prev"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              style={{ padding: '4px 10px' }}
+            >
+              이전
+            </button>
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPage}</span>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              data-testid="sp-pagination-next"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              style={{ padding: '4px 10px' }}
+            >
+              다음
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 4. Create / Edit Modal */}
       {showEditModal && (

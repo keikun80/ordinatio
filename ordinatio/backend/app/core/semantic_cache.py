@@ -21,6 +21,10 @@ from app.core.config import settings
 _TOKEN_RE = re.compile(r"[\w가-힣]{2,}", re.UNICODE)
 _DIMENSIONS = 256
 
+# 거버넌스 지침 역할. app.core.prompt_injector.SYS_ROLES 와 동일한 집합이지만,
+# 본 모듈은 ORM/DB 계층에 의존하지 않아야 하므로 로컬에 정의한다.
+_GOVERNANCE_ROLES = {"system", "developer"}
+
 
 def _canonical_messages(messages: Iterable[Dict[str, Any]]) -> str:
     """Preserve the full conversation context; never cache on only the last question."""
@@ -28,6 +32,29 @@ def _canonical_messages(messages: Iterable[Dict[str, Any]]) -> str:
         f"{message.get('role', 'user')}:{json.dumps(message.get('content', ''), ensure_ascii=False, sort_keys=True)}"
         for message in messages
     )
+
+
+def _split_governance(messages: Iterable[Dict[str, Any]]) -> tuple[list, list]:
+    """
+    메시지를 (거버넌스 지침, 실제 대화 턴)으로 분리한다.
+
+    시스템 프롬프트 거버넌스가 주입하는 지침은 길이가 길고(사내 가드레일 수백 토큰)
+    동일 라우트의 모든 요청에 똑같이 들어가므로, 유사도 임베딩에 포함하면 지침이
+    벡터를 지배해 서로 무관한 질문끼리도 임계값을 넘어버린다.
+    (실측: 전사 가드레일 주입 시 'Failover test prompt' vs 'Canary fail trigger' 유사도 0.939 > 임계값 0.92
+     → 전혀 다른 질문에 남의 캐시 응답이 반환됨)
+
+    따라서 지침은 '네임스페이스'로만 쓰고(= 지침이 바뀌면 캐시가 분리되고),
+    유사도 판정은 실제 대화 턴만으로 수행한다.
+    """
+    governance = []
+    conversation = []
+    for m in messages or []:
+        if m.get("role") in _GOVERNANCE_ROLES:
+            governance.append(m)
+        else:
+            conversation.append(m)
+    return governance, conversation
 
 
 def _embedding(text: str) -> list[float]:
@@ -83,18 +110,24 @@ class SemanticCache:
         return self._redis
 
     @staticmethod
-    def _prefix(scope: Optional[str], model_id: Optional[str]) -> str:
+    def _prefix(scope: Optional[str], model_id: Optional[str], governance: Optional[list] = None) -> str:
         s_val = str(scope or "global")
         m_val = str(model_id or "default")
         scope_hash = hashlib.sha256(s_val.encode("utf-8")).hexdigest()[:24]
         model_hash = hashlib.sha256(m_val.encode("utf-8")).hexdigest()[:24]
-        return f"ordinatio:semantic-cache:{scope_hash}:{model_hash}"
+        # 주입된 거버넌스 지침을 네임스페이스에 포함한다.
+        # 포함하지 않으면 관리자가 가드레일을 수정/교체한 뒤에도 '이전 지침으로 생성된' 응답이
+        # 계속 캐시에서 서빙되어 거버넌스가 우회된다.
+        gov_val = _canonical_messages(governance or [])
+        gov_hash = hashlib.sha256(gov_val.encode("utf-8")).hexdigest()[:24]
+        return f"ordinatio:semantic-cache:{scope_hash}:{model_hash}:{gov_hash}"
 
     def lookup(self, scope: Optional[str], model_id: Optional[str], messages: Iterable[Dict[str, Any]]) -> Optional[CacheHit]:
         if not settings.SEMANTIC_CACHE_ENABLED:
             return None
-        vector = _embedding(_canonical_messages(messages))
-        prefix = self._prefix(scope, model_id)
+        governance, conversation = _split_governance(messages)
+        vector = _embedding(_canonical_messages(conversation))
+        prefix = self._prefix(scope, model_id, governance)
         candidates: list[Dict[str, Any]] = []
         client = self._redis_client()
         if client:
@@ -126,10 +159,12 @@ class SemanticCache:
     def store(self, scope: Optional[str], model_id: Optional[str], messages: Iterable[Dict[str, Any]], response: Dict[str, Any]) -> None:
         if not settings.SEMANTIC_CACHE_ENABLED:
             return
-        prefix = self._prefix(scope, model_id)
-        fingerprint = hashlib.sha256(_canonical_messages(messages).encode("utf-8")).hexdigest()
+        governance, conversation = _split_governance(messages)
+        prefix = self._prefix(scope, model_id, governance)
+        canonical_conversation = _canonical_messages(conversation)
+        fingerprint = hashlib.sha256(canonical_conversation.encode("utf-8")).hexdigest()
         key = f"{prefix}:{fingerprint}"
-        entry = {"embedding": _embedding(_canonical_messages(messages)), "response": copy.deepcopy(response)}
+        entry = {"embedding": _embedding(canonical_conversation), "response": copy.deepcopy(response)}
         with self._lock:
             self._memory[key] = entry
             self._memory.move_to_end(key)

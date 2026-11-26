@@ -51,8 +51,8 @@
   * `FNC-VK-CREATE-TENANT`: 신규 부서(테넌트) 등록
   * `FNC-RT-DEPLOY`: Envoy xDS 동적 라우팅 정책 배포
   * `FNC-RT-AUTOBALANCE`: 모델 가중치 균등 분할
-  * `FNC-SP-CREATE`: 시스템 프롬프트 카탈로그 신규 등록
-  * `FNC-SP-BIND`: 시스템 프롬프트 타겟(ROUTE/KEY/TENANT) 바인딩
+  * `FNC-SP-SAVE`: 시스템 프롬프트 등록/수정 저장 (1:1 타겟 바인딩 포함)
+  * `FNC-SP-RESTORE`: 시스템 프롬프트 특정 버전 복원
   * `FNC-LC-HOTFIX`: 오프라인 패치 번들 서명 검증 및 롤링 핫픽스 실행
 
 ### 2.3 DOM 테스트 식별자 (`data-testid`)
@@ -158,31 +158,86 @@ Playwright, Cypress 등 E2E 테스트 도구 및 DOM 질의에서 사용하는 �
 ---
 
 ### 3.4 [SP] 시스템 프롬프트 거버넌스 (`SCR-SP-*`)
+
+> **설계 주의 — 바인딩 모델**: 바인딩은 별도 엔티티가 아니라 프롬프트 레코드에 인라인된 **1:1 모델**
+> (`target_type` + `target_id`)입니다. 따라서 별도의 바인딩 마법사 화면이나 `/bindings` API는 존재하지
+> 않으며, `SCR-SP-M02`는 **주입 시뮬레이터**입니다.
+>
+> **우선순위 가중치 필드가 없는 이유**: 적용 우선순위는 타겟 유형에 의해
+> `VIRTUAL_KEY > ROUTE > TENANT > GLOBAL` 4단계로 고정되고, 동일 타겟에 대한 중복 활성화가 서버에서
+> 차단되므로(`POST`/`PUT` 모두) 충돌이 구조적으로 발생하지 않습니다. 수치 가중치는 거버넌스의
+> 예측 가능성을 떨어뜨리므로 의도적으로 도입하지 않습니다.
+
 | Screen ID | Element/Test ID (`data-testid`) | 요소 형태 | 공식 명칭 (UI Label) | Function ID | 백엔드 API 연동 |
 | :--- | :--- | :---: | :--- | :--- | :--- |
-| `SCR-SP-01` | `sp-card-total` | `card` | 등록된 프롬프트 수 | - | `GET /api/v1/system-prompts` |
-| `SCR-SP-01` | `sp-card-active` | `card` | 활성 가드레일 수 | - | `GET /api/v1/system-prompts` |
-| `SCR-SP-01` | `sp-card-bindings` | `card` | 연결된 바인딩 규칙 수 | - | `GET /api/v1/system-prompts/bindings` |
-| `SCR-SP-01` | `sp-btn-open-create` | `btn` | 새 시스템 프롬프트 등록 | - | 모달(`SCR-SP-M01`) 오픈 |
-| `SCR-SP-01` | `sp-btn-open-bind` | `btn` | 바인딩 규칙 신규 설정 | - | 모달(`SCR-SP-M02`) 오픈 |
-| `SCR-SP-01` | `sp-table-catalog` | `table` | 프롬프트 카탈로그 테이블 | - | 프롬프트 메타데이터 목록 |
-| `SCR-SP-01` | `sp-row-${id}` | `row` | 개별 프롬프트 행 | - | 프롬프트 정보 표시 |
+| `SCR-SP-01` | `sp-page-container` | `div` | 탭 루트 컨테이너 | - | - |
+| `SCR-SP-01` | `sp-header-section` | `div` | 헤더 및 액션 버튼 영역 | - | - |
+| `SCR-SP-01` | `sp-card-total` | `card` | 총 등록 프롬프트 (활성 수 병기) | - | `GET /api/v1/system-prompts/stats` |
+| `SCR-SP-01` | `sp-card-route` | `card` | 라우팅 정책 바인딩 수 | - | `GET /api/v1/system-prompts/stats` |
+| `SCR-SP-01` | `sp-card-vkey` | `card` | API Key 바인딩 수 | - | `GET /api/v1/system-prompts/stats` |
+| `SCR-SP-01` | `sp-card-tenant-global`| `card` | 테넌트 / 전사 바인딩 수 | - | `GET /api/v1/system-prompts/stats` |
+| `SCR-SP-01` | `sp-btn-open-simulator`| `btn` | 주입 시뮬레이터 열기 | `FNC-SP-OPEN-SIMULATOR` | 모달(`SCR-SP-M02`) 오픈 |
+| `SCR-SP-01` | `sp-btn-open-create` | `btn` | 신규 시스템 프롬프트 등록 | `FNC-SP-OPEN-CREATE` | 모달(`SCR-SP-M01`) 오픈 |
+| `SCR-SP-01` | `sp-filter-card` | `card` | 필터 / 검색 툴바 | - | - |
+| `SCR-SP-01` | `sp-tab-filter-${type}`| `btn` | 바인딩 대상 필터 탭 | - | `GET /api/v1/system-prompts?target_type=` (서버사이드) |
+| `SCR-SP-01` | `sp-input-search` | `input` | 프롬프트/타겟 검색 (300ms 디바운스) | - | `GET /api/v1/system-prompts?search=` (서버사이드) |
+| `SCR-SP-01` | `sp-grid-prompts` | `div` | 프롬프트 카탈로그 카드 그리드 | - | 페이지당 9건 서버사이드 조회 |
+| `SCR-SP-01` | `sp-card-prompt-${id}` | `card` | 개별 프롬프트 카드 | - | 프롬프트 정보 표시 |
+| `SCR-SP-01` | `sp-text-name-${id}` | `span` | 프롬프트 명칭 | - | - |
+| `SCR-SP-01` | `sp-btn-history-${id}` | `btn` | 버전 배지 (클릭 시 이력) | `FNC-SP-HISTORY` | 모달(`SCR-SP-M04`) 오픈 |
+| `SCR-SP-01` | `sp-badge-category-${id}`| `badge` | 프롬프트 분류 배지 | - | SECURITY / COMPLIANCE / PERSONA |
+| `SCR-SP-01` | `sp-badge-mode-${id}` | `badge` | 주입 전략 배지 | - | PREPEND / OVERRIDE / FALLBACK_ONLY |
+| `SCR-SP-01` | `sp-badge-target-${id}`| `badge` | 1:1 바인딩 대상 (삭제 시 경고색) | - | `[삭제된 자원]` 라벨 표시 |
+| `SCR-SP-01` | `sp-btn-toggle-${id}` | `btn` | 주입 활성/비활성 전환 | `FNC-SP-TOGGLE` | `PUT /api/v1/system-prompts/{id}` |
+| `SCR-SP-01` | `sp-tokens-${id}` | `span` | 추가 토큰 추정치 | - | - |
+| `SCR-SP-01` | `sp-content-${id}` | `div` | 프롬프트 본문 뷰포트 | - | - |
 | `SCR-SP-01` | `sp-btn-edit-${id}` | `btn` | 프롬프트 지침 수정 | - | 수정 모달 오픈 |
-| `SCR-SP-01` | `sp-btn-delete-${id}` | `btn` | 프롬프트 삭제 | `FNC-SP-DELETE` | `DELETE /api/v1/system-prompts/{id}` |
+| `SCR-SP-01` | `sp-btn-delete-${id}` | `btn` | 프롬프트 삭제 | `FNC-SP-DELETE` | 삭제 확인 모달(`SCR-SP-M03`) 오픈 |
+| `SCR-SP-01` | `sp-pagination-summary`| `div` | 총 건수 / 현재 페이지 | - | `X-Total-Count` 헤더 기준 |
+| `SCR-SP-01` | `sp-pagination-prev` / `sp-pagination-next` | `btn` | 이전 / 다음 페이지 | - | `offset`/`limit` 서버사이드 |
 | `SCR-SP-M01`| `sp-modal-form` | `modal` | 프롬프트 작성/수정 팝업 | - | 등록/수정 모달 컨테이너 |
-| `SCR-SP-M01`| `sp-input-title` | `input` | 프롬프트 제목 (식별명) | - | 폼 필드 (Title) |
-| `SCR-SP-M01`| `sp-input-code` | `input` | 고유 식별 코드 | - | 폼 필드 (Unique Code) |
-| `SCR-SP-M01`| `sp-select-category` | `select` | 프롬프트 카테고리 | - | SECURITY / COMPLIANCE / PERSONA |
-| `SCR-SP-M01`| `sp-textarea-content`| `textarea` | 시스템 프롬프트 본문 내용 | - | L7 인라인 주입 텍스트 |
-| `SCR-SP-M01`| `sp-badge-token-count`| `badge` | 실시간 토큰 & 글자수 계량기 | - | 문자수 / 추정 토큰수 표출 |
-| `SCR-SP-M01`| `sp-btn-submit` | `btn` | 저장 및 카탈로그 반영 | `FNC-SP-CREATE` | `POST /api/v1/system-prompts` |
-| `SCR-SP-M02`| `sp-modal-binding` | `modal` | 주입 바인딩 마법사 팝업 | - | 1:1 타겟 바인딩 대화상자 |
-| `SCR-SP-M02`| `sp-select-bind-prompt`| `select` | 주입할 시스템 프롬프트 | - | 바인딩 대상 프롬프트 선택 |
-| `SCR-SP-M02`| `sp-select-target-type`| `select` | 바인딩 타겟 유형 | - | ROUTE / VIRTUAL_KEY / TENANT / GLOBAL |
-| `SCR-SP-M02`| `sp-select-target-id` | `select` | 바인딩 대상 식별자 | - | 선택된 타입의 엔티티 목록 |
-| `SCR-SP-M02`| `sp-select-inject-mode`| `select` | 주입 모드 | - | PREPEND / OVERRIDE / FALLBACK_ONLY |
-| `SCR-SP-M02`| `sp-input-priority` | `input` | 우선순위 가중치 (1~100) | - | 위계 우선순위 충돌 해소용 |
-| `SCR-SP-M02`| `sp-btn-submit-binding`| `btn` | 바인딩 규칙 저장 | `FNC-SP-BIND` | `POST /api/v1/system-prompts/bindings` |
+| `SCR-SP-M01`| `sp-btn-template-${i}` | `btn` | 빠른 템플릿 채우기 | - | `GET /api/v1/settings/public` 프리셋 |
+| `SCR-SP-M01`| `sp-input-name` | `input` | 시스템 프롬프트 명칭 | - | 폼 필드 (Name) |
+| `SCR-SP-M01`| `sp-input-desc` | `input` | 프롬프트 설명 | - | 폼 필드 (Description) |
+| `SCR-SP-M01`| `sp-input-code` | `input` | 고유 식별 코드 (선택, 등록 시만) | - | `prompt_id` (미입력 시 자동 생성) |
+| `SCR-SP-M01`| `sp-select-category` | `select` | 프롬프트 분류 | - | SECURITY / COMPLIANCE / PERSONA |
+| `SCR-SP-M01`| `sp-radio-target-type-${type}`| `radio` | 1:1 바인딩 대상 유형 | - | ROUTE / VIRTUAL_KEY / TENANT / GLOBAL |
+| `SCR-SP-M01`| `sp-select-target-route`| `select` | 적용할 라우트 선택 | - | `GET /api/v1/routing/routes` |
+| `SCR-SP-M01`| `sp-select-target-vkey` | `select` | 적용할 API Key 선택 | - | `GET /api/v1/virtual-keys` |
+| `SCR-SP-M01`| `sp-select-target-tenant`| `select` | 적용할 테넌트/부서 선택 | - | `GET /api/v1/tenants` |
+| `SCR-SP-M01`| `sp-info-target-global` | `div` | 전사 공통 적용 안내 | - | - |
+| `SCR-SP-M01`| `sp-select-injection-mode`| `select` | 주입 전략 | - | PREPEND / OVERRIDE / FALLBACK_ONLY |
+| `SCR-SP-M01`| `sp-toggle-is-active` | `checkbox` | 즉시 활성화 | - | 동일 타겟 중복 활성 시 서버 400 |
+| `SCR-SP-M01`| `sp-variables-bar` | `div` | 동적 템플릿 변수 삽입 바 | - | `GET /api/v1/system-prompts/variables` |
+| `SCR-SP-M01`| `sp-btn-variable-${name}`| `btn` | 변수 플레이스홀더 커서 삽입 | - | `{{date}}`, `{{route_name}}` 등 |
+| `SCR-SP-M01`| `sp-textarea-content` | `textarea` | 시스템 프롬프트 본문 내용 | - | L7 인라인 주입 텍스트 |
+| `SCR-SP-M01`| `sp-badge-tokens` | `badge` | 실시간 글자수 & 추정 토큰 계량기 | - | `frontend/src/utils/tokenEstimate.js` (BE와 parity 검증) |
+| `SCR-SP-M01`| `sp-warning-unknown-vars`| `div` | 미지원 템플릿 변수 경고 | - | 저장은 차단하지 않음 |
+| `SCR-SP-M01`| `sp-modal-btn-submit` | `btn` | 저장 및 카탈로그 반영 | `FNC-SP-SAVE` | `POST` / `PUT /api/v1/system-prompts` |
+| `SCR-SP-M01`| `sp-modal-btn-cancel` | `btn` | 취소 | - | 모달 닫기 |
+| `SCR-SP-M02`| `sp-modal-simulator` | `modal` | L7 주입 시뮬레이터 팝업 | - | 우선순위 판정 및 페이로드 합성 검증 |
+| `SCR-SP-M02`| `sp-sim-select-key` | `select` | 1순위: 가상키 컨텍스트 | - | `key_id` |
+| `SCR-SP-M02`| `sp-sim-select-route` | `select` | 2순위: 라우트 컨텍스트 | - | `route_name` |
+| `SCR-SP-M02`| `sp-sim-select-tenant` | `select` | 3순위: 테넌트 컨텍스트 | - | `tenant_id` |
+| `SCR-SP-M02`| `sp-sim-input-client-sys`| `input` | 클라이언트 System 프롬프트 | - | `input_messages[]` |
+| `SCR-SP-M02`| `sp-sim-input-user-msg` | `input` | 사용자 입력 질문 | - | `input_messages[]` |
+| `SCR-SP-M02`| `sp-sim-btn-run` | `btn` | 시뮬레이션 실행 | `FNC-SP-SIMULATE` | `POST /api/v1/system-prompts/resolve` |
+| `SCR-SP-M02`| `sp-sim-result-box` | `div` | 판정 결과 컨테이너 | - | `resolved_by` 표출 |
+| `SCR-SP-M02`| `sp-sim-unmatched-reason`| `div` | 미매칭 사유 안내 | - | - |
+| `SCR-SP-M02`| `sp-sim-token-delta` | `badge` | 주입으로 증가한 토큰 | - | `token_delta` |
+| `SCR-SP-M02`| `sp-sim-applied-vars` | `div` | 치환된 동적 변수 맵 | - | `applied_variables` |
+| `SCR-SP-M02`| `sp-sim-result-badge` | `badge` | 매칭된 프롬프트 명칭/모드 | - | `matched_prompt` |
+| `SCR-SP-M02`| `sp-sim-result-json` | `pre` | 최종 합성 페이로드 | - | `final_messages` |
+| `SCR-SP-M02`| `sp-sim-btn-close` | `btn` | 시뮬레이터 닫기 | - | 모달 닫기 |
+| `SCR-SP-M03`| `sp-modal-delete` | `modal` | 영구 삭제 확인 팝업 | - | 삭제 경고 및 타겟 영향 안내 |
+| `SCR-SP-M03`| `sp-modal-delete-btn-cancel`| `btn` | 삭제 취소 | - | 모달 닫기 |
+| `SCR-SP-M03`| `sp-modal-delete-btn-confirm`| `btn` | 영구 삭제 확인 | `FNC-SP-CONFIRM-DELETE` | `DELETE /api/v1/system-prompts/{id}` |
+| `SCR-SP-M04`| `sp-modal-history` | `modal` | 버전 이력 팝업 | - | `GET /api/v1/system-prompts/{id}/versions` |
+| `SCR-SP-M04`| `sp-table-history` | `table` | 버전 이력 테이블 (최신순) | - | CREATE/UPDATE/ACTIVATE/DEACTIVATE/RESTORE |
+| `SCR-SP-M04`| `sp-history-row-${snapshotId}`| `row` | 개별 이력 스냅샷 행 | - | - |
+| `SCR-SP-M04`| `sp-btn-restore-${snapshotId}`| `btn` | 이 버전으로 복원 (비파괴) | `FNC-SP-RESTORE` | `POST /api/v1/system-prompts/{id}/versions/{snapshotId}/restore` |
+| `SCR-SP-M04`| `sp-btn-history-audit-link`| `btn` | WORM 감사로그 메뉴로 이동 | - | 컴플라이언스 탭 전환 |
+| `SCR-SP-M04`| `sp-modal-history-btn-close`| `btn` | 이력 닫기 | - | 모달 닫기 |
 
 ---
 

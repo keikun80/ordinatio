@@ -49,6 +49,7 @@ from app.models.pii_rule import PiiRule
 from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.system_prompt import SystemPrompt
+from app.models.system_prompt_version import SystemPromptVersion
 from app.models.daily_token_ledger import DailyTokenLedger
 from app.models.user import User, UserSession
 from app.models.role import Role
@@ -243,6 +244,21 @@ def seed_data():
             deployed_by="admin"
         ))
 
+    # 시스템 프롬프트 시드(sp-route-code)가 바인딩하는 라우트를 운영 시드(init_db.py)와 동일하게 보강.
+    # 바인딩 타겟 존재 검증이 항상 수행되므로 픽스처가 자체 정합성을 가져야 한다.
+    if not db.query(RoutingPolicy).filter(RoutingPolicy.route_name == "code-copilot-v2").first():
+        db.add(RoutingPolicy(
+            policy_id="pol-code-copilot",
+            route_name="code-copilot-v2",
+            traffic_weights=[
+                {"model_id": "meta-llama/Llama-3.1-70B-Instruct", "weight": 100}
+            ],
+            load_balancing_strategy="RoundRobin",
+            failover_model_id="meta-llama/Llama-3.1-8B-Instruct",
+            xds_revision="xds-rev-20260911-1423",
+            deployed_by="admin"
+        ))
+
     # Seed PiiRule if missing
     if not db.query(PiiRule).filter(PiiRule.rule_id == "pii-rrn").first():
         db.add_all([
@@ -367,7 +383,7 @@ def seed_data():
                 target_id=None,
                 target_name="전사 공통 (Global)",
                 injection_mode="PREPEND",
-                estimated_tokens=75,
+                estimated_tokens=216,
                 is_active=True
             ),
             SystemPrompt(
@@ -379,7 +395,7 @@ def seed_data():
                 target_id="dept-wm",
                 target_name="자산관리부 (WM-01)",
                 injection_mode="PREPEND",
-                estimated_tokens=70,
+                estimated_tokens=204,
                 is_active=True
             ),
             SystemPrompt(
@@ -391,7 +407,7 @@ def seed_data():
                 target_id="code-copilot-v2",
                 target_name="code-copilot-v2 라우트",
                 injection_mode="PREPEND",
-                estimated_tokens=65,
+                estimated_tokens=192,
                 is_active=True
             )
         ])

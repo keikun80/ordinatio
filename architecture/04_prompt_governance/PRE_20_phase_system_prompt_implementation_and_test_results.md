@@ -99,3 +99,45 @@
 
 ## 5. 결론 및 향후 과제
 본 구현을 통해 고객사 엔터프라이즈 운영팀은 개발팀의 개별 프롬프트 하드코딩이나 변경 없이도, 오케스트레이터 관리 화면에서 시스템 프롬프트를 등록하고 라우팅 정책이나 특정 부서의 가상키에 즉각 바인딩하여 전사 AI 거버넌스를 완벽히 통제할 수 있게 되었습니다.
+
+---
+
+## 6. 후속 보정 (Addendum, 2026-11-26)
+
+본문 §2~§3 은 최초 구현 시점(2026-09-25)의 기록이며, 이후 소스 코드 전수 조사에서 발견된
+결함 보정 및 기능 보완이 반영되었습니다. 아래 내용이 현재의 사실입니다.
+
+### 6.1 본문 기재 내용 정정
+- **시드 바인딩 정정**: §2 Phase 1 의 "`sp-wm-advisor` (ROUTE: `financial-advisor-v1`)",
+  "`sp-route-code` (ROUTE: `code-assistant-v1`)" 는 사실과 다릅니다. 실제 시드
+  (`app/db/init_db.py`, `tests/conftest.py`)는 다음과 같습니다.
+  - `sp-global-guardrail` → `GLOBAL`
+  - `sp-wm-advisor` → `TENANT` / `dept-wm`
+  - `sp-route-code` → `ROUTE` / `code-copilot-v2`
+- **테스트 건수 정정**: §3 의 "78건" 은 당시 수치이며 현재 전체 백엔드 스위트는 약 150건입니다.
+  DoD 스크립트는 더 이상 고정 건수를 단정하지 않고 pytest 종료코드에 위임합니다.
+- **`SCR-SP-M02` 정정**: §2 Phase 4 의 "1:1 바인딩 마법사 모달" 은 `SCR-SP-M01`(등록/수정 모달)에
+  해당합니다. `SCR-SP-M02` 는 주입 시뮬레이터입니다. 별도의 바인딩 마법사 화면과 `/bindings` API 는
+  존재하지 않으며(바인딩은 프롬프트 레코드에 인라인된 1:1 모델), 이 사실은 `PRE_23` §3.4 에 명시되었습니다.
+
+### 6.2 결함 보정 내역
+| 구분 | 내용 |
+| :--- | :--- |
+| 검증 게이트 | `verify-phase-system-prompt.sh` 가 `FAILED` 플래그를 평가하지 않아 테스트/빌드 실패 시에도 `DoD PASSED` + exit 0 을 반환했던 문제 수정 (거짓 통과) |
+| 바인딩 검증 우회 | `target_name` 입력으로 타겟 존재 검증을 건너뛸 수 있던 구멍 차단. 이제 `_validate_and_enrich_target()` 이 항상 수행되고 `target_name` 입력값은 무시됨 |
+| 중복 활성 검증 | 정규화된 `target_id`(ROUTE 는 route_name) 기준으로 검사하도록 순서 변경. `policy_id` 로 전달된 경우에도 중복이 탐지됨 |
+| 타겟명 캐시 | 목록 조회 시 동기화한 `target_name` 을 영속화. 미영속 시 서버사이드 `search` 가 낡은 컬럼을 조회해 이름 변경된 타겟이 검색에서 누락되던 불일치 해소 |
+| 감사 기록 무음 | `except: pass` 제거 → ERROR 로깅 + `x-orche-audit-degraded: true` 응답 헤더로 노출 |
+| 참조 정합성 | 라우트/가상키/테넌트 삭제 시 바인딩된 프롬프트가 있으면 400 차단, `force=true` 시 비활성화 후 `PROMPT_ORPHANED` 감사 기록 (`app/core/prompt_bindings.py`) |
+| 토큰 추정 parity | FE/BE 구현 불일치(`'abc한글def'` → BE 4 / FE 5) 해소. FE 로직을 `frontend/src/utils/tokenEstimate.js` 로 추출하고 공용 벡터(`backend/tests/fixtures/token_vectors.json`)로 DoD 스크립트 [5/5] 단계에서 양측을 비교 |
+
+### 6.3 기능 보완 내역
+| 기능 | 내용 |
+| :--- | :--- |
+| 서버사이드 페이지네이션 | 프론트가 `offset`/`limit`/`target_type`/`search` 를 서버로 전달. 이전에는 클라이언트 필터링이어서 프롬프트 100건 초과 시 목록·KPI·검색이 조용히 잘렸음 |
+| KPI 집계 분리 | `GET /api/v1/system-prompts/stats` 신규. 페이지 응답만으로 전사 집계를 계산하던 왜곡 제거 |
+| 버전 이력 및 복원 | `system_prompt_versions` 테이블 + `GET /{id}/versions`, `POST /{id}/versions/{snapshotId}/restore` 신규. 복원은 비파괴(append-only) 방식으로 새 버전을 생성. UI 는 `SCR-SP-M04` 이력 모달 |
+| 버전 증가 규칙 | 활성 토글만으로는 `version` 을 증가시키지 않고 `change_kind=ACTIVATE/DEACTIVATE` 이력만 기록 |
+| 동적 변수 UX | `SUPPORTED_PROMPT_VARIABLES` 단일 진실 공급원 + `GET /api/v1/system-prompts/variables` + 에디터 변수 칩 삽입 및 미지원 변수 경고 |
+| 분류 / 식별 코드 | `category`(SECURITY/COMPLIANCE/PERSONA) 컬럼 및 등록 시 `prompt_id` 직접 지정 UI 추가 (`PRE_23` 명세 항목 구현) |
+| 명세 드리프트 차단 | `scripts/verify-ui-taxonomy.sh` 신규 (`make verify-ui-taxonomy`). `PRE_23` §3.4 의 testid·엔드포인트와 구현을 기계적으로 대조 |

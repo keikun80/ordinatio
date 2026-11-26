@@ -93,8 +93,14 @@ API_MATRIX: List[Dict] = [
     {"id": "GV-W2", "perm": "governance:write", "method": "DELETE", "path": "/api/v1/virtual-keys/vk-rbac-probe-nonexistent"},
     # 시스템 프롬프트
     {"id": "SP-R1", "perm": "prompts:read", "method": "GET", "path": "/api/v1/system-prompts"},
+    {"id": "SP-R2", "perm": "prompts:read", "method": "GET", "path": "/api/v1/system-prompts/stats"},
+    {"id": "SP-R3", "perm": "prompts:read", "method": "GET", "path": "/api/v1/system-prompts/variables"},
+    {"id": "SP-R4", "perm": "prompts:read", "method": "GET", "path": "/api/v1/system-prompts/sp-rbac-probe-nonexistent/versions"},
+    {"id": "SP-R5", "perm": "prompts:read", "method": "POST", "path": "/api/v1/system-prompts/resolve", "json": {}},
     {"id": "SP-W1", "perm": "prompts:write", "method": "POST", "path": "/api/v1/system-prompts", "json": {}},
     {"id": "SP-W2", "perm": "prompts:write", "method": "DELETE", "path": "/api/v1/system-prompts/sp-rbac-probe-nonexistent"},
+    {"id": "SP-W3", "perm": "prompts:write", "method": "PUT", "path": "/api/v1/system-prompts/sp-rbac-probe-nonexistent", "json": {}},
+    {"id": "SP-W4", "perm": "prompts:write", "method": "POST", "path": "/api/v1/system-prompts/sp-rbac-probe-nonexistent/versions/1/restore"},
     # FinOps
     {"id": "FO-R1", "perm": "finops:read", "method": "GET", "path": "/api/v1/finops/overview"},
     {"id": "FO-W1", "perm": "finops:write", "method": "GET", "path": "/api/v1/finops/invoices/export"},

@@ -362,6 +362,14 @@ def delete_virtual_key(
             detail="활성 상태(ACTIVE)인 가상 API Key는 삭제할 수 없습니다. 안전을 위해 먼저 키를 파기(Revoke)한 후 삭제하십시오."
         )
 
+    # 시스템 프롬프트 바인딩 참조 정합성 가드
+    from app.core.prompt_bindings import guard_bound_prompts
+    guard_bound_prompts(
+        db, "VIRTUAL_KEY", key_id,
+        force=force,
+        requester_id=current_user.email or current_user.user_id
+    )
+
     key_meta = {"name": key.name, "tenant_id": key.tenant_id, "key_prefix": key.key_prefix}
     db.delete(key)
     db.commit()

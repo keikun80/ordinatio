@@ -72,13 +72,26 @@ def resolve_system_prompt_for_context(
 
     return None, None
 
+# 프롬프트 본문에서 사용 가능한 동적 템플릿 변수의 단일 진실 공급원.
+# render_prompt_variables()가 이 정의를 그대로 소비하고, GET /system-prompts/variables 가
+# 동일 정의를 UI에 노출하므로 양쪽이 구조적으로 드리프트할 수 없다.
+SUPPORTED_PROMPT_VARIABLES: Dict[str, Dict[str, str]] = {
+    "date": {"description": "요청 시점의 날짜 (YYYY-MM-DD)", "example": "2026-11-26"},
+    "current_date": {"description": "요청 시점의 날짜 ({{date}}와 동일)", "example": "2026-11-26"},
+    "datetime": {"description": "요청 시점의 날짜와 시각", "example": "2026-11-26 14:05:30"},
+    "route_name": {"description": "호출된 라우팅 정책 명칭", "example": "code-copilot-v2"},
+    "tenant_id": {"description": "호출자 소속 테넌트 식별자", "example": "dept-wm"},
+    "tenant_name": {"description": "호출자 소속 부서명", "example": "자산관리(WM)혁신부"},
+    "key_id": {"description": "호출에 사용된 가상 API Key 식별자", "example": "vk-finance-01"},
+}
+
+
 def render_prompt_variables(
     content: str,
     context: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, Dict[str, str]]:
     """
-    동적 템플릿 변수 치환기:
-    {{date}}, {{current_date}}, {{datetime}}, {{route_name}}, {{tenant_id}}, {{tenant_name}}, {{key_id}}
+    동적 템플릿 변수 치환기 (지원 변수는 SUPPORTED_PROMPT_VARIABLES 참조)
     반환: (치환된_텍스트, 적용된_변수_딕셔너리)
     """
     if not content:
@@ -90,15 +103,17 @@ def render_prompt_variables(
     now_str = now.strftime("%Y-%m-%d")
     now_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    replacements = {
-        "{{date}}": now_str,
-        "{{current_date}}": now_str,
-        "{{datetime}}": now_time_str,
-        "{{route_name}}": str(context.get("route_name") or ""),
-        "{{tenant_id}}": str(context.get("tenant_id") or ""),
-        "{{tenant_name}}": str(context.get("tenant_name") or ""),
-        "{{key_id}}": str(context.get("key_id") or ""),
+    values = {
+        "date": now_str,
+        "current_date": now_str,
+        "datetime": now_time_str,
+        "route_name": str(context.get("route_name") or ""),
+        "tenant_id": str(context.get("tenant_id") or ""),
+        "tenant_name": str(context.get("tenant_name") or ""),
+        "key_id": str(context.get("key_id") or ""),
     }
+    # SUPPORTED_PROMPT_VARIABLES 에 선언된 변수만 치환 대상이 된다.
+    replacements = {f"{{{{{name}}}}}": values[name] for name in SUPPORTED_PROMPT_VARIABLES if name in values}
 
     rendered = content
     applied_vars = {}

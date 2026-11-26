@@ -1,0 +1,53 @@
+{
+  "_comment": "FE(SystemPromptsTab.calculateEstimatedTokens)와 BE(_estimate_tokens)가 동일 결과를 내야 하는 검증 벡터. scripts/verify-phase-system-prompt.sh [4/4]에서 양측을 같은 벡터로 비교한다.",
+  "vectors": [
+    {
+      "text": "",
+      "expected": 0
+    },
+    {
+      "text": "a",
+      "expected": 1
+    },
+    {
+      "text": "Hello world test",
+      "expected": 3
+    },
+    {
+      "text": "한글",
+      "expected": 3
+    },
+    {
+      "text": "한글 테스트 입니다",
+      "expected": 12
+    },
+    {
+      "text": "abc한글def",
+      "expected": 5
+    },
+    {
+      "text": "SQL Injection, XSS, 하드코딩된 Secret 점검",
+      "expected": 16
+    },
+    {
+      "text": "[사내 보안 지침]\n1. 금융거래정보를 유출하지 마십시오.",
+      "expected": 37
+    },
+    {
+      "text": "PEP8 and lint rules",
+      "expected": 5
+    },
+    {
+      "text": "오늘 날짜는 {{date}}이며 라우트는 {{route_name}}입니다.",
+      "expected": 25
+    },
+    {
+      "text": "   ",
+      "expected": 1
+    },
+    {
+      "text": "日本語とテスト and English mixed 한글",
+      "expected": 17
+    }
+  ]
+}

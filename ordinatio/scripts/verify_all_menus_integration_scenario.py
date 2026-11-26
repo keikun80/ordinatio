@@ -233,6 +233,7 @@ def run_scenario(cfg: Dict[str, Any], config_file_path: Optional[str] = None) ->
     raw_virtual_key = None
     created_key_id = None
     created_prompt_db_id = None
+    created_vkey_prompt_db_id = None
 
     # Teardown any leftover test data first to guarantee idempotency
     def safe_pre_cleanup():
@@ -444,24 +445,56 @@ def run_scenario(cfg: Dict[str, Any], config_file_path: Optional[str] = None) ->
         created_prompt_db_id = data["prompt_id"]
         log_pass(f"테넌트 바인딩 시스템 프롬프트 등록 성공 (ID: {created_prompt_db_id}, Target: TENANT/{tenant_id})")
 
-        # Test resolution simulator
+        # Test resolution simulator (스키마 필드명: key_id / input_messages)
+        user_question = "추천 포트폴리오를 안내해줘."
         sim_payload = {
             "tenant_id": tenant_id,
             "route_name": route_name,
-            "virtual_key_id": created_key_id,
-            "messages": [{"role": "user", "content": "추천 포트폴리오를 안내해줘."}]
+            "key_id": created_key_id,
+            "input_messages": [{"role": "user", "content": user_question}]
         }
         s_code, s_data, _ = api_request(f"{base_url}/api/v1/system-prompts/resolve", method="POST", data=sim_payload)
         if s_code == 200 and s_data.get("resolved_by") == "TENANT":
             final_msgs = s_data.get("final_messages", [])
-            if final_msgs and "프라이빗 뱅커(PB)" in final_msgs[0].get("content", ""):
+            sys_ok = bool(final_msgs) and "프라이빗 뱅커(PB)" in final_msgs[0].get("content", "")
+            # 클라이언트 원본 메시지가 실제로 서버에 전달되어 합성 결과에 보존되는지 검증
+            echo_ok = any(user_question in str(m.get("content", "")) for m in final_msgs)
+            if sys_ok and echo_ok:
                 log_pass(f"L7 시스템 프롬프트 시뮬레이션 합성 성공 (Resolved By: {s_data.get('resolved_by')}, Mode: PREPEND)")
                 passed_steps += 1
-            else:
+            elif not sys_ok:
                 log_fail(f"합성된 메시지에 시스템 프롬프트 지침이 누락됨: {final_msgs}")
+                return False
+            else:
+                log_fail(f"클라이언트 원본 사용자 메시지가 합성 결과에 보존되지 않음: {final_msgs}")
                 return False
         else:
             log_fail(f"시스템 프롬프트 우선순위 매칭 실패 (HTTP {s_code}): {s_data}")
+            return False
+
+        # 1순위(VIRTUAL_KEY) 우선순위 추월 검증: 동일 컨텍스트에서 가상키 바인딩이 테넌트를 이겨야 한다
+        vk_prompt_payload = {
+            "name": "가상키 최우선 바인딩 검증 프롬프트",
+            "target_type": "VIRTUAL_KEY",
+            "target_id": created_key_id,
+            "injection_mode": "OVERRIDE",
+            "content": "[가상키 1순위 전용 지침] 본 지침이 테넌트 지침을 대체합니다.",
+            "is_active": True
+        }
+        vk_code, vk_data, _ = api_request(f"{base_url}/api/v1/system-prompts", method="POST", data=vk_prompt_payload)
+        if vk_code == 201 and vk_data.get("prompt_id"):
+            created_vkey_prompt_db_id = vk_data["prompt_id"]
+            p_code, p_data, _ = api_request(f"{base_url}/api/v1/system-prompts/resolve", method="POST", data=sim_payload)
+            if p_code == 200 and p_data.get("resolved_by") == "VIRTUAL_KEY":
+                log_pass("4단계 우선순위 추월 검증 성공 (VIRTUAL_KEY > ROUTE > TENANT > GLOBAL)")
+            else:
+                log_fail(f"가상키 1순위 추월 실패 (HTTP {p_code}, resolved_by={p_data.get('resolved_by')})")
+                return False
+            # 후속 단계(10.3 가상키 파기)가 바인딩 가드에 걸리지 않도록 즉시 정리
+            api_request(f"{base_url}/api/v1/system-prompts/{created_vkey_prompt_db_id}", method="DELETE")
+            created_vkey_prompt_db_id = None
+        else:
+            log_fail(f"가상키 바인딩 프롬프트 등록 실패 (HTTP {vk_code}): {vk_data}")
             return False
     else:
         log_fail(f"시스템 프롬프트 등록 실패 (HTTP {code}): {data}")
@@ -710,9 +743,12 @@ def run_scenario(cfg: Dict[str, Any], config_file_path: Optional[str] = None) ->
         return False
 
     # 10.4 Clean up dynamic route, system prompt & tenant
-    api_request(f"{base_url}/api/v1/routing/routes/{route_name}", method="DELETE")
+    # 바인딩 삭제 가드가 있으므로 시스템 프롬프트를 먼저 정리한 뒤 라우트/테넌트를 삭제한다
     if created_prompt_db_id:
         api_request(f"{base_url}/api/v1/system-prompts/{created_prompt_db_id}", method="DELETE")
+    if created_vkey_prompt_db_id:
+        api_request(f"{base_url}/api/v1/system-prompts/{created_vkey_prompt_db_id}", method="DELETE")
+    api_request(f"{base_url}/api/v1/routing/routes/{route_name}", method="DELETE")
     api_request(f"{base_url}/api/v1/tenants/{tenant_id}", method="DELETE")
     log_pass(f"테스트용 라우트, 시스템 프롬프트, 테넌트 자원 안전 정리 완료")
     passed_steps += 1

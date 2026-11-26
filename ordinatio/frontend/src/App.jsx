@@ -168,7 +168,10 @@ function Dashboard() {
             )}
 
             {activeTab === 'system-prompts' && canAccessPrompts && (
-              <SystemPromptsTab onNotify={addToast} />
+              <SystemPromptsTab
+                onNotify={addToast}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+              />
             )}
 
             {activeTab === 'finops' && canAccessFinops && (

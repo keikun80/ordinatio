@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.patch_history import PatchHistory
 from app.models.agent_router_policy import AgentRouterPolicyModel
 from app.models.system_prompt import SystemPrompt
+from app.models.system_prompt_version import SystemPromptVersion
 from app.models.daily_token_ledger import DailyTokenLedger
 from app.models.user import User, UserSession
 from app.models.role import Role
@@ -43,6 +44,7 @@ def init_db():
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS description TEXT;"))
                 conn.execute(text("ALTER TABLE system_prompts ADD COLUMN IF NOT EXISTS version INT DEFAULT 1;"))
+                conn.execute(text("ALTER TABLE system_prompts ADD COLUMN IF NOT EXISTS category VARCHAR(32);"))
         except Exception as mig_err:
             logger.debug(f"Column migration check: {mig_err}")
 
@@ -478,7 +480,7 @@ def init_db():
                 target_id=None,
                 target_name="전사 공통 (Global)",
                 injection_mode="PREPEND",
-                estimated_tokens=75,
+                estimated_tokens=216,
                 is_active=True
             )
             sp2 = SystemPrompt(
@@ -490,7 +492,7 @@ def init_db():
                 target_id="dept-wm",
                 target_name="자산관리부 (WM-01)",
                 injection_mode="PREPEND",
-                estimated_tokens=70,
+                estimated_tokens=204,
                 is_active=True
             )
             sp3 = SystemPrompt(
@@ -502,7 +504,7 @@ def init_db():
                 target_id="code-copilot-v2",
                 target_name="code-copilot-v2 라우트",
                 injection_mode="PREPEND",
-                estimated_tokens=65,
+                estimated_tokens=192,
                 is_active=True
             )
             db.add_all([sp1, sp2, sp3])

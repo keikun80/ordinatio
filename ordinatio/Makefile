@@ -1,5 +1,5 @@
 .PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down release init-admin \
-	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
+	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-ui-taxonomy verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
 	mp-setup mp-standalone mp-test mp-verify-all mp-k8s mp-clean \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
@@ -35,6 +35,7 @@ help:
 	@echo "  make verify-phase4             - Run Phase 4 DoD verification (PII Masking & WORM Audit)"
 	@echo "  make verify-phase5             - Run Phase 5 DoD verification (Lifecycle & RSA-4096 Hotfix)"
 	@echo "  make verify-phase-system-prompt - Run System Prompt Governance & Inline Injection DoD"
+	@echo "  make verify-ui-taxonomy        - Audit PRE_23 UI spec vs data-testid implementation drift"
 	@echo "  make verify-all-menus          - Run All 8 Menus Integrated E2E Scenario & Monitoring DoD (optional: CONFIG=test_config.json)"
 	@echo "  make verify-standalone-install - Run Standalone Installer & Vagrant Deployment DoD"
 	@echo ""
@@ -142,6 +143,9 @@ verify-phase5:
 
 verify-phase-system-prompt:
 	@bash scripts/verify-phase-system-prompt.sh
+
+verify-ui-taxonomy:
+	@bash scripts/verify-ui-taxonomy.sh
 
 verify-all-menus:
 	@bash scripts/verify-all-menus.sh $(if $(CONFIG),--config $(CONFIG),)

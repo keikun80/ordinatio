@@ -12,6 +12,7 @@ class SystemPrompt(Base):
     target_id = Column(String(128), nullable=True, index=True)    # route_name, key_id, tenant_id (GLOBAL일 경우 NULL)
     target_name = Column(String(128), nullable=True)              # UI 렌더링용 캐시 명칭
     injection_mode = Column(String(32), nullable=False, default="PREPEND")  # 'PREPEND', 'OVERRIDE', 'FALLBACK_ONLY'
+    category = Column(String(32), nullable=True)                  # 'SECURITY', 'COMPLIANCE', 'PERSONA' (분류/필터링용)
     estimated_tokens = Column(Integer, default=0, nullable=False)
     version = Column(Integer, default=1, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)

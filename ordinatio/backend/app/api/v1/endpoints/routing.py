@@ -155,7 +155,11 @@ def update_route(route_name: str, request: RoutePolicyUpdate, db: Session = Depe
     return route
 
 @router.delete("/routes/{route_name}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("routing:write"))])
-def delete_route(route_name: str, db: Session = Depends(get_db)):
+def delete_route(
+    route_name: str,
+    force: bool = Query(False, description="바인딩된 시스템 프롬프트를 비활성화하고 강제 삭제"),
+    db: Session = Depends(get_db)
+):
     """Delete a route profile (at least one route must remain)"""
     total_routes = db.query(RoutingPolicy).count()
     if total_routes <= 1:
@@ -171,9 +175,17 @@ def delete_route(route_name: str, db: Session = Depends(get_db)):
             detail=f"Route '{route_name}' not found."
         )
 
+    # 시스템 프롬프트 바인딩 참조 정합성 가드
+    from app.core.prompt_bindings import guard_bound_prompts
+    orphaned = guard_bound_prompts(db, "ROUTE", route_name, force=force, requester_id="ROUTE_ADMIN")
+
     db.delete(route)
     db.commit()
-    return {"status": "success", "message": f"Route '{route_name}' deleted successfully."}
+    return {
+        "status": "success",
+        "message": f"Route '{route_name}' deleted successfully.",
+        "deactivated_prompts": orphaned
+    }
 
 @router.post("/dry-run", response_model=DryRunResponse, dependencies=[Depends(require_permission("routing:write"))])
 def dry_run_routing(request: DryRunRequest, db: Session = Depends(get_db)):

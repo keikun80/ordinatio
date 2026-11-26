@@ -4,7 +4,7 @@ import json
 import time
 from typing import List, Optional
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -300,12 +300,14 @@ def update_tenant(
 @router.delete("/{tenant_id}", dependencies=[Depends(require_permission("governance:write"))])
 def delete_tenant(
     tenant_id: str,
+    force: bool = Query(False, description="바인딩된 시스템 프롬프트를 비활성화하고 강제 삭제"),
     tenant_scope: Optional[str] = Depends(get_tenant_scope),
     db: Session = Depends(get_db)
 ):
     """
     테넌트(부서) 삭제
     - 활성 상태(ACTIVE)인 가상키가 남아 있는 경우 400 반환 (먼저 파기/삭제 필요)
+    - 바인딩된 시스템 프롬프트가 남아 있는 경우 400 반환 (force=True 시 비활성화 후 삭제)
     - 파기된 가상키는 자동 정리 후 테넌트 삭제 처리
     """
     _require_global_scope(tenant_scope)
@@ -323,11 +325,19 @@ def delete_tenant(
             detail=f"활성 상태인 가상키({active_keys}개)가 남아있어 부서를 삭제할 수 없습니다. 먼저 키를 파기/삭제하십시오."
         )
 
+    # 시스템 프롬프트 바인딩 참조 정합성 가드
+    from app.core.prompt_bindings import guard_bound_prompts
+    orphaned = guard_bound_prompts(db, "TENANT", tenant_id, force=force, requester_id="TENANT_ADMIN")
+
     # Inactive keys cleanup
     db.query(VirtualKey).filter(VirtualKey.tenant_id == tenant_id).delete(synchronize_session=False)
     db.delete(tenant)
     db.commit()
 
-    return {"tenant_id": tenant_id, "message": f"테넌트 [{tenant_id}]가 성공적으로 삭제되었습니다."}
+    return {
+        "tenant_id": tenant_id,
+        "message": f"테넌트 [{tenant_id}]가 성공적으로 삭제되었습니다.",
+        "deactivated_prompts": orphaned
+    }
 
 

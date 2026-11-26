@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ScrollText,
   Plus,
@@ -21,17 +21,21 @@ import {
 import { apiClient } from '../api/client';
 import { strings } from '../constants/strings';
 import { useAuth } from '../context/AuthContext';
+import { calculateEstimatedTokens } from '../utils/tokenEstimate';
 
-export default function SystemPromptsTab({ onNotify }) {
+export default function SystemPromptsTab({ onNotify, onNavigateTab }) {
   const { isSuperAdmin, hasPermission } = useAuth();
   const canWritePrompts = isSuperAdmin || hasPermission('prompts:write');
   const [prompts, setPrompts] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({ total: 0, active: 0, by_target_type: {} });
   const [routes, setRoutes] = useState([]);
   const [virtualKeys, setVirtualKeys] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
 
@@ -48,6 +52,8 @@ export default function SystemPromptsTab({ onNotify }) {
   const [formTargetType, setFormTargetType] = useState('ROUTE'); // ROUTE, VIRTUAL_KEY, TENANT, GLOBAL
   const [formTargetId, setFormTargetId] = useState('');
   const [formInjectionMode, setFormInjectionMode] = useState('PREPEND');
+  const [formCategory, setFormCategory] = useState('');
+  const [formPromptId, setFormPromptId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
 
   // Simulator States
@@ -59,6 +65,13 @@ export default function SystemPromptsTab({ onNotify }) {
   const [simResult, setSimResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [templates, setTemplates] = useState([]);
+  const [variables, setVariables] = useState([]);
+  const contentRef = useRef(null);
+
+  // Version History States
+  const [historyPrompt, setHistoryPrompt] = useState(null);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Default Quick Templates Fallback
   const DEFAULT_TEMPLATES = [
@@ -88,16 +101,15 @@ export default function SystemPromptsTab({ onNotify }) {
     }
   ];
 
-  // Load Data
-  const loadAllData = async () => {
-    setIsLoading(true);
+  // 참조 데이터(라우트/가상키/테넌트/템플릿/변수)는 최초 1회만 로드한다.
+  const loadReferenceData = async () => {
     try {
-      const [promptList, routeList, keyList, tenantList, publicSettings] = await Promise.all([
-        apiClient.getSystemPrompts(),
+      const [routeList, keyList, tenantList, publicSettings, variableList] = await Promise.all([
         apiClient.getRoutes(),
         apiClient.getVirtualKeys(),
         apiClient.getTenants(),
-        apiClient.getPublicSettings().catch(() => ({}))
+        apiClient.getPublicSettings().catch(() => ({})),
+        apiClient.getSystemPromptVariables()
       ]);
 
       if (publicSettings && Array.isArray(publicSettings.prompt_templates) && publicSettings.prompt_templates.length > 0) {
@@ -106,12 +118,37 @@ export default function SystemPromptsTab({ onNotify }) {
         setTemplates(DEFAULT_TEMPLATES);
       }
 
-      setPrompts(Array.isArray(promptList) ? promptList : []);
       setRoutes(Array.isArray(routeList) ? routeList : []);
       setVirtualKeys(Array.isArray(keyList) ? keyList : []);
       setTenants(Array.isArray(tenantList) ? tenantList : []);
+      setVariables(Array.isArray(variableList) ? variableList : []);
     } catch (e) {
-      console.error('Failed to load system prompts data:', e);
+      console.error('Failed to load system prompt reference data:', e);
+      onNotify('ERROR', strings.systemPrompts.alerts.loadFailed);
+    }
+  };
+
+  // 목록은 서버사이드 필터/검색/페이지네이션으로 조회한다.
+  // (클라이언트 필터링은 limit 범위 밖의 프롬프트를 조용히 누락시키므로 사용하지 않는다)
+  const loadPrompts = async () => {
+    setIsLoading(true);
+    try {
+      const [{ items, total }, statsData] = await Promise.all([
+        apiClient.getSystemPrompts({
+          target_type: selectedFilter === 'ALL' ? undefined : selectedFilter,
+          search: debouncedSearch.trim() || undefined,
+          offset: (currentPage - 1) * pageSize,
+          limit: pageSize
+        }),
+        apiClient.getSystemPromptStats().catch(() => null)
+      ]);
+      setPrompts(items);
+      setTotalCount(total);
+      if (statsData) setStats(statsData);
+    } catch (e) {
+      console.error('Failed to load system prompts:', e);
+      setPrompts([]);
+      setTotalCount(0);
       onNotify('ERROR', strings.systemPrompts.alerts.loadFailed);
     } finally {
       setIsLoading(false);
@@ -119,43 +156,91 @@ export default function SystemPromptsTab({ onNotify }) {
   };
 
   useEffect(() => {
-    loadAllData();
+    loadReferenceData();
   }, []);
 
-  // Filtered List
-  const filteredPrompts = prompts.filter((p) => {
-    const matchesFilter = selectedFilter === 'ALL' || p.target_type === selectedFilter;
-    const matchesSearch = !searchTerm.trim() ||
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.content && p.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.target_name && p.target_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.target_id && p.target_id.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesFilter && matchesSearch;
-  });
+  // 검색어 디바운스 (입력마다 서버를 때리지 않도록)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredPrompts.length / pageSize));
-  const paginatedPrompts = filteredPrompts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => {
+    loadPrompts();
+  }, [selectedFilter, debouncedSearch, currentPage]);
 
-  // Calculate estimated tokens with CJK/Latin weighted heuristics
-  const calculateEstimatedTokens = (text) => {
-    if (!text) return 0;
-    let cjkCount = 0;
-    let otherCount = 0;
-    for (let i = 0; i < text.length; i++) {
-      const code = text.charCodeAt(i);
-      if ((code >= 0xac00 && code <= 0xd7a3) || (code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3040 && code <= 0x30ff)) {
-        cjkCount++;
-      } else {
-        otherCount++;
-      }
-    }
-    const words = text.replace(/[\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff]/g, ' ').trim().split(/\s+/).filter(Boolean);
-    const otherTokens = Math.floor(words.length * 1.3) + Math.floor((otherCount - words.join('').length) / 4);
-    const cjkTokens = Math.floor(cjkCount * 1.5);
-    return Math.max(1, cjkTokens + otherTokens);
-  };
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const paginatedPrompts = prompts;
+
+  // 삭제 등으로 현재 페이지가 비면 이전 페이지로 보정
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
   const estimatedTokens = calculateEstimatedTokens(formContent);
+
+  // 본문에 쓰인 {{...}} 중 엔진이 지원하지 않는 변수를 찾아낸다.
+  // 지원 목록은 서버(/system-prompts/variables)가 제공하므로 프론트에 하드코딩하지 않는다.
+  const findUnknownVariables = (text) => {
+    if (!text || variables.length === 0) return [];
+    const supported = new Set(variables.map((v) => v.name));
+    const used = [...text.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].map((m) => m[1]);
+    return [...new Set(used.filter((name) => !supported.has(name)))];
+  };
+
+  // 커서 위치에 변수 플레이스홀더를 삽입
+  const handleInsertVariable = (placeholder) => {
+    const el = contentRef.current;
+    if (!el) {
+      setFormContent((prev) => prev + placeholder);
+      return;
+    }
+    const start = el.selectionStart ?? formContent.length;
+    const end = el.selectionEnd ?? formContent.length;
+    const next = formContent.slice(0, start) + placeholder + formContent.slice(end);
+    setFormContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = start + placeholder.length;
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
+  // 버전 이력 조회
+  const handleOpenHistory = async (p) => {
+    setHistoryPrompt(p);
+    setHistoryRows([]);
+    setIsHistoryLoading(true);
+    try {
+      const rows = await apiClient.getSystemPromptVersions(p.prompt_id);
+      setHistoryRows(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      onNotify('ERROR', strings.systemPrompts.alerts.historyLoadFailed);
+      setHistoryPrompt(null);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  // 특정 이력 스냅샷으로 복원 (비파괴 — 새 버전이 생성된다)
+  const handleRestoreVersion = async (row) => {
+    if (!historyPrompt) return;
+    if (!window.confirm(strings.systemPrompts.historyModal.restoreConfirm(row.version))) return;
+    setIsHistoryLoading(true);
+    try {
+      const restored = await apiClient.restoreSystemPromptVersion(historyPrompt.prompt_id, row.id);
+      onNotify('SUCCESS', strings.systemPrompts.alerts.restoreSuccess(row.version, restored.version));
+      setHistoryPrompt(null);
+      await loadPrompts();
+    } catch (err) {
+      onNotify('ERROR', strings.systemPrompts.alerts.restoreFailed(err.message));
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -166,6 +251,8 @@ export default function SystemPromptsTab({ onNotify }) {
     setFormTargetType('ROUTE');
     setFormTargetId(routes.length > 0 ? routes[0].route_name : '');
     setFormInjectionMode('PREPEND');
+    setFormCategory('');
+    setFormPromptId('');
     setFormIsActive(true);
     setShowEditModal(true);
   };
@@ -185,6 +272,8 @@ export default function SystemPromptsTab({ onNotify }) {
     }
     setFormTargetId(targetId);
     setFormInjectionMode(p.injection_mode || 'PREPEND');
+    setFormCategory(p.category || '');
+    setFormPromptId(p.prompt_id);
     setFormIsActive(p.is_active);
     setShowEditModal(true);
   };
@@ -198,6 +287,7 @@ export default function SystemPromptsTab({ onNotify }) {
     if (tpl.injectionMode || tpl.injection_mode) {
       setFormInjectionMode(tpl.injectionMode || tpl.injection_mode);
     }
+    if (tpl.category) setFormCategory(tpl.category);
     if (tpl.targetType === 'ROUTE' && routes.length > 0) setFormTargetId(routes[0].route_name);
     else if (tpl.targetType === 'VIRTUAL_KEY' && virtualKeys.length > 0) setFormTargetId(virtualKeys[0].key_id || virtualKeys[0].keyId);
     else if (tpl.targetType === 'TENANT' && tenants.length > 0) setFormTargetId(tenants[0].tenant_id || tenants[0].id);
@@ -217,6 +307,12 @@ export default function SystemPromptsTab({ onNotify }) {
       return;
     }
 
+    // 지원되지 않는 템플릿 변수는 치환되지 않고 그대로 LLM에 전달되므로 저장 전에 경고한다 (차단은 하지 않음)
+    const unknownVars = findUnknownVariables(formContent);
+    if (unknownVars.length > 0) {
+      onNotify('WARNING', strings.systemPrompts.alerts.unknownVariableWarning(unknownVars.join(', ')));
+    }
+
     const payload = {
       name: formName.trim(),
       description: formDesc.trim() || null,
@@ -224,8 +320,12 @@ export default function SystemPromptsTab({ onNotify }) {
       target_type: formTargetType,
       target_id: formTargetType === 'GLOBAL' ? null : formTargetId,
       injection_mode: formInjectionMode,
+      category: formCategory || null,
       is_active: formIsActive
     };
+    if (!editingPrompt && formPromptId.trim()) {
+      payload.prompt_id = formPromptId.trim();
+    }
 
     setIsLoading(true);
     try {
@@ -237,7 +337,7 @@ export default function SystemPromptsTab({ onNotify }) {
         onNotify('SUCCESS', strings.systemPrompts.alerts.promptCreated(payload.name));
       }
       setShowEditModal(false);
-      await loadAllData();
+      await loadPrompts();
     } catch (err) {
       console.error('Save prompt error:', err);
       onNotify('ERROR', strings.systemPrompts.alerts.saveFailed(err.message));
@@ -251,12 +351,9 @@ export default function SystemPromptsTab({ onNotify }) {
     try {
       const nextActive = !p.is_active;
       await apiClient.updateSystemPrompt(p.prompt_id, { is_active: nextActive });
-      setPrompts((prev) =>
-        prev.map((item) =>
-          item.prompt_id === p.prompt_id ? { ...item, is_active: nextActive } : item
-        )
-      );
       onNotify('SUCCESS', strings.systemPrompts.alerts.statusChanged(p.name, nextActive));
+      // 서버가 version/이력/감사 상태를 갱신하므로 로컬 state 패치가 아닌 재조회로 동기화한다
+      await loadPrompts();
     } catch (err) {
       const errorMsg = err?.message || err?.detail || strings.systemPrompts.alerts.statusFailed;
       onNotify('ERROR', errorMsg);
@@ -271,7 +368,7 @@ export default function SystemPromptsTab({ onNotify }) {
       await apiClient.deleteSystemPrompt(promptToDelete.prompt_id);
       onNotify('SUCCESS', strings.systemPrompts.alerts.deletedSuccess(promptToDelete.name));
       setPromptToDelete(null);
-      await loadAllData();
+      await loadPrompts();
     } catch (err) {
       onNotify('ERROR', strings.systemPrompts.alerts.deleteFailed(err.message));
     } finally {
@@ -303,13 +400,15 @@ export default function SystemPromptsTab({ onNotify }) {
     }
   };
 
-  // Stats calculation
-  const totalCount = prompts.length;
-  const activeCount = prompts.filter((p) => p.is_active).length;
-  const routeBindingCount = prompts.filter((p) => p.target_type === 'ROUTE').length;
-  const vkeyBindingCount = prompts.filter((p) => p.target_type === 'VIRTUAL_KEY').length;
-  const tenantBindingCount = prompts.filter((p) => p.target_type === 'TENANT').length;
-  const globalBindingCount = prompts.filter((p) => p.target_type === 'GLOBAL').length;
+  // KPI 집계는 서버의 /stats 를 사용한다.
+  // (현재 페이지 응답만으로 집계하면 페이지 이동 시 수치가 요동치고 전사 현황을 왜곡한다)
+  const byType = stats.by_target_type || {};
+  const registeredCount = stats.total || 0;
+  const activeCount = stats.active || 0;
+  const routeBindingCount = byType.ROUTE || 0;
+  const vkeyBindingCount = byType.VIRTUAL_KEY || 0;
+  const tenantBindingCount = byType.TENANT || 0;
+  const globalBindingCount = byType.GLOBAL || 0;
 
   return (
     <div className="tab-pane" data-testid="sp-page-container" data-screen-id="SCR-SP-01" style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
@@ -365,7 +464,7 @@ export default function SystemPromptsTab({ onNotify }) {
         <div className="card" data-testid="sp-card-total" style={{ padding: '16px', borderLeft: '4px solid #38bdf8' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{strings.systemPrompts.kpi.totalRegistered}</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-            {totalCount} <span style={{ fontSize: '0.88rem', fontWeight: 400, color: '#10b981' }}>{strings.systemPrompts.kpi.activeCountSuffix(activeCount)}</span>
+            {registeredCount} <span style={{ fontSize: '0.88rem', fontWeight: 400, color: '#10b981' }}>{strings.systemPrompts.kpi.activeCountSuffix(activeCount)}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
             {strings.systemPrompts.kpi.totalDesc}
@@ -485,9 +584,24 @@ export default function SystemPromptsTab({ onNotify }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.98rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }} data-testid={`sp-text-name-${p.prompt_id}`}>
                       <span>{p.name}</span>
-                      <span style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', background: 'rgba(255,255,255,0.08)', color: '#94a3b8', padding: '1px 6px', borderRadius: '4px' }}>
+                      <button
+                        type="button"
+                        data-testid={`sp-btn-history-${p.prompt_id}`}
+                        data-function-id="FNC-SP-HISTORY"
+                        onClick={() => handleOpenHistory(p)}
+                        title={strings.systemPrompts.historyModal.title}
+                        style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', background: 'rgba(255,255,255,0.08)', color: '#94a3b8', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}
+                      >
                         v{p.version || 1}
-                      </span>
+                      </button>
+                      {p.category && (
+                        <span
+                          data-testid={`sp-badge-category-${p.prompt_id}`}
+                          style={{ fontSize: '0.66rem', fontFamily: 'var(--font-mono)', background: 'rgba(148, 163, 184, 0.12)', color: '#cbd5e1', padding: '1px 6px', borderRadius: '4px' }}
+                        >
+                          {p.category}
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span
@@ -615,10 +729,10 @@ export default function SystemPromptsTab({ onNotify }) {
       </div>
 
       {/* Pagination Bar */}
-      {filteredPrompts.length > 0 && (
+      {totalCount > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', marginTop: '16px', background: 'var(--bg-panel)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-          <div>
-            총 <strong style={{ color: '#ffffff' }}>{filteredPrompts.length}</strong>개 항목 (페이지 {currentPage} / {totalPages})
+          <div data-testid="sp-pagination-summary">
+            {strings.systemPrompts.paginationSummary(totalCount, currentPage, totalPages)}
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
@@ -629,7 +743,7 @@ export default function SystemPromptsTab({ onNotify }) {
               onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
               style={{ padding: '4px 10px' }}
             >
-              이전
+              {strings.common.prev}
             </button>
             <span style={{ fontFamily: 'var(--font-mono)' }}>{currentPage}</span>
             <button
@@ -640,7 +754,7 @@ export default function SystemPromptsTab({ onNotify }) {
               onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
               style={{ padding: '4px 10px' }}
             >
-              다음
+              {strings.common.next}
             </button>
           </div>
         </div>
@@ -703,10 +817,46 @@ export default function SystemPromptsTab({ onNotify }) {
                     type="text"
                     className="form-input"
                     data-testid="sp-input-desc"
-                    placeholder={strings.systemPrompts.editorModal.namePlaceholder}
+                    placeholder={strings.systemPrompts.editorModal.descPlaceholder}
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                   />
+                </div>
+
+                {/* 고유 식별 코드 (등록 시에만 지정 가능) & 분류 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                  <div>
+                    <label className="form-label">{strings.systemPrompts.editorModal.promptIdLabel}</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      data-testid="sp-input-code"
+                      placeholder={strings.systemPrompts.editorModal.promptIdPlaceholder}
+                      value={formPromptId}
+                      onChange={(e) => setFormPromptId(e.target.value)}
+                      disabled={!!editingPrompt}
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', opacity: editingPrompt ? 0.6 : 1 }}
+                    />
+                    {editingPrompt && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {strings.systemPrompts.editorModal.promptIdHint}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="form-label">{strings.systemPrompts.editorModal.categoryLabel}</label>
+                    <select
+                      className="form-select"
+                      data-testid="sp-select-category"
+                      value={formCategory}
+                      onChange={(e) => setFormCategory(e.target.value)}
+                    >
+                      <option value="">{strings.systemPrompts.editorModal.categoryNone}</option>
+                      <option value="SECURITY">{strings.systemPrompts.editorModal.categorySecurity}</option>
+                      <option value="COMPLIANCE">{strings.systemPrompts.editorModal.categoryCompliance}</option>
+                      <option value="PERSONA">{strings.systemPrompts.editorModal.categoryPersona}</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* 1:1 Target Selection */}
@@ -865,9 +1015,38 @@ export default function SystemPromptsTab({ onNotify }) {
                       {strings.systemPrompts.editorModal.contentMeta(formContent.length, estimatedTokens)}
                     </span>
                   </div>
+                  {/* 동적 템플릿 변수 삽입 바 — 엔진이 지원하는 변수를 서버에서 받아 노출 */}
+                  {variables.length > 0 && (
+                    <div
+                      data-testid="sp-variables-bar"
+                      style={{ background: 'rgba(148, 163, 184, 0.08)', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '6px', padding: '8px 10px', marginBottom: '8px' }}
+                    >
+                      <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '6px' }}>
+                        {strings.systemPrompts.editorModal.variablesLabel}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {variables.map((v) => (
+                          <button
+                            key={v.name}
+                            type="button"
+                            data-testid={`sp-btn-variable-${v.name}`}
+                            onClick={() => handleInsertVariable(v.placeholder)}
+                            title={`${v.description}${v.example ? ` (예: ${v.example})` : ''}`}
+                            style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', background: 'rgba(56, 189, 248, 0.1)', color: '#7dd3fc', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.25)', cursor: 'pointer' }}
+                          >
+                            {v.placeholder}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        {strings.systemPrompts.editorModal.variablesHint}
+                      </div>
+                    </div>
+                  )}
                   <textarea
                     className="form-input"
                     data-testid="sp-textarea-content"
+                    ref={contentRef}
                     rows={7}
                     placeholder={strings.systemPrompts.editorModal.contentPlaceholder}
                     value={formContent}
@@ -875,6 +1054,15 @@ export default function SystemPromptsTab({ onNotify }) {
                     style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', lineHeight: 1.45 }}
                     required
                   />
+                  {findUnknownVariables(formContent).length > 0 && (
+                    <div
+                      data-testid="sp-warning-unknown-vars"
+                      style={{ fontSize: '0.74rem', color: '#fbbf24', marginTop: '6px', display: 'flex', alignItems: 'flex-start', gap: '5px' }}
+                    >
+                      <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>{strings.systemPrompts.alerts.unknownVariableWarning(findUnknownVariables(formContent).join(', '))}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1030,7 +1218,7 @@ export default function SystemPromptsTab({ onNotify }) {
                   {simResult.applied_variables && Object.keys(simResult.applied_variables).length > 0 && (
                     <div style={{ marginBottom: '10px', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '5px', fontWeight: 600 }}>
-                        동적 템플릿 변수 치환 ({Object.keys(simResult.applied_variables).length}개):
+                        {strings.systemPrompts.simModal.appliedVarsLabel(Object.keys(simResult.applied_variables).length)}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} data-testid="sp-sim-applied-vars">
                         {Object.entries(simResult.applied_variables).map(([k, v]) => (
@@ -1039,6 +1227,15 @@ export default function SystemPromptsTab({ onNotify }) {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {!simResult.matched && (
+                    <div
+                      data-testid="sp-sim-unmatched-reason"
+                      style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '6px', padding: '8px 10px', marginBottom: '10px', lineHeight: 1.5 }}
+                    >
+                      {strings.systemPrompts.simModal.resultUnmatchedReason}
                     </div>
                   )}
 
@@ -1081,7 +1278,124 @@ export default function SystemPromptsTab({ onNotify }) {
         </div>
       )}
 
-      {/* 6. Custom Delete Confirmation Modal */}
+      {/* 6. Version History Modal */}
+      {historyPrompt && (
+        <div className="modal-overlay" onClick={() => !isHistoryLoading && setHistoryPrompt(null)}>
+          <div className="modal-content" data-testid="sp-modal-history" data-screen-id="SCR-SP-M04" style={{ maxWidth: '860px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05rem', fontWeight: 700, color: '#ffffff' }}>
+                  <Layers size={19} color="#38bdf8" />
+                  <span>{strings.systemPrompts.historyModal.title}</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  {strings.systemPrompts.historyModal.subtitle(historyPrompt.name)}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '66vh', overflowY: 'auto' }}>
+              {isHistoryLoading ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.86rem' }}>
+                  {strings.systemPrompts.historyModal.loading}
+                </div>
+              ) : historyRows.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.86rem' }}>
+                  {strings.systemPrompts.historyModal.empty}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" data-testid="sp-table-history" style={{ width: '100%', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr>
+                        <th>{strings.systemPrompts.historyModal.colVersion}</th>
+                        <th>{strings.systemPrompts.historyModal.colChangeKind}</th>
+                        <th>{strings.systemPrompts.historyModal.colSummary}</th>
+                        <th>{strings.systemPrompts.historyModal.colChangedBy}</th>
+                        <th>{strings.systemPrompts.historyModal.colChangedAt}</th>
+                        <th style={{ textAlign: 'right' }}>{strings.systemPrompts.historyModal.colActions}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyRows.map((row) => (
+                        <tr key={row.id} data-testid={`sp-history-row-${row.id}`}>
+                          <td style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                            v{row.version}
+                            {row.is_current && (
+                              <span className="badge active" style={{ fontSize: '0.64rem', marginLeft: '6px' }}>
+                                {strings.systemPrompts.historyModal.currentBadge}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            {strings.systemPrompts.historyModal.changeKind[row.change_kind] || row.change_kind}
+                          </td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{row.change_summary || '-'}</td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{row.changed_by}</td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                            {new Date(row.created_at).toLocaleString('ko-KR')}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              data-testid={`sp-btn-restore-${row.id}`}
+                              data-function-id="FNC-SP-RESTORE"
+                              disabled={!canWritePrompts || isHistoryLoading || row.is_current}
+                              onClick={() => handleRestoreVersion(row)}
+                              style={{ fontSize: '0.74rem', whiteSpace: 'nowrap', opacity: (!canWritePrompts || row.is_current) ? 0.45 : 1 }}
+                            >
+                              {isHistoryLoading ? strings.systemPrompts.historyModal.btnRestoring : strings.systemPrompts.historyModal.btnRestore}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* WORM 감사로그 교차 추적 링크 (기존 onNavigateTab 패턴 사용) */}
+              {onNavigateTab && (
+                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '6px', fontFamily: 'var(--font-mono)' }}>
+                    {strings.systemPrompts.historyModal.auditLinkHint(historyPrompt.prompt_id)}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    data-testid="sp-btn-history-audit-link"
+                    onClick={() => {
+                      setHistoryPrompt(null);
+                      onNavigateTab('compliance');
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
+                  >
+                    <ShieldCheck size={13} />
+                    <span>{strings.systemPrompts.historyModal.auditLinkLabel}</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                data-testid="sp-modal-history-btn-close"
+                onClick={() => setHistoryPrompt(null)}
+                disabled={isHistoryLoading}
+                style={{ width: '100%' }}
+              >
+                {strings.systemPrompts.historyModal.btnClose}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Custom Delete Confirmation Modal */}
       {promptToDelete && (
         <div className="modal-overlay" onClick={() => !isLoading && setPromptToDelete(null)}>
           <div className="modal-content" data-testid="sp-modal-delete" data-screen-id="SCR-SP-M03" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>

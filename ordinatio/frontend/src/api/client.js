@@ -814,21 +814,73 @@ export const apiClient = {
   },
 
   // --- System Prompt Governance (Phase 1~4) ---
+  // 서버사이드 페이지네이션/필터/검색을 사용한다.
+  // 반환: { items, total } — total 은 X-Total-Count 헤더(필터 적용 후 전체 건수)
+  // 주의: 로딩 실패를 [] 로 삼키면 장애가 "등록된 프롬프트 없음"으로 보이므로 호출처에 전파한다.
   async getSystemPrompts(params = {}) {
+    const url = buildUrl('/system-prompts');
+    if (params.target_type) url.searchParams.append('target_type', params.target_type);
+    if (params.is_active !== undefined) url.searchParams.append('is_active', params.is_active);
+    if (params.search) url.searchParams.append('search', params.search);
+    if (params.offset !== undefined) url.searchParams.append('offset', params.offset);
+    if (params.limit !== undefined) url.searchParams.append('limit', params.limit);
+
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const items = await res.json();
+    const totalHeader = res.headers.get('X-Total-Count');
+    const total = totalHeader !== null ? parseInt(totalHeader, 10) : (Array.isArray(items) ? items.length : 0);
+    return { items: Array.isArray(items) ? items : [], total: Number.isNaN(total) ? 0 : total };
+  },
+
+  async getSystemPromptStats() {
+    const res = await fetch(`${API_BASE_URL}/system-prompts/stats`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  },
+
+  async getSystemPromptVariables() {
     try {
-      const url = buildUrl('/system-prompts');
-      if (params.target_type) url.searchParams.append('target_type', params.target_type);
-      if (params.is_active !== undefined) url.searchParams.append('is_active', params.is_active);
-      if (params.search) url.searchParams.append('search', params.search);
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE_URL}/system-prompts/variables`, {
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('API getSystemPrompts offline:', err);
+      // 변수 안내는 보조 기능이므로 실패 시 조용히 비워둔다 (본문 작성은 계속 가능)
+      console.warn('API getSystemPromptVariables unavailable:', err);
       return [];
     }
+  },
+
+  async getSystemPromptVersions(promptId, includeContent = false) {
+    const url = buildUrl(`/system-prompts/${promptId}/versions`);
+    if (includeContent) url.searchParams.append('include_content', 'true');
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '버전 이력 조회 실패' }));
+      throw new Error(err.detail || '버전 이력 조회 실패');
+    }
+    return await res.json();
+  },
+
+  // snapshotId 는 이력 행의 id (version 번호가 아님 — 활성 토글은 version 을 증가시키지 않아
+  // 동일 version 스냅샷이 여러 개 존재할 수 있으므로 복원 대상은 행 id 로 지정한다)
+  async restoreSystemPromptVersion(promptId, snapshotId) {
+    const res = await fetch(`${API_BASE_URL}/system-prompts/${promptId}/versions/${snapshotId}/restore`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '버전 복원 실패' }));
+      throw new Error(err.detail || '버전 복원 실패');
+    }
+    return await res.json();
   },
 
   async createSystemPrompt(data) {

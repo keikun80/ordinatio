@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.db.session import get_db
 from app.models.tenant import Tenant
@@ -91,8 +91,9 @@ def authenticate_client_key(
     # 3. 부서 Hard Cap 100% 예산 소진 검증
     tenant = matched_key.tenant
     if tenant and tenant.is_hard_cap_enabled:
+        from app.core.metering import tenant_effective_spend
         monthly_budget = float(tenant.monthly_budget_krw)
-        spent_budget = float(tenant.spent_budget_krw)
+        spent_budget = float(tenant_effective_spend(tenant))
         if monthly_budget > 0 and spent_budget >= monthly_budget:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -186,31 +187,38 @@ def report_gateway_usage(
             detail="사용량을 기록할 가상 API Key를 찾을 수 없습니다."
         )
 
-    # Calculate token cost (₩0.80 per 1k prompt, ₩2.40 per 1k completion)
-    cost = Decimal(str(round((payload.prompt_tokens * 0.0008) + (payload.completion_tokens * 0.0024), 4)))
-    total_new_tokens = payload.prompt_tokens + payload.completion_tokens
+    # 계량은 단일 경로(app/core/metering.record_usage)에 위임한다.
+    # 이전에는 본 엔드포인트가 단가를 하드코딩(0.0008/0.0024)하고 DailyTokenLedger 를
+    # 전혀 갱신하지 않아, 이 경로로 들어온 사용량이 일/월 집계에서 영구 누락되었다.
+    from app.core.metering import record_usage
 
-    # Increment key stats
-    key.spent_krw = (key.spent_krw or Decimal("0.00")) + cost
-    key.total_tokens = (key.total_tokens or 0) + total_new_tokens
+    model_entry = None
+    if getattr(payload, "model_id", None):
+        model_entry = db.query(ModelCatalog).filter(
+            or_(ModelCatalog.model_id == payload.model_id, ModelCatalog.alias == payload.model_id)
+        ).first()
 
-    # Increment tenant stats
     tenant = key.tenant
+    usage = record_usage(
+        db=db,
+        key=key,
+        tenant=tenant,
+        model_entry=model_entry,
+        model_id=getattr(payload, "model_id", None),
+        prompt_tokens=payload.prompt_tokens,
+        completion_tokens=payload.completion_tokens,
+    )
+    cost = Decimal(str(usage.cost_krw))
+    total_new_tokens = usage.total_tokens
+
     tenant_total = Decimal("0.00")
     tenant_budget = Decimal("10000000.00")
     is_hard_cap_reached = False
-
     if tenant:
-        tenant.spent_budget_krw = (tenant.spent_budget_krw or Decimal("0.00")) + cost
-        tenant_total = tenant.spent_budget_krw
+        tenant_total = tenant.spent_budget_krw or Decimal("0.00")
         tenant_budget = tenant.monthly_budget_krw
         if tenant.is_hard_cap_enabled and tenant_total >= tenant_budget:
             is_hard_cap_reached = True
-
-    db.commit()
-    db.refresh(key)
-    if tenant:
-        db.refresh(tenant)
 
     usage_percent = float(min(Decimal("100.0"), (tenant_total / tenant_budget) * Decimal("100.0"))) if tenant_budget > 0 else 0.0
 

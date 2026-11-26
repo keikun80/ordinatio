@@ -16,17 +16,22 @@ export default function FinOpsTab({ onNotify }) {
 
   const pricing = finOpsData?.pricing_matrix;
   const modelPricings = pricing?.models || [];
-  const stdInputPrice = modelPricings.length > 0
-    ? Number(modelPricings[0].input_price_per_1k)
-    : Number(pricing?.standard_input_per_1k ?? 0.80);
-  const stdOutputPrice = modelPricings.length > 0
-    ? Number(modelPricings[0].output_price_per_1k)
-    : Number(pricing?.standard_output_per_1k ?? 2.40);
-  const stdDiscountRatio = modelPricings.length > 0
-    ? Number(modelPricings[0].cache_discount_ratio)
-    : Number(pricing?.standard_cache_discount ?? 0.25);
+  // 표준 단가는 서버의 system_settings SSOT 값만 사용한다.
+  // 이전에는 modelPricings[0](모델 목록 '첫 행')을 표준 단가로 표시해,
+  // 모델 등록 순서가 바뀌면 화면의 표준 단가가 함께 바뀌었다.
+  const stdInputPrice = Number(pricing?.standard_input_per_1k ?? 0);
+  const stdOutputPrice = Number(pricing?.standard_output_per_1k ?? 0);
+  const stdDiscountRatio = Number(pricing?.standard_cache_discount ?? 0);
   const stdCachePrice = Number((stdInputPrice * stdDiscountRatio).toFixed(2));
   const savingsPct = Math.round((1 - stdDiscountRatio) * 100);
+
+  const softCapThreshold = Number(finOpsData?.soft_cap_threshold_pct ?? 80);
+  const cacheDriftKrw = Number(finOpsData?.cache_drift_krw ?? 0);
+  const semanticSavedKrw = Number(finOpsData?.semantic_cache_saved_krw ?? 0);
+  const billingMonth = finOpsData?.billing_month || '';
+  const billingMonthLabel = billingMonth
+    ? strings.finops.tenants.billingMonth(billingMonth.slice(0, 4), Number(billingMonth.slice(5, 7)))
+    : '';
 
   const fetchOverview = async () => {
     setLoading(true);
@@ -46,7 +51,9 @@ export default function FinOpsTab({ onNotify }) {
           hardCap: t.is_hard_cap_enabled,
           isBlocked: t.is_blocked,
           burnRate: t.burn_rate_pct,
-          totalTokens: t.total_tokens
+          totalTokens: t.total_tokens,
+          isSoftCapReached: t.is_soft_cap_reached,
+          driftKrw: t.drift_krw
         })));
       }
     } catch (err) {
@@ -82,7 +89,10 @@ export default function FinOpsTab({ onNotify }) {
       const increaseAmt = getEmergencyIncreaseAmt(tenant.budget);
       const newBudget = tenant.budget + increaseAmt;
       await apiClient.updateTenantBudget(tenant.id, { monthly_budget_krw: newBudget });
-      onNotify('SUCCESS', strings.finops.alertEmergencySuccessUnblockDynamic(tenant.name, increaseAmt));
+      // 차단 상태가 아니었다면 '차단 해제' 를 단정하지 않는다
+      onNotify('SUCCESS', tenant.isBlocked
+        ? strings.finops.alertEmergencySuccessUnblockDynamic(tenant.name, increaseAmt)
+        : strings.finops.alertEmergencySuccessDynamic(tenant.name, increaseAmt));
       await fetchOverview();
     } catch (err) {
       onNotify('ERROR', err.message || strings.finops.alertExportFailed);
@@ -99,6 +109,16 @@ export default function FinOpsTab({ onNotify }) {
             {finOpsData && (
               <span className="badge active" data-testid="fo-badge-db-connected" style={{ fontSize: '0.75rem' }}>
                 {strings.finops.dbConnected(finOpsData.active_tenants_count)}
+              </span>
+            )}
+            {cacheDriftKrw > 0 && (
+              <span
+                className="badge warning"
+                data-testid="fo-badge-cache-drift"
+                title={strings.finops.driftBadgeTooltip}
+                style={{ fontSize: '0.75rem' }}
+              >
+                {strings.finops.driftBadge(cacheDriftKrw)}
               </span>
             )}
           </div>
@@ -187,7 +207,9 @@ export default function FinOpsTab({ onNotify }) {
               <span>{strings.finops.kpi.semanticCache}</span>
               <TrendingUp size={18} color="#5EF527" />
             </div>
-            <div className="kpi-value">₩ {Math.round(semanticCacheStats?.saved_cost_krw || 0).toLocaleString()}</div>
+            {/* 절감액은 PostgreSQL 원장 집계값을 쓴다. semanticCacheStats 는 프로세스 메모리라
+                재시작 시 0 이 되고 백엔드 복제본마다 달라 회계 지표로 부적합하다. */}
+            <div className="kpi-value" data-testid="fo-kpi-semantic-saved">₩ {Math.round(semanticSavedKrw).toLocaleString()}</div>
             <div className="kpi-footer">
               <span className="kpi-badge-neutral">{strings.finops.kpi.semanticCacheDetail(semanticCacheStats?.hit_rate_pct || 0, semanticCacheStats?.saved_tokens || 0)}</span>
             </div>
@@ -251,7 +273,7 @@ export default function FinOpsTab({ onNotify }) {
             <span>{strings.finops.tenants.title}</span>
           </div>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            {strings.finops.tenants.billingMonth(new Date().getFullYear(), new Date().getMonth() + 1)}
+            {billingMonthLabel}
           </span>
         </div>
 
@@ -269,7 +291,8 @@ export default function FinOpsTab({ onNotify }) {
             tenants.map((t) => {
             const percent = t.budget > 0 ? Math.min(100, Math.round((t.spent / t.budget) * 100)) : 0;
             const isBlocked = t.isBlocked || (percent >= 100 && t.hardCap);
-            const isWarning = percent >= 80 && percent < 100;
+            // 소프트캡 임계치는 서버 정책(system_settings.finops_budget_policy)을 따른다
+            const isWarning = !isBlocked && (t.isSoftCapReached ?? (percent >= softCapThreshold));
 
             return (
               <div 

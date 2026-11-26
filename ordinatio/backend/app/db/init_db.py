@@ -45,8 +45,36 @@ def init_db():
                 conn.execute(text("ALTER TABLE routing_policies ADD COLUMN IF NOT EXISTS description TEXT;"))
                 conn.execute(text("ALTER TABLE system_prompts ADD COLUMN IF NOT EXISTS version INT DEFAULT 1;"))
                 conn.execute(text("ALTER TABLE system_prompts ADD COLUMN IF NOT EXISTS category VARCHAR(32);"))
+                # FinOps 기록 원장: 가상키 단위 집계 및 시맨틱 캐시 절감액 영속화
+                conn.execute(text("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS spent_period_month VARCHAR(7);"))
+                conn.execute(text("ALTER TABLE virtual_keys ADD COLUMN IF NOT EXISTS spent_period_month VARCHAR(7);"))
+                conn.execute(text("ALTER TABLE daily_token_ledger ADD COLUMN IF NOT EXISTS key_id VARCHAR(64) DEFAULT 'none';"))
+                conn.execute(text("UPDATE daily_token_ledger SET key_id = 'none' WHERE key_id IS NULL;"))
+                conn.execute(text("ALTER TABLE daily_token_ledger ALTER COLUMN key_id SET NOT NULL;"))
+                conn.execute(text("ALTER TABLE daily_token_ledger ADD COLUMN IF NOT EXISTS cache_hit_count INT DEFAULT 0 NOT NULL;"))
+                conn.execute(text("ALTER TABLE daily_token_ledger ADD COLUMN IF NOT EXISTS cache_saved_krw NUMERIC(12,2) DEFAULT 0.00 NOT NULL;"))
         except Exception as mig_err:
             logger.debug(f"Column migration check: {mig_err}")
+
+        # 0-1. FinOps 원장 복합 PK 확장 (date, tenant_id, model_id) -> (+ key_id)
+        # key_id 가 PK 에 없으면 한 테넌트의 여러 키가 한 행으로 합쳐져 키 단위 복구가 불가능하다.
+        # 컬럼 추가와 달리 PK 교체는 IF NOT EXISTS 가 없어 현재 구성을 조회해 1회만 수행한다.
+        try:
+            with engine.begin() as conn:
+                current_pk = conn.execute(text("""
+                    SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                    WHERE i.indrelid = 'daily_token_ledger'::regclass AND i.indisprimary
+                """)).fetchall()
+                pk_cols = {r[0] for r in current_pk}
+                if pk_cols and "key_id" not in pk_cols:
+                    logger.info("Migrating daily_token_ledger primary key to include key_id")
+                    conn.execute(text("ALTER TABLE daily_token_ledger DROP CONSTRAINT daily_token_ledger_pkey;"))
+                    conn.execute(text("ALTER TABLE daily_token_ledger ADD PRIMARY KEY (date, tenant_id, model_id, key_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_daily_ledger_tenant_date ON daily_token_ledger (tenant_id, date);"))
+        except Exception as pk_err:
+            logger.debug(f"daily_token_ledger PK migration check: {pk_err}")
 
         db = SessionLocal()
 

@@ -158,7 +158,28 @@ DEFAULT_SYSTEM_SETTINGS: List[Dict[str, Any]] = [
             "max_sparkline_points": 40,
             "stream_poll_interval_ms": 2000
         }
-    }
+    },
+    {
+        "key": "finops_pricing",
+        "category": "finops",
+        "description": "FinOps 표준 토큰 단가 (KRW / 1K tokens). 모델별 단가는 ModelCatalog 가 오버라이드",
+        "value": {
+            "currency": "KRW",
+            "input_per_1k": 0.80,
+            "output_per_1k": 2.40,
+            "cache_discount_ratio": 0.25,
+        },
+    },
+    {
+        "key": "finops_budget_policy",
+        "category": "finops",
+        "description": "예산 경보 임계치 및 소프트캡 알림 채널 (webhook 미설정 시 알림 비활성)",
+        "value": {
+            "soft_cap_threshold_pct": 80.0,
+            "alert_webhook_url": "",
+            "alert_enabled": False,
+        },
+    },
 ]
 
 def seed_system_settings(db: Session) -> None:

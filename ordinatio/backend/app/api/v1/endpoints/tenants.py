@@ -194,18 +194,27 @@ def reset_tenant_spent_budget(
     db: Session = Depends(get_db)
 ):
     """
-    테넌트(부서) 월간 누적 소진액(spent_budget_krw) 초기화 (0.00 KRW)
-    - 월간 정산 후 롤오버 또는 Hard Cap 해제 시 전사 관리자가 수행
-    - WORM 불변 감사 로그에 RESET_TENANT_SPENT_BUDGET 기록
+    테넌트(부서) 당월 소진액 초기화 (Hard Cap 긴급 해제 / 월간 정산 롤오버)
+
+    기록 원장(DailyTokenLedger)은 지우지 않고 **조정분개(음수 비용 행)** 를 기록한다.
+    캐시 컬럼만 0 으로 만들면 원장 기준 화면(FinOps overview)은 차단으로 보이는데
+    캐시 기준 집행(Hard Cap)은 통과해 'UI 는 차단, 트래픽은 허용' 불일치가 생긴다.
+    조정분개 방식은 원 과금 내역과 조정 내역을 모두 남겨 감사 추적을 유지한다.
     """
+    from app.core.finops_reconcile import post_budget_adjustment, tenant_period_spend
+
     _require_global_scope(tenant_scope)
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="테넌트를 찾을 수 없습니다.")
 
-    previous_spent = float(tenant.spent_budget_krw or 0.0)
-    tenant.spent_budget_krw = Decimal("0.00")
-    db.commit()
+    previous_spent = float(tenant_period_spend(db, tenant_id))
+    adjustment = post_budget_adjustment(
+        db=db,
+        tenant_id=tenant_id,
+        amount_krw=Decimal(str(-previous_spent)),
+        reason="RESET_TENANT_SPENT_BUDGET",
+    )
     db.refresh(tenant)
 
     _record_tenant_audit(
@@ -217,6 +226,7 @@ def reset_tenant_spent_budget(
             "previous_spent_krw": previous_spent,
             "reset_spent_krw": 0.0,
             "monthly_budget_krw": float(tenant.monthly_budget_krw),
+            "ledger_adjustment": adjustment,
         }
     )
 

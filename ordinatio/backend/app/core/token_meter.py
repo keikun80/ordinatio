@@ -1,7 +1,12 @@
-"""Token Metering & Daily Accumulation Engine.
+"""Token Rate Limiting & Daily Aggregation Read Helpers.
 
-Provides dual-layer (Redis In-Memory + PostgreSQL DailyTokenLedger) tracking
-of actual prompt, completion, and total tokens consumed per day.
+과금 기록은 본 모듈이 아니라 app/core/metering.record_usage 단일 경로가 담당한다.
+본 모듈은 (1) 레이트리밋용 Redis 클라이언트 제공, (2) 일일 집계 조회만 담당한다.
+
+Redis 는 과금 경로에서 제거되었다. 이전에는 get_today_total_tokens 가 Redis 를
+1순위로 읽어 PostgreSQL 을 아예 조회하지 않았고, record_daily_tokens 가 Redis incr
+성공 후 DB 커밋 실패 시 rollback 하여 Redis 만 증가한 영구 불일치가 발생했다.
+일일 집계의 SSOT 는 PostgreSQL 의 DailyTokenLedger 이다.
 """
 from __future__ import annotations
 
@@ -51,121 +56,58 @@ def record_daily_tokens(
     completion_tokens: int,
     cost_krw: float = 0.0,
 ) -> int:
-    """Record token consumption in Redis fast counter and persistent DailyTokenLedger.
-
-    Returns the updated global token count for today.
     """
-    total_tokens = max(0, prompt_tokens + completion_tokens)
-    t_id = str(tenant_id or "global").strip() or "global"
-    m_id = str(model_id or "default").strip() or "default"
-    now_utc = datetime.now(timezone.utc)
-    today = now_utc.date()
-    today_str = today.strftime("%Y-%m-%d")
+    [하위호환 shim] 기존 호출부를 위해 유지한다. 실제 기록은 metering.record_usage 가 수행한다.
 
-    # 1. Fast In-Memory Redis counter (< 0.2ms)
-    redis_daily_total: Optional[int] = None
-    client = get_redis_client()
-    if client:
-        try:
-            global_key = f"ordinatio:tokens:daily:{today_str}"
-            redis_daily_total = client.incrby(global_key, total_tokens)
-            client.expire(global_key, 86400 * 3)
+    주의: 본 shim 은 가상키를 특정할 수 없으므로 원장의 key_id 가 'none' 으로 기록되고
+    VirtualKey 캐시는 갱신되지 않는다. 신규 호출부는 metering.record_usage 를 직접 쓸 것.
+    cost_krw 인자는 더 이상 사용하지 않는다(단가는 metering 이 SSOT 에서 산출).
+    """
+    from app.core.metering import record_usage
+    from app.models.tenant import Tenant
 
-            tenant_key = f"ordinatio:tokens:daily:{today_str}:{t_id}"
-            client.incrby(tenant_key, total_tokens)
-            client.expire(tenant_key, 86400 * 3)
-        except Exception as e:
-            logger.debug(f"Redis daily token increment bypassed: {e}")
+    tenant = None
+    if tenant_id:
+        tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
 
-    # 2. Persistent DailyTokenLedger UPSERT in Database
-    try:
-        row = (
-            db.query(DailyTokenLedger)
-            .filter(
-                DailyTokenLedger.date == today,
-                DailyTokenLedger.tenant_id == t_id,
-                DailyTokenLedger.model_id == m_id,
-            )
-            .first()
-        )
-        if row:
-            row.prompt_tokens = (row.prompt_tokens or 0) + prompt_tokens
-            row.completion_tokens = (row.completion_tokens or 0) + completion_tokens
-            row.total_tokens = (row.total_tokens or 0) + total_tokens
-            row.cost_krw = (row.cost_krw or Decimal("0.00")) + Decimal(str(round(cost_krw, 2)))
-            row.request_count = (row.request_count or 0) + 1
-        else:
-            row = DailyTokenLedger(
-                date=today,
-                tenant_id=t_id,
-                model_id=m_id,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-                cost_krw=Decimal(str(round(cost_krw, 2))),
-                request_count=1,
-            )
-            db.add(row)
-        db.commit()
-    except Exception as e:
-        logger.warning(f"DailyTokenLedger persistence commit failed: {e}")
-        db.rollback()
-
-    if redis_daily_total is not None:
-        return redis_daily_total
-
+    record_usage(
+        db=db,
+        key=None,
+        tenant=tenant,
+        model_entry=None,
+        model_id=model_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
     return get_today_total_tokens(db)
 
 
 def get_today_total_tokens(db: Session) -> int:
-    """Retrieve actual cumulative tokens consumed today across all tenants and models."""
-    now_utc = datetime.now(timezone.utc)
-    today = now_utc.date()
-    today_str = today.strftime("%Y-%m-%d")
+    """당일 누적 토큰 조회. SSOT 는 PostgreSQL 의 DailyTokenLedger 이다.
 
-    # 1. Check Redis cache first (Fast Path)
-    client = get_redis_client()
-    if client:
-        try:
-            val = client.get(f"ordinatio:tokens:daily:{today_str}")
-            if val is not None:
-                return int(val)
-        except Exception:
-            pass
-
-    # 2. Fallback to SQL Database (Aggregate Path)
+    Redis 조회를 1순위로 두지 않는다. Redis 를 먼저 읽으면 TTL 만료/eviction/재시작 시
+    수치가 점프하고, DB 합계를 setex 로 덮어쓰면 다른 워커의 incrby 와 경쟁해
+    lost update 가 발생한다. 원장 PK 선두가 date 이므로 당일 범위 집계는 저렴하다.
+    """
+    today = datetime.now(timezone.utc).date()
     try:
         total = db.query(func.sum(DailyTokenLedger.total_tokens)).filter(DailyTokenLedger.date == today).scalar()
-        daily_total = int(total or 0)
-
-        # Repopulate Redis cache for subsequent fast lookups
-        if client:
-            try:
-                client.setex(f"ordinatio:tokens:daily:{today_str}", 86400 * 3, daily_total)
-            except Exception:
-                pass
-        return daily_total
+        return int(total or 0)
     except Exception as e:
         logger.warning(f"Failed to query daily token total from DB: {e}")
         return 0
 
 
 def get_today_total_cost(db: Session) -> float:
-    """Retrieve actual cumulative inference cost (KRW) incurred today from PostgreSQL DailyTokenLedger."""
-    now_utc = datetime.now(timezone.utc)
-    today = now_utc.date()
+    """당일 누적 추론 비용(KRW) 조회. SSOT 는 DailyTokenLedger 이다.
+
+    원장이 비어 있으면 0.0 이 정답이다. 이전 구현은 sum(Tenant.spent_budget_krw),
+    즉 '월 누적 전사 지출'을 '오늘 비용'으로 반환해 단위가 다른 값을 섞었다.
+    """
+    today = datetime.now(timezone.utc).date()
     try:
         total = db.query(func.sum(DailyTokenLedger.cost_krw)).filter(DailyTokenLedger.date == today).scalar()
-        if total is not None:
-            return float(total)
+        return float(total or 0.0)
     except Exception as e:
         logger.warning(f"Failed to query daily total cost from DailyTokenLedger: {e}")
-
-    # Fallback to sum of spent_budget_krw from Tenant table if daily ledger has no records yet
-    try:
-        from app.models.tenant import Tenant
-        tenant_total = db.query(func.sum(Tenant.spent_budget_krw)).scalar()
-        return float(tenant_total) if tenant_total is not None else 0.0
-    except Exception as e:
-        logger.warning(f"Fallback tenant cost query failed: {e}")
         return 0.0

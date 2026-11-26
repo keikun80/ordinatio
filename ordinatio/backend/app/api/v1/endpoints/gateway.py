@@ -188,12 +188,14 @@ def record_token_and_cost_metering(
     completion_tokens: int,
     target_tenant_hint: Optional[str] = None
 ) -> Dict[str, Any]:
-    """가상 API Key 및 부서(Tenant)에 실제 추론 토큰 소비량 및 비용(KRW)을 실시간으로 누적 반영"""
-    total_tokens = prompt_tokens + completion_tokens
-    input_price = float(model_entry.input_price_per_1k) if (model_entry and model_entry.input_price_per_1k) else 0.80
-    output_price = float(model_entry.output_price_per_1k) if (model_entry and model_entry.output_price_per_1k) else 2.40
-    cost_krw = round((prompt_tokens * input_price / 1000.0) + (completion_tokens * output_price / 1000.0), 2)
-    cost_decimal = Decimal(str(cost_krw))
+    """
+    가상 API Key 및 부서(Tenant)에 실제 추론 토큰 소비량 및 비용(KRW)을 누적 반영.
+
+    실제 기록은 app/core/metering.record_usage 단일 경로에 위임한다.
+    (이전에는 본 함수와 external.report_gateway_usage, token_meter.record_daily_tokens 가
+     각자 다른 카운터 부분집합을 2개 트랜잭션으로 갱신해 영구 불일치가 발생했다)
+    """
+    from app.core.metering import record_usage
 
     target_key = matched_key
     target_tenant = None
@@ -216,45 +218,15 @@ def record_token_and_cost_metering(
     if not target_tenant and target_key:
         target_tenant = db.query(Tenant).filter(Tenant.tenant_id == target_key.tenant_id).first()
 
-    if target_key:
-        target_key.total_tokens = (target_key.total_tokens or 0) + total_tokens
-        target_key.spent_krw = (target_key.spent_krw or Decimal("0.00")) + cost_decimal
-
-    if target_tenant:
-        target_tenant.spent_budget_krw = (target_tenant.spent_budget_krw or Decimal("0.00")) + cost_decimal
-
-    try:
-        db.commit()
-        if target_key:
-            db.refresh(target_key)
-        if target_tenant:
-            db.refresh(target_tenant)
-    except Exception as e:
-        logger.warning(f"FinOps metering commit failed: {e}")
-        db.rollback()
-
-    # Record daily cumulative tokens & persistent ledger
-    try:
-        from app.core.token_meter import record_daily_tokens
-        record_daily_tokens(
-            db=db,
-            tenant_id=target_tenant.tenant_id if target_tenant else (target_key.tenant_id if target_key else None),
-            model_id=model_entry.model_id if model_entry else None,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            cost_krw=cost_krw
-        )
-    except Exception as e:
-        logger.warning(f"Daily token recording failed: {e}")
-
-    return {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-        "cost_krw": cost_krw,
-        "tenant_id": target_tenant.tenant_id if target_tenant else None,
-        "tenant_name": target_tenant.name if target_tenant else None
-    }
+    record = record_usage(
+        db=db,
+        key=target_key,
+        tenant=target_tenant,
+        model_entry=model_entry,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    return record.as_dict()
 
 def _extract_client_ip(request: Optional[Request]) -> str:
     """
@@ -381,7 +353,10 @@ def authenticate_gateway_key(
 
             # Budget / Hard cap check
             tenant = db.query(Tenant).filter(Tenant.tenant_id == candidate.tenant_id).first()
-            if tenant and tenant.is_hard_cap_enabled and tenant.spent_budget_krw >= tenant.monthly_budget_krw:
+            from app.core.metering import tenant_effective_spend
+            if (tenant and tenant.is_hard_cap_enabled
+                    and tenant.monthly_budget_krw > 0
+                    and tenant_effective_spend(tenant) >= tenant.monthly_budget_krw):
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"소속 부서({tenant.name})의 월 예산(₩{tenant.monthly_budget_krw:,.0f})이 100% 소진되어 Hard Cap에 의해 차단되었습니다."
@@ -571,7 +546,8 @@ async def dispatch_chat_completion(
     if matched_key:
         tenant = db.query(Tenant).filter(Tenant.tenant_id == matched_key.tenant_id).first()
         if tenant and tenant.monthly_budget_krw > 0:
-            tenant_budget_ratio = float(tenant.spent_budget_krw / tenant.monthly_budget_krw)
+            from app.core.metering import tenant_effective_spend
+            tenant_budget_ratio = float(tenant_effective_spend(tenant) / tenant.monthly_budget_krw)
 
     # Route Policy from DB (if configured)
     db_policy = db.query(RoutingPolicy).filter(
@@ -782,10 +758,36 @@ async def dispatch_chat_completion(
         cached_usage = cached_response.get("usage", {}) if isinstance(cached_response, dict) else {}
         saved_prompt_tokens = int(cached_usage.get("prompt_tokens", prompt_toks))
         saved_completion_tokens = int(cached_usage.get("completion_tokens", compl_toks))
-        input_price = float(model_entry.input_price_per_1k) if model_entry else 0.80
-        output_price = float(model_entry.output_price_per_1k) if model_entry else 2.40
-        saved_cost = round((saved_prompt_tokens * input_price + saved_completion_tokens * output_price) / 1000.0, 2)
+        # 단가는 metering 의 SSOT 해석기를 사용한다 (하드코딩 0.80/2.40 제거)
+        from app.core.metering import compute_cost, record_usage, resolve_pricing
+
+        input_price, output_price, _disc = resolve_pricing(db, model_entry)
+        saved_cost = compute_cost(saved_prompt_tokens, saved_completion_tokens, input_price, output_price)
         semantic_cache.record_savings(saved_prompt_tokens + saved_completion_tokens, saved_cost)
+
+        # 절감액을 PostgreSQL 원장에 영속화한다.
+        # semantic_cache.stats() 는 프로세스 메모리라 재시작 시 0 이 되고 복제본마다 달라
+        # FinOps 의 "절감액" 회계 지표로 쓸 수 없다. 캐시 적중은 과금하지 않으므로
+        # 토큰/비용은 0 으로 기록하고 cache_* 컬럼만 누적한다.
+        try:
+            cache_tenant = None
+            if matched_key and matched_key.tenant_id:
+                cache_tenant = db.query(Tenant).filter(Tenant.tenant_id == matched_key.tenant_id).first()
+            record_usage(
+                db=db,
+                key=None,
+                tenant=cache_tenant,
+                model_entry=model_entry,
+                model_id=selected_model_id,
+                prompt_tokens=0,
+                completion_tokens=0,
+                request_count=1,
+                cache_hit=True,
+                cache_saved_krw=saved_cost,
+            )
+        except Exception as e:
+            logger.warning(f"semantic cache savings persistence failed: {e}")
+
         cached_response["orche_metadata"] = {
             **cached_response.get("orche_metadata", {}),
             "status": "SEMANTIC_CACHE_HIT",
@@ -1383,13 +1385,71 @@ async def gateway_chat_completions_ingress(
     )
 
 @router.post("/ext-proc/process", response_model=ExtProcResponse)
-def envoy_ext_proc_webhook_endpoint(req: ExtProcRequest):
-    """Envoy AI Gateway ext_proc Webhook 엔드포인트: POST /api/v1/ext-proc/process"""
+def envoy_ext_proc_webhook_endpoint(req: ExtProcRequest, db: Session = Depends(get_db)):
+    """
+    Envoy AI Gateway ext_proc Webhook 엔드포인트: POST /v1/ext-proc/process
+
+    이전에는 tpm_limit=200000 / budget_spent_ratio=0.0 을 하드코딩해 전달했다.
+    그 결과 (1) 가상키별 tpm_limit 이 무시되고, (2) Envoy L7 계층이 테넌트 예산을
+    구조적으로 알 수 없어 "Envoy 에서 즉시 429" 라는 Hard Cap 정책이 이 경로에서는
+    전혀 집행되지 않았다. 실제 키/테넌트를 해석해 전달한다.
+    """
+    from app.core.metering import tenant_effective_spend
+
+    headers = req.headers or {}
+    auth_header = headers.get("authorization", "") or ""
+    raw_key = auth_header.replace("Bearer ", "").strip() if "Bearer " in auth_header else (headers.get("x-virtual-key") or "")
+
+    tpm_limit = 200000
+    budget_ratio = 0.0
+    hard_cap_blocked = False
+    tenant_name = None
+
+    try:
+        matched = None
+        if raw_key:
+            if raw_key.startswith("vk-"):
+                matched = db.query(VirtualKey).filter(VirtualKey.key_id == raw_key).first()
+            else:
+                for cand in db.query(VirtualKey).filter(VirtualKey.key_prefix == raw_key[:16]).all():
+                    if verify_virtual_key(raw_key, cand.key_hash):
+                        matched = cand
+                        break
+
+        if matched:
+            if matched.tpm_limit:
+                tpm_limit = int(matched.tpm_limit)
+            tenant_id = headers.get("x-orche-tenant") or headers.get("x-tenant-id") or matched.tenant_id
+        else:
+            tenant_id = headers.get("x-orche-tenant") or headers.get("x-tenant-id")
+
+        if tenant_id:
+            tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+            if tenant and tenant.monthly_budget_krw and tenant.monthly_budget_krw > 0:
+                spent = tenant_effective_spend(tenant)
+                budget_ratio = float(spent / tenant.monthly_budget_krw)
+                tenant_name = tenant.name
+                if tenant.is_hard_cap_enabled and spent >= tenant.monthly_budget_krw:
+                    hard_cap_blocked = True
+    except Exception as e:
+        logger.warning(f"ext_proc budget resolution failed, falling back to permissive: {e}")
+
+    if hard_cap_blocked:
+        return ExtProcResponse(
+            status="REJECT",
+            status_code=429,
+            headers_to_add={"retry-after": "60", "x-orche-hard-cap": "exceeded"},
+            reason=(
+                f"TENANT_HARD_CAP_EXCEEDED: 부서({tenant_name or tenant_id})의 월간 AI 예산이 "
+                f"100% 소진되어 Hard Cap 정책에 의해 차단되었습니다."
+            ),
+        )
+
     return ext_processor.process_request(
         headers=req.headers,
         body=req.body,
-        tpm_limit=200000,
-        budget_spent_ratio=0.0
+        tpm_limit=tpm_limit,
+        budget_spent_ratio=budget_ratio
     )
 
 @router.get("/models")

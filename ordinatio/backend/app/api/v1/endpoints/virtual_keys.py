@@ -444,8 +444,10 @@ def validate_virtual_key_endpoint(
     # Check Tenant Hard Cap 100% budget limit
     tenant = matched_key.tenant
     if tenant and tenant.is_hard_cap_enabled:
+        from app.core.metering import tenant_effective_spend
         monthly_budget = float(tenant.monthly_budget_krw)
-        spent_budget = float(tenant.spent_budget_krw)
+        # 당월 범위 지출로 판정한다 (지난 달 잔재로 영구 차단되지 않도록)
+        spent_budget = float(tenant_effective_spend(tenant))
         if monthly_budget > 0 and spent_budget >= monthly_budget:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

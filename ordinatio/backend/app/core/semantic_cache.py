@@ -30,6 +30,24 @@ def _canonical_messages(messages: Iterable[Dict[str, Any]]) -> str:
     )
 
 
+def _split_context(messages: Iterable[Dict[str, Any]]) -> tuple[str, str]:
+    """Split a conversation into (exact context, final query).
+
+    The context (system prompts + all prior turns) must match exactly, while semantic
+    similarity is computed only on the final message. Embedding the whole conversation lets
+    a long shared system prompt (e.g. an injected GLOBAL compliance prompt) dominate the
+    vector, so unrelated questions would be served each other's cached answers.
+    """
+    items = list(messages)
+    if not items:
+        return "", ""
+    return _canonical_messages(items[:-1]), _canonical_messages(items[-1:])
+
+
+def _context_hash(context: str) -> str:
+    return hashlib.sha256(context.encode("utf-8")).hexdigest()[:24]
+
+
 def _embedding(text: str) -> list[float]:
     """Deterministic feature-hash embedding requiring no downloadable model or network."""
     counts: Counter[int] = Counter()
@@ -83,18 +101,19 @@ class SemanticCache:
         return self._redis
 
     @staticmethod
-    def _prefix(scope: Optional[str], model_id: Optional[str]) -> str:
+    def _prefix(scope: Optional[str], model_id: Optional[str], context: str) -> str:
         s_val = str(scope or "global")
         m_val = str(model_id or "default")
         scope_hash = hashlib.sha256(s_val.encode("utf-8")).hexdigest()[:24]
         model_hash = hashlib.sha256(m_val.encode("utf-8")).hexdigest()[:24]
-        return f"ordinatio:semantic-cache:{scope_hash}:{model_hash}"
+        return f"ordinatio:semantic-cache:{scope_hash}:{model_hash}:{_context_hash(context)}"
 
     def lookup(self, scope: Optional[str], model_id: Optional[str], messages: Iterable[Dict[str, Any]]) -> Optional[CacheHit]:
         if not settings.SEMANTIC_CACHE_ENABLED:
             return None
-        vector = _embedding(_canonical_messages(messages))
-        prefix = self._prefix(scope, model_id)
+        context, query = _split_context(messages)
+        vector = _embedding(query)
+        prefix = self._prefix(scope, model_id, context)
         candidates: list[Dict[str, Any]] = []
         client = self._redis_client()
         if client:
@@ -126,10 +145,11 @@ class SemanticCache:
     def store(self, scope: Optional[str], model_id: Optional[str], messages: Iterable[Dict[str, Any]], response: Dict[str, Any]) -> None:
         if not settings.SEMANTIC_CACHE_ENABLED:
             return
-        prefix = self._prefix(scope, model_id)
-        fingerprint = hashlib.sha256(_canonical_messages(messages).encode("utf-8")).hexdigest()
+        context, query = _split_context(messages)
+        prefix = self._prefix(scope, model_id, context)
+        fingerprint = hashlib.sha256(query.encode("utf-8")).hexdigest()
         key = f"{prefix}:{fingerprint}"
-        entry = {"embedding": _embedding(_canonical_messages(messages)), "response": copy.deepcopy(response)}
+        entry = {"embedding": _embedding(query), "response": copy.deepcopy(response)}
         with self._lock:
             self._memory[key] = entry
             self._memory.move_to_end(key)

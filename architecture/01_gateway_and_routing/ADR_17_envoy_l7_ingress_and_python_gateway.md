@@ -68,6 +68,28 @@
    - 업스트림 서빙 백엔드로의 비동기 HTTP 요청 디스패치 및 스트리밍 중계.
    - WORM 불변 감사 로그(`audit_logs`) 및 FinOps 계량 기록.
 
+### PII 마스킹 적용 범위 (Masking Scope Invariant)
+
+본 ADR의 역할 분리에 따라 **PII 탐지·마스킹의 유일한 집행 지점은 제어 평면 게이트웨이**입니다.
+
+| 경로 | PII 마스킹 | 비고 |
+|---|---|---|
+| Envoy(:10000) → `backend_service` → `/v1/chat/completions` | **적용** | `dispatch_chat_completion` 0.6단계. 운영 추론 트래픽 전량이 이 경로를 통과 |
+| `/v1/chat/completions` 직접 호출 | **적용** | 동일 함수 |
+| `app/core/ext_proc_server.py` (`/api/v1/ext-proc/process`) | **미적용** | 라우팅 결정·TPM 쿼터·프롬프트 주입 전용. 업스트림 추론을 수행하지 않으므로 모델로의 PII 유출 경로가 아님 |
+
+`deploy/envoy/envoy-ai-gateway.yaml`의 `envoy.filters.http.ext_proc` 필터는 **의도적으로 비활성(주석) 상태**이며, Envoy는 평문 `router` 필터로만 동작합니다. 이 전제가 유지되는 동안 마스킹을 우회하여 모델에 도달하는 경로는 존재하지 않습니다.
+
+**변경 시 필수 조건**: ext_proc 필터를 활성화하여 해당 어댑터가 추론 트래픽을 직접 인터셉트·전달하도록 바꾸는 경우, 그 이전에 `ext_proc_server.py`에 `PiiEngine.mask_conversation()` 호출, BLOCK 시 `REJECT`(403) 처리, `record_pii_audit()` 기록을 구현해야 합니다. 동일 경고가 해당 소스 모듈 docstring과 Envoy 설정 파일 주석에 명시되어 있습니다.
+
+### 마스킹 적용 대상 (Coverage)
+
+요청 측은 **대화 전체**를 대상으로 합니다 — 마지막 user 메시지만이 아니라 이전 턴 user·assistant·system 메시지, `tool_result` 블록, 도구 호출 인자(`input`/`arguments`)의 모든 텍스트 리프를 포함합니다. 이미지 base64(`source.data`)와 프로토콜 식별자(`tool_use_id`, `id`, `name`)는 대상에서 제외하여 멀티모달 데이터 손상과 대화 프로토콜 파손을 방지합니다.
+
+응답 측은 업스트림 completion(OpenAI `choices[].message`, Anthropic `content`, `tool_calls[].function.arguments`)을 검사하여 모델이 학습 데이터·RAG 컨텍스트에서 PII를 재출력하는 경로를 차단합니다. **시맨틱 캐시 적재 이전**에 수행하여 마스킹되지 않은 PII가 캐시에 영구 저장되지 않도록 보장합니다. 응답 측 BLOCK은 요청 측과 달리 해당 구간만 인라인 치환합니다(이미 발생한 추론 비용 보존).
+
+마스킹은 **시스템 프롬프트 자동 주입보다 먼저** 수행됩니다. 거버넌스 가드레일 문구가 정규식에 걸려 변형되면 보안 정책 자체가 손상되기 때문입니다.
+
 ---
 
 ## 3. 결과 및 영향 (Consequences)

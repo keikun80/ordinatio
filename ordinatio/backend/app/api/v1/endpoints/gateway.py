@@ -1,5 +1,6 @@
 import time
 import random
+import hashlib
 import logging
 import ipaddress
 import json
@@ -176,6 +177,88 @@ def is_ip_allowed(client_ip: str, allowed_cidrs: List[str]) -> bool:
         return False
     except ValueError:
         return False
+
+# -----------------------------------------------------------------------------
+# Helper: PII Detection WORM Audit Recording
+# -----------------------------------------------------------------------------
+def sha256_canonical(payload: Any) -> str:
+    """임의 구조 페이로드의 정규화 SHA-256 해시 (키 순서 무관)."""
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+
+
+def record_pii_audit(
+    db: Session,
+    matched_key: Optional[VirtualKey],
+    model_id: Optional[str],
+    detections: list,
+    original_hash: str,
+    masked_hash: str,
+    latency_ms: float,
+    is_blocked: bool,
+    direction: str,
+) -> Optional[str]:
+    """PII 탐지 사실을 WORM 파일 및 DB AuditLog에 불변 기록한다.
+
+    Args:
+        direction: ``REQUEST`` 또는 ``RESPONSE``. 요청 측 마스킹과 응답 측 마스킹을
+            포렌식 상에서 구분하기 위해 각 탐지 항목에 함께 보관한다.
+            ``action_taken``은 PASS/MASK/BLOCK 체계를 유지해야 하므로
+            (대시보드 필터 호환) 방향은 별도 필드로 둔다.
+
+    Returns:
+        WORM 참조 URI. 기록 실패 시 None (호출자는 그대로 보관해야 한다).
+    """
+    detections_summary = [
+        {
+            "entity_type": d.entity_type,
+            "rule_id": d.rule_id,
+            "rule_name": d.rule_name,
+            "confidence": d.confidence,
+            "action": d.action,
+            "replacement": d.replacement,
+            "direction": direction,
+        }
+        for d in detections
+    ]
+
+    action_taken = "BLOCK" if is_blocked else "MASK"
+    requester_id = matched_key.tenant_id if matched_key else "unauthenticated"
+    key_id = matched_key.key_id if matched_key else None
+    log_id = f"audit-pii-{int(time.time() * 1000)}-{uuid.uuid4().hex[:6]}"
+
+    worm_ref = WormStorage.record_audit_log(
+        log_id=log_id,
+        requester_id=requester_id,
+        key_id=key_id,
+        model_id=model_id,
+        original_prompt_hash=original_hash,
+        masked_payload_hash=masked_hash,
+        detections=detections_summary,
+        pii_count=len(detections),
+        action_taken=action_taken,
+        latency_ms=latency_ms,
+        is_blocked=is_blocked,
+    )
+
+    audit_entry = AuditLog(
+        log_id=log_id,
+        requester_id=requester_id,
+        key_id=key_id,
+        model_id=model_id,
+        original_prompt_hash=original_hash,
+        masked_payload_hash=masked_hash,
+        detections_json=json.dumps(detections_summary, ensure_ascii=False),
+        pii_count=len(detections),
+        action_taken=action_taken,
+        latency_ms=latency_ms,
+        is_blocked=is_blocked,
+        worm_reference_id=worm_ref,
+    )
+    db.add(audit_entry)
+    db.commit()
+    return worm_ref
+
 
 # -----------------------------------------------------------------------------
 # Helper: FinOps Real-time Token & Cost Metering
@@ -417,7 +500,60 @@ async def dispatch_chat_completion(
 
     req.messages = normalized_req_messages
 
-    # 0.5 System Prompt Governance Auto-Injection (Hierarchy: VIRTUAL_KEY > ROUTE > TENANT > GLOBAL)
+    # 0.6 PII Inspection & WORM Audit
+    #
+    # 반드시 시스템 프롬프트 자동 주입(0.7) **이전에** 수행한다:
+    #   - 클라이언트가 보낸 모든 메시지(이전 턴 user, assistant, tool_result, 도구 인자
+    #     포함)를 전수 마스킹한다. 마지막 user 메시지만 처리하면 멀티턴 2번째 턴부터
+    #     PII가 업스트림으로 원문 전달된다.
+    #   - 거버넌스 주입 프롬프트는 마스킹 대상에서 제외한다. 가드레일 문구가 정규식에
+    #     걸려 변형되면 보안 정책 자체가 손상되기 때문이다.
+    pii_engine = PiiEngine()
+    pii_engine.load_rules_from_db(db)
+
+    client_msgs_dict = [{"role": m.role, "content": m.content} for m in req.messages]
+    masking_res = pii_engine.mask_conversation(client_msgs_dict)
+    is_blocked = masking_res.is_blocked
+    detections = masking_res.detections
+
+    if detections and not is_blocked:
+        # 마스킹된 대화로 교체 — 이후 모든 하류 처리(분류·캐시·업스트림 전송)가
+        # 마스킹된 페이로드만 보게 된다.
+        req.messages = [
+            ChatMessage(role=m["role"], content=m["content"]) for m in masking_res.messages
+        ]
+
+    user_prompt = ""
+    for msg in reversed(req.messages):
+        if msg.role == "user":
+            user_prompt = msg.get_text_content()
+            break
+    masked_prompt = user_prompt
+
+    if detections:
+        record_pii_audit(
+            db=db,
+            matched_key=matched_key,
+            model_id=req.model or route_name,
+            detections=detections,
+            original_hash=masking_res.original_hash,
+            masked_hash=masking_res.masked_hash,
+            latency_ms=round((time.perf_counter() - t0) * 1000, 2),
+            is_blocked=is_blocked,
+            direction="REQUEST",
+        )
+
+    if is_blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "프롬프트 내에 사내 보안 규정상 금지된 개인정보"
+                f"({', '.join(masking_res.blocked_entities)})가 감지되어 차단되었습니다."
+            )
+        )
+
+    # 0.7 System Prompt Governance Auto-Injection (Hierarchy: VIRTUAL_KEY > ROUTE > TENANT > GLOBAL)
+    # PII 마스킹(0.6) 이후에 주입하여 거버넌스 가드레일 문구가 마스킹되지 않도록 보장한다.
     try:
         from app.core.prompt_injector import resolve_and_inject_system_prompt
         effective_key_id = matched_key.key_id if matched_key else None
@@ -439,70 +575,6 @@ async def dispatch_chat_completion(
                 response.headers["x-orche-prompt-mode"] = matched_prompt.injection_mode
     except Exception as pe:
         logger.debug(f"Gateway system prompt injection skipped: {pe}")
-
-    # 1. PII Inspection & WORM Audit
-    user_prompt = ""
-    for msg in reversed(req.messages):
-        if msg.role == "user":
-            user_prompt = msg.get_text_content()
-            break
-
-    pii_engine = PiiEngine()
-    pii_engine.load_rules_from_db(db)
-    masking_res = pii_engine.mask(user_prompt)
-    masked_prompt = masking_res.masked_text
-    is_blocked = masking_res.is_blocked
-    detections = masking_res.detections
-
-    if detections:
-        detections_summary = [
-            {
-                "entity_type": d.entity_type,
-                "rule_id": d.rule_id,
-                "rule_name": d.rule_name,
-                "confidence": d.confidence,
-                "action": d.action,
-                "replacement": d.replacement
-            }
-            for d in detections
-        ]
-        log_id = f"audit-{int(time.time()*1000)}"
-        worm_ref = WormStorage.record_audit_log(
-            log_id=log_id,
-            requester_id=matched_key.tenant_id if matched_key else "dev-client",
-            key_id=matched_key.key_id if matched_key else "sk-ord-test",
-            model_id=req.model or route_name,
-            original_prompt_hash=masking_res.original_hash,
-            masked_payload_hash=masking_res.masked_hash,
-            detections=detections_summary,
-            pii_count=masking_res.pii_count,
-            action_taken="BLOCK" if is_blocked else "MASK",
-            latency_ms=round((time.perf_counter() - t0) * 1000, 2),
-            is_blocked=is_blocked,
-        )
-
-        audit_entry = AuditLog(
-            log_id=log_id,
-            requester_id=matched_key.tenant_id if matched_key else "dev-client",
-            key_id=matched_key.key_id if matched_key else "sk-ord-test",
-            model_id=req.model or route_name,
-            original_prompt_hash=masking_res.original_hash,
-            masked_payload_hash=masking_res.masked_hash,
-            detections_json=json.dumps(detections_summary, ensure_ascii=False),
-            pii_count=masking_res.pii_count,
-            action_taken="BLOCK" if is_blocked else "MASK",
-            latency_ms=round((time.perf_counter() - t0) * 1000, 2),
-            is_blocked=is_blocked,
-            worm_reference_id=worm_ref
-        )
-        db.add(audit_entry)
-        db.commit()
-
-    if is_blocked:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="프롬프트 내에 사내 보안 규정상 금지된 개인정보(임직원 사번 등)가 감지되어 차단되었습니다."
-        )
 
     # 2. AgentRouter Classification & Intelligence Engine
     raw_messages_dict = [{"role": m.role, "content": m.content} for m in req.messages]
@@ -644,26 +716,12 @@ async def dispatch_chat_completion(
     affinity_headers = affinity_mgr.get_affinity_headers(session_id=session_id, prompt_prefix=user_prompt[:50])
 
     # 4. Attempt Upstream Forwarding to vLLM (Multi-Turn Anthropic <-> OpenAI Conversion)
+    # PII 마스킹은 0.6단계에서 req.messages 전체에 이미 적용되었으므로
+    # 여기서는 프로토콜 변환만 수행한다.
     upstream_messages = []
     for msg in req.messages:
         content = msg.content
         role = msg.role
-        msg_text = msg.get_text_content()
-
-        # Apply PII masking to the active user prompt
-        if role == "user" and msg_text == user_prompt:
-            if isinstance(content, str):
-                content = masked_prompt
-            elif isinstance(content, list):
-                new_blocks = []
-                for b in content:
-                    if isinstance(b, dict) and b.get("type") == "text":
-                        b_text = b.get("text", "")
-                        masked_b_text = pii_engine.mask(b_text).masked_text if b_text else ""
-                        new_blocks.append({**b, "text": masked_b_text})
-                    else:
-                        new_blocks.append(b)
-                content = new_blocks
 
         # Convert Anthropic assistant tool_use blocks into OpenAI tool_calls
         if isinstance(content, list) and role == "assistant":
@@ -1144,6 +1202,37 @@ async def dispatch_chat_completion(
     if db_policy and db_policy.match_conditions and db_policy.match_conditions.get("tenant_codes"):
         policy_tenant_code = db_policy.match_conditions["tenant_codes"][0]
     target_tenant_hint = request.headers.get("x-orche-tenant") or policy_tenant_code
+
+    # 4.9 Response-side PII Inspection
+    #
+    # 요청 측 마스킹만으로는 모델이 학습 데이터·RAG 컨텍스트에서 가져온 PII를
+    # 재출력하는 경로를 막을 수 없다. 시맨틱 캐시 적재(5단계) **이전에** 수행하여
+    # 마스킹되지 않은 PII가 캐시에 영구 저장되는 것을 방지한다.
+    response_detections = []
+    if upstream_success and isinstance(upstream_response_data, dict):
+        # 마스킹 전 원본 응답 해시를 먼저 확정한다 (무결성 증적)
+        original_response_hash = sha256_canonical(upstream_response_data)
+        completion_res = pii_engine.mask_completion(upstream_response_data)
+        response_detections = completion_res.detections
+        if response_detections:
+            upstream_response_data = completion_res.payload
+            logger.warning(
+                f"Response-side PII detected and masked: {completion_res.pii_count}건 "
+                f"(model={selected_model_id}, route={route_name})"
+            )
+            record_pii_audit(
+                db=db,
+                matched_key=matched_key,
+                model_id=req.model or route_name,
+                detections=response_detections,
+                original_hash=original_response_hash,
+                masked_hash=sha256_canonical(completion_res.payload),
+                latency_ms=round(completion_res.latency_ms, 3),
+                is_blocked=False,
+                direction="RESPONSE",
+            )
+            if response:
+                response.headers["x-orche-pii-response-masked"] = str(completion_res.pii_count)
 
     # 5. Format Return Payload
     if upstream_success and upstream_response_data:

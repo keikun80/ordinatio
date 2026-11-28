@@ -330,9 +330,13 @@ def get_compliance_stats(db: Session = Depends(get_db)):
 # ==========================================
 
 @router.get("/worm/verify", dependencies=[Depends(require_permission("compliance:read"))])
-def verify_worm_audit_chain():
-    """WORM 불변 스토리지 및 SHA-256 머클 해시 체인 무결성을 실시간 전수 검증합니다."""
-    return WormStorage.verify_integrity()
+def verify_worm_audit_chain(db: Session = Depends(get_db)):
+    """WORM 불변 스토리지 및 SHA-256 해시 체인 연결성을 실시간 전수 검증합니다.
+
+    seq 연속성(레코드 삭제), prev_hash 연결성(재배열), 체인 앵커 일치, 본문 변조,
+    읽기 전용 권한 이탈을 모두 검사하고 DB AuditLog 건수와의 괴리를 함께 보고합니다.
+    """
+    return WormStorage.verify_integrity(db=db)
 
 
 @router.get("/audit-logs/export", dependencies=[Depends(require_permission("compliance:read"))])

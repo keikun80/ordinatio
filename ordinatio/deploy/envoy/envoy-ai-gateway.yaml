@@ -66,7 +66,17 @@ static_resources:
 
           http_filters:
           # Envoy AI Gateway HTTP Filters
-          # In production with Envoy ext_proc filter:
+          #
+          # [보안 전제 / ADR-17] ext_proc 필터는 의도적으로 비활성 상태입니다.
+          # PII 마스킹과 WORM 감사는 Python 제어 평면 게이트웨이
+          # (backend_service -> dispatch_chat_completion)에 통합되어 있으며,
+          # Envoy는 평문 router 필터로 모든 트래픽을 그곳으로 전달합니다.
+          # 따라서 모델에 도달하는 모든 요청은 마스킹을 거칩니다.
+          #
+          # !! 아래 ext_proc 필터를 활성화하면 추론 트래픽이 제어 평면 가드레일을
+          #    우회할 수 있습니다. 활성화 시에는 app/core/ext_proc_server.py에
+          #    PII 마스킹(mask_conversation) + BLOCK REJECT + 감사 기록을
+          #    반드시 먼저 구현해야 합니다.
           # - name: envoy.filters.http.ext_proc
           #   typed_config:
           #     "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor

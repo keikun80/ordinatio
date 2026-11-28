@@ -1,3 +1,21 @@
+"""Envoy ext_proc 어댑터 — 라우팅 · 쿼터 · 프롬프트 주입 전용 (ADR-17)
+
+적용 범위 (Scope Invariant):
+    본 모듈은 **PII 탐지·마스킹을 수행하지 않는다.** ADR-17에 따라 인라인 가드레일
+    (PII 마스킹 + WORM 감사)은 Python 제어 평면 게이트웨이
+    ``api/v1/endpoints/gateway.py::dispatch_chat_completion``에 통합되어 있으며,
+    업스트림 추론 호출은 전부 그 경로를 통과한다.
+
+    현재 배포 구성(``deploy/envoy/envoy-ai-gateway.yaml``)에서 Envoy는 평문
+    ``router`` 필터만 사용하는 역방향 프록시이며 ``ext_proc`` HTTP 필터는
+    비활성(주석) 상태다. 따라서 모델에 도달하는 모든 트래픽은 마스킹을 거친다.
+
+경고:
+    Envoy ``ext_proc`` 필터를 활성화하여 이 어댑터가 추론 트래픽을 직접
+    인터셉트·전달하게 만드는 경우, **마스킹을 우회하는 경로가 생긴다.**
+    그 시점에는 ``PiiEngine.mask_conversation()`` 호출과 BLOCK 시 REJECT 처리,
+    ``record_pii_audit()`` 기록을 본 모듈에 반드시 추가해야 한다.
+"""
 import time
 import logging
 from typing import Dict, Any, Optional

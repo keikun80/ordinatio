@@ -22,6 +22,17 @@ from app.core.security import hash_password, create_access_token
 from app.core.config import settings
 settings.ALLOW_DEV_MOCK_KEYS = True
 
+# WORM 감사 저장소를 테스트 전용 임시 디렉터리로 격리한다.
+# 격리하지 않으면 테스트가 개발 저장소(backend/data/worm_audit)에 레코드를 영구 적재하고,
+# 누적된 과거 레코드의 상태가 무결성 검증 테스트 결과를 좌우해 재현성이 사라진다.
+import atexit
+import shutil
+import tempfile
+
+_WORM_TEST_DIR = tempfile.mkdtemp(prefix="ordinatio-worm-test-")
+settings.WORM_STORAGE_PATH = _WORM_TEST_DIR
+atexit.register(lambda: shutil.rmtree(_WORM_TEST_DIR, ignore_errors=True))
+
 TEST_DATABASE_URL = "sqlite:///:memory:"
 test_engine = create_engine(
     TEST_DATABASE_URL,

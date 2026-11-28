@@ -2,8 +2,8 @@
 
 **문서 번호**: ORDINATIO-ENG-REP-20261120  
 **대상 시스템**: Ordinatio Appliance (고객 자율 운영형 100% 폐쇄망 AI 통합 제어 평면)  
-**작성 일자**: 2026-11-23 (최신 현행화: 소스코드 전수 분석 기반 백엔드 114/114 Tests 100% PASS 완주, 실제 구현 기능 정합화 검증: 레디니스 DB/Redis 지연시간 실측 프로빙, Zero-PII 서포트 번들 호스트OS/감사/라우트 실측치 무결성, 시맨틱 캐시 hit_rate_pct 실측 및 텔레메트리 연동, TokenRateLimiter Redis 분산 슬라이딩 윈도우+인메모리 폴백 탄력성, 실가상키 게이트웨이 502 프로덕션 핸들링, Envoy L7 xDS 실시간 ACK 검증, 솔루션 버전 0.1.3 일원화 및 Data Plane 동적 헬스 연동, 고아 더미 PromQL 프록시 완전 삭제, WORM 불변 스토리지 & SHA-256 해시체인 무결성 검증, Standalone 무인 설치 7/7 PASS, 프론트엔드 Vite Build PASS)
-**검증 상태**: **백엔드 114/114 PASS (100%), Standalone 7/7 PASS (100%), 프론트엔드 Vite Build PASS, E2E 10/10 PASS 프로덕션 레디**
+**작성 일자**: 2026-11-23 (최신 현행화 2026-11-28: 폐쇄망 Standalone 설치 테스트베드(`make vg-airgap`) 구축, 오프라인 번들 이미지 태그/설치 자산 정합화, 컨테이너 외부 DNS 제거, 시맨틱 캐시 교차 응답 결함 해결, 백엔드 132/132 PASS / 이전: 소스코드 전수 분석 기반 백엔드 114/114 Tests 100% PASS 완주, 실제 구현 기능 정합화 검증: 레디니스 DB/Redis 지연시간 실측 프로빙, Zero-PII 서포트 번들 호스트OS/감사/라우트 실측치 무결성, 시맨틱 캐시 hit_rate_pct 실측 및 텔레메트리 연동, TokenRateLimiter Redis 분산 슬라이딩 윈도우+인메모리 폴백 탄력성, 실가상키 게이트웨이 502 프로덕션 핸들링, Envoy L7 xDS 실시간 ACK 검증, 솔루션 버전 0.1.3 일원화 및 Data Plane 동적 헬스 연동, 고아 더미 PromQL 프록시 완전 삭제, WORM 불변 스토리지 & SHA-256 해시체인 무결성 검증, Standalone 무인 설치 7/7 PASS, 프론트엔드 Vite Build PASS)
+**검증 상태**: **백엔드 132/132 PASS (100%), Standalone 7/7 PASS (100%), 프론트엔드 Vite Build PASS, E2E 10/10 PASS 프로덕션 레디**
 
 ---
 
@@ -49,18 +49,19 @@
 | **Phase 6: 사용자 보안 강화** | [PRE_27_auth_rbac_implementation_plan_and_test_results.md](./PRE_27_auth_rbac_implementation_plan_and_test_results.md) | 관리자 비밀번호 초기화(`POST /users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 단일화 | `pytest` | 114 / 114 PASS |
 | **Phase 6: 이원화 테스트 전략** | [PRE_26_bifurcated_testing_strategy_local_vs_production.md](../PRE_26_bifurcated_testing_strategy_local_vs_production.md) | 로컬 고속 계약 검증 vs 실환경 L3/L4 DNS & 포트 프로빙 이원화 전략 확립 및 Day-0 부트스트랩 가드 | `make up` & `verify` | **114 / 114 PASS** |
 | **Phase 6: 시맨틱 캐시** | [PRE_47_semantic_cache_implementation_and_test_results.md](../07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | 테넌트·모델 격리 로컬 시맨틱 캐시, Redis TTL/메모리 fallback, FinOps 절감 관측 | `test_semantic_cache.py` & `npm run build` | 단위 3/3 PASS, 전체 114/114 PASS & Vite Build PASS |
+| **Phase 6: 폐쇄망 설치 테스트베드 & 결함 해결** | [PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md](../07_appliance_and_packaging/PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md) | 번들 이미지 태그·설치 자산 정합화, 외부 DNS 제거(사내 DNS 선택 주입), 시맨틱 캐시 맥락 정확일치 키, Vagrant 폐쇄망 설치 자동화(`make vg-airgap`) | `make verify-standalone-install` | **7 / 7 PASS, 132 / 132 PASS** (VM 실설치 미실행) |
 | **Phase 6: 실구현 테스트 정합화** | [PRE_50_source_code_analysis_and_test_suite_alignment_report.md](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md) | 소스코드 전수 분석 기반 실제 구현 검증 정합화: 레디니스 DB/Redis 실측, 서포트번들, 시맨틱캐시 hit_rate_pct, 토큰리미터 폴백, 실가상키 502 | `pytest` & `npm run build` | **114 / 114 PASS & Vite Build PASS** |
 
 ---
 
-## 3. 전체 테스트 검증 매트릭스 (114 / 114 백엔드 테스트 100% PASS)
+## 3. 전체 테스트 검증 매트릭스 (132 / 132 백엔드 테스트 100% PASS)
 
-> 검증 증적 수치는 114개 테스트 완주 기준으로 전수 동기화 완료되었다. 상세 분석은 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) 및 [`PRE_50`](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md)를 참조한다.
+> 검증 증적 수치는 132개 테스트 완주 기준(2026-11-28, `verify-standalone-install.sh` Test 7)으로 동기화되었다. 아래 케이스별 표는 114건 시점 기준이며 이후 추가분(시맨틱 캐시 회귀 2건 등)은 [`PRE_51`](../07_appliance_and_packaging/PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md)을 참조한다. 상세 분석은 [`PRE_13`](./PRE_13_GAP_ANALYSIS_PHASE_0_TO_6.md) 및 [`PRE_50`](../testdocs/PRE_50_source_code_analysis_and_test_suite_alignment_report.md)를 참조한다.
 
 ```bash
 # 전체 테스트 실행 명령어
 cd ordinatio/backend && uv run pytest tests/ -q
-# 결과: 114 passed in 114.79s (100% PASS)
+# 결과: 132 passed in 211.03s (100% PASS, 2026-11-28)
 ```
 
 | 테스트 파일 | 테스트 케이스 명칭 | 검증 목적 및 동작 내용 | 상태 |
@@ -169,7 +170,7 @@ cd ordinatio/backend && uv run pytest tests/ -q
 
 ---
 
-## 4. 19대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-19 최신화)
+## 4. 23대 아키텍처 결정 기록 총괄 (ADR-01 ~ ADR-23 최신화)
 
 에어갭 폐쇄망 최적화 및 단일 어플라이언스 자립성을 위해 채택된 19대 아키텍처 결정(ADR) 목록입니다:
 
@@ -193,9 +194,12 @@ cd ordinatio/backend && uv run pytest tests/ -q
 - **ADR-18**: 개발 생산성과 운영 정밀도 보장을 위한 **로컬 Docker Compose(Mocking) vs 실사용 온프레미스 K8s/Appliance 이원화 테스트 전략** 채택.
 - **ADR-19**: 웹 브라우저 없이 운영자가 실제 LLM 엔드포인트, 서빙 엔진, 모델 ID, 관리자 계정을 일괄 주입하여 8대 전 메뉴를 무인 검증할 수 있도록 **외부 설정 파일(`test_config.json`) 기반 통합 E2E 자동화 러너** 채택.
 - **ADR-20**: Claude Code 등 Anthropic 표준 에이전트 CLI 호환성을 위해 **Anthropic ↔ OpenAI 양방향 프로토콜 변환 및 실시간 SSE 도구 스트리밍 엔진** 채택 ([PRE-48](../01_gateway_and_routing/PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md)).
+- **ADR-21**: Intel 호스트 폐쇄망 설치 테스트베드로 **Vagrant + VirtualBox 베이스 스냅샷 + 게스트 내부 iptables(OUTPUT + DOCKER-USER) 송신 차단** 채택. NAT 분리는 `vagrant ssh` 제어 채널까지 끊으므로 배제 ([PRE-51](../07_appliance_and_packaging/PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md)).
+- **ADR-22**: 오프라인 번들 직접 반입 설치는 **외부 DNS 미사용(호스트 리졸버 상속)**을 기본으로 하고, 사내 DNS는 `DNS_SERVER` 지정 시에만 주입. ADR-18의 `10.10.0.2` 고정 기본값을 대체 (AWS EC2에서도 호스트 리졸버 상속으로 VPC Resolver 자동 사용).
+- **ADR-23**: 시맨틱 캐시 키를 **맥락(시스템 + 이전 턴) 정확 일치 + 마지막 메시지 유사도**로 분리하여, 공통 시스템 프롬프트에 의한 무관 질문 교차 응답을 차단.
 
 ---
 
 ## 5. 결론 및 프로덕션 릴리즈 상태
 
-현재 시스템은 **Phase 0부터 Phase 6까지의 필수 사양 및 Phase C/B/A 상용 하드닝 구현을 갖추고 있다.** 전체 114개 단위/보안/통합 테스트 100% PASS, 8대 전 메뉴 E2E 10/10 PASS, Standalone 설치 검증 7/7 PASS 및 프론트엔드 Vite 프로덕션 빌드 성공을 달성하여 프로덕션 릴리즈 기준을 완전히 충족한다.
+현재 시스템은 **Phase 0부터 Phase 6까지의 필수 사양 및 Phase C/B/A 상용 하드닝 구현을 갖추고 있다.** 전체 132개 단위/보안/통합 테스트 100% PASS, 8대 전 메뉴 E2E 10/10 PASS, Standalone 설치 검증 7/7 PASS 및 프론트엔드 Vite 프로덕션 빌드 성공을 달성하여 프로덕션 릴리즈 기준을 완전히 충족한다.

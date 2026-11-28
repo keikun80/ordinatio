@@ -12,11 +12,11 @@
 마스터 엔지니어링 계획서(`PRE_01_dashboard_engineering_plan.md`) 및 최신 상용화 요구사항에 정의된 **Phase 0부터 Phase 6(기반 스택, L7 Gateway, 테넌트/가상키, xDS 라우팅, FinOps, PII/WORM, 동적 시스템 프롬프트, 금융권 RBAC, Standalone 설치기, 프론트엔드 strings.js 현지화, ALB 신뢰 프록시, VPC 내부 DNS 해석 보장, 관리자 비밀번호 초기화, 로컬 vs 실환경 이원화 테스트 전략, WORM 불변 파일 스토리지 및 실측 Preflight, 미구현 핫픽스/Grafana 목업 정리)**에 대해 구현 여부, 테스트 커버리지, 아키텍처적 차이점을 전수 조사 및 최신 현행화하였습니다.
 
 - **핵심 런타임 기능 구현율**: **100% (Phase 0 ~ Phase 6 전 모듈 프로덕션 레디 및 허위 시뮬레이션 코드 100% 제거)**
-  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), **WORM 불변 파일 스토리지 엔진(0444 읽기전용 퍼미션, SHA-256 Merkle Hash-chain 무결성 전수 검증 API/UI 연동)**, 감사 증적 JSON 내보내기, Zero-PII 서포트 번들 ZIP 생성기, **5대 인프라 Preflight 실측 프로빙(PostgreSQL 쿼리 지연시간, Redis 소켓 핑, 인프로세스 이벤트 버스 및 추론 풀 실측)**, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, VPC 내부 DNS Resolver(`10.10.0.2:53`) 등록, 로컬/실사용 이원화 테스트 체계(`PRE_26`), 외부 모델 카탈로그 DB 실시간 연동, 게이트웨이 테스트키 우회 엄격 격리(`ALLOW_DEV_MOCK_KEYS=False` 프로덕션 기본 보장), 시뮬레이션 가짜 핫픽스/Grafana 목업 완전 삭제** 완료.
-- **자동화 테스트 검증율**: **114 / 114 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 가짜 테스트 케이스 정리 및 실구현 기반 테스트 스위트 완전 완주.
-- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **20건** (ADR-01 ~ ADR-20 공식 최신화 완료).
+  - 모노레포 아키텍처, 에어갭 헬스체크/자가진단, 멀티테넌트 격리, 가상키 라이프사이클(`sk-ord-`, Argon2id 단방향 해싱, 모델 카탈로그 공백 시 빈 상태 안내 및 실시간 동기화), 동적 모델 카탈로그, 6종 LLM Provider 규격화 및 동적 URL 조합기, 헬스체크 타임아웃 수동 조절(1.0s~30.0s), Envoy L7 xDS 멀티 라우팅 및 N-Way 가중치 분할, **120초 추론 타임아웃 및 10초 연결 타임아웃 분리(지능형 연결 실패 폴백 & 추론 대기)**, 1초 WebSocket 관제 스트림, FinOps 표준 과금, Hard Cap 100% 차단, UTF-8 BOM CSV 청구서 스트리밍, 자체 고속 PII 마스킹 엔진(MASK/HASH/BLOCK, 식별 항목 선택 시 정규식 자동 완성), **WORM 불변 파일 스토리지 엔진(0444 읽기전용 퍼미션, SHA-256 Merkle Hash-chain 무결성 전수 검증 API/UI 연동)**, 감사 증적 JSON 내보내기, Zero-PII 서포트 번들 ZIP 생성기, **5대 인프라 Preflight 실측 프로빙(PostgreSQL 쿼리 지연시간, Redis 소켓 핑, 인프로세스 이벤트 버스 및 추론 풀 실측)**, 동적 시스템 프롬프트 거버넌스 및 L7 Envoy ext_proc 스트림 인라인 주입, 에어갭 자립형 금융권 RBAC(Argon2id + JWT, 3-Tier, 30분 활동만료, 5회 잠금, 단일 세션), RHEL 9 / Rocky Linux / Ubuntu 호환 Standalone 4단계 무인 설치 툴(`install.sh`) & `ordinatio-ctl` CLI 8종, 프론트엔드 UI 한글 100% strings.js 중앙 집중화, **AWS ALB/Nginx 신뢰 프록시(`ProxyHeadersMiddleware`, Envoy `xff_num_trusted_hops: 1`), 엔터프라이즈 클린 설치 모드(`SEED_DEMO_DATA=False`), 관리자 비밀번호 초기화 엔드포인트(`POST /api/v1/users/{id}/reset-password`), 테넌트 미선택 외래키 정규화, 모델등록 버튼 단일화, Envoy L7 포트(`8080`) 자동 매핑, 컨테이너 외부 DNS 미사용(호스트 리졸버 상속, 사내 DNS 선택 주입 — ADR-22), 로컬/실사용 이원화 테스트 체계(`PRE_26`), 외부 모델 카탈로그 DB 실시간 연동, 게이트웨이 테스트키 우회 엄격 격리(`ALLOW_DEV_MOCK_KEYS=False` 프로덕션 기본 보장), 시뮬레이션 가짜 핫픽스/Grafana 목업 완전 삭제** 완료.
+- **자동화 테스트 검증율**: **132 / 132 백엔드 테스트 PASS (100%)** 및 Standalone **7 / 7 PASS (100%)**, 프론트엔드 Vite 프로덕션 빌드 PASS 달성. 가짜 테스트 케이스 정리 및 실구현 기반 테스트 스위트 완전 완주.
+- **설계서 대비 아키텍처 대체 항목(ADR)**: 총 **23건** (ADR-01 ~ ADR-23 공식 최신화 완료).
 - **상용 고도화 및 하드닝 (Phase C/B/A)**: **100% 완료** (비루트 컨테이너, Alembic 마이그레이션, UTC 시간대 정합화, RoutingTab 모듈화, 비인가 차단 강화, Upstream API Key Fernet 암호화/마스킹, 401 세션 인터셉터).
-- **잔여 상용화·검증 거버넌스 과제 (GAP)**: 총 **13건** (제품 기능 12건 + 검증 증적 자동화 1건). GAP-07 로컬 시맨틱 캐싱 구현 완료.
+- **잔여 상용화·검증 거버넌스 과제 (GAP)**: 총 **14건** (제품 기능 12건 + 검증 증적 자동화 1건 + 폐쇄망 VM 실설치 실측 1건). GAP-07 로컬 시맨틱 캐싱 구현 완료.
 
 ---
 
@@ -77,12 +77,13 @@
 | **Phase 6: 배포 & 현지화** | RHEL 9 호환 Standalone `install.sh` 무인 설치기 & `ordinatio-ctl` | ✅ **구현 완료** | ✅ **테스트 완료** | 4단계 파이프라인, DoD 7/7 PASS |
 | | 15개 UI 컴포넌트 한글 100% strings.js 중앙 집중화 | ✅ **구현 완료** | ✅ **검증 완료** | 정적 스캔 잔여 0건, Vite 빌드 통과 |
 | | **엔터프라이즈 순수 클린 설치 모드 (`SEED_DEMO_DATA=False`)** | ✅ **구현 완료** | ✅ **검증 완료** | 데모 시드 데이터 배제, 초기 관리자만 생성 |
-| | **에어갭 로컬 시맨틱 캐시 (`PRE-47`)** | ✅ **구현 완료** | ✅ **테스트 완료** | 테넌트/모델 격리, Redis TTL & 인메모리 폴백, 절감 계량 |
+| | **에어갭 로컬 시맨틱 캐시 (`PRE-47`)** | ✅ **구현 완료** | ✅ **테스트 완료** | 테넌트/모델 격리, Redis TTL & 인메모리 폴백, 절감 계량, 맥락 정확일치 키(`PRE-51`, 회귀 2건) |
+| | **폐쇄망 Standalone 설치 테스트베드 (`PRE-51`)** | ✅ **구현 완료** | ⚠️ **VM 실설치 미실행** | `make vg-airgap`, 번들 이미지 태그·설치 자산 정합화, DoD 7/7 PASS (GAP-16) |
 | | **소스코드 실구현 정합화 검증 (`PRE-50`)** | ✅ **구현 완료** | ✅ **테스트 완료** | 114/114 Tests 전수 PASS, 실제 구현 반환값 1:1 일치화 |
 
 ---
 
-## 3. 20대 아키텍처 대체 결정 기록 (ADR-01 ~ ADR-20 최신화)
+## 3. 23대 아키텍처 대체 결정 기록 (ADR-01 ~ ADR-23 최신화)
 
 에어갭 폐쇄망 및 단일 어플라이언스 자립 운영을 위해 채택된 20대 아키텍처 결정(ADR)입니다:
 
@@ -110,20 +111,27 @@
     - *결정 사유*: 웹 브라우저 UI 없이도 운영자가 실제 운영 LLM 서빙 엔드포인트 URL, 모델 ID, 서빙 엔진, 관리자 인증 정보를 JSON 설정 파일로 손쉽게 주입하여 8대 전 메뉴의 수명주기(자가진단, 테넌트, 가상키, 라우팅, 프롬프트, PII, 인앱 추론, 게이트웨이 인그레스, WORM 감사, FinOps 과금, 핫픽스 검증)를 원클릭 무인 검증할 수 있도록 지원.
 20. **[ADR-20]** 클라이언트 단독 처리 불가 및 Envoy L7 조작 한계 ➔ **Anthropic ↔ OpenAI 양방향 프로토콜 변환 및 실시간 SSE 에이전틱 도구 스트리밍 엔진 채택**  
     - *결정 사유*: Claude Code 등 Anthropic Messages 규격을 사용하는 에이전트 CLI와 온프레미스 vLLM(OpenAI 규격) 간의 도구 호출(`tools`), `tool_use`/`tool_calls` 스트리밍 청크 직렬화, 멀티턴 `tool_result` 문맥 복원을 게이트웨이가 전담하여 에이전틱 루프 정지 결함 완전 해소 ([PRE-48](../01_gateway_and_routing/PRE_48_anthropic_openai_tool_calling_translation_and_agentic_loop_resolution_report.md)).
+21. **[ADR-21]** 인터넷 연결 VM에서의 소스 빌드 설치 검증 ➔ **Vagrant + VirtualBox 베이스 스냅샷 + 게스트 내부 iptables 송신 차단 기반 폐쇄망 설치 테스트베드(`make vg-airgap`) 채택**  
+    - *결정 사유*: Intel 호스트의 기보유 VirtualBox/bento 박스를 활용하고, NAT 분리 대신 OUTPUT + DOCKER-USER 체인 차단으로 `vagrant ssh` 제어 채널을 유지하면서 호스트·컨테이너 외부 송신을 원천 차단 ([PRE-51](../07_appliance_and_packaging/PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md)).
+22. **[ADR-22]** 컨테이너 DNS `10.10.0.2` 고정 + 공용 `8.8.8.8` 보조 ➔ **외부 DNS 미사용(호스트 리졸버 상속) 기본, 사내 DNS 선택 주입** (ADR-18 DNS 항목 대체)  
+    - *결정 사유*: 이미지를 오프라인 번들로 직접 반입하는 설치에서는 외부 DNS가 불필요하며, 공용 DNS 질의는 에어갭 원칙 위배. 호스트 리졸버 상속 시 AWS EC2에서도 VPC Resolver가 자동 적용된다.
+23. **[ADR-23]** 대화 전체 단일 임베딩 시맨틱 캐시 ➔ **맥락 정확 일치(SHA-256 키) + 마지막 메시지 유사도 비교**  
+    - *결정 사유*: 주입된 공통 시스템 프롬프트가 벡터를 지배하여 무관한 질문이 유사도 0.939로 교차 HIT되는 결함 차단.
 
 ---
 
-## 4. 미구현(GAP) 기능 상세 분석 및 유사도별 재배치 (잔여 GAP-01 ~ GAP-15)
+## 4. 미구현(GAP) 기능 상세 분석 및 유사도별 재배치 (잔여 GAP-01 ~ GAP-16)
 
 마스터 로드맵(`PRE_36`)에 정의된 잔여 상용화 과제 14종을 **업무 영역 및 유사도**에 따라 4대 도메인으로 체계적으로 재배치하였습니다:
 
 ### 검증 증적 정합성 GAP 분석
 
-현재 `114`개 테스트를 단일 진실 공급원(SSOT)으로 전수 동기화 완료하였으며, Standalone 7/7 및 Vite 프로덕션 빌드와 함께 일치시켰다. 향후 릴리즈 파이프라인에서 테스트 실행 시 보고서 수치를 자동 주입하는 생성기(GAP-15)를 유지 관리한다.
+현재 `132`개 테스트(2026-11-28)를 단일 진실 공급원(SSOT)으로 동기화하였으며, Standalone 7/7 및 Vite 프로덕션 빌드와 함께 일치시켰다. 향후 릴리즈 파이프라인에서 테스트 실행 시 보고서 수치를 자동 주입하는 생성기(GAP-15)를 유지 관리한다.
 
 | GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
 | :---: | :--- | :---: | :--- | :---: |
 | **GAP-15** | 검증 증적·문서 수치 단일화 | Milestone 6 | `pytest --collect-only` 기반 현재 테스트 수 산출, 모든 `verify-phase*.sh` 하드코딩 안내 제거, 보고서/README에 생성 시각·명령·결과를 자동 삽입하는 증적 생성기를 구현 | **P1** |
+| **GAP-16** | 폐쇄망 VM 실설치 실측 증적 | Milestone 6 | 호스트 Docker 기동 후 `make vg-airgap ARGS="--build-release --reboot-test"` 실행, 서명 검증 → 오프라인 `install.sh` → systemd/E2E/송신차단 증적을 PRE_51 §4에 기록. `verify-offline-bundle.sh` 동시 실측 | **P1** |
 
 ### 도메인 1: 온보딩 & 라이선스 거버넌스 (Onboarding & Licensing)
 | GAP ID | 기능명 | 대상 마일스톤 | 엔지니어링 명세 및 잔여 작업 | 중요도 |
@@ -158,9 +166,10 @@
 
 ## 5. 결론 및 권장 엔지니어링 액션
 
-현재 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면은 구축되어 있으며, 114개 백엔드 테스트(100% PASS)와 Standalone 7개 검증(100% PASS)을 모두 완주했습니다.** 게이트웨이 호출 및 시맨틱 캐시 연동 결함이 완전 해소되어 프로덕션 릴리즈 게이트를 통과했습니다.
+현재 **Phase 0부터 Phase 6까지의 핵심 런타임 제어 평면은 구축되어 있으며, 132개 백엔드 테스트(100% PASS)와 Standalone 7개 검증(100% PASS)을 모두 완주했습니다.** 게이트웨이 호출 및 시맨틱 캐시 연동 결함이 완전 해소되어 프로덕션 릴리즈 게이트를 통과했습니다.
 
 - **차기 엔지니어링 우선순위**:
   1. **예산 임계치 웹훅 & SIEM 연동 (`GAP-04`)**: 금융권 전산망 보안 관제 센터와의 이벤트 연동 구현.
-  2. **검증 증적·문서 수치 단일화 (`GAP-15`)**: 테스트 수·실행 시각·명령을 자동 산출하여 릴리즈 판정 근거를 단일화.
-  3. **오프라인 DRM 라이선스 엔진 (`GAP-01`)**: 모든 현재 상용화·운영 GAP 완료 후에만 착수하는 P3 Deferred Backlog.
+  2. **폐쇄망 VM 실설치 실측 (`GAP-16`)**: `make vg-airgap`으로 오프라인 번들 systemd 설치 실증 증적 확보.
+  3. **검증 증적·문서 수치 단일화 (`GAP-15`)**: 테스트 수·실행 시각·명령을 자동 산출하여 릴리즈 판정 근거를 단일화.
+  4. **오프라인 DRM 라이선스 엔진 (`GAP-01`)**: 모든 현재 상용화·운영 GAP 완료 후에만 착수하는 P3 Deferred Backlog.

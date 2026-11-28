@@ -94,6 +94,7 @@ React 18 Vanilla CSS 커스텀 디자인 시스템, 4대 UI 식별자 계층 및
 | [RELEASE_NOTES_0.1.4.md](./07_appliance_and_packaging/RELEASE_NOTES_0.1.4.md) | **Ordinatio 0.1.4 공식 상용 릴리즈 노트**<br>- Standalone 프론트엔드 Nginx 403 볼륨 마운트 결함 수정, L7 AI Gateway SSE 300초 스트리밍 확장 및 114 Tests 100% PASS | **0.1.4 GA** |
 | [PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_46_install_dns_registry_and_evidence_sync_implementation_and_test_results.md) | **사용자 지정 DNS·오프라인 번들 우선/외부 레지스트리 fallback 및 114건 검증 증적 수치 정합화** | **100% PASS** |
 | [PRE_47_semantic_cache_implementation_and_test_results.md](./07_appliance_and_packaging/PRE_47_semantic_cache_implementation_and_test_results.md) | **에어갭 로컬 시맨틱 캐시, 테넌트 격리 및 FinOps 절감 관측** | **100% PASS** |
+| [PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md](./07_appliance_and_packaging/PRE_51_airgap_standalone_install_testbed_and_defect_resolution_report.md) | **폐쇄망 Standalone 설치 테스트베드(`make vg-airgap`) 및 결함 해결**<br>- 번들 이미지 태그·설치 자산 정합화, 컨테이너 외부 DNS 제거, 시맨틱 캐시 교차 응답 차단, 132/132 Tests & 7/7 Standalone PASS | **구현 완료 (VM 실설치 미실행, GAP-16)** |
 | [OFFLINE_INSTALL_GUIDE.md](./07_appliance_and_packaging/OFFLINE_INSTALL_GUIDE.md) | **폐쇄망(Air-Gapped) 원클릭 오프라인 설치 및 운영 매뉴얼** | **배포 완료** |
 | [SECURITY_AUDIT_REPORT.md](./07_appliance_and_packaging/SECURITY_AUDIT_REPORT.md) | **엔터프라이즈 보안 감사 보고서 (공급망 서명, Non-root, WORM, Argon2id)** | **감사 통과** |
 

@@ -70,9 +70,13 @@ bash scripts/verify-phase3.sh   # Phase 3: FinOps 비용 계량 및 실시간 �
 bash scripts/verify-phase4.sh   # Phase 4: PII 보안 거버넌스 및 WORM 감사 포렌식
 bash scripts/verify-phase5.sh   # Phase 5: 에어갭 긴급 패치 관리자 & 서포트 엔진
 bash scripts/verify-phase-system-prompt.sh # 시스템 프롬프트 거버넌스 & 동적 주입 엔진
-make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약, 114 Tests)
+make verify-auth-rbac # 사용자 인증 및 RBAC (Argon2id+JWT, 금융권 보안제약)
 make verify-standalone-install # Phase 6: Standalone 설치 툴 및 Vagrant 검증 (7/7 PASS)
 make verify-all-menus # 8대 전 메뉴 통합 운영 E2E 시나리오 (10/10 PASS)
+
+# 폐쇄망(Air-Gap) Standalone 설치 테스트 — Vagrant + VirtualBox (PRE_51)
+make vg-airgap ARGS="--build-release --reboot-test"  # 번들 빌드·서명 → 외부망 차단 VM → install.sh 오프라인 설치 → 검증
+make vg-clean                                       # 테스트 VM 폐기
 ```
 
 > 테스트 수치의 과거 문서·DoD 안내 불일치는 GAP-15로 관리합니다. 릴리즈 판정에는 `make test`의 실제 실행 결과를 사용합니다.
@@ -92,12 +96,13 @@ make verify-all-menus # 8대 전 메뉴 통합 운영 E2E 시나리오 (10/10 PA
 | **Phase 4** | PII 보안 거버넌스 및 WORM 감사 포렌식 | ✅ 완료 | `make verify-phase4` 통과 |
 | **Phase 5** | 에어갭 긴급 패치 관리자 & 서포트 엔진 | ✅ 완료 | `bash scripts/verify-phase5.sh` 통과 |
 | **시스템 프롬프트** | 동적 시스템 프롬프트 거버넌스 & L7 인라인 주입 | ✅ 완료 | `verify-phase-system-prompt.sh` 통과 |
-| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 동적 RBAC/PBAC | ✅ 완료 | `make test` 통과 (114 Tests 100% PASS) |
+| **사용자 인증 & RBAC** | 로컬 자립형 금융권 인증(Argon2id+JWT) 및 동적 RBAC/PBAC | ✅ 완료 | `make test` 통과 (132 Tests 100% PASS) |
 | **Phase 6: Standalone** | RHEL 9 호환 Standalone 설치 툴(install.sh) & ordinatio-ctl CLI | ✅ 완료 | `make verify-standalone-install` (7/7 PASS) |
 | **Phase 6: 현지화** | 15개 UI 컴포넌트 한글 리터럴 제거 & strings.js 일원화 | ✅ 완료 | `npm run build` (Vite Build PASS) |
 | **Phase 6: 이원화 테스트** | 로컬 고속 계약 검증 vs 실환경 L3/L4 네트워크 & 포트 프로빙 | ✅ 완료 | `PRE_26` 확립 (114 Tests PASS) |
 | **설치 네트워크·증적 정합성** | 사용자 지정 DNS, 오프라인 번들 우선·외부 레지스트리 fallback, 114건 증적 정합화 | ✅ 완료 | `PRE_46`, 114/114 Tests & 7/7 Standalone PASS |
-| **에어갭 로컬 시맨틱 캐시** | 테넌트·모델 격리, Redis TTL/메모리 fallback, FinOps 절감 KPI | ✅ 완료 | `PRE_47`, 114/114 회귀 테스트 & Vite Build PASS |
+| **에어갭 로컬 시맨틱 캐시** | 테넌트·모델 격리, Redis TTL/메모리 fallback, FinOps 절감 KPI, 맥락 정확일치 키 | ✅ 완료 | `PRE_47`/`PRE_51`, 132/132 회귀 테스트 |
+| **폐쇄망 설치 테스트베드** | 오프라인 번들 systemd 설치, 외부 DNS 미사용, Vagrant 송신 차단 VM 자동화 | ⚠️ 구현 완료 (VM 실설치 미실행) | `PRE_51`, `make vg-airgap`, 7/7 Standalone PASS |
 
 ---
 

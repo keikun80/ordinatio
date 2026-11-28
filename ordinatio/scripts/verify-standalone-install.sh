@@ -55,8 +55,10 @@ if [ -f "$COMPOSE_FILE" ]; then
        grep -q "ordinatio-envoy" "$COMPOSE_FILE" && \
        grep -q "ordinatio-backend" "$COMPOSE_FILE" && \
        grep -q "ordinatio-frontend" "$COMPOSE_FILE" && \
-       grep -q 'DNS_SERVER:-8.8.8.8' "$COMPOSE_FILE"; then
-        assert_pass "docker-compose.standalone.yml 5대 서비스, 루프백 격리 포트 및 사용자 설정 DNS 규격 준수 확인"
+       ! grep -qE '^[[:space:]]*dns:|8\.8\.8\.8|1\.1\.1\.1' "$COMPOSE_FILE" && \
+       grep -q 'container_name: ordinatio-backend' "$COMPOSE_FILE" && \
+       grep -q 'DNS_BLOCK' "${ROOT_DIR}/deploy/standalone/install.sh"; then
+        assert_pass "docker-compose.standalone.yml 5대 서비스, 루프백 격리 포트, 외부 공용 DNS 미사용(사내 DNS 선택 주입) 규격 준수 확인"
     else
         assert_fail "docker-compose.standalone.yml 내부 서비스/네트워크 정의가 불완전합니다."
     fi
@@ -132,11 +134,16 @@ fi
 echo -e "${BOLD}[Test 7/7] 백엔드 단위/통합 테스트 회귀 검증 (현재 pytest Suite)${NC}"
 cd "${ROOT_DIR}/backend"
 if command -v uv &>/dev/null; then
-    TEST_RES=$(uv run pytest tests/ -q 2>&1)
-    if echo "$TEST_RES" | grep -q "passed"; then
-        assert_pass "백엔드 핵심 제어 평면 현재 pytest Suite 무회귀 통과 확인"
+    # set -e 하에서 명령 치환 실패가 스크립트를 조용히 종료시키지 않도록 종료 코드를 명시 수집하고,
+    # "1 failed, N passed" 와 같은 부분 실패를 PASS로 오판하지 않도록 pytest 종료 코드로 판정한다.
+    TEST_RC=0
+    TEST_RES=$(uv run pytest tests/ -q 2>&1) || TEST_RC=$?
+    TEST_SUMMARY=$(echo "$TEST_RES" | grep -E '[0-9]+ (passed|failed)' | tail -n 1)
+    if [ "$TEST_RC" -eq 0 ]; then
+        assert_pass "백엔드 핵심 제어 평면 현재 pytest Suite 무회귀 통과 확인 (${TEST_SUMMARY})"
     else
-        assert_fail "백엔드 테스트 실패:\n$TEST_RES"
+        echo "$TEST_RES" | grep -E '^(FAILED|ERROR)' || true
+        assert_fail "백엔드 테스트 실패 (exit ${TEST_RC}): ${TEST_SUMMARY:-요약 없음}"
     fi
 else
     assert_pass "uv 환경 미존재 시 기본 파이썬 모듈 검사 통과"

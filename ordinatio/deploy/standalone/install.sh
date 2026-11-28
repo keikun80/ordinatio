@@ -31,6 +31,7 @@ DATACENTER_NAME="온프레미스 주전산센터"
 CLUSTER_REGION="DC-1 서울"
 SKIP_BUILD=false
 SKIP_PULL=false
+IMAGES_TAR=""
 USE_LOCAL_BUILD=false
 SEED_DEMO_DATA=false
 
@@ -48,7 +49,7 @@ REDIS_PORT=6379
 POSTGRES_PORT=5432
 
 DOCKER_BRIDGE_GATEWAY_IP="172.20.0.1"
-DNS_SERVER="8.8.8.8"
+DNS_SERVER=""   # 비어 있으면 외부 DNS 미사용 (호스트 리졸버 상속)
 BEHIND_PROXY=true
 TRUSTED_PROXIES="127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,testclient"
 ENVOY_XFF_NUM_TRUSTED_HOPS=1
@@ -203,7 +204,8 @@ usage() {
     echo "      --backend-image IMG  백엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-backend:0.1.6)"
     echo "      --frontend-image IMG 프론트엔드 컨테이너 이미지 (기본값: keikun808/ordinatio-frontend:0.1.6)"
     echo "      --frontend-port PORT 프론트엔드 웹 포트 지정 (기본값: 5173)"
-    echo "      --dns-server IP      컨테이너 DNS 서버 지정 (기본값: 8.8.8.8)"
+    echo "      --dns-server IP[,IP] 사내 DNS 서버 지정 (선택, 기본값: 미지정 → 호스트 리졸버 상속, 외부 DNS 미사용)"
+    echo "      --images-tar PATH    오프라인 이미지 아카이브 경로 (기본 탐색: <소스>/bundle/images.tar.gz)"
     echo "      --skip-pull          컨테이너 이미지 다운로드(Pull) 단계 생략"
     echo "      --skip-build         컨테이너 이미지 다운로드/빌드 단계 생략"
     echo "      --build              Docker Hub 대신 로컬 소스 빌드 강제"
@@ -314,6 +316,10 @@ while [[ $# -gt 0 ]]; do
             DNS_SERVER="$2"
             shift 2
             ;;
+        --images-tar)
+            IMAGES_TAR="$2"
+            shift 2
+            ;;
         --skip-pull)
             SKIP_PULL=true
             shift
@@ -349,7 +355,7 @@ fi
 print_banner
 
 if [ "$AUTO_APPROVE" = false ]; then
-    read -p "컨테이너 DNS 서버 [${DNS_SERVER}]: " -r requested_dns
+    read -p "사내 DNS 서버 (선택, Enter=미지정·호스트 리졸버 상속) [${DNS_SERVER:-미지정}]: " -r requested_dns
     if [ -n "$requested_dns" ]; then
         DNS_SERVER="$requested_dns"
     fi
@@ -390,7 +396,19 @@ if ! docker compose version &> /dev/null; then
 fi
 log_success "Docker Compose 확인 완료 ($(docker compose version --short))."
 
-# 4. 필수 포트 충돌 검사
+# 4. DNS 서버 값 검증 (선택 항목: 지정된 경우 IPv4 목록만 허용)
+DNS_SERVER="${DNS_SERVER// /}"
+if [ -n "$DNS_SERVER" ]; then
+    IFS=',' read -r -a DNS_LIST <<< "$DNS_SERVER"
+    for ip in "${DNS_LIST[@]}"; do
+        if ! [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            log_error "DNS_SERVER 값이 올바른 IPv4 주소가 아닙니다: '${ip}' (예: 10.10.0.2,10.10.0.3)"
+            exit 1
+        fi
+    done
+fi
+
+# 5. 필수 포트 충돌 검사
 PORTS_TO_CHECK=("$FRONTEND_PORT" "$BACKEND_PORT" "$ENVOY_TRAFFIC_PORT" "$ENVOY_ADMIN_PORT")
 CONFLICT=false
 for p in "${PORTS_TO_CHECK[@]}"; do
@@ -415,7 +433,7 @@ log_info "백엔드 이미지 : ${BOLD}${BACKEND_IMAGE}${NC}"
 log_info "프론트 이미지 : ${BOLD}${FRONTEND_IMAGE}${NC}"
 log_info "데이터센터 식별: ${BOLD}${DATACENTER_NAME} (${CLUSTER_REGION})${NC}"
 log_info "도커 브릿지 IP: ${BOLD}${DOCKER_BRIDGE_GATEWAY_IP}${NC}"
-log_info "컨테이너 DNS  : ${BOLD}${DNS_SERVER}${NC}"
+log_info "컨테이너 DNS  : ${BOLD}${DNS_SERVER:-미지정 (호스트 리졸버 상속, 외부 DNS 미사용)}${NC}"
 
 if [ "$AUTO_APPROVE" = false ]; then
     read -p "Standalone 어플라이언스 설치를 시작하시겠습니까? (Y/n): " -r confirm
@@ -464,6 +482,22 @@ chmod 700 "${TARGET_DIR}/data"
 # 소스 파일 복사
 log_info "설정 파일 및 DDL 복사 중..."
 cp "${SOURCE_DIR}/deploy/standalone/docker-compose.standalone.yml" "${TARGET_DIR}/docker-compose.standalone.yml"
+
+# 사내 DNS 지정 시에만 backend 서비스에 dns: 블록 주입 (미지정 시 외부 DNS 없이 호스트 리졸버 상속)
+if [ -n "$DNS_SERVER" ]; then
+    DNS_BLOCK="    dns:"
+    for ip in "${DNS_LIST[@]}"; do
+        DNS_BLOCK="${DNS_BLOCK}\n      - ${ip}"
+    done
+    awk -v block="$DNS_BLOCK" '
+        { print }
+        /container_name: ordinatio-backend/ { print block }   # awk -v 가 "\n" 을 개행으로 해석
+    ' "${TARGET_DIR}/docker-compose.standalone.yml" > "${TARGET_DIR}/docker-compose.standalone.yml.tmp"
+    mv "${TARGET_DIR}/docker-compose.standalone.yml.tmp" "${TARGET_DIR}/docker-compose.standalone.yml"
+    log_info "backend 컨테이너 사내 DNS 적용: ${DNS_SERVER}"
+else
+    log_info "컨테이너 DNS 미지정: 외부 DNS 없이 호스트 리졸버를 상속합니다."
+fi
 cp "${SOURCE_DIR}/deploy/postgres/init.sql" "${TARGET_DIR}/deploy/postgres/init.sql"
 cp "${SOURCE_DIR}/deploy/envoy/envoy.yaml" "${TARGET_DIR}/deploy/envoy/envoy.yaml"
 if [ -f "${SOURCE_DIR}/deploy/frontend/default.conf" ]; then
@@ -533,7 +567,25 @@ echo -e "${BOLD}================================================================
 echo -e "${BOLD}📦 [Step 2] 컨테이너 이미지 프로비저닝${NC}"
 echo -e "${BOLD}================================================================${NC}"
 
-OFFLINE_TAR="${SOURCE_DIR}/ordinatio-standalone-images.tar.gz"
+# 오프라인 이미지 아카이브 탐색 순서:
+#   1) --images-tar / IMAGES_TAR 명시 경로
+#   2) ${SOURCE_DIR}/bundle/images.tar.gz        (package-offline-bundle.sh 산출물 레이아웃)
+#   3) ${SOURCE_DIR}/ordinatio-standalone-images.tar.gz (레거시 파일명 호환)
+OFFLINE_TAR=""
+if [ -n "${IMAGES_TAR}" ]; then
+    if [ ! -f "${IMAGES_TAR}" ]; then
+        log_error "지정된 오프라인 이미지 아카이브를 찾을 수 없습니다: ${IMAGES_TAR}"
+        exit 1
+    fi
+    OFFLINE_TAR="${IMAGES_TAR}"
+else
+    for candidate in "${SOURCE_DIR}/bundle/images.tar.gz" "${SOURCE_DIR}/ordinatio-standalone-images.tar.gz"; do
+        if [ -f "$candidate" ]; then
+            OFFLINE_TAR="$candidate"
+            break
+        fi
+    done
+fi
 RUNTIME_IMAGES=(
     "${BACKEND_IMAGE}"
     "${FRONTEND_IMAGE}"
@@ -541,10 +593,22 @@ RUNTIME_IMAGES=(
     "redis:7-alpine"
     "envoyproxy/envoy:v1.31.2"
 )
-if [ -f "$OFFLINE_TAR" ]; then
+if [ -n "$OFFLINE_TAR" ]; then
     log_info "에어갭 오프라인 이미지 아카이브 로딩 중: ${OFFLINE_TAR}"
     docker load -i "$OFFLINE_TAR"
-    log_success "오프라인 이미지 로드 완료."
+    # 로드 후 런타임 이미지 태그 전수 확인 (누락 시 compose가 외부 pull을 시도하므로 즉시 실패 처리)
+    MISSING_IMAGES=()
+    for image in "${RUNTIME_IMAGES[@]}"; do
+        if ! docker image inspect "${image}" &>/dev/null; then
+            MISSING_IMAGES+=("${image}")
+        fi
+    done
+    if [ ${#MISSING_IMAGES[@]} -gt 0 ]; then
+        log_error "오프라인 아카이브에 필요한 이미지 태그가 없습니다: ${MISSING_IMAGES[*]}"
+        log_error "번들의 이미지 태그와 --backend-image / --frontend-image 값이 일치하는지 확인하십시오."
+        exit 1
+    fi
+    log_success "오프라인 이미지 로드 및 태그 무결성 확인 완료 (${#RUNTIME_IMAGES[@]}종)."
 elif [ "$USE_LOCAL_BUILD" = true ]; then
     log_info "로컬 컨테이너 이미지 빌드 수행 중 (backend & frontend)..."
     mkdir -p "${TARGET_DIR}/backend" "${TARGET_DIR}/frontend"

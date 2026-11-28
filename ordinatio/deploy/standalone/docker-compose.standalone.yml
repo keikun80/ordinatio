@@ -85,7 +85,7 @@ services:
   # 4. Control Plane: FastAPI Backend
   # ----------------------------------------------------------------------------
   backend:
-    image: ${BACKEND_IMAGE:-keikun808/ordinatio-backend:0.1.4}
+    image: ${BACKEND_IMAGE:-keikun808/ordinatio-backend:0.1.6}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -95,9 +95,8 @@ services:
       - ordinatio-net
     env_file:
       - .env
-    dns:
-      - ${DNS_SERVER:-10.10.0.2}
-      - 8.8.8.8
+    # DNS: 기본값은 미지정 → Docker 내장 DNS(127.0.0.11)가 호스트 리졸버를 상속 (외부 공용 DNS 미사용).
+    # 사내 DNS가 필요한 경우에만 install.sh 가 DNS_SERVER 값으로 이 위치에 dns: 블록을 주입한다.
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ordinatio_db}
       REDIS_HOST: redis
@@ -127,7 +126,7 @@ services:
   # 5. Admin Console: React 18 + Vite Nginx Frontend
   # ----------------------------------------------------------------------------
   frontend:
-    image: ${FRONTEND_IMAGE:-keikun808/ordinatio-frontend:0.1.4}
+    image: ${FRONTEND_IMAGE:-keikun808/ordinatio-frontend:0.1.6}
     build:
       context: ./frontend
       dockerfile: Dockerfile

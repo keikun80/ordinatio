@@ -15,6 +15,17 @@ APP_DIR_NAME="ordinatio-appliance"
 STAGING_DIR="${STAGING_PARENT}/${APP_DIR_NAME}"
 ARCHIVE_NAME="ordinatio-appliance-v${VERSION}.tar.gz"
 
+# install.sh 기본 이미지 태그(keikun808/ordinatio-*:<APP_VERSION>)와 일치시키기 위한 애플리케이션 버전
+# (단일 출처: backend/app/core/config.py 의 VERSION)
+APP_VERSION="${APP_VERSION:-$(sed -nE 's/^[[:space:]]*VERSION:[[:space:]]*str[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "${ROOT_DIR}/backend/app/core/config.py" | head -n 1)}"
+if [ -z "${APP_VERSION}" ]; then
+    echo "❌ [ERROR] backend/app/core/config.py 에서 VERSION 을 읽지 못했습니다 (APP_VERSION 환경변수로 지정 가능)."
+    exit 1
+fi
+IMAGE_REPO="${IMAGE_REPO:-keikun808}"
+BACKEND_RELEASE_TAG="${IMAGE_REPO}/ordinatio-backend:${APP_VERSION}"
+FRONTEND_RELEASE_TAG="${IMAGE_REPO}/ordinatio-frontend:${APP_VERSION}"
+
 echo "========================================================================"
 echo "📦 Building Ordinatio Standalone Appliance Package (v${VERSION})"
 echo "========================================================================"
@@ -37,6 +48,9 @@ echo "==> [2/6] Building Immutable Production Docker Images..."
 cd "${ROOT_DIR}"
 docker build -t ordinatio-backend:prod ./backend
 docker build --target prod -t ordinatio-frontend:prod ./frontend
+# install.sh(systemd 경로)가 참조하는 릴리스 태그를 동일 이미지에 부여
+docker tag ordinatio-backend:prod "${BACKEND_RELEASE_TAG}"
+docker tag ordinatio-frontend:prod "${FRONTEND_RELEASE_TAG}"
 
 # Step 3: Ensure 3rd-party Base Images Exist Locally
 echo "==> [3/6] Ensuring Infrastructure Base Docker Images are Present..."
@@ -49,10 +63,12 @@ for img in "${THIRD_PARTY_IMAGES[@]}"; do
 done
 
 # Step 4: Archive All 5 Docker Images to Single Compressed Bundle
-echo "==> [4/6] Archiving 5 Docker images into bundle/images.tar.gz..."
+echo "==> [4/6] Archiving 5 Docker images (+ release tags ${APP_VERSION}) into bundle/images.tar.gz..."
 ALL_IMAGES=(
     "ordinatio-backend:prod"
     "ordinatio-frontend:prod"
+    "${BACKEND_RELEASE_TAG}"
+    "${FRONTEND_RELEASE_TAG}"
     "postgres:15-alpine"
     "redis:7-alpine"
     "envoyproxy/envoy:v1.31.2"
@@ -72,6 +88,17 @@ chmod +x "${STAGING_DIR}/scripts/"*.sh
 
 cp "${ROOT_DIR}/deploy/envoy/envoy.yaml" "${STAGING_DIR}/deploy/envoy/envoy.yaml"
 cp "${ROOT_DIR}/deploy/postgres/init.sql" "${STAGING_DIR}/deploy/postgres/init.sql"
+
+# systemd 기반 설치 경로(deploy/standalone/install.sh)용 자산
+# 번들 루트가 install.sh 의 SOURCE_DIR 이 되며, 이미지는 bundle/images.tar.gz 에서 자동 로드된다.
+mkdir -p "${STAGING_DIR}/deploy/standalone" "${STAGING_DIR}/deploy/frontend"
+for f in install.sh uninstall.sh ordinatio-ctl .env.template docker-compose.standalone.yml \
+         install.conf.example PREREQUISITES.md INSTALL_GUIDE.md; do
+    cp "${ROOT_DIR}/deploy/standalone/${f}" "${STAGING_DIR}/deploy/standalone/${f}"
+done
+chmod +x "${STAGING_DIR}/deploy/standalone/install.sh" "${STAGING_DIR}/deploy/standalone/uninstall.sh" \
+         "${STAGING_DIR}/deploy/standalone/ordinatio-ctl"
+cp "${ROOT_DIR}/deploy/frontend/default.conf" "${STAGING_DIR}/deploy/frontend/default.conf"
 
 # Step 6: Create Final Compressed Tarball & SHA-256 Checksum
 echo "==> [6/6] Generating Final Tarball and SHA-256 Checksum..."
@@ -99,6 +126,7 @@ echo "🚀 Target Machine Deployment Steps:"
 echo "  1. Copy '${ARCHIVE_NAME}' to target server"
 echo "  2. tar -xzf ${ARCHIVE_NAME}"
 echo "  3. cd ${APP_DIR_NAME}"
-echo "  4. make up"
+echo "  4. make up                                   # (A) compose 퀵스타트"
+echo "     또는 sudo bash deploy/standalone/install.sh -y  # (B) systemd 어플라이언스 설치"
 echo "========================================================================"
 

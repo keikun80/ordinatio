@@ -105,8 +105,10 @@ sudo ./deploy/standalone/install.sh
 #### 스크립트 내부 자동 수행 단계
 1. **[Safety Guard]**: Docker 데몬 구동 및 포트 충돌 비침습 검증
 2. **[Step 1]**: `/opt/ordinatio/` 레이아웃 생성 및 `openssl` 기반 32바이트 보안 시크릿(.env) 자동 주입
-3. **[Step 2]**: 오프라인 이미지 아카이브(`ordinatio-standalone-images.tar.gz`) 로드 또는 로컬 빌드
-3. **[Step 2]**: Docker Hub 공식 이미지 다운로드(`keikun808/ordinatio-backend:0.1.4`, `keikun808/ordinatio-frontend:0.1.4`), 오프라인 이미지 로드 또는 로컬 빌드
+3. **[Step 2]**: 컨테이너 이미지 프로비저닝 — 아래 우선순위로 수행
+   - 오프라인 아카이브 로드: `--images-tar PATH` → `<번들 루트>/bundle/images.tar.gz` (`package-offline-bundle.sh` 산출물) → `ordinatio-standalone-images.tar.gz` (레거시 파일명). 로드 후 5종 이미지 태그를 전수 확인하며 누락 시 즉시 실패
+   - `--build`: 로컬 소스 빌드
+   - 그 외: Docker Hub 이미지 pull (`keikun808/ordinatio-backend:0.1.6`, `keikun808/ordinatio-frontend:0.1.6`)
 4. **[Step 3]**: PostgreSQL/Redis 헬스 대기, DDL 마이그레이션, 슈퍼관리자(`admin@ordinatio.local`) 발급
 5. **[Step 4]**: `/etc/systemd/system/ordinatio.service` 등록, 자동 시작 활성화 및 엔드포인트 헬스 검증
 

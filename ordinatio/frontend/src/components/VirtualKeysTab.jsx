@@ -111,7 +111,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab =
             const tenantSpent = Number(matchedTenant?.spent ?? 0);
             const tenantBudget = Number(k.tenant_budget_krw ?? matchedTenant?.budget ?? 0);
             const tenantBurnPct = tenantBudget > 0 ? Math.round((tenantSpent / tenantBudget) * 100) : 0;
-            const isHardCapExceeded = Boolean(matchedTenant?.isHardCap && tenantBudget > 0 && tenantSpent >= tenantBudget);
+            const isHardCapExceeded = Boolean(matchedTenant?.hardCap && tenantBudget > 0 && tenantSpent >= tenantBudget);
             const isExpired = k.expires_at && new Date(k.expires_at) < new Date();
 
             let keyStatus = 'ACTIVE';
@@ -396,7 +396,9 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab =
       setKeys((prevKeys) =>
         prevKeys.map((k) =>
           k.tenantId === selectedDept
-            ? { ...k, tenantName: res.name, budget: Number(res.monthly_budget_krw) }
+            ? { ...k, tenantName: res.name, tenantBudget: Number(res.monthly_budget_krw),
+                tenantBurnPct: Number(res.monthly_budget_krw) > 0 ? Math.round(k.tenantSpent / Number(res.monthly_budget_krw) * 100) : 0,
+                isHardCapExceeded: Boolean(res.is_hard_cap_enabled && Number(res.monthly_budget_krw) > 0 && k.tenantSpent >= Number(res.monthly_budget_krw)) }
             : k
         )
       );
@@ -912,10 +914,10 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab =
                   </tr>
                 ) : (
                   tenants.map((t) => {
-                    const budget = t.monthly_budget_krw || t.monthlyBudget || 0;
-                    const spent = t.current_month_spent_krw || t.currentMonthSpent || 0;
+                    const budget = t.budget;
+                    const spent = t.spent;
                     const burnPct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
-                    const isHardCap = t.hard_cap_enabled ?? t.hardCapEnabled ?? true;
+                    const isHardCap = t.hardCap;
                     const deptKeys = keys.filter(k => k.tenantId === t.id);
                     const activeDeptKeys = deptKeys.filter(k => k.status === 'ACTIVE');
 
@@ -939,7 +941,7 @@ export default function VirtualKeysTab({ onNotify, onNavigateTab, activeSubTab =
                         </td>
                         <td>
                           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: spent > 0 ? '#f8fafc' : 'var(--text-muted)' }}>
-                            ₩{Math.round(spent).toLocaleString()}원
+                            ₩{spent > 0 && spent < 100 ? spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(spent).toLocaleString()}원
                           </div>
                         </td>
                         <td style={{ minWidth: '180px' }}>

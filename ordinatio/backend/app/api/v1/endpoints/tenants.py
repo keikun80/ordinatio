@@ -87,6 +87,8 @@ def list_tenants(
     if tenant_scope:
         query = query.filter(Tenant.tenant_id == tenant_scope)
     tenants = query.order_by(Tenant.created_at.asc()).all()
+    from app.core.finops_reconcile import tenant_period_spend_map
+    spend_map = tenant_period_spend_map(db)
     results = []
     for t in tenants:
         active_count = db.query(VirtualKey).filter(
@@ -100,7 +102,7 @@ def list_tenants(
                 department_code=t.department_code,
                 monthly_budget_krw=t.monthly_budget_krw,
                 is_hard_cap_enabled=t.is_hard_cap_enabled,
-                spent_budget_krw=t.spent_budget_krw or Decimal("0.00"),
+                spent_budget_krw=spend_map.get(t.tenant_id, Decimal("0.00")),
                 active_keys_count=active_count,
                 created_at=t.created_at,
                 updated_at=t.updated_at
@@ -173,13 +175,14 @@ def get_tenant(
         VirtualKey.is_active == True
     ).count()
 
+    from app.core.finops_reconcile import tenant_period_spend
     return TenantResponse(
         tenant_id=tenant.tenant_id,
         name=tenant.name,
         department_code=tenant.department_code,
         monthly_budget_krw=tenant.monthly_budget_krw,
         is_hard_cap_enabled=tenant.is_hard_cap_enabled,
-        spent_budget_krw=tenant.spent_budget_krw or Decimal("0.00"),
+        spent_budget_krw=tenant_period_spend(db, tenant_id),
         active_keys_count=active_count,
         created_at=tenant.created_at,
         updated_at=tenant.updated_at

@@ -74,6 +74,8 @@ def list_virtual_keys(
         )
 
     keys = query.order_by(VirtualKey.created_at.desc()).offset(offset).limit(limit).all()
+    from app.core.finops_reconcile import _key_period_map
+    key_usage = _key_period_map(db)
     results = []
     for k in keys:
         results.append(
@@ -83,8 +85,8 @@ def list_virtual_keys(
                 tenant_id=k.tenant_id,
                 tenant_name=k.tenant.name if k.tenant else None,
                 tenant_budget_krw=float(k.tenant.monthly_budget_krw) if k.tenant and k.tenant.monthly_budget_krw is not None else 0.0,
-                spent_krw=float(k.spent_krw or 0.0),
-                total_tokens=int(k.total_tokens or 0),
+                spent_krw=float(key_usage.get(k.key_id, (0, 0))[0]),
+                total_tokens=key_usage.get(k.key_id, (0, 0))[1],
                 key_prefix=k.key_prefix,
                 allowed_models=k.allowed_models or [],
                 allowed_ip_cidrs=k.allowed_ip_cidrs or [],

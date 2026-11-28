@@ -94,6 +94,31 @@ def _fixture_lifecycle():
 # 1. 교차 소스 일관성
 # ---------------------------------------------------------------------------
 
+def test_governance_and_finops_read_current_month_ledger_when_caches_drift():
+    with TestSessionLocal() as db:
+        db.add(DailyTokenLedger(date=datetime.now(timezone.utc).date(), tenant_id=PROBE_TENANT,
+                                model_id="test", key_id=PROBE_KEY, total_tokens=20000,
+                                cost_krw=Decimal("32.00")))
+        db.query(Tenant).filter(Tenant.tenant_id == PROBE_TENANT).update({"spent_budget_krw": 999})
+        db.query(VirtualKey).filter(VirtualKey.key_id == PROBE_KEY).update({"spent_krw": 999, "total_tokens": 1})
+        db.commit()
+
+    from app.api.v1.endpoints.finops import get_finops_overview
+    from app.api.v1.endpoints.tenants import list_tenants, get_tenant
+    from app.api.v1.endpoints.virtual_keys import list_virtual_keys
+    with TestSessionLocal() as db:
+        overview = get_finops_overview(month=None, db=db)
+        tenants = list_tenants(tenant_scope=None, db=db)
+        tenant_detail = get_tenant(PROBE_TENANT, tenant_scope=None, db=db)
+        keys = list_virtual_keys(tenant_id=PROBE_TENANT, search=None, is_active=None,
+                                 offset=0, limit=100, tenant_scope=None, db=db)
+        finops = next(t for t in overview.tenants if t.tenant_id == PROBE_TENANT)
+        tenant = next(t for t in tenants if t.tenant_id == PROBE_TENANT)
+        key = next(k for k in keys if k.key_id == PROBE_KEY)
+        assert float(tenant.spent_budget_krw) == float(tenant_detail.spent_budget_krw) == finops.spent_budget_krw
+        assert key.spent_krw == finops.spent_budget_krw > 0
+        assert key.total_tokens == finops.total_tokens == 20000
+
 def test_external_usage_report_updates_ledger_and_caches_consistently():
     """
     external/usage/report 경로가 원장과 캐시를 모두 갱신해야 한다.

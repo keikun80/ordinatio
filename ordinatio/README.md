@@ -182,3 +182,6 @@ make k8s-logs
 - **Envoy Gateway**: `make k8s-start-envoy` / `make k8s-stop-envoy`
 - **Database (PostgreSQL & Redis)**: `make k8s-start-db` / `make k8s-stop-db`
 
+
+
+> 2026-11-28 FinOps · AI거버넌스 당월 원장 정합성 수정: 직접 엔드포인트 회귀 1건 및 프론트엔드 빌드 통과. 전체 테스트 및 브라우저 E2E 미완료. [검증 결과](../architecture/02_observability_and_finops/PRE_51_phase3_finops_governance_alignment_implementation_plan_and_test_results.md)

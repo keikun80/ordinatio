@@ -99,6 +99,15 @@ fi
 echo "✅ Docker Engine: $(docker --version)"
 echo "✅ Docker Compose: $(docker compose version)"
 
+# 폐쇄망(Air-Gap) 테스트 베이스 이미지 모드: 사전 요구사항(OS 패키지 + Docker)까지만 구성하고 종료
+# (scripts/vagrant/vg-airgap-test.sh 가 ORD_PREREQ_ONLY=true 로 호출 → 이후 외부망 차단 후 오프라인 번들 설치)
+if [ "${PREREQ_ONLY:-false}" = "true" ]; then
+    echo "======================================================================"
+    echo "📌 [Vagrant Provision] PREREQ_ONLY=true: 사전 요구사항 구성까지만 수행하고 종료합니다."
+    echo "======================================================================"
+    exit 0
+fi
+
 echo "======================================================================"
 echo "🚀 [Vagrant Provision] 2. Standalone Deployment via install.sh"
 echo "======================================================================"

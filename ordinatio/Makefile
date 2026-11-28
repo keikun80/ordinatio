@@ -1,6 +1,6 @@
 .PHONY: help setup test lint migrate migrate-rollback build run-backend run-frontend up down prod-build prod-up prod-down release init-admin \
 	verify-phase0 verify-phase0_1 verify-phase1 verify-phase2 verify-phase3 verify-phase4 verify-phase5 verify-phase-system-prompt verify-all-menus verify-auth-rbac verify-rbac-scenarios verify-standalone-install verify-offline-bundle \
-	mp-setup mp-standalone mp-test mp-verify-all mp-k8s mp-clean \
+	mp-setup mp-standalone mp-test mp-verify-all mp-k8s mp-clean vg-airgap vg-clean \
 	k8s-up k8s-down k8s-deploy k8s-start k8s-stop k8s-restart k8s-status k8s-logs k8s-delete \
 	k8s-start-backend k8s-stop-backend k8s-start-frontend k8s-stop-frontend k8s-start-envoy k8s-stop-envoy k8s-start-db k8s-stop-db
 
@@ -45,6 +45,8 @@ help:
 	@echo "  make mp-verify-all             - Run remote all-menus headless E2E verification in Multipass VM"
 	@echo "  make mp-k8s                    - Run Kubernetes (MicroK8s/K3s) deployment test in Multipass VM"
 	@echo "  make mp-clean                  - Teardown and purge all Multipass test instances"
+	@echo "  make vg-airgap ARGS=\"...\"     - Vagrant/VirtualBox air-gapped standalone install test (signed bundle)"
+	@echo "  make vg-clean                  - Destroy the Vagrant air-gap test VM"
 	@echo ""
 	@echo "  [Kubernetes Pod Lifecycle & Operations]"
 	@echo "  make k8s-up                    - Deploy full stack to Kubernetes (alias of k8s-deploy)"
@@ -173,6 +175,15 @@ mp-k8s:
 
 mp-clean:
 	@bash scripts/multipass/mp-teardown.sh
+
+# Vagrant + VirtualBox 폐쇄망(Air-Gap) Standalone 설치 테스트
+#   make vg-airgap ARGS="--build-release"      # 번들 빌드·서명 후 테스트
+#   make vg-airgap ARGS="--reboot-test --restore"
+vg-airgap:
+	@bash scripts/vagrant/vg-airgap-test.sh $(ARGS)
+
+vg-clean:
+	@cd deploy/vagrant && vagrant destroy -f && rm -f .vagrant/ordinatio-airgap-box
 
 init-admin:
 	@if docker ps --format '{{.Names}}' | grep -q '^ordinatio-backend$$'; then \
